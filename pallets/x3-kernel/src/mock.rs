@@ -1,4 +1,5 @@
 use crate as pallet_x3_kernel;
+use crate::ExecutionReceipt;
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use frame_support::{
     construct_runtime, parameter_types,
@@ -179,9 +180,44 @@ impl pallet_balances::Config for Test {
 
 // A minimal adapter used by tests to emit a deterministic state change so
 // canonical ledger updates can be verified via submit_comit.
+thread_local! { static REAL_EVM_ADAPTER: core::cell::Cell<bool> = const { core::cell::Cell::new(false) }; }
+/// Run the actual production EVM adapter through this test chain's signed dispatch.
+pub fn with_real_evm_adapter<R>(run: impl FnOnce() -> R) -> R {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            REAL_EVM_ADAPTER.with(|flag| flag.set(self.0));
+        }
+    }
+    let previous = REAL_EVM_ADAPTER.with(|flag| flag.replace(true));
+    let _restore = Restore(previous);
+    run()
+}
+
 pub struct TestEvmAdapter;
 
 impl pallet_x3_kernel::EvmExecutorAdapter for TestEvmAdapter {
+    fn execute_call(
+        caller: H160,
+        _target: H160,
+        input: &[u8],
+        _value: u128,
+        gas_limit: u64,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        Self::execute_from(input, gas_limit, caller)
+    }
+
+    fn execute_from(
+        payload: &[u8],
+        gas_limit: u64,
+        _caller: sp_core::H160,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        if REAL_EVM_ADAPTER.with(|flag| flag.get()) {
+            return <crate::wasm_adapters::ContextualWasmEvmAdapter<Test> as pallet_x3_kernel::EvmExecutorAdapter>::execute_from(payload, gas_limit, _caller);
+        }
+        Self::execute(payload, gas_limit)
+    }
+
     fn execute(_payload: &[u8], _gas_limit: u64) -> Result<crate::ExecutionReceipt, DispatchError> {
         // Use a fixed asset/balance so tests can assert on canonical ledger.
         let account: AccountId = ALICE;
@@ -464,10 +500,12 @@ impl pallet_x3_kernel::Config for Test {
     type MaxReplayPruneItemsPerBlock = ConstU32<64>;
     type RequireCrossVmProof = ConstBool<false>;
     type PrivateSubmissionChannel = TestPrivateSubmissionChannel;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = TestEmergencyHaltController;
+    type TradingHost = TestTradingHost;
 }
 
 pub struct ExtBuilder {
@@ -525,6 +563,7 @@ impl ExtBuilder {
             authorized_accounts: self.authorized_accounts.clone(),
             evm_escrow: self.evm_escrow,
             svm_escrow: self.svm_escrow,
+            trading_config: None,
         }
         .assimilate_storage(&mut storage)
         .expect("Failed to assimilate x3-kernel storage");
@@ -627,16 +666,14 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
         evm_tx: Option<Vec<u8>>,
         svm_tx: Option<Vec<u8>>,
     ) -> Result<pallet_x3_kernel::SphereState, DispatchError> {
-        let _evm_receipt = if evm_tx.is_some() {
-            Some(self.execute_evm_tx(evm_tx.unwrap())?)
-        } else {
-            None
+        let _evm_receipt = match evm_tx {
+            Some(tx) => Some(self.execute_evm_tx(tx)?),
+            None => None,
         };
 
-        let _svm_receipt = if svm_tx.is_some() {
-            Some(self.execute_svm_tx(svm_tx.unwrap())?)
-        } else {
-            None
+        let _svm_receipt = match svm_tx {
+            Some(tx) => Some(self.execute_svm_tx(tx)?),
+            None => None,
         };
 
         Ok(pallet_x3_kernel::SphereState {
@@ -693,5 +730,177 @@ impl pallet_x3_kernel::DualVmDispatcher for MockDispatcher {
             }
         }
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Trading host (test-only): venues and flash pools whose reserves are `CanonicalLedger` balances
+// of their custody accounts, like `pallet_x3_dex` and `pallet_x3_flashloan` in the runtime.
+// ---------------------------------------------------------------------------------------------
+
+thread_local! {
+    static TRADING_VENUES: core::cell::RefCell<
+        std::collections::BTreeMap<String, (x3bc_core::state::VenueState, AccountId)>,
+    > = Default::default();
+    static TRADING_FLASH: core::cell::RefCell<
+        std::collections::BTreeMap<u32, (u16, AccountId)>,
+    > = Default::default();
+    static TRADING_PRICES: core::cell::RefCell<std::collections::BTreeMap<u32, (u128, u64)>> =
+        Default::default();
+    static TRADING_HALTED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+}
+
+/// Venue reserves live in storage, not in the thread-local table, so a failed extrinsic's
+/// storage rollback restores them exactly as it would a real dex pool's.
+fn venue_reserves_key(name: &str) -> Vec<u8> {
+    let mut key = b"x3-kernel-mock/venue-reserves/".to_vec();
+    key.extend_from_slice(name.as_bytes());
+    key
+}
+
+/// The test trading host. Reset per test with [`TestTradingHost::reset`]. Venue reserves are kept
+/// in storage, so they roll back with the extrinsic.
+pub struct TestTradingHost;
+
+impl TestTradingHost {
+    pub fn reset() {
+        TRADING_VENUES.with(|v| v.borrow_mut().clear());
+        TRADING_FLASH.with(|v| v.borrow_mut().clear());
+        TRADING_PRICES.with(|v| v.borrow_mut().clear());
+        TRADING_HALTED.with(|h| h.set(false));
+    }
+
+    pub fn set_halted(halted: bool) {
+        TRADING_HALTED.with(|h| h.set(halted));
+    }
+
+    pub fn add_venue(venue: x3bc_core::state::VenueState, custody: AccountId) {
+        frame_support::storage::unhashed::put(
+            &venue_reserves_key(&venue.name),
+            &(venue.reserve_a, venue.reserve_b),
+        );
+        TRADING_VENUES.with(|v| v.borrow_mut().insert(venue.name.clone(), (venue, custody)));
+    }
+
+    pub fn add_flash_pool(asset: u32, fee_bps: u16, custody: AccountId) {
+        TRADING_FLASH.with(|v| v.borrow_mut().insert(asset, (fee_bps, custody)));
+    }
+
+    pub fn set_price(asset: u32, usd: u128, block: u64) {
+        TRADING_PRICES.with(|v| v.borrow_mut().insert(asset, (usd, block)));
+    }
+
+    pub fn venue_state(name: &str) -> Option<x3bc_core::state::VenueState> {
+        <Self as pallet_x3_kernel::KernelTradingHost<AccountId>>::venue(name).map(|(v, _)| v)
+    }
+}
+
+impl pallet_x3_kernel::KernelTradingHost<AccountId> for TestTradingHost {
+    #[cfg(feature = "runtime-benchmarks")]
+    fn benchmark_market(trader: &AccountId) -> Result<(), &'static str> {
+        use pallet_x3_kernel::trading::{BENCHMARK_EXECUTED_AT, BENCHMARK_USDX, BENCHMARK_WETX};
+        const UNIT: u128 = 1_000_000;
+        const VENUE_1: AccountId = 1_001;
+        const VENUE_2: AccountId = 1_002;
+        const FLASH: AccountId = 1_003;
+        Self::reset();
+        for (asset, symbol) in [(BENCHMARK_USDX, b"USDX"), (BENCHMARK_WETX, b"WETX")] {
+            pallet_x3_kernel::AssetRegistry::<Test>::insert(
+                asset,
+                pallet_x3_kernel::AssetMetadata {
+                    symbol: symbol.to_vec().try_into().map_err(|_| "symbol")?,
+                    decimals: 6,
+                },
+            );
+        }
+        let fund = |who: AccountId, asset: u32, amount: u128| {
+            pallet_x3_kernel::CanonicalLedger::<Test>::mutate(who, asset, |b| *b += amount)
+        };
+        let venue =
+            |name: &str, asset_a, asset_b, reserve_a, reserve_b| x3bc_core::state::VenueState {
+                name: name.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset_a,
+                asset_b,
+                reserve_a,
+                reserve_b,
+                fee_bps: 30,
+            };
+        let (usdx, wetx) = (BENCHMARK_USDX, BENCHMARK_WETX);
+        fund(VENUE_1, usdx, 1_000_000 * UNIT);
+        fund(VENUE_1, wetx, 500_000 * UNIT);
+        fund(VENUE_2, wetx, 400_000 * UNIT);
+        fund(VENUE_2, usdx, 830_000 * UNIT);
+        fund(FLASH, usdx, 5_000_000 * UNIT);
+        fund(*trader, usdx, 50 * UNIT);
+        Self::add_venue(
+            venue("x3dex_pool_1", usdx, wetx, 1_000_000 * UNIT, 500_000 * UNIT),
+            VENUE_1,
+        );
+        Self::add_venue(
+            venue("x3dex_pool_2", wetx, usdx, 400_000 * UNIT, 830_000 * UNIT),
+            VENUE_2,
+        );
+        Self::add_flash_pool(usdx, 5, FLASH);
+        Self::set_price(usdx, 1_000_000, u64::from(BENCHMARK_EXECUTED_AT));
+        Self::set_price(wetx, 2_000_000, u64::from(BENCHMARK_EXECUTED_AT));
+        Ok(())
+    }
+
+    fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
+        let (mut venue, custody) = TRADING_VENUES.with(|v| v.borrow().get(name).cloned())?;
+        let (reserve_a, reserve_b): (u128, u128) =
+            frame_support::storage::unhashed::get(&venue_reserves_key(name))?;
+        venue.reserve_a = reserve_a;
+        venue.reserve_b = reserve_b;
+        Some((venue, custody))
+    }
+
+    fn set_venue_reserves(
+        name: &str,
+        reserve_a: u128,
+        reserve_b: u128,
+    ) -> frame_support::dispatch::DispatchResult {
+        let (venue, custody) = TRADING_VENUES
+            .with(|v| v.borrow().get(name).cloned())
+            .ok_or(sp_runtime::DispatchError::Other("unknown venue"))?;
+        let held_a = AtlasKernel::ledger_balance_of(venue.asset_a, &custody);
+        let held_b = AtlasKernel::ledger_balance_of(venue.asset_b, &custody);
+        if reserve_a > held_a || reserve_b > held_b {
+            return Err(sp_runtime::DispatchError::Other("reserves exceed custody"));
+        }
+        frame_support::storage::unhashed::put(&venue_reserves_key(name), &(reserve_a, reserve_b));
+        Ok(())
+    }
+
+    fn flash_pool(
+        provider: &str,
+        asset: u32,
+    ) -> Option<(x3bc_core::state::FlashPoolState, AccountId)> {
+        if provider != x3bc_core::trading::FLASH_PROVIDER {
+            return None;
+        }
+        TRADING_FLASH.with(|v| {
+            v.borrow().get(&asset).map(|(fee_bps, custody)| {
+                (
+                    x3bc_core::state::FlashPoolState {
+                        provider: provider.into(),
+                        version: x3bc_core::trading::CAPABILITY_VERSION,
+                        asset,
+                        liquidity: AtlasKernel::ledger_balance_of(asset, custody),
+                        fee_bps: *fee_bps,
+                    },
+                    *custody,
+                )
+            })
+        })
+    }
+
+    fn usd_price(asset: u32) -> Option<(u128, u64)> {
+        TRADING_PRICES.with(|v| v.borrow().get(&asset).copied())
+    }
+
+    fn transfers_halted() -> bool {
+        TRADING_HALTED.with(|h| h.get())
     }
 }

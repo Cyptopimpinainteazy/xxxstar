@@ -41,6 +41,9 @@ pub struct HirLowerer {
     loop_depth: usize,
     /// Current atomic block (None if not in atomic context).
     current_atomic: Option<AtomicBlockId>,
+    /// Declared structs, by name. The type checker has already refused unknown, duplicate and
+    /// recursive ones; a struct value lowers to a tuple of its fields in declaration order.
+    structs: HashMap<String, x3_typeck::StructType>,
 }
 
 impl HirLowerer {
@@ -54,8 +57,10 @@ impl HirLowerer {
             top_level: HashMap::new(),
             loop_depth: 0,
             current_atomic: None,
+            structs: HashMap::new(),
         };
         let span = module.span;
+        lowerer.collect_structs(&module.items);
 
         // First pass: collect top-level declarations
         lowerer.collect_top_level(&module.items)?;
@@ -99,6 +104,12 @@ impl HirLowerer {
                 }
                 // Arb program lowering is handled in a dedicated pipeline stage.
                 Item::ArbProgram(_) => {}
+                // A struct is a type; its values are lowered where they are built.
+                Item::Struct(_) => {}
+                // An automation is a pallet task, not a HIR function; its body
+                // is validated by the parser pass and lowered by the automation
+                // pipeline, not here.
+                Item::Automation(_) => {}
             }
         }
 
@@ -153,9 +164,105 @@ impl HirLowerer {
                     )?;
                 }
                 Item::ArbProgram(_) => {}
+                Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
         Ok(())
+    }
+
+    /// Resolve every struct's field types, those that name other structs included.
+    fn collect_structs(&mut self, items: &[Item]) {
+        let defs: HashMap<String, &x3_ast::StructDef> = items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Struct(def) => Some((def.name.name.clone(), def)),
+                _ => None,
+            })
+            .collect();
+        let mut names: Vec<&String> = defs.keys().collect();
+        names.sort();
+        for name in names {
+            self.resolve_struct(name, &defs, 0);
+        }
+    }
+
+    fn resolve_struct(
+        &mut self,
+        name: &str,
+        defs: &HashMap<String, &x3_ast::StructDef>,
+        depth: usize,
+    ) -> Type {
+        if let Some(done) = self.structs.get(name) {
+            return Type::new(TypeKind::Struct(done.clone()));
+        }
+        // The type checker refuses a recursive struct; the bound only keeps this total.
+        let Some(def) = defs.get(name).copied().filter(|_| depth <= defs.len()) else {
+            return Type::any();
+        };
+        let fields = def
+            .fields
+            .iter()
+            .map(|field| {
+                (
+                    field.name.name.clone(),
+                    self.resolve_field_type(&field.ty, defs, depth + 1),
+                )
+            })
+            .collect();
+        let resolved = x3_typeck::StructType {
+            name: name.to_string(),
+            fields,
+        };
+        self.structs.insert(name.to_string(), resolved.clone());
+        Type::new(TypeKind::Struct(resolved))
+    }
+
+    fn resolve_field_type(
+        &mut self,
+        ty: &x3_ast::TypeAnnotation,
+        defs: &HashMap<String, &x3_ast::StructDef>,
+        depth: usize,
+    ) -> Type {
+        match &ty.shape {
+            x3_ast::TypeShape::Array { element, size } => {
+                Type::array(self.resolve_field_type(element, defs, depth), *size)
+            }
+            x3_ast::TypeShape::Vector { element } => {
+                Type::vector(self.resolve_field_type(element, defs, depth))
+            }
+            x3_ast::TypeShape::Tuple { elements } => Type::tuple(
+                elements
+                    .iter()
+                    .map(|e| self.resolve_field_type(e, defs, depth))
+                    .collect(),
+            ),
+            x3_ast::TypeShape::Named if defs.contains_key(&ty.name.name) => {
+                self.resolve_struct(&ty.name.name, defs, depth)
+            }
+            x3_ast::TypeShape::Named => self.resolve_type_annotation(ty),
+        }
+    }
+
+    /// The position and type of `field` in a value of type `object`: a struct's named field, or
+    /// a tuple's element written `t.0`.
+    fn field_position(object: &Type, field: &str) -> Option<(usize, Type)> {
+        match &object.kind {
+            TypeKind::Struct(def) => def.field(field).map(|(i, ty)| (i, ty.clone())),
+            TypeKind::Tuple(elements) => {
+                let i: usize = field.parse().ok()?;
+                elements.get(i).map(|ty| (i, ty.clone()))
+            }
+            _ => None,
+        }
+    }
+
+    fn position_literal(at: usize, span: Span) -> HirExpr {
+        HirExpr::new(
+            HirExprKind::Literal(x3_common::Literal::Integer(at as i64)),
+            Type::i64(),
+            span,
+        )
     }
 
     /// Build a function type from AST function.
@@ -181,6 +288,23 @@ impl HirLowerer {
 
     /// Resolve a type annotation from AST.
     fn resolve_type_annotation(&self, ty: &x3_ast::TypeAnnotation) -> Type {
+        match &ty.shape {
+            x3_ast::TypeShape::Array { element, size } => {
+                return Type::array(self.resolve_type_annotation(element), *size)
+            }
+            x3_ast::TypeShape::Vector { element } => {
+                return Type::vector(self.resolve_type_annotation(element))
+            }
+            x3_ast::TypeShape::Tuple { elements } => {
+                return Type::tuple(
+                    elements
+                        .iter()
+                        .map(|element| self.resolve_type_annotation(element))
+                        .collect(),
+                )
+            }
+            x3_ast::TypeShape::Named => {}
+        }
         // Simple type name resolution
         match ty.name.name.as_str() {
             "i8" => Type::i8(),
@@ -200,7 +324,10 @@ impl HirLowerer {
             "address" => Type::address(),
             "pubkey" => Type::pubkey(),
             "()" | "unit" => Type::unit(),
-            _ => Type::named(&ty.name.name),
+            name => match self.structs.get(name) {
+                Some(def) => Type::new(TypeKind::Struct(def.clone())),
+                None => Type::named(name),
+            },
         }
     }
 
@@ -818,6 +945,83 @@ impl HirLowerer {
             });
         }
 
+        // `a[i] = v`: rebinds `a`, so the same rules as `a = v` (a mutable local).
+        if let Expression::IndexAssign(assign) = expr {
+            let target_info = match scope.lookup(&assign.target.name) {
+                Some(info) => info,
+                None if self.top_level.contains_key(&assign.target.name) => {
+                    return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+                }
+                None => {
+                    return Err(HirError::unknown_symbol(
+                        &assign.target.name,
+                        assign.target.span,
+                    ))
+                }
+            };
+            if !target_info.mutable {
+                return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+            }
+            let array = HirExpr::new(
+                HirExprKind::Var(target_info.symbol),
+                target_info.ty.clone(),
+                assign.target.span,
+            );
+            let element_ty = Self::element_type(&target_info.ty, &assign.index);
+            let index = self.lower_expression(&assign.index, scope)?;
+            let value = self.lower_expression(&assign.value, scope)?;
+            return Ok(HirStmt::Assign {
+                target: AssignTarget::Index {
+                    array: Box::new(array),
+                    index: Box::new(index),
+                    element_ty,
+                },
+                value,
+                span: assign.span,
+            });
+        }
+
+        // `s.f = v`: rebinds `s` to a copy with the field replaced, as `a[i] = v` does.
+        if let Expression::FieldAssign(assign) = expr {
+            let target_info = match scope.lookup(&assign.target.name) {
+                Some(info) => info,
+                None if self.top_level.contains_key(&assign.target.name) => {
+                    return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+                }
+                None => {
+                    return Err(HirError::unknown_symbol(
+                        &assign.target.name,
+                        assign.target.span,
+                    ))
+                }
+            };
+            if !target_info.mutable {
+                return Err(HirError::immutable_assign(&assign.target.name, assign.span));
+            }
+            let Some((at, element_ty)) = Self::field_position(&target_info.ty, &assign.field.name)
+            else {
+                return Err(HirError::new(
+                    HirErrorKind::InvalidAssignTarget,
+                    assign.field.span,
+                ));
+            };
+            let object = HirExpr::new(
+                HirExprKind::Var(target_info.symbol),
+                target_info.ty.clone(),
+                assign.target.span,
+            );
+            let value = self.lower_expression(&assign.value, scope)?;
+            return Ok(HirStmt::Assign {
+                target: AssignTarget::Index {
+                    array: Box::new(object),
+                    index: Box::new(Self::position_literal(at, assign.field.span)),
+                    element_ty,
+                },
+                value,
+                span: assign.span,
+            });
+        }
+
         let expr = self.lower_expression(expr, scope)?;
         Ok(HirStmt::Expr(expr))
     }
@@ -885,6 +1089,19 @@ impl HirLowerer {
 
             Expression::FieldAccess(field_access) => {
                 let object = self.lower_expression(&field_access.object, scope)?;
+                // A struct's field and a tuple's `t.0` are elements at a position fixed now.
+                if let Some((at, field_ty)) =
+                    Self::field_position(&object.ty, &field_access.field.name)
+                {
+                    return Ok(HirExpr::new(
+                        HirExprKind::Index {
+                            array: Box::new(object),
+                            index: Box::new(Self::position_literal(at, field_access.field.span)),
+                        },
+                        field_ty,
+                        field_access.span,
+                    ));
+                }
                 // Field type resolution requires type checker integration; defaults to Any
                 let field_ty = Type::any();
                 Ok(HirExpr::new(
@@ -894,6 +1111,120 @@ impl HirLowerer {
                     },
                     field_ty,
                     field_access.span,
+                ))
+            }
+
+            Expression::Array(array) => {
+                let elements = array
+                    .elements
+                    .iter()
+                    .map(|element| self.lower_expression(element, scope))
+                    .collect::<HirResult<Vec<_>>>()?;
+                let element_ty = elements
+                    .first()
+                    .map(|element| element.ty.clone())
+                    .unwrap_or_else(Type::any);
+                let ty = Type::array(element_ty, elements.len());
+                Ok(HirExpr::new(HirExprKind::Array(elements), ty, array.span))
+            }
+
+            Expression::Tuple(tuple) => {
+                let elements = tuple
+                    .elements
+                    .iter()
+                    .map(|element| self.lower_expression(element, scope))
+                    .collect::<HirResult<Vec<_>>>()?;
+                let ty = Type::tuple(elements.iter().map(|e| e.ty.clone()).collect());
+                Ok(HirExpr::new(HirExprKind::Tuple(elements), ty, tuple.span))
+            }
+
+            Expression::Index(index) => {
+                let base = self.lower_expression(&index.base, scope)?;
+                let ty = Self::element_type(&base.ty, &index.index);
+                let at = self.lower_expression(&index.index, scope)?;
+                Ok(HirExpr::new(
+                    HirExprKind::Index {
+                        array: Box::new(base),
+                        index: Box::new(at),
+                    },
+                    ty,
+                    index.span,
+                ))
+            }
+
+            // An element write is a statement (see `lower_expression_statement`).
+            Expression::IndexAssign(assign) => Err(HirError::new(
+                HirErrorKind::InvalidAssignTarget,
+                assign.span,
+            )),
+            Expression::FieldAssign(assign) => Err(HirError::new(
+                HirErrorKind::InvalidAssignTarget,
+                assign.span,
+            )),
+
+            // `Name { f: v, ... }`: a tuple of the fields in declaration order. The values are
+            // evaluated in the order the literal writes them, as everywhere else in the language;
+            // when that is not declaration order they are bound to temporaries first, so a
+            // literal that writes `{ b: f(), a: g() }` calls `f` before `g`.
+            Expression::StructLiteral(literal) => {
+                let Some(def) = self.structs.get(&literal.name.name).cloned() else {
+                    return Err(HirError::unknown_symbol(
+                        &literal.name.name,
+                        literal.name.span,
+                    ));
+                };
+                let written: Vec<&str> = literal
+                    .fields
+                    .iter()
+                    .map(|f| f.name.name.as_str())
+                    .collect();
+                let declared: Vec<&str> = def.fields.iter().map(|(n, _)| n.as_str()).collect();
+                let ty = Type::new(TypeKind::Struct(def.clone()));
+                if written == declared {
+                    let elements = literal
+                        .fields
+                        .iter()
+                        .map(|init| self.lower_expression(&init.value, scope))
+                        .collect::<HirResult<Vec<_>>>()?;
+                    return Ok(HirExpr::new(HirExprKind::Tuple(elements), ty, literal.span));
+                }
+                let mut stmts = Vec::with_capacity(literal.fields.len());
+                let mut temps = HashMap::new();
+                for init in &literal.fields {
+                    let value = self.lower_expression(&init.value, scope)?;
+                    let symbol = self.allocate_symbol(
+                        &format!("{}.{}", literal.name.name, init.name.name),
+                        SymbolKind::Local { mutable: false },
+                        value.ty.clone(),
+                        init.span,
+                    );
+                    temps.insert(
+                        init.name.name.clone(),
+                        (symbol, value.ty.clone(), init.span),
+                    );
+                    stmts.push(HirStmt::Let {
+                        symbol,
+                        ty: value.ty.clone(),
+                        value,
+                        mutable: false,
+                        span: init.span,
+                    });
+                }
+                let mut elements = Vec::with_capacity(def.fields.len());
+                for (name, _) in &def.fields {
+                    let (symbol, field_ty, span) = temps
+                        .remove(name)
+                        .ok_or_else(|| HirError::unknown_symbol(name, literal.span))?;
+                    elements.push(HirExpr::new(HirExprKind::Var(symbol), field_ty, span));
+                }
+                let tuple = HirExpr::new(HirExprKind::Tuple(elements), ty.clone(), literal.span);
+                Ok(HirExpr::new(
+                    HirExprKind::Block {
+                        stmts,
+                        expr: Some(Box::new(tuple)),
+                    },
+                    ty,
+                    literal.span,
                 ))
             }
 
@@ -964,12 +1295,55 @@ impl HirLowerer {
         ))
     }
 
+    /// The type of `base[index]`: an array's element type, or the tuple element a constant index
+    /// names (the type checker has already refused any other tuple index).
+    fn element_type(base: &Type, index: &Expression) -> Type {
+        match &base.kind {
+            TypeKind::Struct(def) => match index {
+                Expression::Literal(literal) => match literal.literal {
+                    x3_common::Literal::Integer(n) if n >= 0 && (n as usize) < def.fields.len() => {
+                        def.fields[n as usize].1.clone()
+                    }
+                    _ => Type::any(),
+                },
+                _ => Type::any(),
+            },
+            TypeKind::Array { element, .. } | TypeKind::Vector(element) => (**element).clone(),
+            TypeKind::Tuple(elements) => match index {
+                Expression::Literal(literal) => match literal.literal {
+                    x3_common::Literal::Integer(n) if n >= 0 && (n as usize) < elements.len() => {
+                        elements[n as usize].clone()
+                    }
+                    _ => Type::any(),
+                },
+                _ => Type::any(),
+            },
+            TypeKind::Bytes => Type::i64(),
+            _ => Type::any(),
+        }
+    }
+
     /// Lower a function call.
     fn lower_call(
         &mut self,
         call: &x3_ast::CallExpression,
         scope: &ScopeStack,
     ) -> HirResult<HirExpr> {
+        // `x.len()`: the one method the language has, on arrays, tuples and strings.
+        if let Expression::FieldAccess(field) = &*call.callee {
+            if field.field.name == "len" && call.args.is_empty() {
+                let receiver = self.lower_expression(&field.object, scope)?;
+                return Ok(HirExpr::new(
+                    HirExprKind::MethodCall {
+                        receiver: Box::new(receiver),
+                        method: "len".to_string(),
+                        args: Vec::new(),
+                    },
+                    Type::i64(),
+                    call.span,
+                ));
+            }
+        }
         // For now, only support direct function calls
         if let Expression::Identifier(callee) = &*call.callee {
             // Resolve callee

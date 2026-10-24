@@ -2,6 +2,7 @@
 name = "x3-pq"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 [dependencies]
 parity-scale-codec = { workspace = true, default-features = false, features = ["derive"] }

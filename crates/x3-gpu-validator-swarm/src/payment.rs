@@ -516,22 +516,19 @@ impl PaymentSystem {
 pub mod wallet_sync {
     use super::*;
 
-    /// GPU capability report
+    /// GPU capability report. Every field is read from a device that answered on this host or
+    /// measured on it; nothing is filled in from a guess.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct GpuCapabilityReport {
         /// Provider ID
         pub provider_id: String,
-        /// GPU model
+        /// Adapter name as the driver reports it
         pub gpu_model: String,
-        /// GPU memory (MB)
-        pub memory_mb: u64,
-        /// Compute capability
-        pub compute_capability: (u32, u32),
-        /// CUDA cores
-        pub cuda_cores: u32,
-        /// Benchmark score
+        /// Graphics API the adapter was reached through (e.g. "Vulkan")
+        pub backend: String,
+        /// Measured Keccak-256 hashes per second on this adapter (64-byte inputs)
         pub benchmark_score: u64,
-        /// Supported operations
+        /// Operations this build runs on the adapter
         pub supported_ops: Vec<String>,
         /// Timestamp
         pub timestamp: i64,
@@ -572,20 +569,41 @@ pub mod wallet_sync {
         pub auth_token: String,
     }
 
-    /// GPU detector
+    /// Detect the first hardware GPU adapter and measure it.
+    ///
+    /// `None` when this build has no GPU backend (`wgpu` feature off) or no hardware adapter
+    /// answers. Software rasterizers are not counted as GPUs.
     pub fn detect_gpu() -> Option<GpuCapabilityReport> {
-        // In production, this would use CUDA/OpenCL to detect
-        // For now, return simulated data
-        Some(GpuCapabilityReport {
-            provider_id: uuid::Uuid::new_v4().to_string(),
-            gpu_model: "NVIDIA GPU".to_string(),
-            memory_mb: 8192,
-            compute_capability: (8, 6),
-            cuda_cores: 4096,
-            benchmark_score: 10000,
-            supported_ops: vec!["hash".to_string(), "sign".to_string()],
-            timestamp: chrono::Utc::now().timestamp(),
-        })
+        #[cfg(feature = "wgpu")]
+        {
+            use x3_accel::AccelBackend;
+
+            let info = x3_accel_wgpu::WgpuBackend::hardware_adapters()
+                .into_iter()
+                .next()?;
+            let backend = x3_accel::WgpuBackend::from_adapter(0).ok()?;
+            let inputs = vec![vec![0x5au8; 64]; 16_384];
+            // Warm-up compiles the pipeline and sizes the buffers.
+            backend.keccak256_batch(&inputs[..64]).ok()?;
+            let started = Instant::now();
+            backend.keccak256_batch(&inputs).ok()?;
+            let seconds = started.elapsed().as_secs_f64().max(f64::EPSILON);
+            Some(GpuCapabilityReport {
+                provider_id: uuid::Uuid::new_v4().to_string(),
+                gpu_model: info.name,
+                backend: format!("{:?}", info.backend),
+                benchmark_score: (inputs.len() as f64 / seconds) as u64,
+                supported_ops: ["keccak256", "sha256", "secp256k1_verify"]
+                    .iter()
+                    .map(|op| op.to_string())
+                    .collect(),
+                timestamp: chrono::Utc::now().timestamp(),
+            })
+        }
+        #[cfg(not(feature = "wgpu"))]
+        {
+            None
+        }
     }
 
     /// Run benchmark
@@ -604,16 +622,94 @@ pub mod wallet_sync {
         count
     }
 
+    /// A signed registration older or newer than this (seconds) is refused, so a captured
+    /// request cannot be replayed later.
+    pub const REGISTRATION_MAX_AGE_SECS: i64 = 300;
+
+    /// The text the wallet signs with `personal_sign` (EIP-191) to register a provider.
+    pub fn registration_message(wallet_address: &str, provider_id: &str, timestamp: i64) -> String {
+        format!(
+            "X3 GPU provider registration\nwallet: {}\nprovider: {}\ntimestamp: {}",
+            wallet_address.to_ascii_lowercase(),
+            provider_id,
+            timestamp
+        )
+    }
+
+    fn eip191_digest(message: &str) -> [u8; 32] {
+        let mut data = format!("\x19Ethereum Signed Message:\n{}", message.len()).into_bytes();
+        data.extend_from_slice(message.as_bytes());
+        keccak_hash::keccak(&data).0
+    }
+
+    /// The lowercase `0x` address that signed `message`, or `None` for a malformed or high-S
+    /// signature. `signature` is `r || s || v` with `v` in {0, 1, 27, 28}.
+    fn recover_signer(message: &str, signature: &[u8]) -> Option<String> {
+        use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
+        use secp256k1::{Message, SECP256K1};
+
+        let (compact, v) = match signature {
+            [compact @ .., v] if compact.len() == 64 => (compact, *v),
+            _ => return None,
+        };
+        let recovery_id = match v {
+            0 | 1 => v,
+            27 | 28 => v - 27,
+            _ => return None,
+        };
+        let recoverable = RecoverableSignature::from_compact(
+            compact,
+            RecoveryId::from_i32(recovery_id.into()).ok()?,
+        )
+        .ok()?;
+        // EIP-2: a high-S signature is the malleated twin of a low-S one.
+        let standard = recoverable.to_standard();
+        let mut low_s = standard;
+        low_s.normalize_s();
+        if low_s != standard {
+            return None;
+        }
+        let digest = Message::from_digest_slice(&eip191_digest(message)).ok()?;
+        let public_key = SECP256K1.recover_ecdsa(&digest, &recoverable).ok()?;
+        let hash = keccak_hash::keccak(&public_key.serialize_uncompressed()[1..]);
+        Some(format!("0x{}", hex::encode(&hash.0[12..])))
+    }
+
+    fn refuse(error: impl Into<String>) -> WalletSyncResponse {
+        WalletSyncResponse {
+            success: false,
+            provider_id: None,
+            error: Some(error.into()),
+            node_info: None,
+        }
+    }
+
     /// Sync wallet with swarm
     pub fn sync_wallet(request: WalletSyncRequest) -> WalletSyncResponse {
-        // Verify signature (simplified)
-        if request.signature.is_empty() {
-            return WalletSyncResponse {
-                success: false,
-                provider_id: None,
-                error: Some("Invalid signature".to_string()),
-                node_info: None,
-            };
+        sync_wallet_at(request, chrono::Utc::now().timestamp())
+    }
+
+    /// `sync_wallet` with the current time supplied, so freshness is testable.
+    ///
+    /// The signature must be the wallet's `personal_sign` over [`registration_message`] for
+    /// this wallet, provider ID and report timestamp, and the timestamp must be within
+    /// [`REGISTRATION_MAX_AGE_SECS`] of `now`.
+    pub fn sync_wallet_at(request: WalletSyncRequest, now: i64) -> WalletSyncResponse {
+        if !PaymentSystem::is_valid_wallet_address(&request.wallet_address) {
+            return refuse("Invalid wallet address");
+        }
+        let timestamp = request.gpu_report.timestamp;
+        if (now - timestamp).abs() > REGISTRATION_MAX_AGE_SECS {
+            return refuse("Registration timestamp outside the accepted window");
+        }
+        let message = registration_message(
+            &request.wallet_address,
+            &request.gpu_report.provider_id,
+            timestamp,
+        );
+        match recover_signer(&message, &request.signature) {
+            Some(signer) if signer == request.wallet_address.to_ascii_lowercase() => {}
+            _ => return refuse("Invalid signature"),
         }
 
         // Create provider
@@ -675,10 +771,107 @@ mod tests {
         assert!(payment.get_pending_payments("provider1").len() > 0);
     }
 
+    #[cfg(not(feature = "wgpu"))]
     #[test]
-    fn test_gpu_detection() {
+    fn test_gpu_detection_without_backend_reports_none() {
+        assert!(wallet_sync::detect_gpu().is_none());
+    }
+
+    #[cfg(feature = "wgpu")]
+    #[test]
+    fn test_gpu_detection_reports_real_adapter() {
+        let adapters = x3_accel_wgpu::WgpuBackend::hardware_adapters();
         let report = wallet_sync::detect_gpu();
-        assert!(report.is_some());
+        if adapters.is_empty() {
+            assert!(std::env::var("X3_REQUIRE_GPU").is_err());
+            assert!(report.is_none());
+            return;
+        }
+        let report = report.expect("a hardware adapter is present");
+        assert_eq!(report.gpu_model, adapters[0].name);
+        assert!(report.benchmark_score > 0);
+    }
+
+    fn signed_request(sk_byte: u8, timestamp: i64) -> wallet_sync::WalletSyncRequest {
+        use secp256k1::{Message, PublicKey, SecretKey, SECP256K1};
+        let sk = SecretKey::from_slice(&[sk_byte; 32]).unwrap();
+        let pk = PublicKey::from_secret_key(SECP256K1, &sk);
+        let address = format!(
+            "0x{}",
+            hex::encode(&keccak_hash::keccak(&pk.serialize_uncompressed()[1..]).0[12..])
+        );
+        let provider_id = "provider-1".to_string();
+        let message = wallet_sync::registration_message(&address, &provider_id, timestamp);
+        let mut data = format!("\x19Ethereum Signed Message:\n{}", message.len()).into_bytes();
+        data.extend_from_slice(message.as_bytes());
+        let digest = Message::from_digest_slice(&keccak_hash::keccak(&data).0).unwrap();
+        let (recovery_id, compact) = SECP256K1
+            .sign_ecdsa_recoverable(&digest, &sk)
+            .serialize_compact();
+        let mut signature = compact.to_vec();
+        signature.push(27 + recovery_id.to_i32() as u8);
+        wallet_sync::WalletSyncRequest {
+            wallet_address: address,
+            signature,
+            gpu_report: wallet_sync::GpuCapabilityReport {
+                provider_id,
+                gpu_model: "test".to_string(),
+                backend: "test".to_string(),
+                benchmark_score: 1,
+                supported_ops: vec![],
+                timestamp,
+            },
+        }
+    }
+
+    #[test]
+    fn wallet_sync_accepts_owner_signature() {
+        let response = wallet_sync::sync_wallet_at(signed_request(7, 1_000), 1_010);
+        assert!(response.success, "{:?}", response.error);
+    }
+
+    #[test]
+    fn wallet_sync_refuses_forged_or_stale_or_bogus_signatures() {
+        // What the wallet_sync binary used to send: three arbitrary bytes.
+        let mut bogus = signed_request(7, 1_000);
+        bogus.signature = vec![1, 2, 3];
+        assert!(!wallet_sync::sync_wallet_at(bogus, 1_000).success);
+
+        // Signed by a different key than the claimed wallet.
+        let mut forged = signed_request(7, 1_000);
+        forged.signature = signed_request(8, 1_000).signature;
+        assert!(!wallet_sync::sync_wallet_at(forged, 1_000).success);
+
+        // Signature over another provider ID.
+        let mut swapped = signed_request(7, 1_000);
+        swapped.gpu_report.provider_id = "provider-2".to_string();
+        assert!(!wallet_sync::sync_wallet_at(swapped, 1_000).success);
+
+        // Replayed outside the window.
+        let stale = signed_request(7, 1_000);
+        let late = 1_000 + wallet_sync::REGISTRATION_MAX_AGE_SECS + 1;
+        assert!(!wallet_sync::sync_wallet_at(stale, late).success);
+    }
+
+    #[test]
+    fn wallet_sync_refuses_high_s_twin() {
+        use secp256k1::ecdsa::Signature;
+        let mut request = signed_request(7, 1_000);
+        // Flip s to n - s and the recovery parity: the same signer, malleated.
+        let low = Signature::from_compact(&request.signature[..64]).unwrap();
+        let n = hex::decode("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
+            .unwrap();
+        let s = &low.serialize_compact()[32..];
+        let mut high_s = [0u8; 32];
+        let mut borrow = 0i16;
+        for i in (0..32).rev() {
+            let d = n[i] as i16 - s[i] as i16 - borrow;
+            borrow = (d < 0) as i16;
+            high_s[i] = d.rem_euclid(256) as u8;
+        }
+        request.signature[32..64].copy_from_slice(&high_s);
+        request.signature[64] ^= 1;
+        assert!(!wallet_sync::sync_wallet_at(request, 1_000).success);
     }
 
     #[test]

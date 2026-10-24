@@ -2,6 +2,7 @@
 name = "x3-gulfstream"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 description = "X3 Chain Gulf-stream - Transaction forwarding and propagation"
 
 [dependencies]

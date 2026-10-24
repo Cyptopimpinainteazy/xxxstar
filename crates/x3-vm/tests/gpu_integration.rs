@@ -32,6 +32,7 @@ fn make_gpu_module(code: Vec<u8>) -> BytecodeModule {
         code,
         debug_info: None,
         metadata: None,
+        trading: None,
     }
 }
 

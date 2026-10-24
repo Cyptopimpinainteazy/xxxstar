@@ -1,8 +1,10 @@
 //! Backend error types for bytecode compilation.
 
-use std::fmt;
+use crate::prelude::*;
+use core::fmt;
 use thiserror::Error;
 use x3_common::Span;
+#[cfg(feature = "std")]
 use x3_hir::hir::SymbolId;
 
 /// Error that occurred during bytecode compilation.
@@ -25,7 +27,7 @@ impl BackendError {
     }
 }
 
-impl std::error::Error for BackendError {}
+impl core::error::Error for BackendError {}
 
 impl fmt::Display for BackendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -43,6 +45,8 @@ pub enum BackendErrorKind {
     // ========================================================================
     // Symbol Resolution Errors
     // ========================================================================
+    // Raised only by HIR lowering, which needs `std`.
+    #[cfg(feature = "std")]
     #[error("unknown symbol: {0}")]
     UnknownSymbol(SymbolId),
 
@@ -73,6 +77,7 @@ pub enum BackendErrorKind {
     #[error("register overflow: exceeded maximum {max} registers")]
     RegisterOverflow { max: u16 },
 
+    #[cfg(feature = "std")]
     #[error("register not found: {0}")]
     RegisterNotFound(SymbolId),
 
@@ -220,7 +225,7 @@ impl BackendErrors {
 
 impl IntoIterator for BackendErrors {
     type Item = BackendError;
-    type IntoIter = std::vec::IntoIter<BackendError>;
+    type IntoIter = alloc::vec::IntoIter<BackendError>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.errors.into_iter()

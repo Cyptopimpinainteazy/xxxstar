@@ -153,10 +153,61 @@ impl pallet_x3_token_factory::Config for Test {
     type Ledger = Ledger;
     type EconomicHalt = Ledger;
     type Sentinel = Sentinel;
+    type LedgerAssets = TestLedgerAssets;
     type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Test>;
 }
 
+thread_local! {
+    /// The test account-level ledger: (ledger asset, account) -> balance.
+    static LEDGER_BALANCES: core::cell::RefCell<std::collections::BTreeMap<(u32, u64), u128>> =
+        Default::default();
+    static NEXT_LEDGER_ASSET: core::cell::Cell<u32> = const { core::cell::Cell::new(100) };
+}
+
+/// A test-only account-level ledger with the kernel's rules: issuance allocates a fresh id,
+/// mint is checked, burn is refused below zero.
+pub struct TestLedgerAssets;
+
+impl TestLedgerAssets {
+    pub fn balance(asset: u32, who: u64) -> u128 {
+        LEDGER_BALANCES.with(|l| l.borrow().get(&(asset, who)).copied().unwrap_or(0))
+    }
+}
+
+impl x3_asset_kernel_types::traits::LedgerAssetIssuer<u64> for TestLedgerAssets {
+    fn issue(_symbol: &[u8], _decimals: u8) -> Result<Option<u32>, sp_runtime::DispatchError> {
+        Ok(Some(NEXT_LEDGER_ASSET.with(|n| {
+            let id = n.get();
+            n.set(id + 1);
+            id
+        })))
+    }
+    fn mint(asset: u32, who: &u64, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        LEDGER_BALANCES.with(|l| {
+            let mut l = l.borrow_mut();
+            let entry = l.entry((asset, *who)).or_insert(0);
+            *entry = entry
+                .checked_add(amount)
+                .ok_or(sp_runtime::DispatchError::Other("overflow"))?;
+            Ok(())
+        })
+    }
+    fn burn(asset: u32, who: &u64, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        LEDGER_BALANCES.with(|l| {
+            let mut l = l.borrow_mut();
+            let entry = l.entry((asset, *who)).or_insert(0);
+            *entry = entry
+                .checked_sub(amount)
+                .ok_or(sp_runtime::DispatchError::Other(
+                    "insufficient ledger balance",
+                ))?;
+            Ok(())
+        })
+    }
+}
+
 pub fn new_test_ext() -> sp_io::TestExternalities {
+    LEDGER_BALANCES.with(|l| l.borrow_mut().clear());
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();
@@ -776,6 +827,96 @@ fn test_sentinel_frozen_authority_cannot_transfer() {
         assert_noop!(
             Factory::transfer_mint_authority(RuntimeOrigin::signed(CREATOR), asset_id, 7u64,),
             Error::<Test>::AuthorityFrozenBySentinel
+        );
+    });
+}
+
+// ── Account-level ledger ─────────────────────────────────────────────────
+
+fn native_leg(asset_id: AssetId) -> u128 {
+    leg_balance(
+        &Ledger::ledgers(asset_id).expect("ledger"),
+        DomainId::X3Native,
+    )
+}
+
+/// A launched token gets a ledger asset and the creator holds the initial supply on it; every
+/// later `X3Native` mint and burn moves the mint authority's ledger balance with the supply
+/// ledger's `X3Native` leg, so the two always agree.
+#[test]
+fn a_launched_tokens_native_supply_is_held_on_the_account_level_ledger() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(burnable_config(b"LDG", 1_000, all_three_domains()));
+        let ledger_asset = Factory::ledger_asset_of(&asset_id).expect("a ledger asset was issued");
+        assert!(System::events().iter().any(|r| matches!(
+            r.event,
+            RuntimeEvent::Factory(Event::LedgerAssetIssued { asset_id: a, ledger_asset: l })
+                if a == asset_id && l == ledger_asset
+        )));
+        assert_eq!(TestLedgerAssets::balance(ledger_asset, CREATOR), 1_000);
+        assert_eq!(native_leg(asset_id), 1_000);
+
+        assert_ok!(Factory::burn(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            400
+        ));
+        assert_eq!(TestLedgerAssets::balance(ledger_asset, CREATOR), 600);
+        assert_eq!(native_leg(asset_id), 600);
+    });
+}
+
+#[test]
+fn a_native_mint_credits_the_mint_authority_and_only_native_mints_do() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(capped_config(b"CAPL", 100, 10_000, all_three_domains()));
+        let ledger_asset = Factory::ledger_asset_of(&asset_id).expect("ledger asset");
+        assert_ok!(Factory::mint(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            250
+        ));
+        assert_eq!(TestLedgerAssets::balance(ledger_asset, CREATOR), 350);
+        assert_eq!(native_leg(asset_id), 350);
+        // Supply minted into another domain is not an account-level balance here.
+        assert_ok!(Factory::mint(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Evm,
+            50
+        ));
+        assert_eq!(TestLedgerAssets::balance(ledger_asset, CREATOR), 350);
+    });
+}
+
+/// Burning supply the mint authority does not hold on the ledger is refused, and the supply
+/// ledger is left as it was (the extrinsic is one storage transaction).
+#[test]
+fn a_native_burn_beyond_the_authoritys_ledger_balance_is_refused() {
+    new_test_ext().execute_with(|| {
+        let asset_id = launch(burnable_config(b"BRN", 1_000, all_three_domains()));
+        let ledger_asset = Factory::ledger_asset_of(&asset_id).expect("ledger asset");
+        // The creator gives part of the supply away on the ledger.
+        assert_ok!(
+            <TestLedgerAssets as x3_asset_kernel_types::traits::LedgerAssetIssuer<u64>>::burn(
+                ledger_asset,
+                &CREATOR,
+                900
+            )
+        );
+        assert!(Factory::burn(
+            RuntimeOrigin::signed(CREATOR),
+            asset_id,
+            DomainId::X3Native,
+            500
+        )
+        .is_err());
+        assert_eq!(
+            native_leg(asset_id),
+            1_000,
+            "the supply ledger did not move"
         );
     });
 }

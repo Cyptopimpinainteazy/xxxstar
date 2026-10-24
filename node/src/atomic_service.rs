@@ -14,8 +14,7 @@ use atomic_swap_orchestrator::{
     KernelReceiptRootData, KernelVmType,
 };
 use codec::Encode;
-use pallet_x3_atomic_kernel::vm_revert::OverlayDomain;
-use pallet_x3_atomic_kernel::vm_revert::StateDiff;
+use pallet_x3_atomic_kernel::chain_legs::{LegExecution, MAX_LEG_PROGRAM_BYTES};
 use pallet_x3_atomic_kernel::BundleStatus;
 use pallet_x3_atomic_kernel::X3AtomicKernelApi;
 use sc_client_api::{BlockBackend, HeaderBackend};
@@ -25,15 +24,10 @@ use sp_core::H256;
 use sp_runtime::traits::SaturatedConversion;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use substrate_frame_rpc_system::AccountNonceApi;
 use tokio::sync::mpsc;
-use x3_bridge_adapters::{
-    overlay_state_diff_for_domain, RuntimeCrossVmDispatcher, SubstrateClientBalanceAdapter,
-    SubstrateX3VmBridge,
-};
 use x3_chain_runtime::opaque::Block;
-use x3_chain_runtime::{Runtime, RuntimeCall, UncheckedExtrinsic};
-use x3_cross_vm_bridge::{CrossVmCall, CrossVmDispatcher, CrossVmStatus, VmId};
-use x3_vm::bridge::BalanceProvider;
+use x3_chain_runtime::{AccountId, Runtime, UncheckedExtrinsic};
 
 /// Transaction pool type used by the node atomic gateway service.
 pub type AtomicPool = sc_transaction_pool::TransactionPoolHandle<Block, FullClient>;
@@ -66,8 +60,6 @@ pub struct AtomicGatewayService {
     pool: Arc<AtomicPool>,
     genesis_hash: H256,
     next_tx_nonce: Arc<AtomicU64>,
-    balances: Arc<SubstrateClientBalanceAdapter<FullClient, Block>>,
-    dispatcher: RuntimeCrossVmDispatcher<FullClient, Block>,
     /// The certificates this node's finality tasks observed, per block (TICKET-107).
     observed_certs: ObservedFinalityCerts,
 }
@@ -86,22 +78,51 @@ impl AtomicGatewayService {
             .block_hash(0)
             .map_err(|e| format!("failed to read genesis hash: {e}"))?
             .ok_or_else(|| "genesis block not found".to_string())?;
-        let runtime_bridge = Arc::new(SubstrateX3VmBridge::<FullClient, Block>::new(
-            client.clone(),
-        ));
-        let balances = runtime_bridge.balances.clone();
-        let dispatcher = RuntimeCrossVmDispatcher::<FullClient, Block>::new(client.clone())
-            .with_x3vm_bridge(runtime_bridge.bridge.clone());
         Ok(Self {
             key,
             client,
             pool,
             genesis_hash,
             next_tx_nonce: Arc::new(AtomicU64::new(0)),
-            balances,
-            dispatcher,
             observed_certs,
         })
+    }
+
+    /// The nonce for the gateway's next extrinsic: the larger of the chain's nonce for the
+    /// account and the one after the last this service handed out. The chain's figure makes a
+    /// restarted node (or one whose account signed elsewhere) start where the account is; the
+    /// local one covers transactions still in the pool.
+    fn next_nonce(&self) -> Result<u32, String> {
+        let on_chain = self
+            .client
+            .runtime_api()
+            .account_nonce(self.client.info().best_hash, self.key.account())
+            .map_err(|e| format!("account_nonce runtime call failed: {e}"))?;
+        let on_chain = u64::from(on_chain);
+        let previous = self
+            .next_tx_nonce
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |local| {
+                Some(local.max(on_chain).saturating_add(1))
+            })
+            .unwrap_or_else(|unchanged| unchanged);
+        u32::try_from(previous.max(on_chain)).map_err(|_| "gateway nonce overflow".to_string())
+    }
+
+    /// Submit to the pool. A refused transaction never takes its nonce, so the local counter is
+    /// dropped and the next nonce comes from the chain again instead of leaving a gap that would
+    /// park every later extrinsic in the pool's future queue.
+    async fn submit(&self, at: H256, extrinsic: UncheckedExtrinsic) -> Result<(), String> {
+        match self
+            .pool
+            .submit_one(at, TransactionSource::External, extrinsic.into())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.next_tx_nonce.store(0, Ordering::SeqCst);
+                Err(e.to_string())
+            }
+        }
     }
 
     /// Run the service until the command channel closes.
@@ -114,7 +135,8 @@ impl AtomicGatewayService {
     }
 
     async fn handle(&self, command: AtomicGatewayCommand) -> Result<(), String> {
-        let tx_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+        // Every step that can refuse runs before a nonce is taken, so a refused command leaves no
+        // gap in the gateway's nonce sequence.
         let (extrinsic, legs_hash, executions, request_clone, should_finalize) = match command {
             AtomicGatewayCommand::SubmitBundle(request) => {
                 let legs_hash = request.legs_hash();
@@ -125,8 +147,11 @@ impl AtomicGatewayService {
                     .iter()
                     .map(to_pallet_leg)
                     .collect::<Result<Vec<_>, _>>()?;
+                let chain_legs = self.chain_legs(&request.executions)?;
+                let tx_nonce = self.next_nonce()?;
                 let extrinsic = self.key.submit_atomic_bundle(
                     legs,
+                    &chain_legs,
                     request.deadline_blocks,
                     request.chain_id,
                     request.nonce,
@@ -150,8 +175,11 @@ impl AtomicGatewayService {
                     .iter()
                     .map(to_pallet_leg)
                     .collect::<Result<Vec<_>, _>>()?;
+                let chain_legs = self.chain_legs(&request.executions)?;
+                let tx_nonce = self.next_nonce()?;
                 let extrinsic = self.key.submit_atomic_bundle(
                     legs,
+                    &chain_legs,
                     request.deadline_blocks,
                     request.chain_id,
                     request.nonce,
@@ -167,16 +195,23 @@ impl AtomicGatewayService {
                 )
             }
             AtomicGatewayCommand::AssignExecutor { bundle_id } => (
-                self.key
-                    .assign_bundle_executor(bundle_id, self.genesis_hash, tx_nonce)?,
+                self.key.assign_bundle_executor(
+                    bundle_id,
+                    self.genesis_hash,
+                    self.next_nonce()?,
+                )?,
                 None,
                 None,
                 None,
                 false,
             ),
             AtomicGatewayCommand::Rollback { bundle_id, reason } => (
-                self.key
-                    .rollback_atomic_bundle(bundle_id, reason, self.genesis_hash, tx_nonce)?,
+                self.key.rollback_atomic_bundle(
+                    bundle_id,
+                    reason,
+                    self.genesis_hash,
+                    self.next_nonce()?,
+                )?,
                 None,
                 None,
                 None,
@@ -185,11 +220,9 @@ impl AtomicGatewayService {
         };
         let best_hash = self.client.info().best_hash;
         let at = best_hash;
-        self.pool
-            .submit_one(at, TransactionSource::External, extrinsic.into())
+        self.submit(at, extrinsic)
             .await
-            .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))
-            .map(|_| ())?;
+            .map_err(|e| format!("transaction pool rejected atomic extrinsic: {e}"))?;
         log::info!(target: "x3-atomic-gateway", "atomic extrinsic submitted");
 
         if let Some(legs_hash) = legs_hash {
@@ -218,16 +251,11 @@ impl AtomicGatewayService {
                 .map_err(|e| format!("find_bundle runtime call failed: {e}"))?;
 
             if let Some((bundle_id, BundleStatus::Pending)) = found {
-                let assign_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+                let assign_nonce = self.next_nonce()?;
                 let extrinsic =
                     self.key
                         .assign_bundle_executor(bundle_id, self.genesis_hash, assign_nonce)?;
-                self.pool
-                    .submit_one(
-                        self.client.info().best_hash,
-                        TransactionSource::External,
-                        extrinsic.into(),
-                    )
+                self.submit(self.client.info().best_hash, extrinsic)
                     .await
                     .map_err(|e| format!("assign_bundle_executor rejected: {e}"))?;
                 for _ in 0..50 {
@@ -248,106 +276,95 @@ impl AtomicGatewayService {
         Err("bundle submission was not found on-chain within timeout".to_string())
     }
 
+    /// The chain-executed form of every requested leg; the bundle commits to exactly these at
+    /// submission, and `execute_legs` runs exactly these.
+    fn chain_legs(
+        &self,
+        executions: &[AtomicLegExecution],
+    ) -> Result<Vec<LegExecution<AccountId>>, String> {
+        let gateway = self.key.account();
+        executions
+            .iter()
+            .enumerate()
+            .map(|(index, execution)| chain_leg(execution, &gateway, index))
+            .collect()
+    }
+
+    /// Have the chain execute every leg. Each leg is a signed `execute_bundle_leg` from the
+    /// bundle's executor: the runtime runs it against chain state and records the journal a
+    /// rollback undoes, so nothing this node computes decides what a leg wrote.
     async fn execute_legs(
         &self,
         executions: &[AtomicLegExecution],
         bundle_id: H256,
     ) -> Result<(), String> {
-        for (index, execution) in executions.iter().enumerate() {
-            let state_diff = self.execute_x3_leg(execution, index as u64).await?;
-            self.record_leg_receipt(bundle_id, index as u32, state_diff)
-                .await?;
-            log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} leg {index} recorded");
-        }
-        Ok(())
-    }
-
-    async fn execute_x3_leg(
-        &self,
-        execution: &AtomicLegExecution,
-        index: u64,
-    ) -> Result<StateDiff, String> {
-        match execution {
-            AtomicLegExecution::X3 {
-                caller,
-                selector,
-                payload,
-            } => {
-                let call = CrossVmCall::new(
-                    VmId::X3Vm,
-                    VmId::X3Vm,
-                    *selector,
-                    payload.clone(),
-                    10_000_000,
-                    index,
-                    10_000,
-                )
-                .map_err(|e| format!("failed to build CrossVmCall: {e:?}"))?;
-
-                let receipt = self
-                    .dispatcher
-                    .execute_x3vm_tx(caller, &call)
-                    .map_err(|e| format!("X3 leg execution failed: {e:?}"))?;
-                if receipt.status != CrossVmStatus::Success {
-                    return Err(format!("X3 leg {} reverted: {:?}", index, receipt.status));
-                }
-                let transitions = self.balances.take_overlay_transitions();
-                Ok(overlay_state_diff_for_domain(
-                    &transitions,
-                    OverlayDomain::X3,
-                ))
-            }
-            AtomicLegExecution::Transfer {
-                vm,
-                from,
-                to,
-                amount,
-            } => {
-                let domain = match vm {
-                    KernelVmType::Evm => OverlayDomain::Evm,
-                    KernelVmType::Svm => OverlayDomain::Svm,
-                    KernelVmType::X3 => OverlayDomain::X3,
-                    KernelVmType::Cross => {
-                        return Err("cross-domain transfer requires two legs".to_string());
-                    }
-                };
-                self.balances
-                    .transfer(from, to, *amount)
-                    .map_err(|e| format!("canonical-ledger transfer failed: {e}"))?;
-                let transitions = self.balances.take_overlay_transitions();
-                Ok(overlay_state_diff_for_domain(&transitions, domain))
-            }
-            _ => Err(
-                "Path B executes X3 calls and canonical-ledger transfers; arbitrary \
-                 EVM/SVM bytecode is not implemented"
-                    .to_string(),
-            ),
-        }
-    }
-
-    async fn record_leg_receipt(
-        &self,
-        bundle_id: H256,
-        leg_index: u32,
-        state_diff: StateDiff,
-    ) -> Result<(), String> {
-        let call = RuntimeCall::X3AtomicKernel(
-            pallet_x3_atomic_kernel::Call::<Runtime>::record_leg_execution_receipt {
+        let chain_legs = self.chain_legs(executions)?;
+        for (index, execution) in chain_legs.into_iter().enumerate() {
+            let tx_nonce = self.next_nonce()?;
+            let extrinsic = self.key.execute_bundle_leg(
                 bundle_id,
-                leg_index,
-                state_diff,
-            },
-        );
-        let extrinsic: UncheckedExtrinsic = UncheckedExtrinsic::new_bare(call);
-        self.pool
-            .submit_one(
-                self.client.info().best_hash,
-                TransactionSource::External,
-                extrinsic.into(),
-            )
+                index as u32,
+                execution,
+                self.genesis_hash,
+                tx_nonce,
+            )?;
+            self.submit(self.client.info().best_hash, extrinsic)
+                .await
+                .map_err(|e| format!("execute_bundle_leg {index} rejected: {e}"))?;
+            log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} leg {index} submitted for on-chain execution");
+        }
+        self.wait_for_leg_journals(bundle_id, executions.len() as u32)
             .await
-            .map(|_| log::debug!(target: "x3-atomic-gateway", "leg {leg_index} receipt submitted"))
-            .map_err(|e| format!("record_leg_execution_receipt rejected: {e}"))
+    }
+
+    /// Wait until the chain recorded a journal for every leg: a leg extrinsic accepted by the pool
+    /// can still fail in its block (insufficient funds, a refused program, a held slot), and the
+    /// chain will not finalize a bundle with a leg missing. Reported here, by leg, instead of as a
+    /// refused finalization later.
+    async fn wait_for_leg_journals(&self, bundle_id: H256, legs: u32) -> Result<(), String> {
+        use sc_client_api::StorageProvider;
+        use sp_core::storage::StorageKey;
+        let keys: Vec<StorageKey> = (0..legs)
+            .map(|leg| {
+                StorageKey(
+                    pallet_x3_atomic_kernel::ChainJournal::<Runtime>::hashed_key_for(
+                        bundle_id, leg,
+                    ),
+                )
+            })
+            .collect();
+        for _ in 0..150 {
+            let at = self.client.info().best_hash;
+            let mut missing = None;
+            for (leg, key) in keys.iter().enumerate() {
+                let recorded = self
+                    .client
+                    .storage(at, key)
+                    .map_err(|e| format!("reading leg {leg}'s journal failed: {e}"))?;
+                if recorded.is_none() {
+                    missing = Some(leg);
+                    break;
+                }
+            }
+            let Some(leg) = missing else {
+                return Ok(());
+            };
+            let status = self
+                .client
+                .runtime_api()
+                .get_bundle_status(at, bundle_id)
+                .map_err(|e| format!("bundle status runtime call failed: {e}"))?;
+            if !matches!(status, Some(BundleStatus::Executing)) {
+                return Err(format!(
+                    "bundle {bundle_id:?} left Executing ({status:?}) before leg {leg} executed"
+                ));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        Err(format!(
+            "bundle {bundle_id:?}: not every leg executed on chain within the timeout; it will not \
+             be finalized"
+        ))
     }
 
     async fn finalize_bundle(
@@ -408,7 +425,7 @@ impl AtomicGatewayService {
                 finalized_block: block_num,
                 finality_cert,
             });
-            let finalize_nonce = self.next_tx_nonce.fetch_add(1, Ordering::Relaxed) as u32;
+            let finalize_nonce = self.next_nonce()?;
             let extrinsic = self.key.finalize_atomic_bundle(
                 bundle_id,
                 receipt_root,
@@ -418,14 +435,9 @@ impl AtomicGatewayService {
                 finalize_nonce,
             )?;
             return self
-                .pool
-                .submit_one(
-                    finalized_hash,
-                    TransactionSource::External,
-                    extrinsic.into(),
-                )
+                .submit(finalized_hash, extrinsic)
                 .await
-                .map(|_| log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} finalized"))
+                .map(|()| log::info!(target: "x3-atomic-gateway", "bundle {bundle_id:?} finalized"))
                 .map_err(|e| format!("finalize_atomic_bundle rejected: {e}"));
         }
         Err("no anchored finality certificate within timeout".to_string())
@@ -467,6 +479,61 @@ fn to_pallet_leg(
     })
 }
 
+/// The chain-executed form of a requested leg, or why the chain cannot run it.
+///
+/// An X3 leg's payload is its X3BC program. A transfer moves the gateway's own funds of the X3
+/// native ledger asset (0): the chain moves only the bundle executor's (the gateway's) funds, so a transfer from
+/// any other account, or on any other VM's balances, is refused here instead of being simulated.
+pub fn chain_leg(
+    execution: &AtomicLegExecution,
+    gateway: &AccountId,
+    index: usize,
+) -> Result<LegExecution<AccountId>, String> {
+    match execution {
+        AtomicLegExecution::X3 { payload, .. } => {
+            let program = payload.clone().try_into().map_err(|_| {
+                format!(
+                    "leg {index}: X3 program of {} bytes exceeds the chain's {MAX_LEG_PROGRAM_BYTES}",
+                    payload.len()
+                )
+            })?;
+            Ok(LegExecution::X3 { program })
+        }
+        AtomicLegExecution::Transfer {
+            vm: KernelVmType::X3,
+            from,
+            to,
+            amount,
+        } => {
+            if from.as_slice() != AsRef::<[u8]>::as_ref(gateway) {
+                return Err(format!(
+                    "leg {index}: the chain moves only the gateway's own funds; a transfer from \
+                     another account cannot execute"
+                ));
+            }
+            let to: [u8; 32] = to.as_slice().try_into().map_err(|_| {
+                format!("leg {index}: transfer recipient must be a 32-byte account")
+            })?;
+            Ok(LegExecution::Transfer {
+                asset: X3_NATIVE_LEDGER_ASSET,
+                to: AccountId::new(to),
+                amount: *amount,
+            })
+        }
+        AtomicLegExecution::Transfer { vm, .. } => Err(format!(
+            "leg {index}: {vm:?} balances are not on the canonical ledger the chain executes \
+             transfers against"
+        )),
+        AtomicLegExecution::Evm { .. } | AtomicLegExecution::Svm { .. } => Err(format!(
+            "leg {index}: the chain executes X3 programs and ledger transfers; EVM/SVM legs are \
+             not executable on chain"
+        )),
+    }
+}
+
+/// The canonical-ledger asset of the X3 domain's native balance.
+pub const X3_NATIVE_LEDGER_ASSET: u32 = 0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -488,5 +555,83 @@ mod tests {
             _ => unreachable!(),
         };
         assert_eq!(encoded.len(), 32);
+    }
+
+    fn gateway() -> AccountId {
+        AtomicGatewayKey::from_uri("//x3-atomic-gateway")
+            .expect("key loads")
+            .account()
+    }
+
+    #[test]
+    fn an_x3_leg_runs_its_program_on_chain() {
+        let leg = AtomicLegExecution::X3 {
+            caller: [7; 32],
+            selector: [1, 2, 3, 4],
+            payload: vec![9, 8, 7],
+        };
+        assert_eq!(
+            chain_leg(&leg, &gateway(), 0),
+            Ok(LegExecution::X3 {
+                program: vec![9, 8, 7].try_into().expect("small"),
+            })
+        );
+        let huge = AtomicLegExecution::X3 {
+            caller: [7; 32],
+            selector: [0; 4],
+            payload: vec![0; MAX_LEG_PROGRAM_BYTES as usize + 1],
+        };
+        assert!(chain_leg(&huge, &gateway(), 1).is_err());
+    }
+
+    #[test]
+    fn a_transfer_leg_moves_only_the_gateways_own_x3_funds() {
+        let gateway = gateway();
+        let own = AtomicLegExecution::Transfer {
+            vm: KernelVmType::X3,
+            from: AsRef::<[u8]>::as_ref(&gateway).to_vec(),
+            to: vec![5; 32],
+            amount: 42,
+        };
+        assert_eq!(
+            chain_leg(&own, &gateway, 0),
+            Ok(LegExecution::Transfer {
+                asset: X3_NATIVE_LEDGER_ASSET,
+                to: AccountId::new([5; 32]),
+                amount: 42,
+            })
+        );
+        let someone_elses = AtomicLegExecution::Transfer {
+            vm: KernelVmType::X3,
+            from: vec![6; 32],
+            to: vec![5; 32],
+            amount: 42,
+        };
+        assert!(chain_leg(&someone_elses, &gateway, 0).is_err());
+        let evm = AtomicLegExecution::Transfer {
+            vm: KernelVmType::Evm,
+            from: vec![1; 20],
+            to: vec![2; 20],
+            amount: 1,
+        };
+        assert!(chain_leg(&evm, &gateway, 0).is_err());
+        let short_recipient = AtomicLegExecution::Transfer {
+            vm: KernelVmType::X3,
+            from: AsRef::<[u8]>::as_ref(&gateway).to_vec(),
+            to: vec![5; 20],
+            amount: 1,
+        };
+        assert!(chain_leg(&short_recipient, &gateway, 0).is_err());
+    }
+
+    #[test]
+    fn evm_and_svm_legs_are_refused_rather_than_simulated() {
+        let evm = AtomicLegExecution::Evm {
+            caller: [1; 20],
+            target: [2; 20],
+            value: 0,
+            input: vec![],
+        };
+        assert!(chain_leg(&evm, &gateway(), 0).is_err());
     }
 }

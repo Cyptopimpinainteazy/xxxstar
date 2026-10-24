@@ -1,0 +1,31 @@
+# Tool-validation fixture crate.
+#
+# This is NOT an X3 fuzz target. It exists so the external-toolchain program can
+# prove that libFuzzer detects a defect (known-bad) and passes clean input
+# (known-good) before we trust it on real X3 targets. See
+# external-tool-gap-analysis.md §69/§90 and
+# scripts/external-toolchain/validate-fuzz-detection.sh.
+#
+# It has no X3 dependencies, so it builds in seconds.
+[package]
+name = "x3-tool-validation-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "crash_if_magic"
+path = "fuzz_targets/crash_if_magic.rs"
+test = false
+doc = false
+bench = false
+
+# Standalone workspace so the root workspace does not pick this up.
+[workspace]

@@ -46,6 +46,8 @@ pallet-x3-kernel = { path = "../x3-kernel", default-features = false }
 pallet-x3-atomic-kernel = { path = "../x3-atomic-kernel", default-features = false }
 pallet-atomic-trade-engine = { path = "../atomic-trade-engine", default-features = false }
 x3-crosschain-intent = { path = "../../crates/x3-crosschain-intent", default-features = false }
+# Bitcoin's Merkle rule (position, depth, CVE-2012-2459), shared with the gateway's verifier.
+x3-btc-spv = { path = "../../crates/x3-btc-spv", default-features = false }
 # The one Merkle-Patricia receipt-proof verifier in this repository
 # (`no_std`/`alloc`), shared with the relayer. The settlement path used to
 # compare two roots it read out of the proof and never walked a path, so a
@@ -89,6 +91,7 @@ std = [
     "pallet-x3-atomic-kernel/std",
     "pallet-atomic-trade-engine/std",
     "x3-crosschain-intent/std",
+    "x3-btc-spv/std",
     "x3-atomic-swap/std",
     # The pallet depends on the router with `default-features = false` so the
     # wasm build gets its `no_std` path; the host build has to turn `std` back on

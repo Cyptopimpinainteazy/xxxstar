@@ -13,7 +13,7 @@ use frame_support::derive_impl;
 use sp_core::H256;
 use sp_runtime::BuildStorage;
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use x3_asset_kernel_types::traits::AssetRegistryInspect;
 use x3_asset_kernel_types::{AssetId, AssetStatus, Balance, SupplyLedger, SupplyPolicy};
 
@@ -59,6 +59,10 @@ impl frame_system::Config for Test {
 thread_local! {
     /// Assets the mock reports as paused. A real deployment reads this from the asset registry.
     static FROZEN: RefCell<BTreeSet<AssetId>> = const { RefCell::new(BTreeSet::new()) };
+    /// Supply-policy overrides. The registry reports `NativeMintBurn` for everything by default
+    /// (the policy this pallet implements); a test that needs `enforce_supply_policy` to refuse
+    /// something sets an override, without which the refusing branch is unreachable in mock.
+    static POLICY_OVERRIDE: RefCell<BTreeMap<AssetId, SupplyPolicy>> = const { RefCell::new(BTreeMap::new()) };
 }
 
 /// The mock registry: an asset exists exactly when the ledger holds one for it, and it is active
@@ -86,7 +90,10 @@ impl AssetRegistryInspect for TestRegistry {
         })
     }
 
-    fn supply_policy(_asset_id: &AssetId) -> Option<SupplyPolicy> {
+    fn supply_policy(asset_id: &AssetId) -> Option<SupplyPolicy> {
+        if let Some(policy) = POLICY_OVERRIDE.with(|p| p.borrow().get(asset_id).copied()) {
+            return Some(policy);
+        }
         Some(SupplyPolicy::NativeMintBurn)
     }
 
@@ -118,6 +125,7 @@ pub fn asset(seed: u8) -> AssetId {
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
     FROZEN.with(|f| f.borrow_mut().clear());
+    POLICY_OVERRIDE.with(|p| p.borrow_mut().clear());
     frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .expect("the mock genesis builds")
@@ -145,6 +153,11 @@ pub fn pause(asset_id: AssetId) {
 
 pub fn unpause(asset_id: AssetId) {
     FROZEN.with(|f| f.borrow_mut().remove(&asset_id));
+}
+
+/// Report `policy` for `asset_id` regardless of the registry default.
+pub fn set_supply_policy(asset_id: AssetId, policy: SupplyPolicy) {
+    POLICY_OVERRIDE.with(|p| p.borrow_mut().insert(asset_id, policy));
 }
 
 pub fn ledger_of(asset_id: AssetId) -> SupplyLedger {

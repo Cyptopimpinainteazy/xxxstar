@@ -73,6 +73,7 @@ impl pallet_x3_crosschain_gateway::Config for Test {
     type OperationalOrigin = frame_system::EnsureSigned<AccountId>;
     type DailyLimitWindowBlocks = DailyWindow;
     type EvmHeaderAnchor = MockEvmAnchor;
+    type BtcHeaderAnchor = MockBtcAnchor;
     type WeightInfo = ();
 }
 
@@ -386,4 +387,35 @@ fn evm_header_rlp(receipts_root: [u8; 32], number: u64) -> Vec<u8> {
         rlp_bytes(&zeros),         // mixHash
         rlp_bytes(&[0u8; 8]),      // nonce
     ])
+}
+
+/// Best-chain Bitcoin blocks by hash, and the best height.
+type BtcChainView = (std::collections::BTreeMap<[u8; 32], u64>, Option<u64>);
+
+thread_local! {
+    /// This test thread's view of Bitcoin: best-chain blocks by hash, and the best height.
+    static BTC_CHAIN: std::cell::RefCell<BtcChainView> =
+        const { std::cell::RefCell::new((std::collections::BTreeMap::new(), None)) };
+}
+
+/// Put `block_hash` on the mock's best Bitcoin chain at `height`, with the chain `best` tall.
+pub fn anchor_btc_block(block_hash: [u8; 32], height: u64, best: u64) {
+    BTC_CHAIN.with(|cell| {
+        let mut chain = cell.borrow_mut();
+        chain.0.insert(block_hash, height);
+        chain.1 = Some(best);
+    });
+}
+
+/// The mock's stand-in for the settlement engine's Bitcoin header store.
+pub struct MockBtcAnchor;
+
+impl x3_verification_router::BtcHeaderAnchor for MockBtcAnchor {
+    fn best_chain_height(block_hash: &[u8; 32]) -> Option<u64> {
+        BTC_CHAIN.with(|cell| cell.borrow().0.get(block_hash).copied())
+    }
+
+    fn best_height() -> Option<u64> {
+        BTC_CHAIN.with(|cell| cell.borrow().1)
+    }
 }

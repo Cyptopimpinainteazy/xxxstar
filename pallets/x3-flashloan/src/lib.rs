@@ -9,7 +9,18 @@
 //!
 //! ## Invariant
 //! Every borrow must be followed by repayment + fee in the same call.
-//! The pallet checks the repay-or-revert guarantee at the end of execution.
+//!
+//! ## Flash liquidity for atomic trades (2026-10-17)
+//!
+//! The native-token `borrow` extrinsic is refused: it paid the pool's funds out and nothing ever
+//! enforced the `repay` it relied on (`check_no_pending_loans` had no caller, and a FRAME block
+//! does not revert because a later call was never made), so a borrower could simply keep the
+//! money. `repay` stays, so a loan opened before the upgrade can still be closed.
+//!
+//! Flash liquidity is now offered per ledger asset ([`AssetPools`]): providers deposit on the
+//! kernel's `CanonicalLedger` into the asset's pool account and receive shares; the kernel's atomic
+//! trade execution (`pallet_x3_kernel::submit_trade`) borrows and repays inside one VM execution,
+//! where an unrepaid debt traps and rolls the whole trade back before anything reaches the chain.
 
 pub use pallet::*;
 
@@ -21,7 +32,10 @@ pub mod pallet {
         traits::{Currency, ExistenceRequirement},
     };
     use frame_system::pallet_prelude::*;
+    use sp_runtime::helpers_128bit::multiply_by_rational_with_rounding;
     use sp_runtime::traits::Saturating;
+    use sp_runtime::Rounding;
+    use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
 
     type BalanceOf<T> =
         <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -40,7 +54,29 @@ pub mod pallet {
         ///
         /// Before this existed every call charged a literal and none had been measured.
         type WeightInfo: WeightInfo;
+
+        /// The ledger asset pools custody liquidity on (the kernel's `CanonicalLedger`).
+        type Ledger: CanonicalLedgerTransfer<Self::AccountId>;
+
+        /// Who may open a flash-liquidity pool for a ledger asset.
+        type AssetPoolOrigin: EnsureOrigin<Self::RuntimeOrigin>;
     }
+
+    /// A flash-liquidity pool for one ledger asset. Its liquidity is the ledger balance of
+    /// [`Pallet::asset_pool_account`]; providers hold shares of it.
+    #[derive(
+        Clone, Debug, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
+    )]
+    pub struct AssetPoolInfo {
+        pub fee_bps: u16,
+        pub total_shares: u128,
+    }
+
+    /// Shares the first deposit into an asset pool locks forever (see `provide_asset_liquidity`).
+    pub const MINIMUM_LOCKED_SHARES: u128 = 1_000;
+
+    /// The interface version of an asset flash pool, which a trading artifact requires.
+    pub const ASSET_POOL_VERSION: u16 = 1;
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
@@ -67,6 +103,23 @@ pub mod pallet {
     #[pallet::storage]
     pub type TotalFeesCollected<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
+    /// Flash-liquidity pools by ledger asset id.
+    #[pallet::storage]
+    pub type AssetPools<T: Config> =
+        StorageMap<_, Blake2_128Concat, u32, AssetPoolInfo, OptionQuery>;
+
+    /// Each provider's shares of each asset pool.
+    #[pallet::storage]
+    pub type AssetShares<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        u32,
+        Blake2_128Concat,
+        T::AccountId,
+        u128,
+        ValueQuery,
+    >;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -87,6 +140,22 @@ pub mod pallet {
             provider: T::AccountId,
             amount: BalanceOf<T>,
         },
+        /// A flash-liquidity pool was opened for a ledger asset.
+        AssetPoolCreated { asset: u32, fee_bps: u16 },
+        /// Liquidity was deposited into an asset pool for shares.
+        AssetLiquidityProvided {
+            asset: u32,
+            provider: T::AccountId,
+            amount: u128,
+            shares: u128,
+        },
+        /// Shares of an asset pool were redeemed for liquidity.
+        AssetLiquidityWithdrawn {
+            asset: u32,
+            provider: T::AccountId,
+            amount: u128,
+            shares: u128,
+        },
     }
 
     #[pallet::error]
@@ -103,6 +172,23 @@ pub mod pallet {
         ZeroAmount,
         /// Arithmetic overflow computing fee.
         FeeOverflow,
+        /// A flash loan is only safe inside one atomic execution that must repay it; the
+        /// cross-extrinsic native loan is refused (see the module docs).
+        FlashLoansRequireAtomicTrade,
+        /// No flash-liquidity pool exists for this asset.
+        AssetPoolNotFound,
+        /// A flash-liquidity pool already exists for this asset.
+        AssetPoolExists,
+        /// The fee is above 10_000 basis points.
+        FeeOutOfRange,
+        /// The deposit or redemption would mint or burn no shares or move nothing.
+        NothingToMove,
+        /// The provider holds fewer shares than it tried to redeem.
+        InsufficientShares,
+        /// The first deposit must exceed the shares it locks (`MINIMUM_LOCKED_SHARES`).
+        FirstDepositTooSmall,
+        /// The deposit would mint fewer shares than the depositor's `min_shares`.
+        SharesBelowMinimum,
     }
 
     #[pallet::call]
@@ -119,6 +205,158 @@ pub mod pallet {
             #[pallet::compact] amount: BalanceOf<T>,
         ) -> DispatchResult {
             let borrower = ensure_signed(origin)?;
+            // Refused: see the module docs. Kept as a call so its index and decoding stay stable
+            // for anything that encodes it, and so its refusal is explicit rather than a missing
+            // call. The checks below are retained for `Self::open_native_loan`, which tests use to
+            // put a pre-upgrade loan in place for `repay`.
+            let _ = (&borrower, &amount);
+            Err(Error::<T>::FlashLoansRequireAtomicTrade.into())
+        }
+
+        /// Repay the active flash loan (amount + fee).
+        #[pallet::call_index(1)]
+        #[pallet::weight(<T as Config>::WeightInfo::repay())]
+        pub fn repay(
+            origin: OriginFor<T>,
+            #[pallet::compact] repayment: BalanceOf<T>,
+        ) -> DispatchResult {
+            Self::do_repay(ensure_signed(origin)?, repayment)
+        }
+
+        /// Add liquidity to the flash loan pool.
+        #[pallet::call_index(2)]
+        #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
+        pub fn add_liquidity(
+            origin: OriginFor<T>,
+            #[pallet::compact] amount: BalanceOf<T>,
+        ) -> DispatchResult {
+            Self::do_add_liquidity(ensure_signed(origin)?, amount)
+        }
+
+        /// Open a flash-liquidity pool for a ledger asset.
+        #[pallet::call_index(3)]
+        #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
+        pub fn create_asset_pool(origin: OriginFor<T>, asset: u32, fee_bps: u16) -> DispatchResult {
+            T::AssetPoolOrigin::ensure_origin(origin)?;
+            ensure!(fee_bps <= 10_000, Error::<T>::FeeOutOfRange);
+            ensure!(
+                !AssetPools::<T>::contains_key(asset),
+                Error::<T>::AssetPoolExists
+            );
+            AssetPools::<T>::insert(
+                asset,
+                AssetPoolInfo {
+                    fee_bps,
+                    total_shares: 0,
+                },
+            );
+            Self::deposit_event(Event::AssetPoolCreated { asset, fee_bps });
+            Ok(())
+        }
+
+        /// Deposit `amount` of `asset` into its flash pool for at least `min_shares` shares.
+        ///
+        /// The first deposit locks [`MINIMUM_LOCKED_SHARES`] of its shares permanently (owned by
+        /// no account), so the share price cannot be inflated from a dust deposit: without it, a
+        /// first depositor holding one share could raise the pool's balance by paying fees into it
+        /// and make the next deposit round down to a fraction of its value. `min_shares` bounds
+        /// what rounding can cost any depositor.
+        #[pallet::call_index(4)]
+        #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
+        pub fn provide_asset_liquidity(
+            origin: OriginFor<T>,
+            asset: u32,
+            amount: u128,
+            min_shares: u128,
+        ) -> DispatchResult {
+            let provider = ensure_signed(origin)?;
+            let mut pool = AssetPools::<T>::get(asset).ok_or(Error::<T>::AssetPoolNotFound)?;
+            let account = Self::asset_pool_account(asset);
+            let liquidity = T::Ledger::ledger_balance(asset, &account);
+            let (shares, minted) = if pool.total_shares == 0 {
+                ensure!(
+                    amount > MINIMUM_LOCKED_SHARES,
+                    Error::<T>::FirstDepositTooSmall
+                );
+                (amount - MINIMUM_LOCKED_SHARES, amount)
+            } else {
+                // Shares outstanding with nothing behind them: no price to mint at.
+                ensure!(liquidity > 0, Error::<T>::NothingToMove);
+                let shares = multiply_by_rational_with_rounding(
+                    amount,
+                    pool.total_shares,
+                    liquidity,
+                    Rounding::Down,
+                )
+                .ok_or(Error::<T>::FeeOverflow)?;
+                (shares, shares)
+            };
+            ensure!(amount > 0 && shares > 0, Error::<T>::NothingToMove);
+            ensure!(shares >= min_shares, Error::<T>::SharesBelowMinimum);
+            T::Ledger::ledger_transfer(asset, &provider, &account, amount)?;
+            pool.total_shares = pool
+                .total_shares
+                .checked_add(minted)
+                .ok_or(Error::<T>::FeeOverflow)?;
+            AssetShares::<T>::try_mutate(asset, &provider, |held| -> DispatchResult {
+                *held = held.checked_add(shares).ok_or(Error::<T>::FeeOverflow)?;
+                Ok(())
+            })?;
+            AssetPools::<T>::insert(asset, pool);
+            Self::deposit_event(Event::AssetLiquidityProvided {
+                asset,
+                provider,
+                amount,
+                shares,
+            });
+            Ok(())
+        }
+
+        /// Redeem `shares` of `asset`'s flash pool for their share of its liquidity (fees included).
+        #[pallet::call_index(5)]
+        #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
+        pub fn withdraw_asset_liquidity(
+            origin: OriginFor<T>,
+            asset: u32,
+            shares: u128,
+        ) -> DispatchResult {
+            let provider = ensure_signed(origin)?;
+            let mut pool = AssetPools::<T>::get(asset).ok_or(Error::<T>::AssetPoolNotFound)?;
+            let held = AssetShares::<T>::get(asset, &provider);
+            ensure!(shares > 0, Error::<T>::NothingToMove);
+            ensure!(held >= shares, Error::<T>::InsufficientShares);
+            let account = Self::asset_pool_account(asset);
+            let liquidity = T::Ledger::ledger_balance(asset, &account);
+            let amount = multiply_by_rational_with_rounding(
+                shares,
+                liquidity,
+                pool.total_shares,
+                Rounding::Down,
+            )
+            .ok_or(Error::<T>::FeeOverflow)?;
+            ensure!(amount > 0, Error::<T>::NothingToMove);
+            T::Ledger::ledger_transfer(asset, &account, &provider, amount)?;
+            pool.total_shares -= shares;
+            AssetShares::<T>::insert(asset, &provider, held - shares);
+            AssetPools::<T>::insert(asset, pool);
+            Self::deposit_event(Event::AssetLiquidityWithdrawn {
+                asset,
+                provider,
+                amount,
+                shares,
+            });
+            Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        /// Put a native loan in place exactly as the pre-upgrade `borrow` did. Test support for the
+        /// `repay` path that still closes such loans; never reachable from a call.
+        #[cfg(test)]
+        pub(crate) fn open_native_loan(
+            borrower: T::AccountId,
+            amount: BalanceOf<T>,
+        ) -> DispatchResult {
             ensure!(amount > BalanceOf::<T>::default(), Error::<T>::ZeroAmount);
             ensure!(
                 ActiveLoan::<T>::get().is_none(),
@@ -165,15 +403,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Repay the active flash loan (amount + fee).
-        #[pallet::call_index(1)]
-        #[pallet::weight(<T as Config>::WeightInfo::repay())]
-        pub fn repay(
-            origin: OriginFor<T>,
-            #[pallet::compact] repayment: BalanceOf<T>,
-        ) -> DispatchResult {
-            let borrower = ensure_signed(origin)?;
-
+        fn do_repay(borrower: T::AccountId, repayment: BalanceOf<T>) -> DispatchResult {
             let loan = ActiveLoan::<T>::get().ok_or(Error::<T>::NoActiveLoan)?;
             ensure!(loan.borrower == borrower, Error::<T>::NoActiveLoan);
 
@@ -201,14 +431,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Add liquidity to the flash loan pool.
-        #[pallet::call_index(2)]
-        #[pallet::weight(<T as Config>::WeightInfo::add_liquidity())]
-        pub fn add_liquidity(
-            origin: OriginFor<T>,
-            #[pallet::compact] amount: BalanceOf<T>,
-        ) -> DispatchResult {
-            let provider = ensure_signed(origin)?;
+        fn do_add_liquidity(provider: T::AccountId, amount: BalanceOf<T>) -> DispatchResult {
             ensure!(amount > BalanceOf::<T>::default(), Error::<T>::ZeroAmount);
 
             let pool_account = Self::pool_account();
@@ -246,6 +469,23 @@ pub mod pallet {
             bytes[0..8].copy_from_slice(b"x3flashl");
             T::AccountId::decode(&mut &bytes[..])
                 .expect("x3-flashloan pool account decodes from 32 zero-padded bytes")
+        }
+
+        /// The account that custodies `asset`'s flash pool on the ledger.
+        ///
+        /// A `PalletId` sub-account, which cannot fail to derive for any account type.
+        pub fn asset_pool_account(asset: u32) -> T::AccountId {
+            use sp_runtime::traits::AccountIdConversion;
+            frame_support::PalletId(*b"x3flasha").into_sub_account_truncating(asset)
+        }
+
+        /// `asset`'s flash pool as the trading extension sees it: fee and liquidity.
+        pub fn asset_pool(asset: u32) -> Option<(u16, u128)> {
+            let pool = AssetPools::<T>::get(asset)?;
+            Some((
+                pool.fee_bps,
+                T::Ledger::ledger_balance(asset, &Self::asset_pool_account(asset)),
+            ))
         }
 
         /// Check that no active loan is pending (called at end-of-block).

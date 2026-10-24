@@ -86,10 +86,13 @@ class Rpc:
         self.url = url
         self.timeout = timeout
         self.calls = 0
+        self.request_id = 0
 
     def call(self, method: str, params: list[Any]) -> Any:
+        self.request_id += 1
+        request_id = self.request_id
         body = json.dumps(
-            {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+            {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
         ).encode()
         request = urllib.request.Request(
             self.url, data=body, headers={"Content-Type": "application/json"}
@@ -102,10 +105,19 @@ class Rpc:
         self.calls += 1
         if not isinstance(document, dict):
             raise RpcError(f"{method}: response was not a JSON object")
-        if document.get("error") is not None:
-            raise RpcError(f"{method}: {document['error']}")
-        if "result" not in document:
-            raise RpcError(f"{method}: response carried no result")
+        if document.get("jsonrpc") != "2.0":
+            raise RpcError(f"{method}: response carried an invalid JSON-RPC version")
+        response_id = document.get("id")
+        if type(response_id) not in (int, float) or response_id != request_id:
+            raise RpcError(f"{method}: response id does not match request {request_id}")
+        if ("result" in document) == ("error" in document):
+            raise RpcError(f"{method}: response must carry exactly one of result or error")
+        if "error" in document:
+            error = document["error"]
+            if (not isinstance(error, dict) or type(error.get("code")) is not int
+                    or not isinstance(error.get("message"), str)):
+                raise RpcError(f"{method}: response carried an invalid error object")
+            raise RpcError(f"{method}: {error}")
         return document["result"]
 
 
@@ -122,6 +134,14 @@ def hex_to_int(value: str, what: str) -> int:
         return int(value, 16)
     except (TypeError, ValueError) as exc:
         raise Refused(f"{what} is not a hex quantity: {value!r}") from exc
+
+
+def read_header_number(rpc: Rpc, block_hash: str, what: str) -> int:
+    """Refuse missing headers instead of crashing while reading a head's height."""
+    header = rpc.call("chain_getHeader", [block_hash])
+    if not isinstance(header, dict) or "number" not in header:
+        raise Refused(f"{what}: no numbered header for {block_hash}")
+    return hex_to_int(header["number"], what)
 
 
 def read_anchor(rpc: Rpc, block_hash: str) -> dict[str, Any]:
@@ -145,9 +165,7 @@ def read_anchor(rpc: Rpc, block_hash: str) -> dict[str, Any]:
 
     note = ""
     finalized = rpc.call("chain_getFinalizedHead", [])
-    finalized_number = hex_to_int(
-        rpc.call("chain_getHeader", [finalized])["number"], "finalized.number"
-    )
+    finalized_number = read_header_number(rpc, finalized, "finalized.number")
     if number > finalized_number:
         raise Refused(
             f"height {number} is above the finalized head ({finalized_number}); a "
@@ -387,6 +405,7 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
 
     started = time.time()
     start_head = rpc.call("chain_getFinalizedHead", [])
+    start_number = read_header_number(rpc, start_head, "start.number")
 
     if args.at:
         anchor = read_anchor(rpc, args.at)
@@ -447,12 +466,9 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
 
     spec_version = rpc.call("state_getRuntimeVersion", []) or {}
     end_head = rpc.call("chain_getFinalizedHead", [])
-    end_number = hex_to_int(
-        rpc.call("chain_getHeader", [end_head])["number"], "end.number"
-    )
+    end_number = read_header_number(rpc, end_head, "end.number")
     spec = dict(metadata)
     spec["genesis"] = {"raw": {"top": top, "childrenDefault": {}}}
-    write_json(args.out, spec, args.force)
 
     report = {
         "chain_id": metadata.get("id"),
@@ -472,9 +488,7 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
         "source_spec": args.from_spec,
         "spec": args.out,
         "node_was_never_stopped": True,
-        "finalized_head_before": hex_to_int(
-            rpc.call("chain_getHeader", [start_head])["number"], "start.number"
-        ),
+        "finalized_head_before": start_number,
         "finalized_head_after": end_number,
         "finalized_head_advanced_by": None,
         "elapsed_seconds": round(time.time() - started, 3),
@@ -483,6 +497,9 @@ def export(args: argparse.Namespace) -> dict[str, Any]:
     report["finalized_head_advanced_by"] = (
         report["finalized_head_after"] - report["finalized_head_before"]
     )
+    # Finish every RPC check before replacing either artifact. An endpoint that
+    # loses the end header during the final report read must preserve old data.
+    write_json(args.out, spec, args.force)
     if args.report:
         write_json(args.report, report, args.force)
     return report

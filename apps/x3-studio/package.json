@@ -9,8 +9,8 @@
     "dev": "concurrently -k \"corepack pnpm dev:renderer\" \"corepack pnpm dev:electron\"",
     "build:renderer": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build": "corepack pnpm build:electron && corepack pnpm build:renderer",
-    "test": "vitest run",
+    "build": "corepack pnpm lint && corepack pnpm build:electron && corepack pnpm build:renderer",
+    "test": "corepack pnpm lint && vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit -p tsconfig.json"
   },
@@ -33,7 +33,7 @@
     "concurrently": "^8.2.0",
     "electron": ">=44.3.0",
     "typescript": "^5.4.0",
-    "vite": ">=6.4.3",
+    "vite": "^8.3.5",
     "vitest": "^5.0.0"
   }
 }

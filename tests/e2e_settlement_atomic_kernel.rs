@@ -35,10 +35,10 @@
 //!
 //! ### Scenario 4: Rollback with VM state reversion
 //!
-//! 1. Submit bundle, execute legs (populate state diffs via
-//!    `record_leg_execution_receipt`).
+//! 1. Submit bundle, have the executor run its legs on chain with `execute_bundle_leg` (the chain
+//!    records each leg's journal).
 //! 2. Rollback via `rollback_atomic_bundle(ExecutionFailed)`.
-//! 3. Verify `IncompleteVmRevert` event (or no event if reverts succeed).
+//! 3. Verify every journal was undone, or `IncompleteVmRevert` names the leg that could not be.
 //!
 //! ### Scenario 5: Cross-VM packet validation rejects bad packets
 //!

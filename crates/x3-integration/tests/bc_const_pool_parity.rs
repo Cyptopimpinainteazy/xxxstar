@@ -339,7 +339,7 @@ fn a_module_from_a_newer_compiler_or_needing_a_newer_loader_is_refused_by_both_r
 
     let current = x3_common::bytecode::VERSION;
     // The field layout is major << 16 | minor << 8 | patch, so `+ 1` is a patch and `+ 0x100` a minor.
-    let newer_minor = current + 0x100;
+    let newer_minor = x3_common::bytecode::READER_VERSION + 0x100;
 
     assert!(
         BytecodeModule::from_bytes(&envelope(

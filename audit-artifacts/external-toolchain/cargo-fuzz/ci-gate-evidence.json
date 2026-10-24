@@ -1,0 +1,45 @@
+{
+  "artifact": "external-tool-ci-integration",
+  "schema": "x3-tool-evidence/1",
+  "tool": "cargo-fuzz (libFuzzer)",
+  "gate": {
+    "set": "GATES_FUZZ",
+    "flag": "--fuzz",
+    "in_all": true,
+    "default_fast_set": false,
+    "slug": "fuzz-x3-language-and-detection",
+    "command": "bash scripts/local-ci.sh --fuzz --only fuzz-x3-language-and-detection",
+    "entry": "scripts/local-ci.sh -> bash scripts/external-toolchain/fuzz-gate.sh",
+    "why_opt_in": "needs a nightly toolchain (cargo-fuzz passes -Zsanitizer) and compiles with ASAN; the default fast run has neither"
+  },
+  "coverage": [
+    "builds all X3-language fuzz targets once with bounded parallelism (CARGO_BUILD_JOBS=4)",
+    "runs compile_and_run (seeded, 4000 runs)",
+    "runs x3bc_engines (seeded, 4000 runs)",
+    "proves defect detection: known-good fixture stays clean, known-bad crashes with an artifact"
+  ],
+  "run": {
+    "commit": "ff57d15dd6e93ba4bcc19081d18bcd5632954941",
+    "branch": "master",
+    "dirty_state": true,
+    "result": "PASS",
+    "seconds": 9,
+    "summary_json": ".ai/runlogs/local-ci-20261001T222924Z-summary.json",
+    "gate_log": ".ai/runlogs/local-ci-20261001T222924Z-fuzz-x3-language-and-detection.log"
+  },
+  "integration_hardening": [
+    "local-ci pins RUSTC to the stable toolchain for every gate; fuzz-gate.sh re-points RUSTC/CARGO at the nightly toolchain by absolute path, otherwise -Zsanitizer is rejected.",
+    "local-ci exports CARGO_TARGET_DIR for every gate; fuzz-gate.sh overrides it to target-fuzz so nightly ASAN artifacts cannot contaminate the stable target/ (the repo has been bitten by cross-toolchain target dirs before).",
+    "a missing nightly, missing cargo-fuzz, or missing rust target is classified BLOCKED (tool-missing), not FAIL.",
+    "a build killed by memory pressure is classified BLOCKED (resource), not FAIL."
+  ],
+  "known_limitations": [
+    "First cold build was SIGTERM'd under memory pressure on this box (systemd-oomd active, swap nearly full); the gate now builds once with 4 jobs and reports the kill as BLOCKED rather than a code failure. A cold run on a heavily loaded box may still report BLOCKED.",
+    "Opt-in only: it does not run on a normal commit and is not part of the release gate yet.",
+    "Only 2 of 98 fuzz targets are covered."
+  ],
+  "next_actions": [
+    "Promote the fuzz gate from opt-in to the release/nightly set once a cold run is proven stable.",
+    "Extend coverage to the pallet fuzz crates (needs the openssl/pkg-config fix)."
+  ]
+}

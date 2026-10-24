@@ -34,6 +34,7 @@ use sp_runtime::{
 
 use pallet_x3_kernel::{MockEvmAdapter, MockSvmAdapter, X3ExecutorAdapter, X3VmAdapter};
 use x3_backend::{BytecodeModule, FunctionEntry};
+use x3_x3_integration::compiler_bridge::compile_legacy_source as compile_source;
 
 type AccountId = u64;
 type Balance = u128;
@@ -176,10 +177,12 @@ impl pallet_x3_kernel::Config for StorageTest {
     // This test chain speaks no private channel; the intake check must still see the posture as a
     // runtime decision rather than a constant baked into the pallet.
     type PrivateSubmissionChannel = ConstBool<false>;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = TestProofVerifier;
     type BridgeEvmEscrow = TestBridgeEvmEscrow;
     type BridgeSvmEscrow = TestBridgeSvmEscrow;
     type EmergencyHaltController = TestEmergencyHaltController;
+    type TradingHost = ();
 }
 
 const ALICE: AccountId = 1;
@@ -210,6 +213,7 @@ fn new_test_ext() -> TestExternalities {
         authorized_accounts: vec![ALICE, BOB, CHARLIE],
         evm_escrow: H160::repeat_byte(0xE3),
         svm_escrow: [0x53; 32],
+        trading_config: None,
     }
     .assimilate_storage(&mut storage)
     .expect("kernel genesis");
@@ -398,6 +402,53 @@ fn a_store_reaches_chain_storage_through_the_receipt() {
 /// view and `evm_sload` answered EVM's zero for a slot the chain had held a value in since the
 /// previous comit. Contract state was write-only. The control below is the same program on a chain
 /// that never wrote the slot, so a pass here cannot come from the opcode returning a constant.
+/// This is intentionally compiled from actual .x3 source rather than assembly.
+/// It pins the entire source -> bytecode -> real kernel state lifecycle and
+/// protects against a compiler that drops a storage call while the hand-written
+/// bytecode path continues to pass.
+#[test]
+fn compiled_x3_source_persists_a_slot_and_a_later_comit_reads_it() {
+    let writer = compile_source("fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }")
+        .expect("storage writer source must compile");
+    let reader = compile_source("fn main() -> i64 { return evm_sload(7); }")
+        .expect("storage reader source must compile");
+
+    new_test_ext().execute_with(|| {
+        assert_eq!(Kernel::x3_contract_slot(evm_slot_key(7)), None);
+
+        submit_v2(H256::from_low_u64_be(0x5721), Vec::new(), writer)
+            .expect("compiled writer accepted");
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(7)),
+            Some(encoded_i64_payload(41)),
+            "compiled source must actually persist its write"
+        );
+
+        submit_v2_from(
+            BOB,
+            H256::from_low_u64_be(0x5722),
+            Vec::new(),
+            reader.clone(),
+        )
+        .expect("compiled reader accepted");
+        let receipt =
+            Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5722)).expect("reader receipt");
+        assert!(receipt.success);
+        assert_eq!(receipt.return_data, 41i64.to_le_bytes().to_vec());
+        assert!(receipt.storage_writes.is_empty());
+    });
+
+    new_test_ext().execute_with(|| {
+        submit_v2(H256::from_low_u64_be(0x5723), Vec::new(), reader)
+            .expect("reader accepted against empty state");
+        let receipt = Kernel::x3_execution_receipt(H256::from_low_u64_be(0x5723))
+            .expect("empty-state reader receipt");
+        assert!(receipt.success);
+        assert_eq!(receipt.return_data, 0i64.to_le_bytes().to_vec());
+        assert!(receipt.storage_writes.is_empty());
+    });
+}
+
 #[test]
 fn a_second_comit_reads_the_slot_the_first_one_wrote() {
     new_test_ext().execute_with(|| {
@@ -614,6 +665,139 @@ fn a_balance_shaped_change_still_reaches_the_ledger() {
             Kernel::x3_contract_slot(evm_slot_key(0)),
             None,
             "an EVM balance change must not be written to the X3VM slot keyspace"
+        );
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Block context: what a program on this chain learns about its call
+// ---------------------------------------------------------------------------------------------
+
+/// `main() { sstore(0, ctx_block_height()); sstore(1, ctx_chain_id()); sstore(2, ctx_timestamp()); }`
+fn store_block_context_in_slots() -> Vec<u8> {
+    module_with_code(vec![
+        0x18, 0x01, 0x00, // LoadImm r1, 0
+        0x81, 0x02, //       CtxBlockHeight r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x18, 0x01, 0x01, // LoadImm r1, 1
+        0x85, 0x02, //       CtxChainId r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x18, 0x01, 0x02, // LoadImm r1, 2
+        0x82, 0x02, //       CtxTimestamp r2
+        0xB4, 0x01, 0x02, // EvmSstore slot=r1 val=r2
+        0x06, // RetVoid
+    ])
+}
+
+#[test]
+fn a_submitted_program_reads_the_real_block_chain_id_and_timestamp() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(42);
+        submit_v2(
+            H256::from_low_u64_be(0xC7_01),
+            Vec::new(),
+            store_block_context_in_slots(),
+        )
+        .expect("the comit must be accepted");
+
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(0)),
+            Some(encoded_i64_payload(42)),
+            "ctx_block_height is the block the comit executed in"
+        );
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(1)),
+            Some(encoded_i64_payload(
+                <<StorageTest as pallet_x3_kernel::Config>::X3ChainId as Get<u64>>::get() as i64
+            )),
+            "ctx_chain_id is the chain's configured id"
+        );
+        assert_eq!(
+            Kernel::x3_contract_slot(evm_slot_key(2)),
+            Some(encoded_i64_payload(12_000)),
+            "ctx_timestamp is the block timestamp in milliseconds"
+        );
+    });
+}
+
+#[test]
+fn ctx_sender_is_the_signing_account_and_is_refused_where_there_is_none() {
+    new_test_ext().execute_with(|| {
+        // `main() { return ctx_sender(); }`
+        let program = module_with_code(vec![0x80, 0x00, 0x05, 0x00]);
+
+        let signed = Kernel::x3_call_context(Some(&ALICE));
+        let receipt = X3VmAdapter::execute_with_context(&program, 5_000_000, &[], false, &signed)
+            .expect("executes");
+        assert!(receipt.success);
+        // A `u64` account is not 32 bytes, so it is identified by the hash of its encoding.
+        assert_eq!(
+            receipt.return_data,
+            sp_io::hashing::blake2_256(&parity_scale_codec::Encode::encode(&ALICE)).to_vec()
+        );
+        let bob = Kernel::x3_call_context(Some(&BOB));
+        assert_ne!(
+            signed.sender, bob.sender,
+            "different signers, different senders"
+        );
+
+        // A cross-VM call has no signer: the program is told so instead of reading an invented one.
+        let unsigned = Kernel::x3_call_context(None);
+        let receipt = X3VmAdapter::execute_with_context(&program, 5_000_000, &[], false, &unsigned)
+            .expect("a receipt");
+        assert!(!receipt.success);
+        assert!(
+            String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"),
+            "{}",
+            String::from_utf8_lossy(&receipt.return_data)
+        );
+    });
+}
+
+/// An X3 program's `emit` reaches the chain. The production adapter used to replace the engine's
+/// events with an empty list, so an accepted comit's events were lost between execution and the
+/// chain. They are now delivered as `X3LogEmitted` events, in order; the receipt kept in state does
+/// not store them (an event is priced per event, not per byte).
+#[test]
+fn an_emitted_event_reaches_the_chain_as_a_kernel_event() {
+    let program =
+        compile_source("fn main() -> i64 { emit Transfer(1, 2); emit Closed(9); return 7; }")
+            .expect("the emitting program compiles");
+    new_test_ext().execute_with(|| {
+        let comit_id = H256::from_low_u64_be(0xE417);
+        submit_v2(comit_id, Vec::new(), program).expect("the comit must be accepted");
+
+        let logs: Vec<(u32, H256, Vec<u8>)> = System::events()
+            .into_iter()
+            .filter_map(|record| match record.event {
+                RuntimeEvent::Kernel(pallet_x3_kernel::Event::X3LogEmitted {
+                    comit_id: id,
+                    index,
+                    topic,
+                    data,
+                }) if id == comit_id => Some((index, topic, data.into_inner())),
+                _ => None,
+            })
+            .collect();
+
+        // Each argument is one tagged scalar: tag 1 (int), length 8, little-endian digits.
+        let int = |n: i64| {
+            let mut out = vec![1u8, 8];
+            out.extend_from_slice(&n.to_le_bytes());
+            out
+        };
+        let topic = |name: &str| H256::from(sp_io::hashing::sha2_256(name.as_bytes()));
+        assert_eq!(
+            logs,
+            vec![
+                (0, topic("Transfer"), [int(1), int(2)].concat()),
+                (1, topic("Closed"), int(9)),
+            ]
+        );
+        let receipt = Kernel::x3_execution_receipt(comit_id).expect("the receipt is stored");
+        assert!(
+            receipt.logs.is_empty(),
+            "logs are delivered as events, not kept in state"
         );
     });
 }

@@ -34,13 +34,17 @@
       "order": [
         "deepseek_flash",
         "deepseek_pro",
-        "ollama_qwen3"
+        "ollama_qwen3",
+        "ollama_gtx_qwen3"
       ]
     },
     "x3-fast": {
       "tier": "routine",
       "order": [
+        "ollama_gtx",
         "ollama",
+        "ollama_gtx_qwen3",
+        "ollama_qwen3",
         "deepseek_flash",
         "deepseek_pro"
       ]
@@ -48,9 +52,12 @@
     "x3-code": {
       "tier": "routine",
       "order": [
+        "ollama_qwen3",
+        "ollama",
+        "ollama_gtx_qwen3",
+        "ollama_gtx",
         "deepseek_flash",
-        "deepseek_pro",
-        "ollama_qwen3"
+        "deepseek_pro"
       ]
     },
     "x3-deep": {
@@ -58,7 +65,8 @@
       "order": [
         "deepseek_flash",
         "deepseek_pro",
-        "ollama_qwen3"
+        "ollama_qwen3",
+        "ollama_gtx_qwen3"
       ]
     },
     "x3-security": {
@@ -74,7 +82,9 @@
         "deepseek_flash",
         "deepseek_pro",
         "ollama_auditor",
-        "ollama_qwen3"
+        "ollama_qwen3",
+        "ollama_gtx_qwen3",
+        "ollama_gtx"
       ]
     },
     "x3-local": {
@@ -82,7 +92,9 @@
       "order": [
         "ollama_auditor",
         "ollama",
-        "ollama_qwen3"
+        "ollama_qwen3",
+        "ollama_gtx",
+        "ollama_gtx_qwen3"
       ]
     }
   },
@@ -90,7 +102,8 @@
     "routine": [
       "deepseek_flash",
       "deepseek_pro",
-      "ollama_qwen3"
+      "ollama_qwen3",
+      "ollama_gtx_qwen3"
     ],
     "critical": [
       "deepseek_flash",
@@ -102,7 +115,9 @@
     "ollama_qwen3",
     "ollama",
     "nemotron_lightning_free",
-    "nemotron_ultra_free"
+    "nemotron_ultra_free",
+    "ollama_gtx_qwen3",
+    "ollama_gtx"
   ],
   "providers": {
     "ollama": {
@@ -112,7 +127,9 @@
       "supports_tools": false,
       "tool_probe": true,
       "critical_allowed": true,
-      "probe_samples": 2
+      "probe_samples": 2,
+      "max_in_flight": 1,
+      "worker": "gpu-rtx"
     },
     "ollama_qwen3": {
       "base_url": "http://192.168.0.29:11434/v1",
@@ -123,7 +140,9 @@
       "tool_probe_max_tokens": 512,
       "probe_timeout_seconds": 120,
       "probe_samples": 2,
-      "critical_allowed": false
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "gpu-rtx"
     },
     "nemotron_lightning_free": {
       "base_url": "https://openrouter.ai/api/v1",
@@ -230,6 +249,30 @@
       "tool_probe": true,
       "probe_samples": 2,
       "critical_allowed": false
+    },
+    "ollama_gtx": {
+      "base_url": "http://127.0.0.1:11436/v1",
+      "protocol": "chat_completions",
+      "model": "qwen2.5-coder:7b",
+      "supports_tools": false,
+      "tool_probe": true,
+      "critical_allowed": true,
+      "probe_samples": 2,
+      "max_in_flight": 1,
+      "worker": "gpu-gtx"
+    },
+    "ollama_gtx_qwen3": {
+      "base_url": "http://127.0.0.1:11436/v1",
+      "protocol": "chat_completions",
+      "model": "qwen3:8b",
+      "supports_tools": true,
+      "tool_probe": true,
+      "tool_probe_max_tokens": 512,
+      "probe_timeout_seconds": 120,
+      "probe_samples": 2,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "gpu-gtx"
     }
   },
   "capability_probe_samples": 3

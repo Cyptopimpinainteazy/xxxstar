@@ -1,0 +1,74 @@
+{
+  "node": "x3gpu1",
+  "generated": "2026-10-02T23:36:39+00:00",
+  "providers": {
+    "x3gpu1_gpu0_qwen3_8b": {
+      "base_url": "http://192.168.0.30:11434/v1",
+      "model": "qwen3:8b",
+      "supports_tools": true,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu1-gpu0"
+    },
+    "x3gpu1_gpu0_qwen2_5_coder_7b": {
+      "base_url": "http://192.168.0.30:11434/v1",
+      "model": "qwen2.5-coder:7b",
+      "supports_tools": false,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu1-gpu0"
+    },
+    "x3gpu1_gpu1_qwen3_8b": {
+      "base_url": "http://192.168.0.30:11436/v1",
+      "model": "qwen3:8b",
+      "supports_tools": true,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu1-gpu1"
+    },
+    "x3gpu1_gpu1_qwen2_5_coder_7b": {
+      "base_url": "http://192.168.0.30:11436/v1",
+      "model": "qwen2.5-coder:7b",
+      "supports_tools": false,
+      "tool_probe": true,
+      "probe_samples": 2,
+      "probe_timeout_seconds": 120,
+      "critical_allowed": false,
+      "max_in_flight": 1,
+      "worker": "x3gpu1-gpu1"
+    }
+  },
+  "policies": {
+    "x3-local": [
+      "x3gpu1_gpu0_qwen3_8b",
+      "x3gpu1_gpu0_qwen2_5_coder_7b",
+      "x3gpu1_gpu1_qwen3_8b",
+      "x3gpu1_gpu1_qwen2_5_coder_7b"
+    ],
+    "x3-code": [
+      "x3gpu1_gpu0_qwen3_8b",
+      "x3gpu1_gpu0_qwen2_5_coder_7b"
+    ],
+    "x3-deep": [
+      "x3gpu1_gpu0_qwen3_8b",
+      "x3gpu1_gpu0_qwen2_5_coder_7b"
+    ],
+    "x3-review": [
+      "x3gpu1_gpu1_qwen3_8b",
+      "x3gpu1_gpu1_qwen2_5_coder_7b"
+    ],
+    "x3-fast": [
+      "x3gpu1_gpu1_qwen3_8b",
+      "x3gpu1_gpu1_qwen2_5_coder_7b"
+    ]
+  }
+}

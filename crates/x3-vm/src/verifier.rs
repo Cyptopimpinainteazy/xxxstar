@@ -14,10 +14,13 @@
 //! 6. **Gas**: Conservative gas estimate doesn't exceed limits
 //! 7. **On-Chain**: Debug/JIT opcodes forbidden in production
 
-use std::collections::{BTreeMap, BTreeSet};
+use crate::prelude::*;
+use alloc::collections::{BTreeMap, BTreeSet};
 
-use x3_backend::bc_format::{BytecodeModule, VERSION};
+use x3_backend::bc_format::BytecodeModule;
 use x3_backend::opcode::Opcode;
+use x3bc_core::spec::{self, OnChain, OperandKind};
+use x3bc_core::trading::TradeOp;
 
 use crate::error::{VerifierError, VerifierErrorKind, VerifierResult};
 
@@ -43,6 +46,10 @@ pub struct VerifyOptions {
     pub max_module_size: usize,
     /// Reject floating-point arithmetic in consensus-sensitive contexts.
     pub deny_float_arithmetic: bool,
+    /// Admit the trading extension (format 1.1, opcodes `0xE0–0xE9`). Off chain by default; on
+    /// chain only through [`VerifyOptions::on_chain_trading`], which the runtime selects for a
+    /// trade submission.
+    pub allow_trading: bool,
 }
 
 impl Default for VerifyOptions {
@@ -53,6 +60,7 @@ impl Default for VerifyOptions {
             check_reachability: true,
             max_module_size: 16 * 1024 * 1024, // 16 MB
             deny_float_arithmetic: false,
+            allow_trading: true,
         }
     }
 }
@@ -66,7 +74,29 @@ impl VerifyOptions {
             check_reachability: true,
             max_module_size: 1024 * 1024, // 1 MB
             deny_float_arithmetic: true,
+            allow_trading: false,
         }
+    }
+
+    /// The chain's options for a trade submission: every on-chain rule, plus the trading extension.
+    pub fn on_chain_trading() -> Self {
+        Self {
+            allow_trading: true,
+            ..Self::on_chain()
+        }
+    }
+}
+
+/// Does the chain's verifier, configured with `options`, admit `opcode`?
+///
+/// The admission rule as one predicate over the canonical spec, so the verifier's passes and the
+/// exhaustiveness test cannot disagree about it.
+pub fn admitted_on_chain(opcode: Opcode, options: &VerifyOptions) -> bool {
+    match spec::of(opcode).on_chain {
+        OnChain::Admitted => true,
+        OnChain::TradingOnly => options.allow_trading,
+        OnChain::FloatDenied => !options.deny_float_arithmetic,
+        OnChain::Forbidden | OnChain::NotExecutable => false,
     }
 }
 
@@ -146,28 +176,188 @@ impl Verifier {
         // 6. Const pool validation
         Self::verify_const_pool_refs(&instrs, module)?;
 
+        // 6b. Linkage: entries, calls, globals and frames agree with the module's tables.
+        Self::verify_linkage(&instrs, &offsets, module)?;
+
         // 7. Atomic balance validation
         Self::verify_atomic_balance(&instrs)?;
+
+        // 7b. The trading extension: section soundness, opcode/section agreement, atomic windows.
+        Self::verify_trading(module, &instrs, options)?;
 
         // 8. Gas estimation
         Self::verify_gas(&instrs, options)?;
 
         // 9. On-chain restrictions
         if options.on_chain {
-            Self::verify_on_chain_restrictions(&instrs)?;
+            Self::verify_on_chain_restrictions(&instrs, options)?;
+            Self::verify_engine_executes(&instrs)?;
         }
 
         if options.deny_float_arithmetic {
             Self::verify_float_determinism(&instrs)?;
         }
 
+        // Last, so a module refused for what its code does is told that rather than that its
+        // function table is incomplete.
+        if options.on_chain {
+            Self::verify_on_chain_entry(module)?;
+        }
+
+        Ok(())
+    }
+
+    /// The trading extension's static rules.
+    ///
+    /// A module with trading opcodes must carry a sound trading section
+    /// (`x3bc_core::trading::verify_section`, the stateful verifier: bindings and debts resolve,
+    /// capabilities are in the catalog at this engine's version, costs are charged once and before
+    /// every profit floor, every debt is repaid). Its code must agree with the section: each
+    /// indexed opcode names an operation of its own kind, at most once and in section order, after
+    /// `trade_begin` and before `trade_commit`, always inside an atomic window (whose snapshot is
+    /// what makes a trap roll the trade back). After `trade_charge_costs` the code runs straight to
+    /// the end, so the gas charged there for the rest of the function is exact.
+    fn verify_trading(
+        module: &BytecodeModule,
+        instrs: &[DecodedInstr],
+        options: &VerifyOptions,
+    ) -> VerifierResult<()> {
+        let trading = |reason: &str| {
+            VerifierError::without_offset(VerifierErrorKind::Trading(reason.to_string()))
+        };
+        let at = |offset: usize, reason: &str| {
+            VerifierError::new(VerifierErrorKind::Trading(reason.to_string()), offset)
+        };
+        let has_trade_ops = instrs.iter().any(|instr| {
+            Opcode::from_byte(instr.opcode).is_some_and(|opcode| opcode.is_trading_op())
+        });
+        let Some(section) = module.trading.as_ref() else {
+            if has_trade_ops {
+                return Err(trading("trading opcodes without a trading section"));
+            }
+            return Ok(());
+        };
+        if !options.allow_trading {
+            return Err(trading(
+                "the trading extension is not enabled for this context",
+            ));
+        }
+        x3bc_core::trading::verify_section(section).map_err(|error| {
+            trading(&format!(
+                "unsound trading section{}: {}",
+                error
+                    .op_index
+                    .map(|index| format!(" at operation {index}"))
+                    .unwrap_or_default(),
+                error.reason
+            ))
+        })?;
+        if module.functions.len() != 1 {
+            return Err(trading("a trading module has exactly one function"));
+        }
+        let private = module
+            .features
+            .has(x3_backend::bc_format::FeatureFlags::PRIVATE_SUBMISSION_REQUIRED);
+        if private != section.policy.private_submission_required {
+            return Err(trading(
+                "the header's private-submission bit must match the compiled policy",
+            ));
+        }
+
+        let mut depth: usize = 0;
+        let mut begun = false;
+        let mut committed = false;
+        let mut next_index: u64 = 0;
+        let mut charged_at: Option<usize> = None;
+        for (position, instr) in instrs.iter().enumerate() {
+            let Some(opcode) = Opcode::from_byte(instr.opcode) else {
+                continue;
+            };
+            match opcode {
+                Opcode::AtomicBegin => depth += 1,
+                Opcode::AtomicCommit | Opcode::AtomicRollback => depth = depth.saturating_sub(1),
+                _ if opcode.is_trading_op() => {
+                    if depth == 0 {
+                        return Err(at(instr.offset, "trading opcode outside an atomic window"));
+                    }
+                    match opcode {
+                        Opcode::TradeBegin => {
+                            if begun {
+                                return Err(at(instr.offset, "trade begun twice"));
+                            }
+                            begun = true;
+                        }
+                        Opcode::TradeCommit => {
+                            if !begun || committed {
+                                return Err(at(instr.offset, "trade committed out of order"));
+                            }
+                            committed = true;
+                        }
+                        Opcode::TradeLoadProfit => {
+                            if !begun {
+                                return Err(at(instr.offset, "profit read before the trade began"));
+                            }
+                        }
+                        _ => {
+                            if !begun || committed {
+                                return Err(at(
+                                    instr.offset,
+                                    "trading operation outside begin/commit",
+                                ));
+                            }
+                            let index = instr.operands[0];
+                            let op: &TradeOp = section
+                                .ops
+                                .get(index as usize)
+                                .ok_or_else(|| at(instr.offset, "operation index out of range"))?;
+                            if op.opcode() != opcode {
+                                return Err(at(
+                                    instr.offset,
+                                    "opcode does not match the operation it indexes",
+                                ));
+                            }
+                            if index < next_index {
+                                return Err(at(
+                                    instr.offset,
+                                    "operations must run once each, in section order",
+                                ));
+                            }
+                            next_index = index + 1;
+                            if opcode == Opcode::TradeChargeCosts {
+                                charged_at = Some(position);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(position) = charged_at {
+            for instr in &instrs[position + 1..] {
+                if matches!(
+                    Opcode::from_byte(instr.opcode),
+                    Some(
+                        Opcode::Jump
+                            | Opcode::JumpIf
+                            | Opcode::JumpUnless
+                            | Opcode::Call
+                            | Opcode::Halt
+                    )
+                ) {
+                    return Err(at(
+                        instr.offset,
+                        "control flow after costs are charged: the gas charged must be exact",
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
     /// Verify structural integrity.
     fn verify_structure(module: &BytecodeModule) -> VerifierResult<()> {
         // Version check - compare packed u32 representations
-        if module.version.to_packed() > VERSION {
+        if !x3bc_core::bytecode::version_is_readable(module.version.to_packed()) {
             return Err(VerifierError::without_offset(
                 VerifierErrorKind::UnsupportedVersion(module.version.to_packed()),
             ));
@@ -222,36 +412,13 @@ impl Verifier {
         Ok(instrs)
     }
 
-    /// Decode operands for a single instruction.
-    /// Returns (total_size, operands).
+    /// Decode operands for a single instruction, from the canonical operand layout
+    /// (`x3bc_core::spec`). Returns `(total_size, operands)`.
     ///
-    /// # Operand Encoding Reference (74 opcodes)
-    ///
-    /// Register operands are encoded as **u8** (matching the VM interpreter).
-    ///
-    /// | Size | Format | Count | Examples |
-    /// |------|--------|-------|----------|
-    /// | 1B   | `[op]` | 4 | Nop, Halt, RetVoid, Breakpoint |
-    /// | 2B   | `[op][reg:u8]` | 14 | Ret, LoadZero, CtxSender, AtomicCheck, DebugPrint |
-    /// | 3B   | `[op][id:u16]` | 3 | AtomicBegin/Commit/Rollback |
-    /// | 3B   | `[op][reg:u8][i8]` | 1 | LoadImm |
-    /// | 3B   | `[op][dst:u8][src:u8]` | 18 | Mov, NegI, Inc, conversions, ArrayLen |
-    /// | 3B   | `[op][dst:u8][cap:u8]` | 1 | NewArray |
-    /// | 3B   | `[op][r:u8][r:u8]` | 6 | EvmSload, EvmSstore, EvmBalance, SvmGetData... |
-    /// | 4B   | `[op][dst:u8][a:u8][b:u8]` | 28 | AddI, EqI, LoadField, TupleGet, SvmTransfer... |
-    /// | 5B   | `[op][target:u32]` | 1 | Jump |
-    /// | 5B   | `[op][idx:u32]` | 1 | Panic |
-    /// | 5B   | `[op][dst:u8][4×reg:u8]` | 5 | EvmStaticCall, SvmInvoke, SvmCreateAccount |
-    /// | 6B   | `[op][cond:u8][target:u32]` | 2 | JumpIf, JumpUnless |
-    /// | 6B   | `[op][dst:u8][idx:u32]` | 2 | LoadConst, LoadGlobal |
-    /// | 6B   | `[op][idx:u32][src:u8]` | 1 | StoreGlobal |
-    /// | 6B   | `[op][cond:u8][msg:u32]` | 1 | Assert |
-    /// | 6B   | `[op][dst:u8][5×reg:u8]` | 2 | EvmCall, SvmInvokeSigned |
-    /// | var  | `[op][dst:u8][func:u32][argc:u16][args:u8...]` | 1 | Call |
-    /// | var  | `[op][dst:u8][count:u16][elems:u8...]` | 1 | NewTuple |
-    /// | var  | `[op][evt:u32][argc:u16][args:u8...]` | 1 | Emit |
-    /// | var  | `[op][agent:u8][fc:u16][pairs:u8...]` | 1 | AgentInit |
-    /// | var  | `[op][tc:u8][topics:u8...][data:u8]` | 1 | EvmLog |
+    /// The operand vector is in encoding order; a list operand contributes its count followed by
+    /// its elements (a pair list, each pair's two bytes). Registers are one byte, `Imm8` is
+    /// sign-extended. There is no per-opcode table here any more: the spec is the table, and
+    /// `tests/opcode_spec_exhaustive.rs` holds this decoder to it.
     fn decode_operands(
         code: &[u8],
         pc: usize,
@@ -259,510 +426,45 @@ impl Verifier {
     ) -> VerifierResult<(usize, Vec<u64>)> {
         let opcode = Opcode::from_byte(opcode_byte)
             .ok_or_else(|| VerifierError::new(VerifierErrorKind::InvalidOpcode(opcode_byte), pc))?;
-
-        // Helper to read bytes safely
-        let read_u8 = |off: usize| -> VerifierResult<u8> {
-            code.get(pc + off)
-                .copied()
-                .ok_or_else(|| VerifierError::new(VerifierErrorKind::OperandOutOfBounds, pc))
+        let out_of_bounds = || VerifierError::new(VerifierErrorKind::OperandOutOfBounds, pc);
+        let read = |offset: usize, width: usize| -> VerifierResult<u64> {
+            let start = pc.checked_add(offset).ok_or_else(out_of_bounds)?;
+            let end = start.checked_add(width).ok_or_else(out_of_bounds)?;
+            let bytes = code.get(start..end).ok_or_else(out_of_bounds)?;
+            let mut value: u64 = 0;
+            for (i, byte) in bytes.iter().enumerate() {
+                value |= u64::from(*byte) << (8 * i);
+            }
+            Ok(value)
         };
 
-        let read_u16 = |off: usize| -> VerifierResult<u16> {
-            if pc + off + 2 > code.len() {
-                return Err(VerifierError::new(
-                    VerifierErrorKind::OperandOutOfBounds,
-                    pc,
-                ));
-            }
-            Ok(u16::from_le_bytes([code[pc + off], code[pc + off + 1]]))
-        };
-
-        let read_u32 = |off: usize| -> VerifierResult<u32> {
-            if pc + off + 4 > code.len() {
-                return Err(VerifierError::new(
-                    VerifierErrorKind::OperandOutOfBounds,
-                    pc,
-                ));
-            }
-            Ok(u32::from_le_bytes([
-                code[pc + off],
-                code[pc + off + 1],
-                code[pc + off + 2],
-                code[pc + off + 3],
-            ]))
-        };
-
-        // Decode based on opcode format
-        match opcode {
-            // No operands (1 byte total)
-            Opcode::Nop | Opcode::Halt | Opcode::RetVoid => Ok((1, vec![])),
-
-            // Single register operand: opcode reg:u8 (2 bytes)
-            Opcode::LoadZero
-            | Opcode::LoadTrue
-            | Opcode::LoadFalse
-            | Opcode::CtxSender
-            | Opcode::CtxBlockHeight
-            | Opcode::CtxTimestamp
-            | Opcode::CtxValue
-            | Opcode::CtxGas
-            | Opcode::CtxChainId
-            | Opcode::AtomicCheck
-            | Opcode::AgentSelf => {
-                let dst = read_u8(1)? as u64;
-                Ok((2, vec![dst]))
-            }
-
-            // Return with value: opcode src:u8 (2 bytes)
-            Opcode::Ret => {
-                let src = read_u8(1)? as u64;
-                Ok((2, vec![src]))
-            }
-
-            // Two registers: opcode dst:u8 src:u8 (3 bytes)
-            Opcode::Mov
-            | Opcode::NegI
-            | Opcode::NegF
-            | Opcode::Not
-            | Opcode::LNot
-            | Opcode::Inc
-            | Opcode::Dec
-            | Opcode::I32ToI64
-            | Opcode::I64ToI32
-            | Opcode::I32ToF32
-            | Opcode::I64ToF64
-            | Opcode::F32ToI32
-            | Opcode::F64ToI64
-            | Opcode::F32ToF64
-            | Opcode::F64ToF32
-            | Opcode::ToBool
-            | Opcode::ArrayLen
-            | Opcode::ArrayPop => {
-                let dst = read_u8(1)? as u64;
-                let src = read_u8(2)? as u64;
-                Ok((3, vec![dst, src]))
-            }
-
-            // Three registers: opcode dst:u8 a:u8 b:u8 (4 bytes)
-            Opcode::AddI
-            | Opcode::SubI
-            | Opcode::MulI
-            | Opcode::DivI
-            | Opcode::ModI
-            | Opcode::AddF
-            | Opcode::SubF
-            | Opcode::MulF
-            | Opcode::DivF
-            | Opcode::ModF
-            | Opcode::EqI
-            | Opcode::NeI
-            | Opcode::LtI
-            | Opcode::LeI
-            | Opcode::GtI
-            | Opcode::GeI
-            | Opcode::EqF
-            | Opcode::NeF
-            | Opcode::LtF
-            | Opcode::LeF
-            | Opcode::GtF
-            | Opcode::GeF
-            | Opcode::And
-            | Opcode::Or
-            | Opcode::Xor
-            | Opcode::Shl
-            | Opcode::Shr
-            | Opcode::UShr
-            | Opcode::LAnd
-            | Opcode::LOr
-            | Opcode::LoadIndex
-            | Opcode::StoreIndex => {
-                let dst = read_u8(1)? as u64;
-                let a = read_u8(2)? as u64;
-                let b = read_u8(3)? as u64;
-                Ok((4, vec![dst, a, b]))
-            }
-
-            // Jump: opcode target:u32 (5 bytes)
-            Opcode::Jump => {
-                let target = read_u32(1)? as u64;
-                Ok((5, vec![target]))
-            }
-
-            // Conditional jump: opcode cond:u8 target:u32 (6 bytes)
-            Opcode::JumpIf | Opcode::JumpUnless => {
-                let cond = read_u8(1)? as u64;
-                let target = read_u32(2)? as u64;
-                Ok((6, vec![cond, target]))
-            }
-
-            // Load const: opcode dst:u8 idx:u32 (6 bytes)
-            Opcode::LoadConst => {
-                let dst = read_u8(1)? as u64;
-                let idx = read_u32(2)? as u64;
-                Ok((6, vec![dst, idx]))
-            }
-
-            // Load/store global: opcode dst:u8 idx:u32 (6 bytes)
-            Opcode::LoadGlobal => {
-                let dst = read_u8(1)? as u64;
-                let idx = read_u32(2)? as u64;
-                Ok((6, vec![dst, idx]))
-            }
-            Opcode::StoreGlobal => {
-                let idx = read_u32(1)? as u64;
-                let src = read_u8(5)? as u64;
-                Ok((6, vec![idx, src]))
-            }
-
-            // Load field: opcode dst:u8 obj:u8 field:u8 (4 bytes)
-            Opcode::LoadField => {
-                let dst = read_u8(1)? as u64;
-                let obj = read_u8(2)? as u64;
-                let field = read_u8(3)? as u64;
-                Ok((4, vec![dst, obj, field]))
-            }
-
-            // Store field: opcode obj:u8 field:u8 val:u8 (4 bytes)
-            Opcode::StoreField => {
-                let obj = read_u8(1)? as u64;
-                let field = read_u8(2)? as u64;
-                let val = read_u8(3)? as u64;
-                Ok((4, vec![obj, field, val]))
-            }
-
-            // Load immediate: opcode dst:u8 val:i8 (3 bytes)
-            Opcode::LoadImm => {
-                let dst = read_u8(1)? as u64;
-                let val = read_u8(2)? as i8 as i64 as u64;
-                Ok((3, vec![dst, val]))
-            }
-
-            // Array push: opcode arr:u8 val:u8 (3 bytes)
-            Opcode::ArrayPush => {
-                let arr = read_u8(1)? as u64;
-                let val = read_u8(2)? as u64;
-                Ok((3, vec![arr, val]))
-            }
-
-            // New array: opcode dst:u8 capacity:u8 (3 bytes)
-            Opcode::NewArray => {
-                let dst = read_u8(1)? as u64;
-                let capacity = read_u8(2)? as u64;
-                Ok((3, vec![dst, capacity]))
-            }
-
-            // Tuple get: opcode dst:u8 tuple:u8 idx:u8 (4 bytes)
-            Opcode::TupleGet => {
-                let dst = read_u8(1)? as u64;
-                let tuple = read_u8(2)? as u64;
-                let idx = read_u8(3)? as u64;
-                Ok((4, vec![dst, tuple, idx]))
-            }
-
-            // Atomic operations: opcode id:u16 (3 bytes)
-            Opcode::AtomicBegin | Opcode::AtomicCommit | Opcode::AtomicRollback => {
-                let id = read_u16(1)? as u64;
-                Ok((3, vec![id]))
-            }
-
-            // Call: opcode dst:u8 func:u32 argc:u16 [args:u8...] (variable)
-            Opcode::Call => {
-                let dst = read_u8(1)? as u64;
-                let func = read_u32(2)? as u64;
-                let argc = read_u16(6)? as usize;
-                let mut operands = vec![dst, func, argc as u64];
-                // Read argument registers
-                for i in 0..argc {
-                    let arg = read_u8(8 + i)? as u64;
-                    operands.push(arg);
+        let mut offset = 1usize;
+        let mut operands = Vec::new();
+        for kind in spec::of(opcode).operands {
+            match kind {
+                OperandKind::Imm8 => {
+                    operands.push(read(offset, 1)? as u8 as i8 as i64 as u64);
+                    offset += 1;
                 }
-                Ok((8 + argc, operands))
-            }
-
-            // New tuple: opcode dst:u8 count:u16 [elements:u8...] (variable)
-            Opcode::NewTuple => {
-                let dst = read_u8(1)? as u64;
-                let count = read_u16(2)? as usize;
-                let mut operands = vec![dst, count as u64];
-                for i in 0..count {
-                    let elem = read_u8(4 + i)? as u64;
-                    operands.push(elem);
+                OperandKind::RegList16 | OperandKind::PairList16 | OperandKind::TopicList8 => {
+                    let count = read(offset, kind.width())?;
+                    offset += kind.width();
+                    operands.push(count);
+                    let elements = (count as usize)
+                        .checked_mul(kind.element_width())
+                        .ok_or_else(out_of_bounds)?;
+                    for i in 0..elements {
+                        operands.push(read(offset + i, 1)?);
+                    }
+                    offset += elements;
                 }
-                Ok((4 + count, operands))
-            }
-
-            // Emit: opcode name:u8 argc:u16 [args:u8...] (variable)
-            //
-            // The name was a `u32` constant-pool index here too. Nothing emitted the opcode, so
-            // nothing had ever disagreed; the moment the compiler did, this decoder walked past
-            // the end of the instruction and reported `OperandOutOfBounds` for a well-formed one.
-            Opcode::Emit => {
-                let name = read_u8(1)? as u64;
-                let argc = read_u16(2)? as usize;
-                let mut operands = vec![name, argc as u64];
-                for i in 0..argc {
-                    let arg = read_u8(4 + i)? as u64;
-                    operands.push(arg);
+                _ => {
+                    operands.push(read(offset, kind.width())?);
+                    offset += kind.width();
                 }
-                Ok((4 + argc, operands))
-            }
-
-            // Agent init: opcode agent:u8 field_count:u16 [field_idx:u8 val:u8...] (variable)
-            Opcode::AgentInit => {
-                let agent = read_u8(1)? as u64;
-                let field_count = read_u16(2)? as usize;
-                let mut operands = vec![agent, field_count as u64];
-                for i in 0..field_count {
-                    let field_idx = read_u8(4 + i * 2)? as u64;
-                    let val = read_u8(5 + i * 2)? as u64;
-                    operands.push(field_idx);
-                    operands.push(val);
-                }
-                Ok((4 + field_count * 2, operands))
-            }
-
-            // EVM call: opcode dst:u8 gas:u8 addr:u8 value:u8 data:u8 (6 bytes)
-            Opcode::EvmCall => {
-                let dst = read_u8(1)? as u64;
-                let gas = read_u8(2)? as u64;
-                let addr = read_u8(3)? as u64;
-                let value = read_u8(4)? as u64;
-                let data = read_u8(5)? as u64;
-                Ok((6, vec![dst, gas, addr, value, data]))
-            }
-
-            // EVM staticcall/delegatecall: opcode dst:u8 gas:u8 addr:u8 data:u8 (5 bytes)
-            Opcode::EvmStaticCall | Opcode::EvmDelegateCall => {
-                let dst = read_u8(1)? as u64;
-                let gas = read_u8(2)? as u64;
-                let addr = read_u8(3)? as u64;
-                let data = read_u8(4)? as u64;
-                Ok((5, vec![dst, gas, addr, data]))
-            }
-
-            // EVM sload: opcode dst:u8 slot:u8 (3 bytes)
-            Opcode::EvmSload => {
-                let dst = read_u8(1)? as u64;
-                let slot = read_u8(2)? as u64;
-                Ok((3, vec![dst, slot]))
-            }
-
-            // EVM sstore: opcode slot:u8 val:u8 (3 bytes)
-            Opcode::EvmSstore => {
-                let slot = read_u8(1)? as u64;
-                let val = read_u8(2)? as u64;
-                Ok((3, vec![slot, val]))
-            }
-
-            // EVM create: opcode dst:u8 value:u8 code:u8 (4 bytes)
-            Opcode::EvmCreate => {
-                let dst = read_u8(1)? as u64;
-                let value = read_u8(2)? as u64;
-                let code_reg = read_u8(3)? as u64;
-                Ok((4, vec![dst, value, code_reg]))
-            }
-
-            // EVM create2: opcode dst:u8 value:u8 code:u8 salt:u8 (5 bytes)
-            Opcode::EvmCreate2 => {
-                let dst = read_u8(1)? as u64;
-                let value = read_u8(2)? as u64;
-                let code_reg = read_u8(3)? as u64;
-                let salt = read_u8(4)? as u64;
-                Ok((5, vec![dst, value, code_reg, salt]))
-            }
-
-            // ================================================================
-            // Debug/Meta (0xF0 - 0xFF)
-            // ================================================================
-
-            // Debug print: opcode src:u8 (2 bytes)
-            Opcode::DebugPrint => {
-                let src = read_u8(1)? as u64;
-                Ok((2, vec![src]))
-            }
-
-            // Breakpoint: opcode (1 byte) - no operands
-            Opcode::Breakpoint => Ok((1, vec![])),
-
-            // Assert: opcode cond:u8 msg_idx:u32 (6 bytes)
-            Opcode::Assert => {
-                let cond = read_u8(1)? as u64;
-                let msg_idx = read_u32(2)? as u64;
-                Ok((6, vec![cond, msg_idx]))
-            }
-
-            // Panic: opcode msg_idx:u32 (5 bytes)
-            Opcode::Panic => {
-                let msg_idx = read_u32(1)? as u64;
-                Ok((5, vec![msg_idx]))
-            }
-
-            // ================================================================
-            // EVM Intrinsics (0xB0 - 0xBF) - remaining opcodes
-            // ================================================================
-
-            // EVM log: opcode topic_count:u8 [topics:u8...] data:u8 (variable)
-            // Size = 1 (opcode) + 1 (count) + count (topics) + 1 (data)
-            Opcode::EvmLog => {
-                let topic_count = read_u8(1)? as usize;
-                let mut operands = vec![topic_count as u64];
-                for i in 0..topic_count {
-                    let topic = read_u8(2 + i)? as u64;
-                    operands.push(topic);
-                }
-                let data = read_u8(2 + topic_count)? as u64;
-                operands.push(data);
-                Ok((3 + topic_count, operands))
-            }
-
-            // EVM balance: opcode dst:u8 addr:u8 (3 bytes)
-            Opcode::EvmBalance => {
-                let dst = read_u8(1)? as u64;
-                let addr = read_u8(2)? as u64;
-                Ok((3, vec![dst, addr]))
-            }
-
-            // EVM codesize: opcode dst:u8 addr:u8 (3 bytes)
-            Opcode::EvmCodeSize => {
-                let dst = read_u8(1)? as u64;
-                let addr = read_u8(2)? as u64;
-                Ok((3, vec![dst, addr]))
-            }
-
-            // ================================================================
-            // SVM Intrinsics (0xC0 - 0xCF)
-            // ================================================================
-
-            // SVM invoke: opcode dst:u8 program:u8 accounts:u8 data:u8 (5 bytes)
-            Opcode::SvmInvoke => {
-                let dst = read_u8(1)? as u64;
-                let program = read_u8(2)? as u64;
-                let accounts = read_u8(3)? as u64;
-                let data = read_u8(4)? as u64;
-                Ok((5, vec![dst, program, accounts, data]))
-            }
-
-            // SVM invoke signed: opcode dst:u8 program:u8 accounts:u8 data:u8 seeds:u8 (6 bytes)
-            Opcode::SvmInvokeSigned => {
-                let dst = read_u8(1)? as u64;
-                let program = read_u8(2)? as u64;
-                let accounts = read_u8(3)? as u64;
-                let data = read_u8(4)? as u64;
-                let seeds = read_u8(5)? as u64;
-                Ok((6, vec![dst, program, accounts, data, seeds]))
-            }
-
-            // SVM create account: opcode dst:u8 lamports:u8 space:u8 owner:u8 (5 bytes)
-            Opcode::SvmCreateAccount => {
-                let dst = read_u8(1)? as u64;
-                let lamports = read_u8(2)? as u64;
-                let space = read_u8(3)? as u64;
-                let owner = read_u8(4)? as u64;
-                Ok((5, vec![dst, lamports, space, owner]))
-            }
-
-            // SVM transfer: opcode from:u8 to:u8 lamports:u8 (4 bytes)
-            Opcode::SvmTransfer => {
-                let from = read_u8(1)? as u64;
-                let to = read_u8(2)? as u64;
-                let lamports = read_u8(3)? as u64;
-                Ok((4, vec![from, to, lamports]))
-            }
-
-            // SVM get data: opcode dst:u8 account:u8 (3 bytes)
-            Opcode::SvmGetData => {
-                let dst = read_u8(1)? as u64;
-                let account = read_u8(2)? as u64;
-                Ok((3, vec![dst, account]))
-            }
-
-            // SVM set data: opcode account:u8 data:u8 (3 bytes)
-            Opcode::SvmSetData => {
-                let account = read_u8(1)? as u64;
-                let data = read_u8(2)? as u64;
-                Ok((3, vec![account, data]))
-            }
-
-            // SVM get rent: opcode dst:u8 (2 bytes)
-            Opcode::SvmGetRent => {
-                let dst = read_u8(1)? as u64;
-                Ok((2, vec![dst]))
-            }
-
-            // SVM get clock: opcode dst:u8 (2 bytes)
-            Opcode::SvmGetClock => {
-                let dst = read_u8(1)? as u64;
-                Ok((2, vec![dst]))
-            }
-
-            // ================================================================
-            // GPU Intrinsics (0xD0 - 0xD5)
-            // ================================================================
-
-            // gpu_sha256_batch: opcode dst:u8 inputs:u8 count:u8 (4 bytes)
-            Opcode::GpuSha256Batch => {
-                let dst = read_u8(1)? as u64;
-                let inputs = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                Ok((4, vec![dst, inputs, count]))
-            }
-
-            // gpu_ed25519_verify: opcode dst:u8 sigs:u8 count:u8 (4 bytes)
-            Opcode::GpuEd25519Verify => {
-                let dst = read_u8(1)? as u64;
-                let sigs = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                Ok((4, vec![dst, sigs, count]))
-            }
-
-            // gpu_poh_chain: opcode dst:u8 seeds:u8 count:u8 chain_len:u8 (5 bytes)
-            Opcode::GpuPohChain => {
-                let dst = read_u8(1)? as u64;
-                let seeds = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                let chain_len = read_u8(4)? as u64;
-                Ok((5, vec![dst, seeds, count, chain_len]))
-            }
-
-            // gpu_sha256_streamed: opcode dst:u8 inputs:u8 count:u8 streams:u8 (5 bytes)
-            Opcode::GpuSha256Streamed => {
-                let dst = read_u8(1)? as u64;
-                let inputs = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                let streams = read_u8(4)? as u64;
-                Ok((5, vec![dst, inputs, count, streams]))
-            }
-
-            // gpu_device_count: opcode dst:u8 (2 bytes)
-            Opcode::GpuDeviceCount => {
-                let dst = read_u8(1)? as u64;
-                Ok((2, vec![dst]))
-            }
-
-            // gpu_benchmark: opcode dst:u8 count:u8 streams:u8 (4 bytes)
-            Opcode::GpuBenchmark => {
-                let dst = read_u8(1)? as u64;
-                let count = read_u8(2)? as u64;
-                let streams = read_u8(3)? as u64;
-                Ok((4, vec![dst, count, streams]))
-            }
-
-            // gpu_keccak256_batch: opcode dst:u8 inputs:u8 count:u8 (4 bytes)
-            Opcode::GpuKeccak256Batch => {
-                let dst = read_u8(1)? as u64;
-                let inputs = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                Ok((4, vec![dst, inputs, count]))
-            }
-
-            // gpu_secp256k1_verify: opcode dst:u8 sigs:u8 count:u8 (4 bytes)
-            Opcode::GpuSecp256k1Verify => {
-                let dst = read_u8(1)? as u64;
-                let sigs = read_u8(2)? as u64;
-                let count = read_u8(3)? as u64;
-                Ok((4, vec![dst, sigs, count]))
             }
         }
+        Ok((offset, operands))
     }
 
     /// Verify CFG: all jump targets are valid instruction boundaries.
@@ -801,6 +503,104 @@ impl Verifier {
             }
         }
 
+        Ok(())
+    }
+
+    /// Check that every reference into the module's tables matches the table.
+    ///
+    /// These were checked only when the interpreter reached them, so a module that called a
+    /// function with the wrong number of arguments, named a global that does not exist, or entered
+    /// a function in the middle of an instruction was admitted and failed at run time. The runtime
+    /// interpreter this engine replaces refused each of them at intake; so does this.
+    fn verify_linkage(
+        instrs: &[DecodedInstr],
+        offsets: &BTreeSet<usize>,
+        module: &BytecodeModule,
+    ) -> VerifierResult<()> {
+        for (idx, func) in module.functions.iter().enumerate() {
+            if !offsets.contains(&(func.entry_point as usize)) {
+                return Err(VerifierError::without_offset(
+                    VerifierErrorKind::FunctionEntryUnaligned(idx, func.entry_point),
+                ));
+            }
+            let frame = func.param_count as usize + func.local_count as usize;
+            if frame > crate::vm::MAX_REGISTERS {
+                return Err(VerifierError::without_offset(
+                    VerifierErrorKind::FunctionFrameTooLarge(idx, frame, crate::vm::MAX_REGISTERS),
+                ));
+            }
+        }
+
+        let globals = module.globals.len();
+        for instr in instrs {
+            match Opcode::from_byte(instr.opcode) {
+                Some(Opcode::Call) => {
+                    // operands: dst, func, argc, args...
+                    let func_idx = instr.operands[1] as u32;
+                    let argc = instr.operands[2] as usize;
+                    // `verify_cfg` has already refused an index past the table.
+                    if let Some(func) = module.functions.get(func_idx as usize) {
+                        if func.param_count as usize != argc {
+                            return Err(VerifierError::new(
+                                VerifierErrorKind::CallArgumentCountMismatch(
+                                    func_idx,
+                                    func.param_count,
+                                    argc,
+                                ),
+                                instr.offset,
+                            ));
+                        }
+                    }
+                }
+                Some(Opcode::LoadGlobal) | Some(Opcode::StoreGlobal) => {
+                    // LoadGlobal: dst, idx. StoreGlobal: idx, src.
+                    let index = if instr.opcode == Opcode::LoadGlobal as u8 {
+                        instr.operands[1]
+                    } else {
+                        instr.operands[0]
+                    } as u32;
+                    if index as usize >= globals {
+                        return Err(VerifierError::new(
+                            VerifierErrorKind::GlobalIndexOutOfBounds(index, globals),
+                            instr.offset,
+                        ));
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// On chain the runtime calls function 0 with no arguments, so it must exist and take none.
+    fn verify_on_chain_entry(module: &BytecodeModule) -> VerifierResult<()> {
+        let entry = module.functions.first().ok_or_else(|| {
+            VerifierError::without_offset(VerifierErrorKind::MissingEntryFunction)
+        })?;
+        if entry.param_count != 0 {
+            return Err(VerifierError::without_offset(
+                VerifierErrorKind::InvalidParamCount(0, entry.param_count),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Refuse, at intake, any opcode the interpreter has no implementation for.
+    ///
+    /// Without this a module carrying one was admitted, stored, and then failed with
+    /// `UnimplementedOpcode` on the block that reached it. An admitted program is a promise that
+    /// the chain can run it; this keeps the promise checkable before anything is charged.
+    fn verify_engine_executes(instrs: &[DecodedInstr]) -> VerifierResult<()> {
+        for instr in instrs {
+            if let Some(opcode) = Opcode::from_byte(instr.opcode) {
+                if !crate::vm::engine_executes(opcode) {
+                    return Err(VerifierError::new(
+                        VerifierErrorKind::NotExecutable(instr.opcode),
+                        instr.offset,
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -894,43 +694,28 @@ impl Verifier {
     }
 
     /// Verify on-chain restrictions (no debug opcodes).
-    fn verify_on_chain_restrictions(instrs: &[DecodedInstr]) -> VerifierResult<()> {
+    fn verify_on_chain_restrictions(
+        instrs: &[DecodedInstr],
+        options: &VerifyOptions,
+    ) -> VerifierResult<()> {
         for instr in instrs {
-            match Opcode::from_byte(instr.opcode) {
-                // GPU intrinsics are host calls into whatever device the node has: a device count
-                // or a benchmark result differs from validator to validator, and a runtime has no
-                // GPU host at all, so a block containing one cannot be agreed on.
-                Some(
-                    Opcode::DebugPrint
-                    | Opcode::Breakpoint
-                    | Opcode::GpuSha256Batch
-                    | Opcode::GpuEd25519Verify
-                    | Opcode::GpuPohChain
-                    | Opcode::GpuSha256Streamed
-                    | Opcode::GpuDeviceCount
-                    | Opcode::GpuBenchmark
-                    | Opcode::GpuKeccak256Batch
-                    | Opcode::GpuSecp256k1Verify
-                    // The runtime interpreter refuses these at intake (TICKET-149): the 32-bit
-                    // conversions have no honest meaning in an `i64`/`f64` value model, and
-                    // `ctx_gas` answers with a count the two engines are not held to agree on.
-                    | Opcode::I32ToI64
-                    | Opcode::I64ToI32
-                    | Opcode::I32ToF32
-                    | Opcode::I64ToF64
-                    | Opcode::F32ToI32
-                    | Opcode::F64ToI64
-                    | Opcode::F32ToF64
-                    | Opcode::F64ToF32
-                    | Opcode::ToBool
-                    | Opcode::CtxGas,
-                ) => {
+            if let Some(opcode) = Opcode::from_byte(instr.opcode) {
+                // GPU intrinsics are host calls into whatever device the node has; debug opcodes
+                // print; the 32-bit conversions have no honest meaning in the value model and
+                // `ctx_gas` answers with a count the engines are not held to agree on (TICKET-149).
+                // The list is the spec's `OnChain::Forbidden`; trading opcodes are forbidden unless
+                // the options admit the extension.
+                let forbidden = match spec::of(opcode).on_chain {
+                    OnChain::Forbidden => true,
+                    OnChain::TradingOnly => !options.allow_trading,
+                    _ => false,
+                };
+                if forbidden {
                     return Err(VerifierError::new(
                         VerifierErrorKind::ForbiddenOnChain(instr.opcode),
                         instr.offset,
                     ));
                 }
-                _ => {}
             }
         }
 
@@ -940,14 +725,13 @@ impl Verifier {
     /// Verify that platform-dependent floating-point arithmetic is not used.
     fn verify_float_determinism(instrs: &[DecodedInstr]) -> VerifierResult<()> {
         for instr in instrs {
-            match Opcode::from_byte(instr.opcode) {
-                Some(Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF | Opcode::ModF) => {
+            if let Some(opcode) = Opcode::from_byte(instr.opcode) {
+                if spec::of(opcode).on_chain == OnChain::FloatDenied {
                     return Err(VerifierError::new(
                         VerifierErrorKind::ForbiddenOnChain(instr.opcode),
                         instr.offset,
                     ));
                 }
-                _ => {}
             }
         }
 
@@ -956,147 +740,18 @@ impl Verifier {
 }
 
 /// Get gas cost for an opcode.
+/// The gas one execution of `opcode` costs: the single table both the verifier's static bound and
+/// the interpreter's charge read.
+///
+/// The interpreter used to keep its own table, which disagreed on 78 of 114 opcodes: an `emit`
+/// (whose payload is consensus state) cost 1, an atomic window (which copies every register and
+/// global) cost 5, and the verifier's bound described charges no block made. One table means a
+/// simulation's figure, the verifier's estimate and a block's charge are the same arithmetic.
+///
+/// Every instruction costs at least 1, so the gas a run consumed bounds the instructions it ran.
 pub fn opcode_gas_cost(opcode: u8) -> u64 {
     match Opcode::from_byte(opcode) {
-        Some(op) => match op {
-            // Free operations
-            Opcode::Nop => 0,
-
-            // Very cheap (1 gas)
-            Opcode::Mov
-            | Opcode::LoadZero
-            | Opcode::LoadTrue
-            | Opcode::LoadFalse
-            | Opcode::LoadImm => 1,
-
-            // Cheap (2 gas)
-            Opcode::AddI
-            | Opcode::SubI
-            | Opcode::NegI
-            | Opcode::Inc
-            | Opcode::Dec
-            | Opcode::And
-            | Opcode::Or
-            | Opcode::Xor
-            | Opcode::Not
-            | Opcode::Shl
-            | Opcode::Shr
-            | Opcode::UShr
-            | Opcode::LAnd
-            | Opcode::LOr
-            | Opcode::LNot => 2,
-
-            // Moderate (3 gas)
-            Opcode::MulI
-            | Opcode::DivI
-            | Opcode::ModI
-            | Opcode::AddF
-            | Opcode::SubF
-            | Opcode::MulF
-            | Opcode::DivF
-            | Opcode::ModF
-            | Opcode::NegF
-            | Opcode::EqI
-            | Opcode::NeI
-            | Opcode::LtI
-            | Opcode::LeI
-            | Opcode::GtI
-            | Opcode::GeI
-            | Opcode::EqF
-            | Opcode::NeF
-            | Opcode::LtF
-            | Opcode::LeF
-            | Opcode::GtF
-            | Opcode::GeF => 3,
-
-            // Memory operations (5 gas)
-            Opcode::LoadConst
-            | Opcode::LoadGlobal
-            | Opcode::StoreGlobal
-            | Opcode::LoadIndex
-            | Opcode::StoreIndex
-            | Opcode::LoadField
-            | Opcode::StoreField => 5,
-
-            // Type conversions (2 gas)
-            Opcode::I32ToI64
-            | Opcode::I64ToI32
-            | Opcode::I32ToF32
-            | Opcode::I64ToF64
-            | Opcode::F32ToI32
-            | Opcode::F64ToI64
-            | Opcode::F32ToF64
-            | Opcode::F64ToF32
-            | Opcode::ToBool => 2,
-
-            // Control flow (1-10 gas)
-            Opcode::Jump | Opcode::JumpIf | Opcode::JumpUnless => 3,
-            Opcode::Call => 10,
-            Opcode::Ret | Opcode::RetVoid => 2,
-            Opcode::Halt => 1,
-
-            // Array operations (5-10 gas)
-            Opcode::NewArray => 10,
-            Opcode::ArrayLen => 2,
-            Opcode::ArrayPush | Opcode::ArrayPop => 5,
-            Opcode::NewTuple => 10,
-            Opcode::TupleGet => 3,
-
-            // Context operations (5 gas)
-            Opcode::CtxSender
-            | Opcode::CtxBlockHeight
-            | Opcode::CtxTimestamp
-            | Opcode::CtxValue
-            | Opcode::CtxGas
-            | Opcode::CtxChainId => 5,
-
-            // Atomic operations (100 gas)
-            Opcode::AtomicBegin | Opcode::AtomicCommit | Opcode::AtomicRollback => 100,
-            Opcode::AtomicCheck => 5,
-
-            // Agent operations (50 gas)
-            Opcode::AgentSelf => 5,
-            Opcode::AgentInit => 50,
-            Opcode::Emit => 20,
-
-            // EVM intrinsics (very expensive)
-            Opcode::EvmCall => 2500,
-            Opcode::EvmStaticCall => 700,
-            Opcode::EvmDelegateCall => 700,
-            Opcode::EvmSload => 200,
-            Opcode::EvmSstore => 5000,
-            Opcode::EvmCreate => 32000,
-            Opcode::EvmCreate2 => 32000,
-            Opcode::EvmLog => 375, // Base log cost
-            Opcode::EvmBalance => 400,
-            Opcode::EvmCodeSize => 100,
-
-            // SVM intrinsics (expensive)
-            Opcode::SvmInvoke => 5000,
-            Opcode::SvmInvokeSigned => 6000,
-            Opcode::SvmCreateAccount => 10000,
-            Opcode::SvmTransfer => 3000,
-            Opcode::SvmGetData => 200,
-            Opcode::SvmSetData => 1000,
-            Opcode::SvmGetRent => 100,
-            Opcode::SvmGetClock => 100,
-
-            // GPU intrinsics (very expensive — real CUDA kernel launch)
-            Opcode::GpuSha256Batch
-            | Opcode::GpuEd25519Verify
-            | Opcode::GpuPohChain
-            | Opcode::GpuKeccak256Batch => 500,
-            Opcode::GpuSha256Streamed => 750,
-            Opcode::GpuDeviceCount => 10,
-            Opcode::GpuBenchmark => 1000,
-            Opcode::GpuSecp256k1Verify => 600,
-
-            // Debug (0 gas in dev, forbidden on-chain)
-            Opcode::DebugPrint => 0,
-            Opcode::Breakpoint => 0,
-            Opcode::Assert => 5,
-            Opcode::Panic => 5,
-        },
+        Some(op) => spec::of(op).gas,
         None => 0,
     }
 }
@@ -1119,6 +774,7 @@ mod tests {
             code,
             debug_info: None,
             metadata: None,
+            trading: None,
         }
     }
 
@@ -1268,6 +924,164 @@ mod tests {
         }
     }
 
+    fn entry(params: u8, locals: u16, at: u32) -> x3_backend::bc_format::FunctionEntry {
+        x3_backend::bc_format::FunctionEntry {
+            name: "f".to_string(),
+            entry_point: at,
+            param_count: params,
+            local_count: locals,
+            max_stack: 8,
+            return_type_tag: 1,
+        }
+    }
+
+    #[test]
+    fn an_opcode_the_engine_cannot_run_is_refused_on_chain_and_admitted_off_it() {
+        // `agent_self dst` — decodes, and the interpreter has no arm for it (no agent registry).
+        let mut module = make_simple_module(vec![
+            Opcode::AgentSelf.to_byte(),
+            0x00,
+            Opcode::Halt.to_byte(),
+        ]);
+        module.functions.push(entry(0, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("a block could not run it");
+        assert!(
+            matches!(refusal.kind, VerifierErrorKind::NotExecutable(b) if b == Opcode::AgentSelf.to_byte()),
+            "{refusal:?}"
+        );
+        // Off chain the verifier stays a structural check: tools may inspect such a module.
+        Verifier::verify_module(&module, &VerifyOptions::default()).expect("admitted off chain");
+    }
+
+    #[test]
+    fn a_call_with_the_wrong_number_of_arguments_is_refused() {
+        // main: call f1 with one argument; f1 declares two parameters.
+        let mut code = vec![Opcode::Call.to_byte(), 0x00];
+        code.extend_from_slice(&1u32.to_le_bytes());
+        code.extend_from_slice(&1u16.to_le_bytes());
+        code.push(0x02); // the one argument register
+        code.push(Opcode::Halt.to_byte());
+        let f1_at = code.len() as u32;
+        code.push(Opcode::RetVoid.to_byte());
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(0, 4, 0));
+        module.functions.push(entry(2, 4, f1_at));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("argument count must match");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::CallArgumentCountMismatch(1, 2, 1)
+            ),
+            "{refusal:?}"
+        );
+        // The control: declaring one parameter makes it admissible.
+        module.functions[1].param_count = 1;
+        Verifier::verify_module(&module, &VerifyOptions::default()).expect("now it matches");
+    }
+
+    #[test]
+    fn a_global_index_past_the_table_is_refused() {
+        let mut code = vec![Opcode::LoadGlobal.to_byte(), 0x00];
+        code.extend_from_slice(&0u32.to_le_bytes());
+        code.push(Opcode::Halt.to_byte());
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(0, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("no globals declared");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::GlobalIndexOutOfBounds(0, 0)
+            ),
+            "{refusal:?}"
+        );
+    }
+
+    #[test]
+    fn a_function_entering_mid_instruction_or_with_an_oversized_frame_is_refused() {
+        // LoadImm is three bytes; offset 1 is inside it.
+        let code = vec![
+            Opcode::LoadImm.to_byte(),
+            0x00,
+            0x05,
+            Opcode::Halt.to_byte(),
+        ];
+        let mut module = make_simple_module(code.clone());
+        module.functions.push(entry(0, 4, 1));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("entry inside an instruction");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::FunctionEntryUnaligned(0, 1)
+            ),
+            "{refusal:?}"
+        );
+
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(10, 250, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect_err("frame larger than the register file");
+        assert!(
+            matches!(
+                refusal.kind,
+                VerifierErrorKind::FunctionFrameTooLarge(0, 260, 256)
+            ),
+            "{refusal:?}"
+        );
+    }
+
+    #[test]
+    fn on_chain_the_entry_function_must_exist_and_take_no_arguments() {
+        let code = vec![Opcode::Halt.to_byte()];
+        let module = make_simple_module(code.clone());
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("no entry function");
+        assert!(matches!(
+            refusal.kind,
+            VerifierErrorKind::MissingEntryFunction
+        ));
+
+        let mut module = make_simple_module(code);
+        module.functions.push(entry(1, 4, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::on_chain())
+            .expect_err("the runtime calls the entry with no arguments");
+        assert!(
+            matches!(refusal.kind, VerifierErrorKind::InvalidParamCount(0, 1)),
+            "{refusal:?}"
+        );
+        Verifier::verify_module(&module, &VerifyOptions::default())
+            .expect("off chain a tool may call it with arguments");
+    }
+
+    #[test]
+    fn the_verifier_decodes_aggregate_instructions_exactly_as_the_emitter_writes_them() {
+        use x3_backend::opcode::Register as R;
+        let mut emitter = x3_backend::BytecodeEmitter::new();
+        emitter.emit_new_array(R(1), 300);
+        emitter.emit_new_tuple(R(2), &[R(1), R(1)]);
+        emitter.emit_load_field(R(3), R(2), 1);
+        emitter.emit_store_field(R(2), 0, R(3));
+        emitter.emit_tuple_get(R(4), R(2), 1);
+        let code = emitter.code().to_vec();
+        let instrs = Verifier::decode_all_instructions(&code).expect("decodes");
+        let lens: Vec<usize> = instrs.iter().map(|i| i.size).collect();
+        assert_eq!(
+            lens,
+            vec![4, 6, 5, 5, 5],
+            "each instruction's length is the emitter's"
+        );
+        assert_eq!(
+            lens.iter().sum::<usize>(),
+            code.len(),
+            "no byte left over or skipped"
+        );
+        // And the u16 operands are read whole.
+        assert_eq!(instrs[0].operands[1], 300);
+    }
+
     #[test]
     fn verify_float_arithmetic_forbidden_on_chain() {
         let module = make_simple_module(vec![
@@ -1287,8 +1101,13 @@ mod tests {
 
     #[test]
     fn gas_costs_reasonable() {
-        // Ensure all costs are set
-        assert_eq!(opcode_gas_cost(Opcode::Nop.to_byte()), 0);
+        // Ensure all costs are set, and that none is free.
+        assert_eq!(opcode_gas_cost(Opcode::Nop.to_byte()), 1);
+        for byte in 0u8..=255 {
+            if Opcode::from_byte(byte).is_some() {
+                assert!(opcode_gas_cost(byte) >= 1, "0x{byte:02X} is free");
+            }
+        }
         assert_eq!(opcode_gas_cost(Opcode::AddI.to_byte()), 2);
         assert_eq!(opcode_gas_cost(Opcode::MulI.to_byte()), 3);
         assert_eq!(opcode_gas_cost(Opcode::EvmSstore.to_byte()), 5000);
@@ -1718,7 +1537,8 @@ mod tests {
         assert_eq!(opcode_gas_cost(Opcode::SvmGetRent.to_byte()), 100);
         assert_eq!(opcode_gas_cost(Opcode::SvmGetClock.to_byte()), 100);
 
-        assert_eq!(opcode_gas_cost(Opcode::Breakpoint.to_byte()), 0);
+        // The floor: no instruction is free (`gas_costs_reasonable` checks every opcode).
+        assert_eq!(opcode_gas_cost(Opcode::Breakpoint.to_byte()), 1);
         assert_eq!(opcode_gas_cost(Opcode::Assert.to_byte()), 5);
         assert_eq!(opcode_gas_cost(Opcode::Panic.to_byte()), 5);
     }

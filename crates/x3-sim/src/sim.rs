@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use x3_cross_vm_coordinator::{
     CoordinatorConfig, HtlcCreateParams, HtlcId, HtlcRecord, HtlcSecret, HtlcStatus,
     InMemoryPersistence, SessionPersistence, SwapCoordinator, SwapPhase, SwapSession, VmTarget,
@@ -34,7 +34,7 @@ const FAST_TIMELOCK_SECS: u64 = 3_600;
 const SLOW_TIMELOCK_SECS: u64 = 7_200;
 
 /// Which adversarial schedule to run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Scenario {
     /// Every session walks the happy path once, in order.
     HappyPath,
@@ -77,7 +77,7 @@ impl Scenario {
 }
 
 /// Knobs for one run.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimConfig {
     pub seed: u64,
     pub scenario: Scenario,
@@ -95,6 +95,39 @@ impl Default for SimConfig {
             steps: 120,
             nodes: 4,
         }
+    }
+}
+
+impl SimConfig {
+    /// The CLI arguments that re-enter this exact config.
+    ///
+    /// Every dimension the binary reads is present, so a replay cannot
+    /// silently fall back to a default and run a different schedule.
+    pub fn replay_args(&self) -> Vec<String> {
+        vec![
+            "--seed".to_string(),
+            self.seed.to_string(),
+            "--scenario".to_string(),
+            self.scenario.as_str().to_string(),
+            "--sessions".to_string(),
+            self.sessions.to_string(),
+            "--steps".to_string(),
+            self.steps.to_string(),
+            "--nodes".to_string(),
+            self.nodes.to_string(),
+        ]
+    }
+
+    /// The `cargo run` line that reproduces this config.
+    ///
+    /// `crates/x3-sim` is a standalone workspace root, so the manifest path
+    /// form works from the repository root, where packets are produced and
+    /// replay is most useful.
+    pub fn replay_command(&self) -> String {
+        format!(
+            "cargo run --manifest-path crates/x3-sim/Cargo.toml -- {}",
+            self.replay_args().join(" ")
+        )
     }
 }
 
@@ -153,7 +186,13 @@ struct OpEntry {
 pub struct SimOutcome {
     pub seed: u64,
     pub scenario: String,
+    /// Effective sessions in the ledger for this run (`config.sessions`,
+    /// clamped to at least one).
+    pub sessions: usize,
     pub steps: usize,
+    /// Effective nodes in the simulated topology (`config.nodes`, clamped to
+    /// at least two).
+    pub nodes: usize,
     pub accepted: u64,
     pub rejected: u64,
     pub restarts: u64,
@@ -164,9 +203,35 @@ pub struct SimOutcome {
     pub network: NetworkStats,
     pub trace_digest: String,
     pub state_digest: String,
+    /// Scheduler step whose execution introduced the first violation. `None`
+    /// when the violation appeared during the drain, after the last step.
+    pub first_bad_step: Option<u64>,
+    /// `"step N"` or `"drain"`, for humans.
+    pub first_bad_step_label: String,
+    /// The operation applied just before the first violation was observed.
+    pub first_bad_op: Option<String>,
+    /// Faults that had fired by the time the first violation appeared.
+    pub active_faults: Vec<String>,
+    /// The violating session's state immediately before the step that
+    /// introduced the first violation, when one step can be attributed.
+    pub state_before: Option<serde_json::Value>,
+    /// The same session's state after that step.
+    pub state_after: Option<serde_json::Value>,
     pub violations: Vec<Violation>,
     #[serde(skip)]
     pub trace: Vec<String>,
+}
+
+/// The last operation that touched one session, kept so the first violation
+/// can be attributed to the step that produced it rather than to the schedule
+/// as a whole. Keyed by session: several deliveries on different sessions can
+/// happen between two invariant checks, and the first violation must be
+/// attributed to *its own* session, not to whichever ran last.
+#[derive(Debug, Clone)]
+struct LastApplied {
+    op: String,
+    before: Option<serde_json::Value>,
+    after: Option<serde_json::Value>,
 }
 
 impl SimOutcome {
@@ -175,11 +240,18 @@ impl SimOutcome {
     }
 
     /// The `cargo run` line that reproduces this exact run.
+    ///
+    /// Delegates to `SimConfig::replay_command` so the packet, the minimizer,
+    /// and the CLI help can never drift apart.
     pub fn replay_command(&self) -> String {
-        format!(
-            "cargo run -p x3-sim -- --seed {} --scenario {}",
-            self.seed, self.scenario
-        )
+        SimConfig {
+            seed: self.seed,
+            scenario: Scenario::parse(&self.scenario).unwrap_or(Scenario::HappyPath),
+            sessions: self.sessions,
+            steps: self.steps,
+            nodes: self.nodes,
+        }
+        .replay_command()
     }
 
     pub fn to_evidence_json(&self) -> String {
@@ -213,9 +285,7 @@ fn htlc_record(session: usize, secret: &[u8; 32], fast: bool, now_secs: u64) -> 
     }
 }
 
-fn coordinator(
-    persistence: &Arc<InMemoryPersistence>,
-) -> SwapCoordinator<InMemoryPersistence> {
+fn coordinator(persistence: &Arc<InMemoryPersistence>) -> SwapCoordinator<InMemoryPersistence> {
     // `with_persistence`, not `new`: the latter deliberately panics outside
     // `cfg(test)` because non-durable persistence loses funds on a crash.
     SwapCoordinator::with_persistence(CoordinatorConfig::default(), Arc::clone(persistence))
@@ -310,9 +380,22 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
     let mut partitions = 0u64;
     let mut node_down_until_ms = 0u64;
     let mut last_op_index: Option<usize> = None;
+    let mut last_applied: HashMap<String, LastApplied> = HashMap::new();
+    let mut first_bad_step: Option<u64> = None;
+    let mut first_bad_step_label: Option<String> = None;
+    let mut first_bad_op: Option<String> = None;
+    // Faults *in effect right now*: a partition that was healed is no longer
+    // active, and a slow link stays installed across a heal (the network's
+    // `heal_all` restores connectivity, not latency or drop settings).
+    let mut live_partitions: Vec<String> = Vec::new();
+    let mut live_slow_link: Option<String> = None;
+    let mut live_node_down: Option<(u64, String)> = None;
+    let mut active_faults: Vec<String> = Vec::new();
+    let mut state_before: Option<serde_json::Value> = None;
+    let mut state_after: Option<serde_json::Value> = None;
 
     macro_rules! record_violations {
-        ($step:expr) => {{
+        ($trace:expr, $human:expr, $index:expr) => {{
             let mut sessions_now: Vec<SwapSession> = persistence.load_all().into_values().collect();
             sessions_now.sort_by(|a, b| a.session_id.cmp(&b.session_id));
             let mut found = check_sessions(&sessions_now);
@@ -321,8 +404,41 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                 for item in &found {
                     trace.push(format!(
                         "{} INVARIANT {} session={} {}",
-                        $step, item.code, item.session_id, item.detail
+                        $trace, item.code, item.session_id, item.detail
                     ));
+                }
+                if violations.is_empty() && !found.is_empty() {
+                    // The first violation is the one worth attributing; later
+                    // ones are often the same defect seen through other
+                    // sessions.
+                    first_bad_step = if $index == u64::MAX {
+                        None
+                    } else {
+                        Some($index)
+                    };
+                    first_bad_step_label = Some($human.to_string());
+                    let blamed = found[0].session_id.clone();
+                    if let Some(last) = last_applied.get(&blamed) {
+                        first_bad_op = Some(last.op.clone());
+                        state_before = last.before.clone();
+                        state_after = last.after.clone();
+                    } else {
+                        state_before = None;
+                        state_after = None;
+                    }
+                    // Report the faults that are *in effect*, not every
+                    // fault that ever fired: a healed partition must not
+                    // mislead the investigator about the network state.
+                    let mut live = live_partitions.clone();
+                    if let Some(label) = &live_slow_link {
+                        live.push(label.clone());
+                    }
+                    if let Some((until, label)) = &live_node_down {
+                        if clock.now_ms() < *until {
+                            live.push(label.clone());
+                        }
+                    }
+                    active_faults = live;
                 }
                 violations.extend(found);
             }
@@ -347,10 +463,16 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                 FaultKind::Partition { group_a, group_b } => {
                     net.partition(&group_a, &group_b);
                     partitions += 1;
+                    let label = format!("{step:04} partition {group_a:?}|{group_b:?}");
+                    live_partitions.clear();
+                    live_partitions.push(label.clone());
                     trace.push(format!("{step:04} FAULT partition {group_a:?}|{group_b:?}"));
                 }
                 FaultKind::Heal => {
                     net.heal_all();
+                    live_partitions.clear();
+                    // `heal_all` restores connectivity only; latency and drop
+                    // settings stay installed, so a slow link is still active.
                     trace.push(format!("{step:04} FAULT heal"));
                 }
                 FaultKind::SlowLink {
@@ -359,6 +481,9 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                 } => {
                     net.set_latency(latency_ms, latency_ms / 4);
                     net.set_drop_percent(extra_drop_percent);
+                    live_slow_link = Some(format!(
+                        "{step:04} slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
+                    ));
                     trace.push(format!(
                         "{step:04} FAULT slow-link latency={latency_ms}ms drop={extra_drop_percent}%"
                     ));
@@ -368,6 +493,12 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                     coord = coordinator(&persistence);
                     restarts += 1;
                     node_down_until_ms = now_ms + duration_ms;
+                    live_node_down = Some((
+                        node_down_until_ms,
+                        format!(
+                            "{step:04} crash-restart down_for={duration_ms}ms dropped={dropped}"
+                        ),
+                    ));
                     trace.push(format!(
                         "{step:04} FAULT crash-restart down_for={duration_ms}ms dropped={dropped}"
                     ));
@@ -375,6 +506,10 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                 FaultKind::StaleWrite { session } => {
                     if let Some(id) = session_ids.get(session) {
                         if let Some(previous) = shadow.get(id).cloned() {
+                            // This session's state changed outside an
+                            // operation, so the last operation no longer
+                            // describes how it reached the current state.
+                            last_applied.remove(id);
                             persistence.save(&previous);
                             coord = coordinator(&persistence);
                             stale_writes += 1;
@@ -421,13 +556,33 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
             }
 
             let id = session_ids[entry.op.session()].clone();
-            shadow.insert(id.clone(), persistence.load(&id).unwrap_or_else(|| {
-                panic!("session {id} vanished from persistence")
-            }));
+            let restored = match persistence.load(&id) {
+                Some(session) => session,
+                None => {
+                    // Unreachable in practice: the id was just created and the
+                    // simulator owns the persistence handle. Record the anomaly
+                    // instead of aborting the whole hunt, so the seed can still
+                    // be inspected.
+                    trace.push(format!(
+                        "{step:04} ERROR session {id} vanished from persistence"
+                    ));
+                    continue;
+                }
+            };
+            shadow.insert(id.clone(), restored);
+            let before = serde_json::to_value(persistence.load(&id)).ok();
 
             match apply_op(&mut coord, entry, &session_ids, &secrets, now_secs) {
                 Ok(()) => {
                     accepted += 1;
+                    last_applied.insert(
+                        id.clone(),
+                        LastApplied {
+                            op: entry.op.name().to_string(),
+                            before,
+                            after: serde_json::to_value(persistence.load(&id)).ok(),
+                        },
+                    );
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} ok",
                         envelope.from,
@@ -437,6 +592,21 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                 }
                 Err(error) => {
                     rejected += 1;
+                    let after = serde_json::to_value(persistence.load(&id)).ok();
+                    // A rejected call normally leaves the session untouched.
+                    // Do not let it overwrite the last operation that really
+                    // changed state, or a violation would be blamed on a call
+                    // that was refused.
+                    if before != after || !last_applied.contains_key(&id) {
+                        last_applied.insert(
+                            id.clone(),
+                            LastApplied {
+                                op: entry.op.name().to_string(),
+                                before,
+                                after,
+                            },
+                        );
+                    }
                     trace.push(format!(
                         "{step:04} t={now_secs} node={} op={} s={} rejected: {error}",
                         envelope.from,
@@ -445,9 +615,15 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
                     ));
                 }
             }
+
+            // Judge after every delivered operation, not once per step. The
+            // envelope that introduced a violation owns the before/after
+            // snapshots; a later envelope in the same step must not rewrite
+            // the story the packet tells.
+            record_violations!(format!("{step:04}"), format!("step {step}"), step as u64);
         }
 
-        record_violations!(step);
+        record_violations!(format!("{step:04}"), format!("step {step}"), step as u64);
     }
 
     // ── Drain: let late messages land before judging the run ──────────────
@@ -467,7 +643,7 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
         }
     }
 
-    record_violations!("drain");
+    record_violations!("drain", "drain", u64::MAX);
 
     // ── Judge ─────────────────────────────────────────────────────────────
     let mut final_sessions: Vec<SwapSession> = persistence.load_all().into_values().collect();
@@ -498,7 +674,11 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
     SimOutcome {
         seed: config.seed,
         scenario: config.scenario.as_str().to_string(),
+        // The effective sizes, not the requested ones: `run` clamps them
+        // above, and a packet must replay the run that actually happened.
+        sessions,
         steps: config.steps,
+        nodes,
         accepted,
         rejected,
         restarts,
@@ -509,6 +689,12 @@ pub fn run_with(config: &SimConfig, params: &SimParams) -> SimOutcome {
         network: net.stats(),
         trace_digest: trace_hasher.finalize().to_hex().to_string(),
         state_digest: state_hasher.finalize().to_hex().to_string(),
+        first_bad_step,
+        first_bad_step_label: first_bad_step_label.unwrap_or_else(|| "none".to_string()),
+        first_bad_op,
+        active_faults,
+        state_before,
+        state_after,
         violations,
         trace,
     }

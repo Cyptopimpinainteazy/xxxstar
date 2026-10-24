@@ -1,0 +1,75 @@
+{
+  "artifact": "external-tool-evidence",
+  "schema": "x3-tool-evidence/1",
+  "section": 72,
+  "tool": {
+    "name": "cargo-fuzz (libFuzzer)",
+    "version": "cargo-fuzz 0.13.2",
+    "dependency": "libfuzzer-sys 0.4.13",
+    "toolchain": "nightly-x86_64-unknown-linux-gnu (rustc 1.101.0-nightly 21b707e3f 2026-09-30)"
+  },
+  "run": {
+    "commit": "ff57d15dd6e93ba4bcc19081d18bcd5632954941",
+    "branch": "master",
+    "dirty_state": true,
+    "dirty_note": "untracked corpus and evidence directories only; no tracked file modified for this run",
+    "crate": "crates/x3-integration/fuzz",
+    "target": "compile_and_run",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "command": "cargo fuzz run --target x86_64-unknown-linux-gnu compile_and_run -- -runs=3000 -max_total_time=25 -seed=20261001 -print_final_stats=1",
+    "env": {
+      "RUSTUP_TOOLCHAIN": "nightly",
+      "OPENSSL_NO_VENDOR": "1",
+      "OPENSSL_LIB_DIR": "/usr/lib/x86_64-linux-gnu",
+      "OPENSSL_INCLUDE_DIR": "/usr/include"
+    },
+    "seed": 20261001,
+    "started_at": "2026-10-01T16:20:00-06:00",
+    "executed_units": 3000,
+    "exec_per_sec": 3000,
+    "new_units_added": 90,
+    "peak_rss_mb": 288,
+    "crashes": 0
+  },
+  "result": "PASS - fuzz target builds and executes; corpus grows; no crash on this input surface",
+  "artifacts": {
+    "log_first_run": "audit-artifacts/external-toolchain/cargo-fuzz/run-gov0-2026-10-01.log",
+    "log_seeded_run": "audit-artifacts/external-toolchain/cargo-fuzz/run-seed20261001-2026-10-01.log",
+    "corpus": "crates/x3-integration/fuzz/corpus/compile_and_run",
+    "crash_artifact_dir": "crates/x3-integration/fuzz/artifacts/compile_and_run"
+  },
+  "known_limitations": [
+    "cargo-fuzz defaults to the musl target, where ASAN is incompatible with a statically linked libc (error: sanitizer is incompatible with statically linked libc). All X3 fuzz builds must pass --target x86_64-unknown-linux-gnu.",
+    "cargo-fuzz requires nightly for -Zsanitizer; the repo default toolchain is stable 1.90.0. The fuzz gate must select nightly explicitly.",
+    "pkg-config is absent on this host; openssl-sys must be pointed at the system OpenSSL via OPENSSL_LIB_DIR/OPENSSL_INCLUDE_DIR or its build fails.",
+    "Only 2 of 98 fuzz targets have been exercised (compile_and_run, x3bc_engines). The pallet fuzz crates have not been built.",
+    "cargo-fuzz resolves its project as the nearest ancestor containing a Cargo.toml and then expects fuzz/ beside it; a validation fixture needs a parent manifest or cargo-fuzz walks to the repo root.",
+    "libFuzzer's value profiling solves memcmp against a constant, so a short defect trigger is found even from benign seeds; a stable negative control must bound the input space below the trigger length."
+  ],
+  "detection_validation": {
+    "why": "An installed tool is not an integrated tool (prompt §69/§90). This proves libFuzzer distinguishes a known-good fixture from a deliberately-broken one.",
+    "fixture": "tools/tool-validation (standalone workspace; intentionally-defective `crash_if_magic` target that panics on the 14-byte magic X3CRASHFIXTURE)",
+    "script": "scripts/external-toolchain/validate-fuzz-detection.sh",
+    "known_good": {
+      "command": "cargo fuzz run --target x86_64-unknown-linux-gnu crash_if_magic -- -runs=2000 -seed=20261001 -max_len=13",
+      "max_len_rationale": "the defect needs a 14-byte magic, so a 13-byte bound makes it unreachable - a real negative control, not a lucky seed",
+      "result": "exit=0, artifacts=0"
+    },
+    "known_bad": {
+      "command": "cargo fuzz run --target x86_64-unknown-linux-gnu crash_if_magic -- -runs=2000 -seed=20261001 -max_len=64",
+      "result": "exit=1, artifacts=1 (crash written under fuzz/artifacts/crash_if_magic/)"
+    },
+    "verdict": "PASS - distinguishes known-good from known-bad; repeatable across two consecutive runs",
+    "artifacts": [
+      "audit-artifacts/external-toolchain/cargo-fuzz/validation-known-good-*.log",
+      "audit-artifacts/external-toolchain/cargo-fuzz/validation-known-bad-*.log",
+      "tools/tool-validation/fuzz/artifacts/crash_if_magic/crash-*"
+    ]
+  },
+  "next_actions": [
+    "Persist and commit the seed corpus for compile_and_run and x3bc_engines.",
+    "Add a nightly fuzz gate to scripts/local-ci.sh covering the X3-language targets.",
+    "Build one pallet fuzz crate to confirm the substrate dependency graph also compiles under ASAN.",
+    "Triage any real crash found by the X3-language targets into Audit King."
+  ]
+}

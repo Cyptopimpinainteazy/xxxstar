@@ -15,18 +15,83 @@ function setTxt(id, val) {
 function renderGpuBars(gpus) {
   const container = document.getElementById("gpu_bars");
   if (!container || !gpus) return;
-  container.innerHTML = gpus
-    .map(
-      (g, i) =>
-        `<div class="gpu-bar-row">
-          <span class="gpu-label">GPU ${i}</span>
-          <div class="gpu-bar-bg">
-            <div class="gpu-bar-fill" style="width:${g.util_pct}%"></div>
-          </div>
-          <span class="gpu-pct">${g.util_pct}%</span>
-        </div>`
-    )
-    .join("");
+  container.replaceChildren();
+
+  gpus.forEach((gpu, i) => {
+    const row = document.createElement("div");
+    row.className = "gpu-bar-row";
+
+    const label = document.createElement("span");
+    label.className = "gpu-label";
+    label.textContent = `GPU ${i}`;
+
+    const barBg = document.createElement("div");
+    barBg.className = "gpu-bar-bg";
+
+    const barFill = document.createElement("div");
+    barFill.className = "gpu-bar-fill";
+    const utilPct = Number(gpu.util_pct || 0);
+    barFill.style.width = `${Math.max(0, Math.min(100, utilPct))}%`;
+    barBg.appendChild(barFill);
+
+    const pct = document.createElement("span");
+    pct.className = "gpu-pct";
+    pct.textContent = `${utilPct}%`;
+
+    row.appendChild(label);
+    row.appendChild(barBg);
+    row.appendChild(pct);
+    container.appendChild(row);
+  });
+}
+
+function renderChainRows(chains) {
+  const body = document.getElementById("chain_tps_rows");
+  if (!body) return;
+  body.replaceChildren();
+  const top = (chains || []).slice(0, 50);
+  for (let i = 0; i < top.length; i += 1) {
+    const chain = top[i];
+    const tr = document.createElement("tr");
+    [
+      i + 1,
+      chain.chain_name || "-",
+      chain.chain_id || "-",
+      fmt(chain.max_tps || 0),
+      fmt(chain.best_level || 0),
+    ].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = String(value);
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  }
+}
+
+async function refreshBenchmarks() {
+  let data;
+  try {
+    const response = await fetch("/chain-benchmarks.json");
+    if (!response.ok) return;
+    data = await response.json();
+  } catch {
+    return;
+  }
+
+  if (!data || !data.chains) return;
+
+  setTxt("our_chain_label", `Chain: ${data.our_chain_id || "--"}`);
+  setTxt("our_chain_max_tps", fmt(data.our_chain_max_tps || 0));
+  setTxt("global_max_tps", fmt(data.global_max_tps || 0));
+  setTxt("bench_chain_count", fmt(data.tested_chains || data.chains.length || 0));
+  setTxt("bench_run_levels", (data.levels || []).map((v) => fmt(v)).join(", "));
+
+  if (data.generated_at) {
+    const ts = new Date(data.generated_at * 1000).toLocaleString();
+    setTxt("bench_updated", `Benchmarks: ${ts}`);
+  }
+
+  renderChainRows(data.chains);
 }
 
 async function refreshMetrics() {
@@ -105,4 +170,6 @@ async function refreshMetrics() {
 }
 
 setInterval(refreshMetrics, 1000);
+setInterval(refreshBenchmarks, 10000);
 refreshMetrics();
+refreshBenchmarks();

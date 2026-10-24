@@ -105,7 +105,8 @@ export default function XTerminal() {
       termContainer.id = `xterm-${id}`;
       containerRef.current.appendChild(termContainer);
       inst.term.open(termContainer);
-      setTimeout(() => inst.fitAddon.fit(), 50);
+      const { fitAddon } = inst;
+      setTimeout(() => fitAddon.fit(), 50);
     }
     return () => {};
   }, [activeTerminalId]);

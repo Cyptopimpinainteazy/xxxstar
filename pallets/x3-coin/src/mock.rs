@@ -152,6 +152,7 @@ impl pallet_x3_kernel::Config for Test {
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
     type RequireCrossVmProof = ConstBool<false>;
     type PrivateSubmissionChannel = ConstBool<false>;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type WeightInfo = ();
     type EvmAdapter = MockEvmAdapter;
     type SvmAdapter = MockSvmAdapter;
@@ -162,6 +163,7 @@ impl pallet_x3_kernel::Config for Test {
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = ();
+    type TradingHost = ();
 }
 
 // ─── pallet_x3_coin ──────────────────────────────────────────────────────────

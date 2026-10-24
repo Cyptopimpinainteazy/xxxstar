@@ -2869,6 +2869,55 @@ mod tests {
             .expect("drop isolated test schema");
     }
 
+    #[tokio::test]
+    async fn orchestra_evidence_fetch_refuses_mismatched_control_plane_bundle() {
+        let Some(database_url) = integration_database_url() else {
+            eprintln!("skipping gateway relay integration test: set X3_GATEWAY_TEST_DATABASE_URL or DATABASE_URL");
+            return;
+        };
+
+        let (db, schema) = Database::connect_isolated_for_test(&database_url)
+            .await
+            .expect("create isolated test database");
+        let (control_plane_url, control_plane_handle) = spawn_mock_control_plane().await;
+        let app = integration_app_with_orchestra_client(
+            db.clone(),
+            Arc::new(ControlPlaneClient::new(control_plane_url, None)),
+        );
+
+        // The mock answers every /evidence/{id} with bundle_id
+        // "remote-fetched-evidence-1"; ask for something else. The gateway must
+        // refuse to mirror evidence that does not match the request and fall
+        // back to the local index (which has nothing) instead of persisting the
+        // mismatched bundle under the requested id.
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/v1/orchestra/evidence-bundles/requested-evidence-1")
+                    .body(Body::empty())
+                    .expect("build mismatched evidence fetch request"),
+            )
+            .await
+            .expect("fetch mismatched evidence through gateway");
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let mirrored = db
+            .get_evidence_bundle("remote-fetched-evidence-1")
+            .await
+            .expect("query mirrored evidence");
+        assert!(
+            mirrored.is_none(),
+            "a control-plane bundle whose id differs from the request must not be mirrored"
+        );
+
+        control_plane_handle.abort();
+        Database::drop_test_schema(&database_url, &schema)
+            .await
+            .expect("drop isolated test schema");
+    }
+
     // ── Funding Swarm public endpoint integration tests ───────────────────────
 
     #[tokio::test]

@@ -2,6 +2,8 @@ use crate::error::FoundryError;
 use crate::evm_deploy;
 use crate::types::{DAppType, DeploymentReceipt};
 use chrono::Utc;
+use ethers::signers::{LocalWallet, Signer};
+use ethers::utils::hash_message;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -49,6 +51,16 @@ impl Deployer {
             deployer_key,
             default_chain,
         }
+    }
+
+    fn signing_wallet(&self) -> Result<LocalWallet, FoundryError> {
+        self.deployer_key
+            .parse()
+            .map_err(|_| FoundryError::DeploymentFailed("invalid EVM deployer signing key".into()))
+    }
+
+    pub fn deployer_address(&self) -> Result<String, FoundryError> {
+        Ok(format!("{:?}", self.signing_wallet()?.address()))
     }
 
     /// Deploys all smart contracts for the dApp: compiles each with the real
@@ -157,102 +169,57 @@ impl Deployer {
         Ok(())
     }
 
-    /// Deploys the frontend application.
+    /// Refuse the full pipeline before signing or sending any chain transaction.
+    /// Publication adapters are not implemented; none of these operations may
+    /// manufacture evidence that a remote deployment exists.
+    pub(crate) fn ensure_publication_backends(&self) -> Result<(), FoundryError> {
+        Err(Self::unavailable_backend("frontend publishing"))
+    }
+
+    fn unavailable_backend(name: &str) -> FoundryError {
+        FoundryError::DeploymentFailed(format!("{name} backend is not configured"))
+    }
+
     pub fn deploy_frontend(
         &self,
-        app_name: &str,
-        frontend_framework: &str,
+        _app_name: &str,
+        _frontend_framework: &str,
         _routes: &[String],
         _api_endpoints: &[String],
     ) -> Result<String, FoundryError> {
-        info!(
-            "Deployer: deploying frontend for {} using {}",
-            app_name, frontend_framework
-        );
-        let url = format!(
-            "https://{}.x3-app.io",
-            app_name.to_lowercase().replace(' ', "-")
-        );
-        info!("Frontend deployed at: {}", url);
-        Ok(url)
+        Err(Self::unavailable_backend("frontend publishing"))
     }
 
-    /// Deploys metadata (IPFS/Arweave).
     pub fn deploy_metadata(
         &self,
-        app_name: &str,
-        description: &str,
-        features: &[String],
+        _app_name: &str,
+        _description: &str,
+        _features: &[String],
     ) -> Result<String, FoundryError> {
-        info!("Deployer: deploying metadata for {}", app_name);
-        let metadata = serde_json::json!({
-            "name": app_name,
-            "description": description,
-            "features": features,
-            "version": "1.0.0",
-            "deployed_at": Utc::now().to_rfc3339(),
-            "deployer": self.deployer_key,
-        });
-        let metadata_str = serde_json::to_string(&metadata).map_err(|e| {
-            FoundryError::DeploymentFailed(format!("Failed to serialize metadata: {}", e))
-        })?;
-        let mut hasher = Sha256::new();
-        hasher.update(metadata_str.as_bytes());
-        let hash = hex::encode(hasher.finalize());
-        let uri = format!("ipfs://{}", hash);
-        info!("Metadata deployed at: {}", uri);
-        Ok(uri)
+        Err(Self::unavailable_backend("metadata publishing"))
     }
 
-    /// Deploys treasury hooks for fee distribution.
     pub fn deploy_treasury_hooks(
         &self,
-        treasury_wallet: &str,
-        platform_fee_bps: u16,
-        chain: &str,
+        _treasury_wallet: &str,
+        _platform_fee_bps: u16,
+        _chain: &str,
     ) -> Result<Vec<String>, FoundryError> {
-        info!("Deployer: deploying treasury hooks for {}", treasury_wallet);
-        let hooks = vec![
-            format!(
-                "FeeCollector: {} bps -> {}",
-                platform_fee_bps, treasury_wallet
-            ),
-            format!("RevenueDistributor: deployed on {}", chain),
-            format!(
-                "TreasuryHook: 0x{}...{}",
-                &self.deployer_key[..8],
-                &self.deployer_key[self.deployer_key.len().saturating_sub(8)..]
-            ),
-        ];
-        Ok(hooks)
+        Err(Self::unavailable_backend("treasury contract deployment"))
     }
 
-    /// Creates a marketplace listing for the deployed dApp.
     pub fn deploy_marketplace_listing(
         &self,
-        title: &str,
+        _title: &str,
         _description: &str,
         _tags: &[String],
-        chain: &str,
+        _chain: &str,
     ) -> Result<String, FoundryError> {
-        info!("Deployer: creating marketplace listing for {}", title);
-        let listing_id = format!("listing-{}", &uuid::Uuid::new_v4().to_string()[..8]);
-        info!("Marketplace listing created: {} on {}", listing_id, chain);
-        Ok(listing_id)
+        Err(Self::unavailable_backend("marketplace publishing"))
     }
 
-    /// Deploys analytics tracking.
-    pub fn deploy_analytics(&self, app_name: &str, chain: &str) -> Result<String, FoundryError> {
-        info!(
-            "Deployer: deploying analytics for {} on {}",
-            app_name, chain
-        );
-        let endpoint = format!(
-            "https://analytics.x3-chain.io/api/v1/apps/{}/events",
-            app_name.to_lowercase().replace(' ', "-")
-        );
-        info!("Analytics endpoint: {}", endpoint);
-        Ok(endpoint)
+    pub fn deploy_analytics(&self, _app_name: &str, _chain: &str) -> Result<String, FoundryError> {
+        Err(Self::unavailable_backend("analytics registration"))
     }
 
     /// Generates a deployment manifest.
@@ -268,7 +235,7 @@ impl Deployer {
         marketplace_listing_id: Option<String>,
         analytics_endpoint: Option<String>,
         chain: &str,
-    ) -> DeploymentManifest {
+    ) -> Result<DeploymentManifest, FoundryError> {
         let manifest = DeploymentManifest {
             app_name: app_name.to_string(),
             version: "1.0.0".to_string(),
@@ -281,33 +248,50 @@ impl Deployer {
             marketplace_listing_id,
             analytics_endpoint,
             deployed_at: Utc::now(),
-            deployer_address: self.deployer_key.clone(),
+            deployer_address: self.deployer_address()?,
             manifest_hash: String::new(), // Will be computed
         };
 
         // Compute manifest hash
-        let manifest_json = serde_json::to_string(&manifest).unwrap_or_default();
+        let manifest_json = serde_json::to_string(&manifest).map_err(|_| {
+            FoundryError::DeploymentFailed("could not serialize deployment manifest".into())
+        })?;
         let mut hasher = Sha256::new();
         hasher.update(manifest_json.as_bytes());
         let hash = hex::encode(hasher.finalize());
 
-        DeploymentManifest {
+        Ok(DeploymentManifest {
             manifest_hash: hash,
             ..manifest
-        }
+        })
     }
 
-    /// Signs a deployment receipt.
-    pub fn sign_receipt(&self, receipt: &mut DeploymentReceipt) {
-        let receipt_data = format!(
-            "{:?}{:?}{}",
-            receipt.contract_addresses, receipt.tx_hashes, self.deployer_key
-        );
-        let mut hasher = Sha256::new();
-        hasher.update(receipt_data.as_bytes());
-        receipt.signature = hex::encode(hasher.finalize());
-        receipt.signed_at = Utc::now();
-        info!("Receipt signed: {}", receipt.signature);
+    /// Sign an EIP-191 personal message containing the complete receipt as UTF-8
+    /// JSON with recursively sorted object keys and an empty signature field.
+    /// The public signer address and signing timestamp are part of that message.
+    pub fn sign_receipt(&self, receipt: &mut DeploymentReceipt) -> Result<(), FoundryError> {
+        let wallet = self.signing_wallet()?;
+        // Prepare a copy so an invalid key or signing failure cannot partially
+        // rewrite a previously valid receipt.
+        let mut signed = receipt.clone();
+        signed.deployer_address = format!("{:?}", wallet.address());
+        signed.signature.clear();
+        signed.signed_at = Utc::now();
+        let mut value = serde_json::to_value(&signed).map_err(|_| {
+            FoundryError::DeploymentFailed("could not serialize deployment receipt".into())
+        })?;
+        // Canonicalize nested maps, including contract_addresses, independently
+        // of HashMap iteration order and serde_json's preserve_order feature.
+        value.sort_all_objects();
+        let payload = serde_json::to_vec(&value).map_err(|_| {
+            FoundryError::DeploymentFailed("could not serialize deployment receipt".into())
+        })?;
+        let signature = wallet.sign_hash(hash_message(payload)).map_err(|_| {
+            FoundryError::DeploymentFailed("could not sign deployment receipt".into())
+        })?;
+        signed.signature = format!("0x{signature}");
+        *receipt = signed;
+        Ok(())
     }
 }
 
@@ -358,10 +342,12 @@ impl CrossChainDeployer {
         app_name: &str,
         dapp_type: &DAppType,
         chain_results: &HashMap<String, Vec<DeployedContractInfo>>,
-    ) -> HashMap<String, DeploymentManifest> {
+    ) -> Result<HashMap<String, DeploymentManifest>, FoundryError> {
         let mut manifests = HashMap::new();
         for (chain, contracts) in chain_results {
-            let deployer = self.deployers.get(chain).unwrap();
+            let deployer = self.deployers.get(chain).ok_or_else(|| {
+                FoundryError::DeploymentFailed("no deployer configured for manifest chain".into())
+            })?;
             let manifest = deployer.generate_manifest(
                 app_name,
                 dapp_type,
@@ -372,10 +358,10 @@ impl CrossChainDeployer {
                 None,
                 None,
                 chain,
-            );
+            )?;
             manifests.insert(chain.clone(), manifest);
         }
-        manifests
+        Ok(manifests)
     }
 }
 
@@ -388,6 +374,141 @@ impl Default for CrossChainDeployer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn manifest_never_publishes_the_signing_key() {
+        use ethers::signers::{LocalWallet, Signer};
+        let wallet = LocalWallet::new(&mut ethers::core::rand::thread_rng());
+        let key = hex::encode(wallet.signer().to_bytes());
+        let expected_address = format!("{:?}", wallet.address());
+        let deployer = Deployer::new(key.clone(), "local-test".into());
+        let manifest = deployer
+            .generate_manifest(
+                "identity-regression",
+                &DAppType::TokenLaunchpad,
+                &[],
+                None,
+                None,
+                vec![],
+                None,
+                None,
+                "local-test",
+            )
+            .expect("valid local signing key");
+        let serialized = serde_json::to_string(&manifest).unwrap();
+        assert!(
+            !serialized.contains(&key),
+            "public manifest contains signing material"
+        );
+        assert_eq!(manifest.deployer_address, expected_address);
+        assert!(matches!(
+            deployer.deploy_treasury_hooks(&expected_address, 200, "local-test"),
+            Err(FoundryError::DeploymentFailed(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_short_signing_key_is_rejected_without_a_treasury_hook_panic() {
+        let deployer = Deployer::new("x".into(), "local-test".into());
+        let result = std::panic::catch_unwind(|| {
+            deployer.deploy_treasury_hooks("treasury", 200, "local-test")
+        });
+        assert!(result.is_ok(), "untrusted key length must not panic");
+        assert!(result.unwrap().is_err());
+    }
+
+    #[test]
+    fn receipt_signature_is_publicly_recoverable_and_binds_its_manifest() {
+        use ethers::signers::{LocalWallet, Signer};
+        use ethers::types::Signature;
+        let wallet = LocalWallet::new(&mut ethers::core::rand::thread_rng());
+        let expected_address = wallet.address();
+        let deployer = Deployer::new(hex::encode(wallet.signer().to_bytes()), "local-test".into());
+        let mut receipt = DeploymentReceipt::new(
+            "id".into(),
+            "name".into(),
+            DAppType::TokenLaunchpad,
+            "local-test".into(),
+            format!("{:?}", expected_address),
+        );
+        receipt.manifest_hash = "manifest-one".into();
+        deployer
+            .sign_receipt(&mut receipt)
+            .expect("valid local signing key");
+        let signature: Signature = receipt
+            .signature
+            .parse()
+            .expect("receipt requires a recoverable signature");
+        let payload = |receipt: &DeploymentReceipt| {
+            let mut value = serde_json::to_value(receipt).unwrap();
+            value["signature"] = serde_json::Value::String(String::new());
+            value.sort_all_objects();
+            serde_json::to_vec(&value).unwrap()
+        };
+        assert_eq!(
+            signature.recover(payload(&receipt).as_slice()).unwrap(),
+            expected_address
+        );
+        receipt.manifest_hash = "manifest-two".into();
+        assert_ne!(
+            signature.recover(payload(&receipt).as_slice()).unwrap(),
+            expected_address
+        );
+    }
+
+    #[test]
+    fn signing_failure_preserves_the_original_receipt() {
+        let wallet = LocalWallet::new(&mut ethers::core::rand::thread_rng());
+        let deployer = Deployer::new(hex::encode(wallet.signer().to_bytes()), "local-test".into());
+        let mut receipt = DeploymentReceipt::new(
+            "id".into(),
+            "name".into(),
+            DAppType::TokenLaunchpad,
+            "local-test".into(),
+            deployer.deployer_address().unwrap(),
+        );
+        deployer.sign_receipt(&mut receipt).unwrap();
+        let original = serde_json::to_value(&receipt).unwrap();
+        let invalid = Deployer::new("invalid-test-key".into(), "local-test".into());
+        assert!(invalid.sign_receipt(&mut receipt).is_err());
+        assert_eq!(serde_json::to_value(&receipt).unwrap(), original);
+        assert!(invalid
+            .generate_manifest(
+                "app",
+                &DAppType::TokenLaunchpad,
+                &[],
+                None,
+                None,
+                vec![],
+                None,
+                None,
+                "local-test"
+            )
+            .is_err());
+        let mut chains = HashMap::new();
+        chains.insert("unconfigured-chain".into(), vec![]);
+        assert!(CrossChainDeployer::new()
+            .generate_cross_chain_manifest("app", &DAppType::TokenLaunchpad, &chains)
+            .is_err());
+    }
+
+    #[test]
+    fn missing_publication_backends_cannot_report_deployment_success() {
+        let wallet = LocalWallet::new(&mut ethers::core::rand::thread_rng());
+        let deployer = Deployer::new(hex::encode(wallet.signer().to_bytes()), "local-test".into());
+        let outcomes = [
+            deployer.deploy_frontend("app", "React", &[], &[]),
+            deployer.deploy_metadata("app", "description", &[]),
+            deployer.deploy_marketplace_listing("app", "description", &[], "local-test"),
+            deployer.deploy_analytics("app", "local-test"),
+        ];
+        for outcome in outcomes {
+            assert!(
+                matches!(outcome, Err(FoundryError::DeploymentFailed(_))),
+                "unconfigured publisher must not fabricate deployment evidence"
+            );
+        }
+    }
 
     /// `forge` is a first-class repo toolchain requirement (X3-contracts/evm
     /// tests already depend on it); skip rather than hard-fail on a dev
@@ -515,11 +636,14 @@ mod tests {
     }
 
     #[test]
-    fn test_deploy_frontend() {
+    fn test_deploy_frontend_refuses_unconfigured_publisher() {
         let deployer = Deployer::new("test".into(), "x3".into());
         let url = deployer.deploy_frontend("MyApp", "React", &["/".into()], &["/api".into()]);
-        assert!(url.is_ok());
-        assert!(url.unwrap().contains("x3-app.io"));
+        assert!(matches!(url, Err(FoundryError::DeploymentFailed(_))));
+        assert!(url
+            .unwrap_err()
+            .to_string()
+            .contains("frontend publishing backend"));
     }
 
     /// `deploy_to_chains` must propagate each per-chain deployer's real

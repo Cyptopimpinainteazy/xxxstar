@@ -1,0 +1,445 @@
+X3JOB-META free_gb=272
+X3JOB-META host=x3star1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-main
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+X3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target
+X3JOB-META start=2026-10-03T08:27:01Z
+    Updating git repository `https://github.com/paritytech/polkadot-sdk`
+    Updating git repository `https://github.com/paritytech/polkadot-sdk`
+    Updating crates.io index
+     Locking 145 packages to highest compatible versions
+      Adding aead v0.5.2
+      Adding allocator-api2 v0.2.21
+    Updating aquamarine v0.3.3 -> v0.5.0
+      Adding ark-bls12-377 v0.4.0
+      Adding ark-bls12-381 v0.4.0
+      Adding ark-bls12-381 v0.5.0
+      Adding ark-ec v0.4.2
+      Adding ark-ec v0.5.0
+      Adding ark-ed-on-bls12-381-bandersnatch v0.5.0
+      Adding ark-ff v0.4.2
+      Adding ark-ff v0.5.0
+      Adding ark-ff-asm v0.4.2
+      Adding ark-ff-asm v0.5.0
+      Adding ark-ff-macros v0.4.2
+      Adding ark-ff-macros v0.5.0
+      Adding ark-poly v0.4.2
+      Adding ark-poly v0.5.0
+      Adding ark-serialize v0.4.2
+      Adding ark-serialize v0.5.0
+      Adding ark-serialize-derive v0.4.2
+      Adding ark-serialize-derive v0.5.0
+      Adding ark-std v0.4.0
+      Adding ark-std v0.5.0
+      Adding ark-transcript v0.0.3
+      Adding ark-vrf v0.1.1
+      Adding atomic-waker v1.1.2
+      Adding binary-merkle-tree v16.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding bip39 v2.2.2
+      Adding bitcoin_hashes v0.14.101
+    Updating bounded-collections v0.1.9 -> v0.3.2
+      Adding deranged v0.5.8
+      Adding derivative v2.2.0
+    Updating ed25519-zebra v3.1.0 -> v4.0.3 (available: v4.2.0)
+      Adding educe v0.6.0
+      Adding enum-ordinalize v4.4.2
+      Adding enum-ordinalize-derive v4.4.2
+      Adding fnv v1.0.7
+      Adding foldhash v0.1.5
+      Adding frame-benchmarking v45.0.3 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+    Updating frame-metadata v16.0.0 -> v23.0.1
+      Adding frame-support v45.1.3 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding frame-support-procedural v36.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding frame-support-procedural-tools v13.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding frame-support-procedural-tools-derive v12.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding frame-system v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding h2 v0.4.19
+      Adding hashbrown v0.14.5
+      Adding hashbrown v0.15.5
+      Adding heck v0.5.0
+      Adding hex-conservative v0.2.3
+      Adding http v1.5.0
+      Adding http-body v1.1.0
+      Adding http-body-util v0.1.5
+      Adding httparse v1.10.1
+      Adding httpdate v1.0.3
+      Adding hyper v1.11.1
+      Adding hyper-util v0.1.21
+    Updating impl-codec v0.6.0 -> v0.7.1
+      Adding impl-num-traits v0.2.0
+    Updating impl-serde v0.4.0 -> v0.5.0
+      Adding itertools v0.11.0
+      Adding itertools v0.13.0
+      Adding jam-codec v0.1.1
+      Adding jam-codec-derive v0.1.1
+    Updating macro_magic v0.4.2 -> v0.5.1
+    Updating macro_magic_core v0.4.2 -> v0.5.1
+    Updating macro_magic_core_macros v0.4.3 -> v0.5.1
+    Updating macro_magic_macros v0.4.2 -> v0.5.1
+    Updating matchers v0.0.1 -> v0.2.0
+    Updating memory-db v0.32.0 -> v0.34.0
+      Adding mio v1.2.3
+      Adding nu-ansi-term v0.50.3
+      Adding num-conv v0.2.2
+      Adding password-hash v0.5.0
+      Adding pbkdf2 v0.12.2
+      Adding picosimd v0.9.6
+      Adding polkavm-common v0.30.0
+      Adding polkavm-derive v0.30.0
+      Adding polkavm-derive-impl v0.30.0
+      Adding polkavm-derive-impl-macro v0.30.0
+      Adding powerfmt v0.2.0
+    Updating primitive-types v0.12.2 -> v0.13.1
+    Updating proc-macro-warning v0.4.2 -> v1.84.1
+      Adding prometheus v0.13.4
+    Updating secp256k1 v0.24.3 -> v0.28.2
+    Updating secp256k1-sys v0.6.1 -> v0.9.2
+      Adding serde_bytes v0.11.19
+      Adding serdect v0.2.0
+      Adding simple-mermaid v0.1.1
+      Adding socket2 v0.6.5
+      Adding sp-api v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-api-proc-macro v26.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-application-crypto v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-arithmetic v28.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-core v40.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-core v39.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-crypto-hashing-proc-macro v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-debug-derive v15.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-debug-derive v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-externalities v0.32.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-externalities v0.31.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-genesis-builder v0.21.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-inherents v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-io v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-keystore v0.45.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-metadata-ir v0.12.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-panic-handler v13.0.2 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-runtime v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-runtime-interface v33.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-runtime-interface-proc-macro v20.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-staking v42.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-state-machine v0.49.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-std v14.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-std v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-storage v23.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-tracing v19.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-trie v42.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-version v43.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-version-proc-macro v15.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding sp-weights v33.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding strum v0.26.3
+      Adding strum_macros v0.26.4
+      Adding substrate-bip39 v0.6.1 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+      Adding substrate-bip39 v0.6.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding substrate-prometheus-endpoint v0.17.7 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+      Adding syn v3.0.6
+      Adding time v0.3.55
+      Adding time-core v0.1.9
+      Adding time-macros v0.2.32
+      Adding tokio v1.53.1
+      Adding tokio-util v0.7.19
+    Updating tracing-log v0.1.4 -> v0.2.0
+    Updating tracing-subscriber v0.2.25 -> v0.3.23
+    Updating trie-db v0.27.1 -> v0.30.1
+      Adding tuplex v0.1.2
+    Updating uint v0.9.5 -> v0.10.2
+      Adding w3f-bls v0.1.9
+      Adding w3f-pcs v0.0.2
+      Adding w3f-plonk-common v0.0.2
+      Adding w3f-ring-proof v0.0.2
+      Adding x3-asset-kernel-types v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T082653Z-fuzz-atomic-kernel-rollback-9cc865/crates/x3-asset-kernel-types)
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.45
+   Compiling libc v0.2.186
+   Compiling version_check v0.9.5
+   Compiling cfg-if v1.0.4
+   Compiling hashbrown v0.17.0
+   Compiling equivalent v1.0.2
+   Compiling serde_core v1.0.228
+   Compiling rustversion v1.0.22
+   Compiling typenum v1.20.0
+   Compiling zerocopy v0.8.48
+   Compiling winnow v1.0.2
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling arrayvec v0.7.6
+   Compiling serde v1.0.228
+   Compiling subtle v2.4.1
+   Compiling unicode-xid v0.2.6
+   Compiling bytes v1.11.1
+   Compiling const-oid v0.9.6
+   Compiling konst_macro_rules v0.2.19
+   Compiling byte-slice-cast v1.2.3
+   Compiling memchr v2.8.0
+   Compiling autocfg v1.5.0
+   Compiling crunchy v0.2.4
+   Compiling regex-syntax v0.8.10
+   Compiling log v0.4.29
+   Compiling pin-project-lite v0.2.17
+   Compiling once_cell v1.21.4
+   Compiling smallvec v1.15.1
+   Compiling generic-array v0.14.9
+   Compiling cpufeatures v0.2.17
+   Compiling byteorder v1.5.0
+   Compiling konst v0.2.20
+   Compiling itoa v1.0.18
+   Compiling static_assertions v1.1.0
+   Compiling futures-core v0.3.32
+   Compiling semver v1.0.28
+   Compiling futures-sink v0.3.32
+   Compiling zmij v1.0.21
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling lazy_static v1.5.0
+   Compiling num-traits v0.2.19
+   Compiling shlex v1.3.0
+   Compiling arrayref v0.3.9
+   Compiling slab v0.4.12
+   Compiling tracing-core v0.1.36
+   Compiling keccak v0.1.6
+   Compiling find-msvc-tools v0.1.9
+   Compiling ref-cast v1.0.25
+   Compiling lock_api v0.4.14
+   Compiling futures-channel v0.3.32
+   Compiling getrandom v0.1.16
+   Compiling indexmap v2.14.0
+   Compiling getrandom v0.3.4
+   Compiling aho-corasick v1.1.4
+   Compiling ahash v0.8.12
+   Compiling rustc_version v0.4.1
+   Compiling parity-scale-codec v3.7.5
+   Compiling serde_json v1.0.149
+   Compiling base16ct v0.2.0
+   Compiling jam-codec v0.1.1
+   Compiling base64ct v1.8.3
+   Compiling hex v0.4.3
+   Compiling hash-db v0.16.0
+   Compiling allocator-api2 v0.2.21
+   Compiling futures-io v0.3.32
+   Compiling winnow v0.7.15
+   Compiling rustc-hex v2.1.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling environmental v1.1.4
+   Compiling toml_write v0.1.2
+   Compiling constant_time_eq v0.4.2
+   Compiling curve25519-dalek v4.1.3
+   Compiling futures-task v0.3.32
+   Compiling prettyplease v0.2.37
+   Compiling thiserror v1.0.69
+   Compiling hex-conservative v0.2.3
+   Compiling fs-err v2.11.0
+   Compiling tinyvec v1.11.0
+   Compiling toml_parser v1.1.2+spec-1.1.0
+   Compiling httparse v1.10.1
+   Compiling http v1.5.0
+   Compiling paste v1.0.15
+   Compiling uint v0.10.2
+   Compiling same-file v1.0.6
+   Compiling opaque-debug v0.3.1
+   Compiling fnv v1.0.7
+   Compiling num-format v0.4.4
+   Compiling blake2b_simd v1.0.4
+   Compiling expander v2.2.1
+   Compiling base64 v0.22.1
+   Compiling common-path v1.0.0
+   Compiling termcolor v1.4.1
+   Compiling walkdir v2.5.0
+   Compiling atomic-waker v1.1.2
+   Compiling hash256-std-hasher v0.15.2
+   Compiling bitcoin_hashes v0.14.101
+   Compiling dyn-clone v1.0.20
+   Compiling syn v2.0.117
+   Compiling const_format_proc_macros v0.2.34
+   Compiling crypto-common v0.1.6
+   Compiling block-buffer v0.10.4
+   Compiling digest v0.9.0
+   Compiling jobserver v0.1.34
+   Compiling integer-sqrt v0.1.5
+   Compiling getrandom v0.2.17
+   Compiling file-guard v0.2.0
+   Compiling mio v1.2.3
+   Compiling socket2 v0.6.5
+   Compiling unicode-normalization v0.1.25
+   Compiling toml_edit v0.25.11+spec-1.1.0
+   Compiling libsecp256k1-core v0.3.0
+   Compiling digest v0.10.7
+   Compiling impl-num-traits v0.2.0
+   Compiling sp-std v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling either v1.15.0
+   Compiling prometheus v0.13.4
+   Compiling httpdate v1.0.3
+   Compiling cc v1.2.61
+   Compiling bitflags v1.3.2
+   Compiling rand_core v0.5.1
+   Compiling rand_core v0.6.4
+   Compiling blake2 v0.10.6
+   Compiling array-bytes v6.2.3
+   Compiling object v0.37.3
+   Compiling const_format v0.2.36
+   Compiling adler2 v2.0.1
+   Compiling parking_lot v0.12.5
+   Compiling num-conv v0.2.2
+   Compiling gimli v0.32.3
+   Compiling itertools v0.11.0
+   Compiling bs58 v0.5.1
+   Compiling regex-automata v0.4.14
+   Compiling time-core v0.1.9
+   Compiling deranged v0.5.8
+   Compiling foldhash v0.1.5
+   Compiling ff v0.13.1
+   Compiling password-hash v0.5.0
+   Compiling powerfmt v0.2.0
+   Compiling miniz_oxide v0.8.9
+   Compiling libsecp256k1-gen-ecmult v0.3.0
+   Compiling libsecp256k1-gen-genmult v0.3.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling group v0.13.0
+   Compiling tracing-log v0.2.0
+   Compiling sharded-slab v0.1.7
+   Compiling hashbrown v0.15.5
+   Compiling thread_local v1.1.9
+   Compiling libsecp256k1 v0.7.2
+   Compiling hashbrown v0.13.2
+   Compiling nu-ansi-term v0.50.3
+   Compiling rustc-demangle v0.1.27
+   Compiling trie-db v0.30.1
+   Compiling trie-root v0.18.0
+   Compiling nohash-hasher v0.2.0
+   Compiling serde_bytes v0.11.19
+   Compiling sp-io v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling secp256k1-sys v0.9.2
+   Compiling tiny-keccak v2.0.2
+   Compiling heck v0.5.0
+   Compiling simple-mermaid v0.1.1
+   Compiling tokio v1.53.1
+   Compiling tuplex v0.1.2
+   Compiling const-random-macro v0.1.16
+   Compiling memory-db v0.34.0
+   Compiling sha2 v0.10.9
+   Compiling proc-macro-error-attr v1.0.4
+   Compiling syn v1.0.109
+   Compiling time v0.3.55
+   Compiling sha3 v0.10.9
+   Compiling proc-macro-error v1.0.4
+   Compiling parity-wasm v0.45.0
+   Compiling const-random v0.1.18
+   Compiling include_dir_macros v0.7.4
+   Compiling itertools v0.10.5
+   Compiling tt-call v1.0.9
+   Compiling libfuzzer-sys v0.4.12
+   Compiling arbitrary v1.4.2
+   Compiling sp-std v14.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+   Compiling include_dir v0.7.4
+   Compiling cfg-expr v0.15.8
+   Compiling regex v1.12.3
+   Compiling ppv-lite86 v0.2.21
+   Compiling http-body v1.1.0
+   Compiling http-body-util v0.1.5
+   Compiling hashbrown v0.14.5
+   Compiling schnellru v0.2.4
+   Compiling Inflector v0.11.4
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.2.2
+   Compiling proc-macro-warning v1.84.1
+   Compiling serde_derive v1.0.228
+   Compiling zeroize_derive v1.4.3
+   Compiling impl-trait-for-tuples v0.2.3
+   Compiling parity-scale-codec-derive v3.7.5
+   Compiling derive_more-impl v1.0.0
+   Compiling tracing-attributes v0.1.31
+   Compiling scale-info-derive v2.11.6
+   Compiling curve25519-dalek-derive v0.1.1
+   Compiling ref-cast-impl v1.0.25
+   Compiling derive-syn-parse v0.2.0
+   Compiling sp-debug-derive v14.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling futures-macro v0.3.32
+   Compiling jam-codec-derive v0.1.1
+   Compiling thiserror-impl v1.0.69
+   Compiling strum_macros v0.26.4
+   Compiling macro_magic_core_macros v0.5.1
+   Compiling frame-support-procedural-tools-derive v12.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling async-trait v0.1.89
+   Compiling secp256k1 v0.28.2
+   Compiling aquamarine v0.5.0
+   Compiling zeroize v1.8.2
+   Compiling sp-debug-derive v15.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+   Compiling addr2line v0.25.1
+   Compiling rand v0.7.3
+   Compiling frame-support-procedural-tools v13.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling macro_magic_core v0.5.1
+   Compiling rand v0.8.6
+   Compiling futures-util v0.3.32
+   Compiling der v0.7.10
+   Compiling merlin v3.0.0
+   Compiling secrecy v0.8.0
+   Compiling derive_more v1.0.0
+   Compiling macro_magic_macros v0.5.1
+   Compiling tracing v0.1.44
+   Compiling sp-runtime-interface-proc-macro v20.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling sp-api-proc-macro v26.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling backtrace v0.3.76
+   Compiling crypto-bigint v0.5.5
+   Compiling block-buffer v0.9.0
+   Compiling macro_magic v0.5.1
+   Compiling getrandom_or_panic v0.0.3
+   Compiling fixed-hash v0.8.0
+   Compiling sha2 v0.9.9
+   Compiling strum v0.26.3
+   Compiling signature v2.2.0
+   Compiling hmac v0.12.1
+   Compiling pbkdf2 v0.12.2
+   Compiling twox-hash v1.6.3
+   Compiling rfc6979 v0.4.0
+   Compiling ed25519 v2.2.3
+   Compiling sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling sp-crypto-hashing-proc-macro v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling impl-serde v0.5.0
+   Compiling serdect v0.2.0
+   Compiling ss58-registry v1.51.0
+   Compiling bip39 v2.2.2
+   Compiling futures-executor v0.3.32
+   Compiling toml_edit v0.22.27
+   Compiling sp-version-proc-macro v15.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+   Compiling spki v0.7.3
+   Compiling sec1 v0.7.3
+   Compiling scale-info v2.11.6
+   Compiling impl-codec v0.7.1
+   Compiling sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling binary-merkle-tree v16.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#fc23a6b2)
+   Compiling sp-storage v23.0.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+   Compiling pkcs8 v0.10.2
+   Compiling sp-externalities v0.32.0 (https://github.com/paritytech/polkadot-sdk?tag=polkadot-stable2603#2e4dd0bc)
+error: cannot find macro `thread_local` in this scope
+  --> /home/lojak/.cargo/git/checkouts/polkadot-sdk-dee0edd6eefa0594/2e4dd0b/substrate/primitives/externalities/src/scope_limited.rs:22:1
+   |
+22 | environmental::environmental!(ext: trait Externalities);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `thread_local` is in scope, but it is an attribute: `#[thread_local]`
+   = note: this error originates in the macro `$crate::thread_local_impl` which comes from the expansion of the macro `environmental::environmental` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0425]: cannot find value `GLOBAL` in this scope
+  --> /home/lojak/.cargo/git/checkouts/polkadot-sdk-dee0edd6eefa0594/2e4dd0b/substrate/primitives/externalities/src/scope_limited.rs:22:1
+   |
+22 | environmental::environmental!(ext: trait Externalities);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+   = note: this error originates in the macro `$crate::environmental` which comes from the expansion of the macro `environmental::environmental` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `sp-externalities` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+Error: failed to build fuzz script: ASAN_OPTIONS="detect_odr_violation=0" RUSTFLAGS=" -Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Cllvm-args=-sanitizer-coverage-inline-8bit-counters -Cllvm-args=-sanitizer-coverage-pc-table -Cllvm-args=-sanitizer-coverage-trace-compares --cfg fuzzing -Cllvm-args=-simplifycfg-branch-fold-threshold=0 -Zsanitizer=address -Cllvm-args=-sanitizer-coverage-stack-depth -Cdebug-assertions -Ccodegen-units=1" "cargo" "build" "--manifest-path" "/home/lojak/.cache/x3-cluster/jobs/20261003T082653Z-fuzz-atomic-kernel-rollback-9cc865/pallets/x3-atomic-kernel/fuzz/Cargo.toml" "--target" "x86_64-unknown-linux-gnu" "--release" "--config" "profile.release.debug=\"line-tables-only\"" "--bin" "fuzz_rollback"
+X3JOB-META end=2026-10-03T08:27:37Z

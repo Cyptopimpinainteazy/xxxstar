@@ -69,10 +69,10 @@ fn refund_proof_set<T: Config>(
             ExternalChainId::Bitcoin => ("bitcoin-mainnet", VmType::BitcoinScript, 3),
             _ => ("ethereum-mainnet", VmType::Evm, 4),
         };
-        if bundles
-            .iter()
-            .any(|b| b.chain_id == chain_id && b.vm_type == vm_type)
-        {
+        // `chain_id` and `vm_type` are produced together by the match above
+        // (each chain arm names one VM), so the chain alone identifies the
+        // bundle; a second condition can never disagree with the first.
+        if bundles.iter().any(|b| b.chain_id == chain_id) {
             continue;
         }
         let mut bundle = CrossDomainProofBundle {
@@ -418,4 +418,109 @@ benchmarks! {
     }
 
     impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
+}
+
+#[cfg(test)]
+mod gate_pins {
+    use super::*;
+    use crate::mock::{new_test_ext, RuntimeOrigin, Test, ALICE, BOB};
+    use crate::types::{AssetSpec, TokenId};
+    use frame_support::assert_ok;
+
+    #[test]
+    fn refund_proof_set_deduplicates_only_identical_domains() {
+        new_test_ext().execute_with(|| {
+            // Two legs on the same chain and VM: one bundle for the domain.
+            assert_ok!(Pallet::<Test>::create_intent(
+                RuntimeOrigin::signed(ALICE),
+                BOB,
+                AssetSpec {
+                    chain: ExternalChainId::Ethereum,
+                    token: TokenId::Native,
+                    amount: 10,
+                },
+                AssetSpec {
+                    chain: ExternalChainId::Ethereum,
+                    token: TokenId::Native,
+                    amount: 20,
+                },
+                H256::repeat_byte(0x91),
+                Some(3_600),
+            ));
+            let same = SettlementIntents::<Test>::iter()
+                .find(|(_, intent)| intent.secret_hash == H256::repeat_byte(0x91))
+                .map(|(id, _)| id)
+                .expect("intent exists");
+            assert_ok!(Pallet::<Test>::lock_escrow(
+                RuntimeOrigin::signed(ALICE),
+                same,
+                0,
+                ExternalChainId::Ethereum,
+                10,
+                vec![],
+            ));
+            assert_ok!(Pallet::<Test>::lock_escrow(
+                RuntimeOrigin::signed(BOB),
+                same,
+                1,
+                ExternalChainId::Ethereum,
+                20,
+                vec![],
+            ));
+            assert_eq!(
+                refund_proof_set::<Test>(same)
+                    .expect("set builds")
+                    .bundles
+                    .len(),
+                1,
+                "the second leg is the same domain and must be skipped"
+            );
+
+            // Two distinct domains: one bundle each.
+            assert_ok!(Pallet::<Test>::create_intent(
+                RuntimeOrigin::signed(ALICE),
+                BOB,
+                AssetSpec {
+                    chain: ExternalChainId::Ethereum,
+                    token: TokenId::Native,
+                    amount: 30,
+                },
+                AssetSpec {
+                    chain: ExternalChainId::Solana,
+                    token: TokenId::Native,
+                    amount: 40,
+                },
+                H256::repeat_byte(0x92),
+                Some(3_600),
+            ));
+            let distinct = SettlementIntents::<Test>::iter()
+                .find(|(_, intent)| intent.secret_hash == H256::repeat_byte(0x92))
+                .map(|(id, _)| id)
+                .expect("intent exists");
+            assert_ok!(Pallet::<Test>::lock_escrow(
+                RuntimeOrigin::signed(ALICE),
+                distinct,
+                0,
+                ExternalChainId::Ethereum,
+                30,
+                vec![],
+            ));
+            assert_ok!(Pallet::<Test>::lock_escrow(
+                RuntimeOrigin::signed(BOB),
+                distinct,
+                1,
+                ExternalChainId::Solana,
+                40,
+                vec![],
+            ));
+            assert_eq!(
+                refund_proof_set::<Test>(distinct)
+                    .expect("set builds")
+                    .bundles
+                    .len(),
+                2,
+                "distinct domains each get a bundle"
+            );
+        });
+    }
 }

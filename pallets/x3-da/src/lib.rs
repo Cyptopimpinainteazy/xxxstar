@@ -39,17 +39,29 @@ mod tests;
 #[frame_support::pallet]
 pub mod pallet {
     use crate::weights::WeightInfo;
-    use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::ReservableCurrency};
+    use frame_support::{
+        dispatch::DispatchResult,
+        pallet_prelude::*,
+        traits::{Currency, ExistenceRequirement, WithdrawReasons},
+    };
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
+    use sp_runtime::traits::{Saturating, Zero};
     use sp_runtime::SaturatedConversion;
+
+    type BalanceOf<T> =
+        <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
     // ── Config ─────────────────────────────────────────────────────────────
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// Currency for DA fees.
-        type Currency: ReservableCurrency<Self::AccountId>;
+        type Currency: Currency<Self::AccountId>;
+
+        /// Account the anti-spam fee is paid to. It must exist (hold at least the existential
+        /// deposit) for any fee below that deposit to be accepted.
+        type ProtocolTreasury: Get<Self::AccountId>;
 
         /// Maximum blob size in bytes (anti-spam cap).
         #[pallet::constant]
@@ -174,6 +186,11 @@ pub mod pallet {
         BlobAvailable { blob_id: u64, data_hash: H256 },
         /// A blob commitment expired and was pruned.
         BlobExpired { blob_id: u64, data_hash: H256 },
+        /// The DA fee for a submission was paid to the protocol treasury.
+        DaFeeCollected {
+            who: T::AccountId,
+            fee: BalanceOf<T>,
+        },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────
@@ -186,6 +203,9 @@ pub mod pallet {
         BlobNotFound,
         /// Insufficient funds for DA fee.
         InsufficientFee,
+        /// The fee could not be credited to the protocol treasury, although the submitter can
+        /// pay it. A treasury holding less than the existential deposit refuses small fees.
+        FeeDestinationRefused,
         /// Duplicate blob commitment.
         BlobAlreadyExists,
         /// Too many shard proofs for this blob.
@@ -243,8 +263,7 @@ pub mod pallet {
 
             let fee_u128 = T::PerByteFee::get().saturating_mul(size_bytes as u128);
             let fee = fee_u128.saturated_into();
-            // Charge fee via T::Currency
-            T::Currency::reserve(&submitter, fee).map_err(|_| Error::<T>::InsufficientFee)?;
+            Self::charge_da_fee(&submitter, fee)?;
 
             let now = <frame_system::Pallet<T>>::block_number();
             let blob_id = NextBlobId::<T>::mutate(|id| {
@@ -336,6 +355,47 @@ pub mod pallet {
     // ── Internal Helpers ───────────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        /// Charge the anti-spam DA fee by moving it to the protocol treasury.
+        ///
+        /// This used to `reserve` the fee, and nothing in the pallet ever released it, so every
+        /// submission locked part of the submitter's balance for good (TICKET-154). The fee now
+        /// leaves the account. It is not waived when the treasury refuses the deposit (a dead
+        /// treasury refuses any amount below the existential deposit): a waived anti-spam fee
+        /// makes spam free, so the submission is refused instead, with an error that names the
+        /// treasury rather than the payer.
+        fn charge_da_fee(who: &T::AccountId, fee: BalanceOf<T>) -> DispatchResult {
+            if fee.is_zero() {
+                return Ok(());
+            }
+            let free = T::Currency::free_balance(who);
+            let payer_covers_it = free >= fee.saturating_add(T::Currency::minimum_balance())
+                && T::Currency::ensure_can_withdraw(
+                    who,
+                    fee,
+                    WithdrawReasons::TRANSFER,
+                    free.saturating_sub(fee),
+                )
+                .is_ok();
+            T::Currency::transfer(
+                who,
+                &T::ProtocolTreasury::get(),
+                fee,
+                ExistenceRequirement::KeepAlive,
+            )
+            .map_err(|_| {
+                if payer_covers_it {
+                    Error::<T>::FeeDestinationRefused
+                } else {
+                    Error::<T>::InsufficientFee
+                }
+            })?;
+            Self::deposit_event(Event::DaFeeCollected {
+                who: who.clone(),
+                fee,
+            });
+            Ok(())
+        }
+
         /// Check if a blob has sufficient proofs to be considered available.
         pub fn is_blob_available(blob_hash: H256) -> bool {
             Blobs::<T>::get(blob_hash)

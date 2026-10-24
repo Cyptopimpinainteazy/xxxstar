@@ -132,10 +132,12 @@ pub fn check_session(session: &SwapSession) -> Vec<Violation> {
     // `record_refunds` sets both legs to `Refunded`, so a refund that happened
     // *after* a claim leaves no trace in `status` — only in the journal. This
     // is the check that catches a swap paying out and then refunding.
-    let journal_has_claim = session
-        .operation_journal
-        .iter()
-        .any(|r| matches!(r.operation, CoordinatorOperation::FastClaim | CoordinatorOperation::SlowClaim));
+    let journal_has_claim = session.operation_journal.iter().any(|r| {
+        matches!(
+            r.operation,
+            CoordinatorOperation::FastClaim | CoordinatorOperation::SlowClaim
+        )
+    });
     let journal_has_refund = session
         .operation_journal
         .iter()
@@ -144,8 +146,7 @@ pub fn check_session(session: &SwapSession) -> Vec<Violation> {
         out.push(violation(
             "REFUND_AFTER_CLAIM",
             session,
-            "journal records a claim and then a refund — both sides were paid"
-                .to_string(),
+            "journal records a claim and then a refund — both sides were paid".to_string(),
         ));
     }
 
@@ -168,20 +169,34 @@ pub fn check_sessions(sessions: &[SwapSession]) -> Vec<Violation> {
             .or_default()
             .push(session);
     }
-    for (lock, group) in by_lock {
+    for (_lock, group) in by_lock {
         if group.len() < 2 {
             continue;
         }
-        let completed = group
+        let mut completed: Vec<&SwapSession> = group
             .iter()
+            .copied()
             .filter(|s| s.phase == SwapPhase::Complete)
-            .count();
-        if completed > 1 {
-            out.push(Violation {
-                code: "DOUBLE_SETTLE",
-                session_id: format!("hashlock-{}", hex::encode(&lock[..8])),
-                detail: format!("{completed} sessions completed against one hash lock"),
-            });
+            .collect();
+        if completed.len() > 1 {
+            // Blame a real session, never a synthetic lock id: consumers key
+            // per-session state by session id (the simulator's before/after
+            // snapshots), and an id no session ever had makes that lookup
+            // miss. Sorting makes the choice deterministic; the detail stays
+            // seed-independent (no session names, no lock bytes), so two
+            // seeds that expose the same defect still dedupe to one
+            // signature.
+            completed.sort_by(|a, b| a.session_id.cmp(&b.session_id));
+            if let Some(blamed) = completed.last() {
+                out.push(Violation {
+                    code: "DOUBLE_SETTLE",
+                    session_id: blamed.session_id.clone(),
+                    detail: format!(
+                        "{} sessions completed against one hash lock",
+                        completed.len()
+                    ),
+                });
+            }
         }
     }
 

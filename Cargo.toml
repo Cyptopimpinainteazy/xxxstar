@@ -22,10 +22,9 @@ exclude = [
     "programs/svm/*",
     # Cross-VM coordinator is intentionally a standalone crate.
     "crates/cross-vm-coordinator",
-    # x3-sim and x3-mc are standalone workspace roots for the same reason: they
-    # drive the excluded cross-vm-coordinator crate, so they path-depend on a
-    # crate the parent workspace does not build. Each has its own gate in
-    # scripts/local-ci.sh (`test x3-sim`, `test x3-mc`).
+    # x3-sim and x3-mc are standalone workspace roots: they drive the excluded
+    # cross-vm-coordinator crate, which the parent workspace does not build.
+    # Each has its own gate in scripts/local-ci.sh (`test x3-sim`, `test x3-mc`).
     "crates/x3-sim",
     "crates/x3-mc",
     # Each of these declares its own `[workspace]` (or path-depends on one that
@@ -51,6 +50,17 @@ exclude = [
     # than green. This was the last entry in
     # `.ai/workspace-membership-baseline.txt`.
     "tests/loom-concurrency",
+    # External-toolchain validation fixtures: a standalone workspace holding an
+    # intentionally-defective (and a known-good) fixture used to prove that
+    # testing tools actually detect defects before we trust them on X3 code.
+    # See scripts/external-toolchain/validate-fuzz-detection.sh.
+    "tools/tool-validation",
+    # The X3 Lang language workspace (its own `[workspace]`, CI'd by
+    # `.github/workflows/x3-lang-nested-workspace.yml`). `crates/x3-integration` path-depends on its
+    # compiler and reference VM for the production trading suites; without this entry cargo would
+    # adopt those path dependencies as members of *this* workspace and resolve their
+    # `*.workspace = true` keys against the wrong root.
+    "x3-lang",
 ]
 members = [
     "pallets/x3-kernel",
@@ -203,6 +213,7 @@ members = [
     "crates/x3-validator-attestation", # <- node/Cargo.toml
     "crates/x3-runtime-signer",        # <- node/Cargo.toml, crates/x3-relayer
     "crates/x3-verification-router",   # <- node/Cargo.toml
+    "crates/x3-btc-spv",               # <- x3-verification-router, x3-crosschain-intent, x3-bridge
     "crates/x3-circuit-breaker",       # <- crosschain-gateway, pallets
     "crates/x3-external-route-registry", # <- crosschain-gateway, pallets
     "crates/x3-gateway-indexer",       # <- crosschain-gateway
@@ -215,6 +226,7 @@ members = [
     "crates/x3-orchestra-control-plane", # <- x3-gateway, x3-gpu-validator-swarm (required)
     "crates/x3-vm",                      # <- x3-gpu-validator-swarm (required), x3-integration (optional)
     "crates/x3-backend",                 # <- x3-gpu-validator-swarm (required), x3-integration (optional), x3-vm
+    "crates/x3bc-core",                  # canonical X3BC semantic core: <- x3-common, x3-backend, x3-vm, x3-lang/compiler
     "crates/x3-compiler",                # <- x3-integration (optional)
     "crates/x3-verifier",                # <- x3-integration (optional), x3-compiler (note: separate from pallets/x3-verifier)
     # Transitive path deps (level-2+, compiler/language toolchain):

@@ -148,14 +148,21 @@ pub fn free_bytes(path: &Path) -> std::io::Result<u64> {
 /// volume that does not exist at all) falls back to the original call, so the
 /// error an unmeasurable path produces is unchanged.
 pub fn free_bytes_for_new_path(path: &Path) -> std::io::Result<u64> {
+    free_bytes(&measured_path(path))
+}
+
+/// Where a path that may not exist yet is measured: itself if it exists, else its nearest
+/// existing ancestor (the directory a write to it would land in). The walk always ends, at the
+/// root or at the path itself when it has no parent.
+pub fn measured_path(path: &Path) -> std::path::PathBuf {
     let mut candidate = path.to_path_buf();
     loop {
         if candidate.exists() {
-            return free_bytes(&candidate);
+            return candidate;
         }
         match candidate.parent() {
             Some(parent) if parent != candidate.as_path() => candidate = parent.to_path_buf(),
-            _ => return free_bytes(path),
+            _ => return path.to_path_buf(),
         }
     }
 }
@@ -215,10 +222,10 @@ mod tests {
         let missing = dir.path().join("not-created-yet").join("deeper");
         assert!(!missing.exists());
 
-        assert_eq!(
-            free_bytes_for_new_path(&missing).expect("measured through the parent"),
-            free_bytes(dir.path()).expect("measured directly"),
-        );
+        // Which directory is measured is the property; comparing two free-space readings would
+        // race every other writer on a shared CI volume.
+        assert_eq!(measured_path(&missing), dir.path());
+        free_bytes_for_new_path(&missing).expect("measured through the parent");
     }
 
     #[test]
@@ -228,10 +235,8 @@ mod tests {
         // Reporting that is more useful than refusing to answer, and it is
         // bounded: the walk always terminates at an existing directory.
         let missing = Path::new("/definitely/not/a/real/volume/x3-nonexistent");
-        assert_eq!(
-            free_bytes_for_new_path(missing).expect("measured at the nearest ancestor"),
-            free_bytes(Path::new("/")).expect("measured at /"),
-        );
+        assert_eq!(measured_path(missing), Path::new("/"));
+        free_bytes_for_new_path(missing).expect("measured at the nearest ancestor");
     }
 
     #[test]

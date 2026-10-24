@@ -170,12 +170,6 @@ while_halted = false
 why = "Registering a task reserves `BaseRegistrationFee`; `cancel_task` unreserves it, so the fee is trapped while the halt refuses cancels."
 
 [[holding]]
-call = "pallet_x3_da/submit_blob_commitment"
-pallet_variant = "X3Da"
-disposition = "permanent_charge"
-why = "The reserved amount is the per-byte anti-spam fee (`PerByteFee`), a charge rather than a refundable bond; no dispatchable in this pallet releases it. TICKET-154 records that reserve-as-charge is indistinguishable from a fund trap and should use an explicit fee primitive."
-
-[[holding]]
 call = "pallet_x3_kernel/prepare_cross_vm_operation"
 pallet_variant = "AtlasKernel"
 disposition = "transient"
@@ -195,12 +189,6 @@ recoverable_by = "pallet_x3_proof_carrying_agent/resolve_challenge"
 recoverable_variant = "X3ProofCarryingAgent"
 while_halted = false
 why = "Challenging a proof reserves the challenger's bond; `resolve_challenge` returns or slashes it, which the halt blocks."
-
-[[holding]]
-call = "pallet_x3_sequencer/submit_transaction"
-pallet_variant = "X3Sequencer"
-disposition = "permanent_charge"
-why = "The reserved amount is the anti-spam sequencing fee (`BaseFee` + `PerByteFee`), charged rather than bonded; no dispatchable in this pallet releases it. TICKET-154 records the same reserve-as-charge concern as x3-da."
 
 [[holding]]
 call = "pallet_x3_settlement_engine/deposit_bond"

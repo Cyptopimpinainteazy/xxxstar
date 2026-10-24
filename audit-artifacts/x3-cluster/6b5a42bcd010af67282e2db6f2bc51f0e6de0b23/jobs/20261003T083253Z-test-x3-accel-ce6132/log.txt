@@ -1,0 +1,103 @@
+X3JOB-META free_gb=275
+X3JOB-META host=x3star1
+X3JOB-META repo=/home/lojak/Desktop/xxxstar-main
+X3JOB-META kernel=6.8.0-146-generic
+X3JOB-META rustc=rustc 1.90.0 (1159e78c4 2025-09-14)
+X3JOB-META cargo=cargo 1.90.0 (840b83a10 2025-07-30)
+X3JOB-META cc=cc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+X3JOB-META target_dir=/home/lojak/.cache/x3-cluster/target
+X3JOB-META start=2026-10-03T08:33:01Z
+warning: /home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+    Blocking waiting for file lock on package cache
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Blocking waiting for file lock on package cache
+   Compiling crypto-common v0.1.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/patches/crypto-common)
+   Compiling x3-accel-wgpu v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/crates/x3-accel-wgpu)
+   Compiling digest v0.10.7 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/patches/digest)
+   Compiling sha2 v0.10.9
+   Compiling curve25519-dalek v4.1.3
+   Compiling blake2 v0.10.6
+   Compiling ed25519-dalek v2.2.0
+   Compiling x3-accel v0.1.0 (/home/lojak/.cache/x3-cluster/jobs/20261003T083253Z-test-x3-accel-ce6132/crates/x3-accel)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.47s
+     Running unittests src/lib.rs (/home/lojak/.cache/x3-cluster/target/debug/deps/x3_accel-195fc3711b174999)
+
+running 29 tests
+test multi_device::tests::plan_is_proportional_contiguous_and_complete ... ok
+test multi_device::tests::small_batches_go_to_the_fastest_device_only ... ok
+test multi_device::tests::unusable_weights_are_rejected ... ok
+test tests::backend_selection_defaults_to_cpu_for_cuda_bypass ... ok
+test tests::cpu_hash_batches_are_deterministic ... ok
+test tests::cpu_reference_matches_published_blake2b_vectors ... ok
+test tests::cpu_reference_matches_published_keccak256_vectors ... ok
+test tests::an_absent_device_refuses_every_primitive_instead_of_answering ... ok
+test multi_device::tests::all_devices_failing_is_an_error_for_the_caller_to_fall_back_on ... ok
+test tests::cpu_reference_matches_published_sha256_vectors ... ok
+test tests::merkle_root_matches_the_published_rule_and_refuses_an_empty_tree ... ok
+test tests::strict_unavailable_backend_fails_closed ... ok
+test tests::strict_wgpu_selection_fails_closed_when_unavailable_or_executes_sha256 ... ok
+test tests::parity_wrapper_accepts_cpu_backend ... ok
+test tests::the_probe_reports_what_this_host_can_run ... ok
+test tests::cpu_reference_anchors_secp256k1_to_the_published_generator ... ok
+test tests::cpu_backend_verifies_real_signature_batches ... ok
+test tests::an_accelerator_that_disagrees_with_the_cpu_is_refused_on_every_primitive ... ok
+test tests::the_parity_wrapper_refuses_a_divergent_backend_through_the_trait ... ok
+test shadow::tests::accelerator_error_falls_back_without_disabling ... ok
+test tests::the_parity_wrapper_passes_through_a_backend_that_agrees ... ok
+test tests::cpu_reference_matches_the_rfc8032_ed25519_test_vector ... ok
+test multi_device::tests::a_failing_or_truncating_device_is_covered_by_the_others ... ok
+test shadow::tests::honest_accelerator_is_used_and_rejections_rechecked ... ok
+test shadow::tests::false_acceptance_unsampled_is_the_documented_risk ... ok
+test shadow::tests::false_acceptance_is_caught_when_sampled ... ok
+test shadow::tests::false_rejection_is_always_caught_and_disables ... ok
+test multi_device::tests::split_results_are_identical_and_in_order ... ok
+test shadow::tests::sampling_rate_is_roughly_honoured ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.80s
+
+     Running tests/secp256k1_gpu_parity.rs (/home/lojak/.cache/x3-cluster/target/debug/deps/secp256k1_gpu_parity-0cc4308cc3466b55)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/home/lojak/.cache/x3-cluster/target/debug/deps/x3_accel_wgpu-655ef668ab7c2928)
+
+running 6 tests
+libEGL warning: DRI2: failed to authenticate
+libEGL warning: DRI2: failed to authenticate
+libEGL warning: DRI2: failed to authenticate
+libEGL warning: DRI2: failed to authenticate
+libEGL warning: DRI2: failed to authenticate
+libEGL warning: DRI2: failed to authenticate
+test tests::all_empty_batch_and_empty_list ... ok
+test secp256k1::tests::gpu_field_and_scalar_primitives_match_reference ... ok
+test tests::reused_buffers_do_not_leak_previous_batches ... ok
+test tests::keccak256_kernel_matches_cpu_when_wgpu_is_available ... ok
+test tests::sha256_kernel_matches_cpu_when_wgpu_is_available ... ok
+test tests::every_padding_boundary_matches_cpu ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+   Doc-tests x3_accel
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests x3_accel_wgpu
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+X3JOB-META end=2026-10-03T08:33:11Z

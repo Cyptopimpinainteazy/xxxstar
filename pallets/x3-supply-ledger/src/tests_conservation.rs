@@ -24,7 +24,7 @@ use crate::Pallet;
 use frame_support::assert_ok;
 use sp_core::H256;
 use x3_asset_kernel_types::traits::SupplyLedgerWrite;
-use x3_asset_kernel_types::{DomainId, SupplyLedger};
+use x3_asset_kernel_types::{Balance, DomainId, SupplyLedger};
 
 /// The representative asset each test uses, with a ceiling and a fully-native starting balance.
 const CANONICAL: u128 = 1_000_000;
@@ -334,5 +334,59 @@ fn a_replayed_mint_nonce_cannot_mint_twice() {
             after_mint,
             "and the refused replay must leave the ledger untouched"
         );
+    });
+}
+
+fn slot(ledger: &SupplyLedger, domain: DomainId) -> Balance {
+    match domain {
+        DomainId::X3Native => ledger.native_supply,
+        DomainId::X3Evm => ledger.evm_supply,
+        DomainId::X3Svm => ledger.svm_supply,
+        _ => ledger.external_locked_supply,
+    }
+}
+
+/// Slot attribution, arm by arm. Totals-only assertions are invariant under rerouting a
+/// domain into the wrong field, which is how `delete match arm DomainId::X3Svm` survived the
+/// suite (a cargo-mutants survivor): every leg must move the slot its `DomainId` names, and
+/// the external catch-all must never absorb an internal domain's balance.
+#[test]
+fn every_domain_leg_moves_its_own_slot() {
+    new_test_ext().execute_with(|| {
+        let asset_id = seeded(6);
+        let domains = [DomainId::X3Native, DomainId::X3Evm, DomainId::X3Svm];
+
+        // Fund pending from native, then credit ten into each internal domain.
+        assert_ok!(debit(asset_id, DomainId::X3Native, 30));
+        for domain in domains {
+            let before = slot(&ledger_of(asset_id), domain);
+            assert_ok!(credit(asset_id, domain, 10));
+            let after = ledger_of(asset_id);
+            assert_eq!(
+                slot(&after, domain),
+                before + 10,
+                "credit must land in {domain:?}'s own slot"
+            );
+            assert_eq!(
+                after.external_locked_supply, 0,
+                "never in the external catch-all"
+            );
+        }
+
+        // Debit ten back out of each domain; its own slot must give it up.
+        for domain in domains {
+            let before = slot(&ledger_of(asset_id), domain);
+            assert_ok!(debit(asset_id, domain, 10));
+            let after = ledger_of(asset_id);
+            assert_eq!(
+                slot(&after, domain),
+                before - 10,
+                "debit must come out of {domain:?}'s own slot"
+            );
+            assert_eq!(
+                after.external_locked_supply, 0,
+                "still never in the external catch-all"
+            );
+        }
     });
 }

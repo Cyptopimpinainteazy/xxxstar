@@ -8,8 +8,10 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -44,6 +46,70 @@ class Provider(BaseHTTPRequestHandler):
 
     def log_message(self, *_):
         pass
+
+
+class DatabaseStartupTests(unittest.TestCase):
+    def test_creates_nested_parent_and_preserves_usage_after_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "state" / "router" / "usage.sqlite3"
+            router = router_module.Router({}, path)
+            try:
+                router.db.execute("INSERT INTO usage (day, agent, cost_usd) VALUES (?, ?, ?)",
+                                  ("2026-10-01", "alice", 0.25))
+                router.db.commit()
+            finally:
+                router.db.close()
+            restarted = router_module.Router({}, path)
+            try:
+                self.assertEqual(restarted.db.execute("SELECT agent, cost_usd FROM usage").fetchall(),
+                                 [("alice", 0.25)])
+            finally:
+                restarted.db.close()
+
+    def test_memory_database_remains_supported(self):
+        router = router_module.Router({}, ":memory:")
+        try:
+            self.assertEqual(router.db.execute("PRAGMA database_list").fetchone()[2], "")
+        finally:
+            router.db.close()
+
+    def test_parent_file_reports_database_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory) / "file"
+            parent.write_text("keep me", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, parent / "usage.sqlite3")
+            self.assertIn(str(parent), str(failure.exception))
+            self.assertEqual(parent.read_text(encoding="utf-8"), "keep me")
+
+    def test_invalid_database_reports_location(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "usage.sqlite3"
+            path.write_bytes(b"not a sqlite database")
+            with self.assertRaisesRegex(RuntimeError, "initialize router database") as failure:
+                router_module.Router({}, path)
+            self.assertIn(str(path), str(failure.exception))
+
+    def test_all_startup_failures_close_the_opened_connection(self):
+        original = router_module.sqlite3.connect
+        for config, corrupt in (({"reservation_ttl_seconds": "invalid"}, False), ({}, True)):
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "usage.sqlite3"
+                if corrupt:
+                    path.write_bytes(b"not a database")
+                connections = []
+
+                def connect(*args, **kwargs):
+                    connection = original(*args, **kwargs)
+                    connections.append(connection)
+                    return connection
+
+                with patch.object(router_module.sqlite3, "connect", side_effect=connect):
+                    with self.assertRaisesRegex(RuntimeError, "initialize router database"):
+                        router_module.Router(config, path)
+                self.assertEqual(len(connections), 1)
+                with self.assertRaises(router_module.sqlite3.ProgrammingError):
+                    connections[0].execute("SELECT 1")
 
 
 class RouterTests(unittest.TestCase):
@@ -123,6 +189,9 @@ class RouterTests(unittest.TestCase):
             server.server_close()
 
     def test_chat_stream_escaped_exception_ends_with_error_and_done(self):
+        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
         original = self.router.stream
 
         def exploding(plan, agent, start, send):
@@ -131,9 +200,6 @@ class RouterTests(unittest.TestCase):
             raise RuntimeError("synthetic internal failure")
 
         self.router.stream = exploding
-        server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
-        worker = threading.Thread(target=server.serve_forever, daemon=True)
-        worker.start()
         try:
             data = json.dumps({"model": "x3-auto", "messages": [{"role": "user", "content": "format"}],
                                "max_tokens": 10, "stream": True}).encode()
@@ -468,6 +534,7 @@ class RouterTests(unittest.TestCase):
         body.update(overrides)
         return body
 
+
     def serve(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), router_module.handler_for(self.router))
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -683,6 +750,123 @@ class ProtocolTests(unittest.TestCase):
                            "content": [{"type": "input_text", "text": "hi"}]}]}
         body.update(overrides)
         return body
+
+    def test_malformed_choices_fail_closed_without_booking_success(self):
+        for choices in (None, [], "invalid", {}, [None], [{}], [{"message": "invalid"}],
+                        [{"message": {}}], [{"message": {"role": "assistant", "content": 123}}],
+                        [{"message": {"role": "assistant", "refusal": 123}}],
+                        [{"message": {"role": "assistant", "tool_calls": "invalid"}}],
+                        [{"message": {"role": "assistant", "tool_calls": [{}]}}],
+                        [{"message": {"role": "user", "content": "wrong role"}}]):
+            with self.subTest(choices=choices):
+                self.router.note_provider_success("up")
+
+                def malformed(handler, body):
+                    payload = json.dumps({"choices": choices}).encode()
+                    handler.send_response(200)
+                    handler.send_header("Content-Length", str(len(payload)))
+                    handler.end_headers()
+                    handler.wfile.write(payload)
+
+                ScriptedProvider.script = malformed
+                status, _ = self.router.complete({"messages": [{"role": "user", "content": "hello"}],
+                                                  "max_tokens": 10}, "alice")
+                self.assertEqual(status, 502)
+                self.assertEqual(self.router.stats(), [])
+                self.assertEqual(self.router.snapshot()["reserved_usd"], 0)
+
+    def test_provider_recovers_after_persisted_cooldown_and_router_restart(self):
+        self.config["retry_attempts"] = 0
+        self.config["provider_cooldown_seconds"] = 2
+        self.config["providers"]["backup"] = {**self.config["providers"]["up"], "model": "backup"}
+        self.config["routes"]["routine"] = ["up", "backup"]
+        healthy = False
+
+        def respond(handler, body):
+            if body["model"] == "up-model" and not healthy:
+                handler.send_response(503)
+                handler.send_header("Content-Length", "2")
+                handler.end_headers()
+                handler.wfile.write(b"{}")
+            else:
+                payload = json.dumps({"model": body["model"], "choices": [{
+                    "message": {"role": "assistant", "content": "recovered"}}]}).encode()
+                handler.send_response(200)
+                handler.send_header("Content-Length", str(len(payload)))
+                handler.end_headers()
+                handler.wfile.write(payload)
+
+        ScriptedProvider.script = respond
+        request = {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 10}
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertGreater(self.router.provider_cooldown("up"), 0)
+        self.router.db.close()
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+        healthy = True
+        count = len(ScriptedProvider.requests)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "backup"))
+        self.assertEqual([r["model"] for r in ScriptedProvider.requests[count:]], ["backup"])
+        deadline = time.monotonic() + 5
+        while self.router.provider_cooldown("up") > 0 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(self.router.provider_cooldown("up"), 0)
+        status, response = self.router.complete(request, "alice")
+        self.assertEqual((status, response["model"]), (200, "up-model"))
+        self.assertNotIn("up", [row["provider"] for row in self.router.provider_health()])
+
+    def test_valid_tool_calls_and_refusals_survive_responses_translation(self):
+        messages = [
+            {"role": "assistant", "content": None, "tool_calls": [{
+                "id": "call_1", "type": "function",
+                "function": {"name": "read_file", "arguments": '{"path":"README.md"}'}}]},
+            {"role": "assistant", "content": None, "refusal": "I cannot fulfill that request."},
+        ]
+        server = self.serve()
+        try:
+            for message in messages:
+                with self.subTest(message=message):
+                    def respond(handler, body):
+                        payload = json.dumps({"choices": [{"message": message}]}).encode()
+                        handler.send_response(200)
+                        handler.send_header("Content-Length", str(len(payload)))
+                        handler.end_headers()
+                        handler.wfile.write(payload)
+
+                    ScriptedProvider.script = respond
+                    status, raw = self.post(server, self.responses_body(stream=False))
+                    self.assertEqual(status, 200, raw)
+                    output = json.loads(raw)["output"]
+                    if message.get("tool_calls"):
+                        self.assertEqual(output[0]["type"], "function_call")
+                        self.assertEqual(output[0]["call_id"], "call_1")
+                        self.assertEqual(output[0]["arguments"], '{"path":"README.md"}')
+                    else:
+                        self.assertEqual(output[0]["content"], [{"type": "refusal", "refusal": message["refusal"]}])
+        finally:
+            server.shutdown()
+            server.server_close()
+
+    def test_malformed_completion_is_reported_as_upstream_failure_on_responses_endpoint(self):
+        def malformed(handler, body):
+            payload = b'{"choices":null}'
+            handler.send_response(200)
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+
+        ScriptedProvider.script = malformed
+        server = self.serve()
+        try:
+            status, raw = self.post(server, self.responses_body(stream=False))
+            self.assertEqual(status, 502)
+            self.assertEqual(json.loads(raw)["error"]["type"], "no_provider_succeeded")
+            self.assertEqual(self.router.stats(), [])
+        finally:
+            server.shutdown()
+            server.server_close()
+
 
     # ── Named tool_choice ────────────────────────────────────────────────
 
@@ -2559,6 +2743,209 @@ class NativeResponsesTests(unittest.TestCase):
         self.assertNotIn(SECRET, logs)
         self.assertNotIn("Bearer", logs)
         self.assertIn("[redacted]", logs, "the credential must be visibly scrubbed, not quietly dropped")
+
+
+class SlowProvider(BaseHTTPRequestHandler):
+    """Answers after a delay and records which port served each request.
+
+    A test that needs two requests to overlap sets `barrier`: each request then
+    waits until the other is also inside a provider, which proves concurrency
+    without a wall-clock bound (that failed on a loaded machine)."""
+    delay = 0.4
+    barrier = None
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers["Content-Length"]))
+        if self.barrier is not None:
+            self.barrier.wait()
+        else:
+            time.sleep(self.delay)
+        body = json.dumps({"choices": [{"message": {"role": "assistant", "content": str(self.server.server_port)}}],
+                           "usage": {"prompt_tokens": 1, "completion_tokens": 1}}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+class DualGpuTests(unittest.TestCase):
+    """Two local workers: saturation spills to the idle card, death fails over."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.servers = []
+        for _ in range(2):
+            server = ThreadingHTTPServer(("127.0.0.1", 0), SlowProvider)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            self.servers.append(server)
+        rtx, gtx = (s.server_port for s in self.servers)
+        local = {"protocol": "chat_completions", "supports_tools": False, "critical_allowed": True,
+                 "max_in_flight": 1}
+        self.config = {
+            "daily_budget_usd": 1, "agent_daily_budget_usd": 1, "max_input_tokens": 1000,
+            "max_output_tokens": 100, "default_max_output_tokens": 16, "retry_attempts": 0,
+            "providers": {
+                "rtx": dict(local, base_url=f"http://127.0.0.1:{rtx}/v1", model="m"),
+                "gtx": dict(local, base_url=f"http://127.0.0.1:{gtx}/v1", model="m"),
+            },
+            "policies": {"x3-local": {"tier": "routine", "order": ["rtx", "gtx"]}},
+            "routes": {"routine": ["rtx", "gtx"], "critical": ["rtx", "gtx"]},
+            "budget_fallback": [],
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/nested/dir/usage.db")
+
+    def tearDown(self):
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+        self.router.db.close()
+        self.tmp.cleanup()
+
+    def ask(self):
+        status, body = self.router.complete({"model": "x3-local", "messages": [{"role": "user", "content": "hi"}]}, "a")
+        self.assertEqual(status, 200, body)
+        return int(body["choices"][0]["message"]["content"])
+
+    def test_database_directory_is_created_and_uses_wal(self):
+        self.assertTrue(os.path.isdir(self.tmp.name + "/nested/dir"))
+        self.assertEqual(self.router.db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+
+    def test_default_db_path_is_absolute_and_overridable(self):
+        with unittest.mock.patch.dict(os.environ, {"X3_ROUTER_DB": "", "XDG_DATA_HOME": "/data"}):
+            self.assertEqual(router_module.default_db_path(), "/data/x3-router/usage.sqlite3")
+        with unittest.mock.patch.dict(os.environ, {"X3_ROUTER_DB": "/x/u.db"}):
+            self.assertEqual(router_module.default_db_path(), "/x/u.db")
+
+    def test_saturated_worker_is_moved_last_not_dropped(self):
+        self.assertEqual(self.router.attempt_order(["rtx", "gtx"]), ["rtx", "gtx"])
+        with self.router.track("rtx"):
+            self.assertEqual(self.router.attempt_order(["rtx", "gtx"]), ["gtx", "rtx"])
+        self.assertEqual(self.router.load(), {})
+
+    def test_providers_sharing_a_worker_share_its_slots(self):
+        self.config["providers"]["rtx_big"] = dict(self.config["providers"]["rtx"], worker="card0")
+        self.config["providers"]["rtx"]["worker"] = "card0"
+        with self.router.track("rtx"):
+            self.assertEqual(self.router.attempt_order(["rtx", "rtx_big", "gtx"]), ["gtx", "rtx", "rtx_big"])
+            self.assertEqual(self.router.load(), {"card0": 1})
+
+    def test_concurrent_requests_use_both_workers(self):
+        # Both requests must be in flight at once: a serialized pair breaks the
+        # barrier (BrokenBarrierError -> a provider error) instead of passing.
+        SlowProvider.barrier = threading.Barrier(2, timeout=30)
+        try:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                ports = set(pool.map(lambda _: self.ask(), range(2)))
+        finally:
+            SlowProvider.barrier = None
+        self.assertEqual(ports, {s.server_port for s in self.servers}, "the two requests must run in parallel")
+
+    def test_dead_worker_fails_over_to_the_other(self):
+        dead = self.servers.pop(0)
+        dead.shutdown()
+        dead.server_close()
+        self.assertEqual(self.ask(), self.servers[0].server_port)
+        self.assertGreater(self.router.provider_cooldown("rtx"), 0, "a dead worker must be put on cooldown")
+        self.assertEqual(self.ask(), self.servers[0].server_port)
+
+    def test_both_workers_dead_reports_every_failure(self):
+        for server in self.servers:
+            server.shutdown()
+            server.server_close()
+        self.servers = []
+        status, body = self.router.complete({"model": "x3-local", "messages": [{"role": "user", "content": "hi"}]}, "a")
+        self.assertGreaterEqual(status, 500)
+        text = json.dumps(body)
+        self.assertIn("rtx", text)
+        self.assertIn("gtx", text)
+
+
+class RegistrationTests(unittest.TestCase):
+    """GPU nodes join through providers.d drop-ins, not config edits."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.config = {"providers": {"ollama": {"base_url": "http://127.0.0.1:11434/v1", "model": "m"}},
+                       "policies": {"x3-local": {"tier": "routine", "order": ["ollama"]}},
+                       "budget_fallback": ["ollama"]}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def write(self, name, data):
+        Path(self.tmp.name, name).write_text(json.dumps(data))
+
+    def test_registration_appends_providers_after_configured_ones(self):
+        self.write("x3gpu2.json", {"node": "x3gpu2",
+                                   "providers": {"g2": {"base_url": "http://x3gpu2:11434/v1", "model": "qwen3:8b",
+                                                        "worker": "x3gpu2-gpu0", "max_in_flight": 1}},
+                                   "policies": {"x3-local": ["g2"]}})
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(rejected, [])
+        self.assertEqual(accepted[0]["providers"], ["g2"])
+        self.assertEqual(self.config["policies"]["x3-local"]["order"], ["ollama", "g2"])
+        self.assertEqual(self.config["budget_fallback"], ["ollama", "g2"])
+        self.assertFalse(self.config["providers"]["g2"]["critical_allowed"], "registered workers are not critical by default")
+
+    def test_registration_cannot_carry_credentials_prices_or_overwrite(self):
+        self.write("a.json", {"providers": {"x": {"base_url": "http://h/v1", "model": "m", "api_key_env": "HOME"}}})
+        self.write("b.json", {"providers": {"y": {"base_url": "http://h/v1", "model": "m",
+                                                  "input_usd_per_million": 9}}})
+        self.write("c.json", {"providers": {"ollama": {"base_url": "http://h/v1", "model": "evil"}}})
+        self.write("d.json", {"providers": {"z": {"base_url": "file:///etc/passwd", "model": "m"}}})
+        self.write("e.json", {"providers": {"w": {"base_url": "http://h/v1", "model": "m"}},
+                              "policies": {"x3-local": ["ollama"]}})
+        self.write("f.json", "not an object")
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(accepted, [])
+        self.assertEqual(len(rejected), 6)
+        self.assertEqual(self.config["providers"]["ollama"]["model"], "m")
+        self.assertEqual(self.config["policies"]["x3-local"]["order"], ["ollama"])
+
+    def test_missing_directory_is_not_an_error(self):
+        self.assertEqual(router_module.apply_registrations(self.config, self.tmp.name + "/none"), ([], []))
+
+    def test_registration_values_are_type_checked(self):
+        bad = {"a": {"max_in_flight": "1"}, "b": {"max_in_flight": 0}, "c": {"max_in_flight": True},
+               "d": {"worker": ["x3gpu2-gpu0"]}, "e": {"supports_tools": "yes"}, "f": {"critical_allowed": True},
+               "g": {"probe_timeout_seconds": -1}}
+        for name, extra in bad.items():
+            self.write(f"{name}.json", {"providers": {name: dict({"base_url": "http://h/v1", "model": "m"}, **extra)}})
+        accepted, rejected = router_module.apply_registrations(self.config, self.tmp.name)
+        self.assertEqual(accepted, [])
+        self.assertEqual(len(rejected), len(bad))
+        self.assertEqual(set(self.config["providers"]), {"ollama"})
+
+    def test_a_registered_provider_never_serves_critical_requests(self):
+        self.write("x3gpu2.json", {"providers": {"g2": {"base_url": "http://x3gpu2:11434/v1", "model": "m"}}})
+        router_module.apply_registrations(self.config, self.tmp.name)
+        registered = self.config["providers"]["g2"]
+        self.assertNotIn("api_key_env", registered)
+        self.assertFalse(router_module.may_serve_critical(registered),
+                         "no credentials does not mean the model is on this machine")
+        self.assertTrue(router_module.may_serve_critical(self.config["providers"]["ollama"]))
+
+
+class ServerTests(unittest.TestCase):
+    def test_an_ipv6_host_gets_an_ipv6_server(self):
+        import socket
+        self.assertEqual(router_module.server_class_for("::1").address_family, socket.AF_INET6)
+        self.assertEqual(router_module.server_class_for("127.0.0.1").address_family, socket.AF_INET)
+
+    def test_zero_max_in_flight_is_zero_slots_not_unlimited(self):
+        config = {"providers": {"p": {"base_url": "http://h/v1", "model": "m", "max_in_flight": 0},
+                                "q": {"base_url": "http://h/v1", "model": "m"}},
+                  "policies": {}, "budget_fallback": []}
+        router = router_module.Router(config, ":memory:")
+        try:
+            self.assertTrue(router.saturated("p"))
+            self.assertFalse(router.saturated("q"), "no limit is unlimited")
+        finally:
+            router.db.close()
 
 
 if __name__ == "__main__":

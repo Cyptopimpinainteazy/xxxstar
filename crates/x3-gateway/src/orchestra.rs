@@ -260,7 +260,7 @@ pub async fn get_evidence_bundle(
                 tracing::warn!(
                     requested = bundle_id,
                     returned = %mismatched.bundle_id,
-                    "control-plane returned a different evidence bundle than requested;                      refusing to mirror mismatched evidence and falling back to the local index"
+                    "control-plane returned a different evidence bundle than requested; refusing to mirror mismatched evidence and falling back to the local index"
                 );
             }
             Err(err) => {

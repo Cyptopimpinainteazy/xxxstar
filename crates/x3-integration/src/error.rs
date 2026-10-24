@@ -38,6 +38,9 @@ pub enum X3IntegrationError {
     CompilationFailed(String),
     /// A standalone artifact's attestation was refused, so it was not executed.
     UnattestedArtifact(String),
+    /// The artifact's compiled policy demands private submission and this submission did not
+    /// arrive through a private channel; nothing ran.
+    PrivateSubmissionUnavailable,
 }
 
 #[cfg(feature = "std")]
@@ -63,6 +66,10 @@ impl std::fmt::Display for X3IntegrationError {
             Self::UnattestedArtifact(msg) => {
                 write!(f, "Artifact attestation refused: {}", msg)
             }
+            Self::PrivateSubmissionUnavailable => write!(
+                f,
+                "private submission required by the compiled policy, but no private channel"
+            ),
         }
     }
 }
@@ -86,6 +93,9 @@ impl From<X3IntegrationError> for frame_support::pallet_prelude::DispatchError {
             X3IntegrationError::ModuleNotFound => "X3: Module not found",
             X3IntegrationError::CompilationFailed(_) => "X3: Compilation failed",
             X3IntegrationError::UnattestedArtifact(_) => "X3: Artifact attestation refused",
+            X3IntegrationError::PrivateSubmissionUnavailable => {
+                "X3: Private submission required but unavailable"
+            }
         })
     }
 }

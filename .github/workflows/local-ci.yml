@@ -1,0 +1,94 @@
+name: Local CI
+
+# The gate runner of record (scripts/local-ci.sh, see docs/local-ci.md) on the
+# self-hosted x3 runners, automatically on every push to master and every PR.
+# GitHub-hosted runners cannot execute for this account, so this is the only CI
+# that runs without someone starting it by hand.
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "local-ci.sh mode flag (empty = fast gate set, or --deep, --all, ...)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  statuses: write
+
+concurrency:
+  # A superseded PR push cancels; a master run always finishes.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  local-ci:
+    # The repository is public and the runners are our own machines: never run
+    # code from a fork's pull request on them.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 180
+    env:
+      CARGO_TERM_COLOR: always
+      GH_TOKEN: ${{ github.token }}
+      X3_LOCAL_CI_LOG_DIR: ${{ github.workspace }}/.ai/runlogs/${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # The PR's own head, so the x3/local-ci status lands on the commit the
+          # PR shows (the default pull_request checkout is a synthetic merge).
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Use this machine's toolchain, isolated per runner
+        # The runner service starts with a minimal PATH: system Python 3.10 (no tomllib, no
+        # pytest), no Homebrew node/python, no ~/.local/bin (cargo-deny, cargo-audit). And
+        # both runners share one ~/.cargo and ~/.rustup, so one job's toolchain install or
+        # cache prune deletes files another job is compiling. Each runner gets its own
+        # hard-linked copy of both homes (seconds to create, no extra disk until written).
+        run: |
+          set -euo pipefail
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin "$HOME/.foundry/bin"; do
+            [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
+          done
+          iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
+          [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
+          [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
+          # rustup reinstalls replace the binary; keep the copy's launcher current.
+          ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
+          {
+            echo "CARGO_HOME=$iso/cargo"
+            echo "RUSTUP_HOME=$iso/rustup"
+          } >> "$GITHUB_ENV"
+          echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Show the resolved toolchain
+        run: |
+          for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker anvil forge; do
+            printf '%-12s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
+          done
+          python3 --version; cargo --version
+
+      - name: Local CI
+        env:
+          MODE: ${{ github.event.inputs.mode }}
+        # Full gate set: a scoped run (--changed-from/--only) publishes no verdict.
+        run: bash scripts/local-ci.sh ${MODE} --publish-status
+
+      # Gate output is redirected to per-gate files. Preserve it even when the
+      # gate fails, before the next checkout cleans this runner's workspace.
+      - name: Preserve Local CI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-ci-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.X3_LOCAL_CI_LOG_DIR }}/local-ci-*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

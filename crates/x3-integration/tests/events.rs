@@ -192,3 +192,35 @@ fn emit_without_an_event_is_refused() {
     let error = refusal("fn main() -> i64 { let x = 1; emit x; return 0; }");
     assert!(error.contains("emit needs an event"), "{error}");
 }
+
+/// An event's payload is priced per byte (`x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE`): two programs
+/// that differ only in the length of the string they emit compile to the same instructions, so the
+/// whole gas difference is the payload's.
+#[test]
+fn an_events_payload_is_priced_per_byte() {
+    let gas = |source: &str| {
+        let bytes = compile_source(source).unwrap_or_else(|e| panic!("must compile: {e}"));
+        let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false)
+            .unwrap_or_else(|e| panic!("on-chain path: {e:?}"));
+        assert!(receipt.success);
+        assert_eq!(receipt.logs.len(), 1);
+        (receipt.gas_used, receipt.logs[0].data.len() as u64)
+    };
+    let (short_gas, short_len) = gas(r#"fn main() -> i64 { emit Note("a"); return 0; }"#);
+    let (long_gas, long_len) = gas(r#"fn main() -> i64 { emit Note("abcdefgh"); return 0; }"#);
+    assert_eq!(long_len - short_len, 7);
+    assert_eq!(
+        long_gas - short_gas,
+        7 * x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE,
+        "the gas difference is exactly the payload's"
+    );
+
+    // A limit that covers the instructions but not the payload refuses the event rather than
+    // recording it unpaid.
+    let bytes = compile_source(r#"fn main() -> i64 { emit Note("abcdefgh"); return 0; }"#)
+        .expect("compiles");
+    let starved = X3Executor::execute_on_chain(&bytes, long_gas - 1, &[], false)
+        .expect("a gas failure is a receipt, not an engine fault");
+    assert!(!starved.success);
+    assert!(starved.logs.is_empty(), "an unpaid event is not journalled");
+}

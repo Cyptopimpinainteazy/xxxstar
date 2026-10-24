@@ -796,16 +796,10 @@ where
     }
 }
 
+/// A returned value's bytes, in the engine's one encoding (`x3_vm::Value::return_bytes`), so a log
+/// line here reads the same as the receipt a block produces.
 fn value_to_log(value: x3_vm::Value) -> Vec<u8> {
-    match value {
-        x3_vm::Value::I64(v) => v.to_le_bytes().to_vec(),
-        x3_vm::Value::F64(v) => v.to_bits().to_le_bytes().to_vec(),
-        x3_vm::Value::Bool(v) => vec![v as u8],
-        x3_vm::Value::String(v) => v.into_bytes(),
-        x3_vm::Value::Bytes(v) => v,
-        x3_vm::Value::Addr(v) => v.to_le_bytes().to_vec(),
-        x3_vm::Value::Unit => Vec::new(),
-    }
+    value.return_bytes()
 }
 
 #[cfg(test)]

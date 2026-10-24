@@ -1,0 +1,87 @@
+{
+  "artifact": "dependency-gate-remediation",
+  "schema": "x3-tool-evidence/1",
+  "date": "2026-10-01",
+  "commit": "ff57d15dd6e93ba4bcc19081d18bcd5632954941",
+  "branch": "master",
+  "scope": "cargo audit + cargo deny advisories + cargo deny licenses",
+
+  "advisories": {
+    "finding": "cargo audit reported 1 vulnerability: wasmtime 36.0.14, RUSTSEC-2026-0316 (low)",
+    "reachability": "wasmtime <- sp-wasm-interface 24.0.0 and sc-executor-wasmtime 0.43.0 (the runtime executor) - in the shipped node",
+    "resolution": "upgraded wasmtime 36.0.14 -> 36.0.16, which is inside the advisory's patched range (>= 36.0.16, < 37.0.0). Not suppressed.",
+    "lock_delta": "wasmtime family 36.0.14->36.0.16 and cranelift 0.123.14->0.123.16 only",
+    "result": "cargo audit exit 0, 0 vulnerabilities"
+  },
+
+  "unsound_no_fix": [
+    {
+      "id": "RUSTSEC-2026-0255",
+      "crate": "sized-chunks 0.6.5",
+      "patched": "none (crate unmaintained; `im` was archived 2026-05-03)",
+      "chain": "sized-chunks <- im 15.1.0 <- solana-runtime 3.0.14 <- solana-banks-server <- solana-program-test <- x3-svm-integration (dev-dependency)",
+      "reachability_proof": {
+        "with_dev_deps": "cargo tree -p x3-svm-integration -e all | grep sized-chunks => 4 matches, introduced by solana-program-test v3.0.14",
+        "without_dev_deps": "cargo tree -p x3-svm-integration -e normal,build | grep sized-chunks => 0",
+        "node": "cargo tree -p x3-chain-node -e normal,build => 0 matches for sized-chunks/im/solana-runtime",
+        "conclusion": "DEV/TEST-ONLY. Not present in any production or release artifact."
+      },
+      "status": "warning only (cargo audit allows unsound/unmaintained); does not fail either gate"
+    },
+    {
+      "id": "RUSTSEC-2023-0126",
+      "crate": "im 15.1.0",
+      "patched": "none (archived)",
+      "reachability": "same dev-only chain as sized-chunks"
+    },
+    {
+      "id": "RUSTSEC-2026-0186",
+      "crate": "memmap2 0.5.10",
+      "patched": ">= 0.9.11",
+      "note": "0.9.11 is already resolved elsewhere in the tree; the 0.5.10 copy is pinned by parity-db/solana/sc-chain-spec. Affected functions are advise_range/flush_range."
+    },
+    {
+      "id": "RUSTSEC-2026-0097",
+      "crate": "rand 0.7.3",
+      "patched": ">= 0.8.6 / >= 0.9.3 / >= 0.10.1 (no 0.7.x fix)",
+      "note": "0.7.3 pinned by jsonrpc-pubsub 18 -> x3-rpc; not bumpable without that chain moving."
+    }
+  ],
+
+  "licenses": {
+    "before": "cargo deny check licenses FAILED: 12 unlicensed crates + 5 rejected licence expressions",
+    "first_party_fix": [
+      "crates/custody-service", "crates/swarm-media", "crates/treasury", "crates/x3-appzone-factory",
+      "crates/x3-gulfstream", "crates/x3-marketplace", "crates/x3-mobile-sdk", "crates/x3-parallel-executor",
+      "crates/x3-pq", "crates/x3-runtime-params", "crates/x3-swap-router"
+    ],
+    "first_party_change": "added `license.workspace = true` (inherits Apache-2.0, matching the 43 crates that already do this)",
+    "allow_list_additions": [
+      {"license": "BSL-1.0", "why": "xxhash-rust 0.8.18 via redis -> x3-gateway"},
+      {"license": "Unlicense", "why": "ws_stream_wasm/async_io_stream -> ethers-providers 2.0.14 -> x3-bot"},
+      {"license": "NCSA", "why": "dependency of x3-integration-fuzz"},
+      {"license": "OpenSSL", "why": "LEGAL CALL - required only for the ring clarification; permissive, not copyleft"}
+    ],
+    "clarification": {
+      "crate": "ring 0.16.20",
+      "why": "no SPDX field in manifest; LICENSE is ISC-style + BoringSSL/OpenSSL, below cargo-deny's 0.8 confidence threshold",
+      "mechanism": "[[licenses.clarify]] expression = \"ISC AND OpenSSL\", pinned to the LICENSE hash 0xbd0eed23, rather than lowering the global confidence threshold",
+      "note": "ring was already an accepted dependency (RUSTSEC-2025-0009 is in both advisory ignore lists); this makes that acceptance machine-checkable"
+    },
+    "result": "cargo deny check licenses exit 0 (licenses ok)"
+  },
+
+  "final_gate_state": {
+    "cargo audit": 0,
+    "cargo deny check advisories": 0,
+    "cargo deny check licenses": 0,
+    "cargo deny check (all)": 0,
+    "cargo metadata --no-deps": 0,
+    "scripts/check-advisory-scope.py": "OK - 3 advisory record(s) verified against 68 lockfile(s)"
+  },
+
+  "open_decisions": [
+    "Accept the OpenSSL license term for ring (only entry that is a legal judgement rather than a factual fix).",
+    "Prove reachability for memmap2 0.5.10 (advise_range/flush_range) and rand 0.7.3 on the production path."
+  ]
+}

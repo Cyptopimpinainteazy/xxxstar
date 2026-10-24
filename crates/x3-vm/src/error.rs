@@ -1,6 +1,7 @@
 //! Error types for the X3 VM.
 
-use std::fmt;
+use crate::prelude::*;
+use core::fmt;
 use thiserror::Error;
 
 // =============================================================================
@@ -27,13 +28,17 @@ impl VerifierError {
     }
 }
 
-impl std::error::Error for VerifierError {}
+impl core::error::Error for VerifierError {}
 
 /// Specific verifier error kinds.
 #[derive(Debug, Error)]
 pub enum VerifierErrorKind {
     #[error("empty module")]
     EmptyModule,
+
+    /// A trading-extension rule the module breaks (format 1.1).
+    #[error("trading extension: {0}")]
+    Trading(String),
 
     #[error("invalid magic bytes (expected 'X3BC')")]
     BadMagic,
@@ -109,6 +114,21 @@ pub enum VerifierErrorKind {
 
     #[error("parse error: {0}")]
     ParseError(String),
+
+    #[error("function {0} has entry point {1}, which is not the start of an instruction")]
+    FunctionEntryUnaligned(usize, u32),
+
+    #[error("call to function {0} passes {2} arguments, but it declares {1} parameters")]
+    CallArgumentCountMismatch(u32, u8, usize),
+
+    #[error("function {0} needs {1} registers for its parameters and locals (max {2})")]
+    FunctionFrameTooLarge(usize, usize, usize),
+
+    #[error("the module has no entry function")]
+    MissingEntryFunction,
+
+    #[error("opcode 0x{0:02x} is not executed by this engine, so a block could not run it")]
+    NotExecutable(u8),
 }
 
 // =============================================================================
@@ -136,7 +156,7 @@ impl VMError {
     }
 }
 
-impl std::error::Error for VMError {}
+impl core::error::Error for VMError {}
 
 /// Specific VM error kinds.
 #[derive(Debug, Error)]
@@ -229,6 +249,18 @@ pub enum VMErrorKind {
     #[error("atomic transaction aborted")]
     AtomicAborted,
 
+    #[error("atomic windows nested deeper than {0}")]
+    AtomicDepthExceeded(usize),
+
+    #[error("the host supplied no {0} for this execution")]
+    ContextUnavailable(&'static str),
+
+    #[error("pop from an empty array")]
+    EmptyArray,
+
+    #[error("aggregate would hold {0} values (max {1})")]
+    AggregateTooLarge(usize, usize),
+
     #[error("hostcall {0} not found")]
     HostcallNotFound(u8),
 
@@ -258,6 +290,11 @@ pub enum VMErrorKind {
 
     #[error("not implemented: {0}")]
     NotImplemented(String),
+
+    /// A trading-extension rule stopped the execution (`x3bc_core::trap`); the receipt carries the
+    /// trap and the whole trade rolls back.
+    #[error("trade trapped: {0}")]
+    Trade(x3bc_core::trap::TrapId),
 }
 
 // =============================================================================

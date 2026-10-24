@@ -1,0 +1,90 @@
+{
+  "scope": "Review fixes for router, validator launcher and source scan",
+  "git_commit": "0ba554a379da3b58bb9f5ec6a4e9cbf38cbab49a",
+  "tested_code_tree": "f8c68136f689b4baa8bc574f4cf087ec7d2f973b",
+  "checks": [
+    {
+      "command": "python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 143
+    },
+    {
+      "command": "COUNT=8 python3 tests/test_validator_launcher.py -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 11
+    },
+    {
+      "command": "python3 tests/test_fake_code_scan.py -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 2
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py cheats",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 151,
+      "counts": {
+        "constant-assert": 16,
+        "noop-test": 2,
+        "skip": 133
+      }
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py stubs",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 1573
+    },
+    {
+      "command": "bash -n scripts/testnet/run-7-validators-local.sh scripts/local-ci.sh",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    }
+  ],
+  "fixed": [
+    "Configuration exceptions close initialized SQLite connections",
+    "Empty/invalid assistant payloads are rejected before success accounting; valid tool calls/refusals survive translation",
+    "Explicit --only 0 and invalid numeric formats rejected before touching peers",
+    "Restart refuses live target PID and occupied RPC port without killing processes",
+    "Multi-host restart uses spec bootnodes without localhost node-1 lookup",
+    "RPC readiness follows overall deadline and requires new node PID alive",
+    "Shell tests pin COUNT and use explicit orchestration marker",
+    "Source scanner ignores hash comments in shell/Python/config files; actual executable skips remain detected by fixture tests"
+  ],
+  "ratchet": {
+    "old_cheat_counts": {
+      "constant-assert": 17,
+      "noop-test": 2,
+      "skip": 139
+    },
+    "new_cheat_counts": {
+      "constant-assert": 16,
+      "noop-test": 2,
+      "skip": 133
+    },
+    "false_findings_removed": 9,
+    "comment_findings_removed": {
+      "skip": 8,
+      "constant-assert": 1
+    },
+    "old_stub_baseline": 1702,
+    "new_stub_baseline": 1573,
+    "scanner_pin_refreshed": true,
+    "thresholds_increased": false
+  },
+  "limitations": [
+    "No live chain finality or node database durability evidence",
+    "Local HTTP provider tests; commercial/local model providers not exercised",
+    "Rust/Docker/built node unavailable; full production gate not run"
+  ],
+  "production_gate": "NOT_RUN",
+  "completion_percent": null
+}

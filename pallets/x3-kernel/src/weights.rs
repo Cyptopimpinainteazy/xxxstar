@@ -64,6 +64,7 @@ pub trait WeightInfo {
 	fn emergency_pause() -> Weight;
 	fn emergency_unpause() -> Weight;
 	fn emergency_halt() -> Weight;
+	fn set_trading_config() -> Weight;
 	fn x3_execute(g: u32, ) -> Weight;
 }
 
@@ -244,6 +245,21 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Minimum execution time: 20_335_000 picoseconds.
 		Weight::from_parts(23_517_000, 0)
 			.saturating_add(T::DbWeight::get().writes(2_u64))
+	}
+	/// Storage: `AtlasKernel::AssetRegistry` (r:1 w:0)
+	/// Proof: `AtlasKernel::AssetRegistry` (`max_values`: None, `max_size`: Some(38), added: 2513, mode: `MaxEncodedLen`)
+	/// Storage: `AtlasKernel::TradingConfiguration` (r:0 w:1)
+	/// Proof: `AtlasKernel::TradingConfiguration` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	///
+	/// Not separately benchmarked: a governance-only setter whose shape matches
+	/// `update_canonical_balance` (one registry read, one bounded write) with headroom.
+	fn set_trading_config() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `3503`
+		Weight::from_parts(45_000_000, 3503)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 	/// Running an X3 program for `g` gas on the chain's engine. Measured 2026-09-26 with
 	/// `x3-chain-node benchmark pallet --pallet pallet_x3_kernel --extrinsic x3_execute --steps 10
@@ -436,6 +452,21 @@ impl WeightInfo for () {
 		// Minimum execution time: 20_335_000 picoseconds.
 		Weight::from_parts(23_517_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
+	}
+	/// Storage: `AtlasKernel::AssetRegistry` (r:1 w:0)
+	/// Proof: `AtlasKernel::AssetRegistry` (`max_values`: None, `max_size`: Some(38), added: 2513, mode: `MaxEncodedLen`)
+	/// Storage: `AtlasKernel::TradingConfiguration` (r:0 w:1)
+	/// Proof: `AtlasKernel::TradingConfiguration` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	///
+	/// Not separately benchmarked: a governance-only setter whose shape matches
+	/// `update_canonical_balance` (one registry read, one bounded write) with headroom.
+	fn set_trading_config() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `3503`
+		Weight::from_parts(45_000_000, 3503)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 	/// Running an X3 program for `g` gas on the chain's engine. Measured 2026-09-26 with
 	/// `x3-chain-node benchmark pallet --pallet pallet_x3_kernel --extrinsic x3_execute --steps 10

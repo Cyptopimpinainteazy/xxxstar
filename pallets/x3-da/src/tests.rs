@@ -314,3 +314,57 @@ fn submit_blob_commitment_insufficient_funds_fails() {
         );
     });
 }
+
+// ── TICKET-154: the DA fee is a charge, not a reserve that is never released ──
+
+#[test]
+fn da_fee_leaves_the_submitter_and_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        let treasury = Treasury::get();
+        let (payer_before, treasury_before) =
+            (Balances::free_balance(1), Balances::free_balance(treasury));
+
+        assert_ok!(X3Da::submit_blob_commitment(
+            RuntimeOrigin::signed(1),
+            h256(0x54),
+            100,
+            None,
+            None,
+        ));
+
+        let fee = DaPerByteFee::get() * 100;
+        assert_eq!(Balances::reserved_balance(1), 0, "nothing is left locked");
+        assert_eq!(Balances::free_balance(1), payer_before - fee);
+        assert_eq!(Balances::free_balance(treasury), treasury_before + fee);
+        System::assert_has_event(Event::<Test>::DaFeeCollected { who: 1, fee }.into());
+    });
+}
+
+#[test]
+fn a_treasury_that_cannot_take_the_fee_refuses_the_submission() {
+    new_test_ext().execute_with(|| {
+        // A dead treasury refuses any deposit below the existential deposit. The submitter can
+        // pay, so the refusal must name the treasury, and the fee must not be waived.
+        ExistentialDeposit::set(1_000);
+        Balances::make_free_balance_be(&Treasury::get(), 0);
+
+        assert_noop!(
+            X3Da::submit_blob_commitment(RuntimeOrigin::signed(1), h256(0x55), 100, None, None),
+            Error::<Test>::FeeDestinationRefused
+        );
+    });
+}
+
+#[test]
+fn a_fee_that_would_reap_the_submitter_is_insufficient_funds() {
+    new_test_ext().execute_with(|| {
+        let fee = DaPerByteFee::get() * 100;
+        // Exactly the fee: paying it would leave the account below the existential deposit.
+        Balances::make_free_balance_be(&1, fee);
+
+        assert_noop!(
+            X3Da::submit_blob_commitment(RuntimeOrigin::signed(1), h256(0x56), 100, None, None),
+            Error::<Test>::InsufficientFee
+        );
+    });
+}

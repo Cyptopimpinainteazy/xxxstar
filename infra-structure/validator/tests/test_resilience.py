@@ -19,17 +19,18 @@ Invariants tested:
 """
 
 import os
-import time
 import threading
-import pytest
+import time
 
-# ── Circuit Breaker Tests ────────────────────────────────────
+import pytest
 
 from cross_chain_gpu_validator.resilience.circuit import (
     CircuitBreaker,
-    CircuitState,
     CircuitOpenError,
+    CircuitState,
 )
+
+# ── Circuit Breaker Tests ────────────────────────────────────
 
 
 class TestCircuitBreaker:
@@ -93,13 +94,17 @@ class TestCircuitBreaker:
 
     def test_on_open_callback(self):
         opened = []
-        cb = CircuitBreaker("redis", failure_threshold=1, on_open=lambda n: opened.append(n))
+        cb = CircuitBreaker(
+            "redis", failure_threshold=1, on_open=lambda n: opened.append(n)
+        )
         cb.record_failure()
         assert opened == ["redis"]
 
     def test_on_close_callback(self):
         closed = []
-        cb = CircuitBreaker("gpu", failure_threshold=1, on_close=lambda n: closed.append(n))
+        cb = CircuitBreaker(
+            "gpu", failure_threshold=1, on_close=lambda n: closed.append(n)
+        )
         cb.record_failure()
         cb.record_success()
         assert closed == ["gpu"]
@@ -114,16 +119,16 @@ class TestCircuitBreaker:
 
 # ── Lane Orchestrator Tests ──────────────────────────────────
 
+from cross_chain_gpu_validator.resilience.health import (
+    GpuStats,
+    HealthScore,
+    NodeHealth,
+)
 from cross_chain_gpu_validator.resilience.lanes import (
     AccelerationLane,
     LaneOrchestrator,
     LaneStatus,
     LaneTier,
-)
-from cross_chain_gpu_validator.resilience.health import (
-    GpuStats,
-    HealthScore,
-    NodeHealth,
 )
 
 
@@ -152,14 +157,26 @@ class TestLaneOrchestrator:
 
         def fail_first():
             call_count[0] += 1
-            if call_count[0] <= 3:
+            if call_count[0] == 1:
                 raise RuntimeError("lane down")
             return "recovered"
 
-        # After 3 failures the first lane's breaker will trip,
-        # then fallback tries next tiers
         result = lo.execute(fail_first)
         assert result == "recovered"
+        assert call_count[0] == 2
+        assert lo.get_lane(LaneTier.PRIMARY).requests_served == 1
+        assert lo.get_lane(LaneTier.SHADOW).requests_served == 1
+
+    def test_execute_skips_open_breaker(self):
+        lo = LaneOrchestrator()
+        primary = lo.get_lane(LaneTier.PRIMARY)
+        assert primary.breaker is not None
+        for _ in range(3):
+            primary.breaker.record_failure()
+
+        assert lo.execute(lambda: "shadow") == "shadow"
+        assert primary.requests_served == 0
+        assert lo.get_lane(LaneTier.SHADOW).requests_served == 1
 
     def test_health_driven_failover(self):
         lo = LaneOrchestrator(health_threshold=0.5, promotion_cooldown=0)
@@ -185,33 +202,41 @@ class TestLaneOrchestrator:
     def test_recovery_back_to_primary(self):
         lo = LaneOrchestrator(health_threshold=0.5, promotion_cooldown=0)
         # Failover to shadow
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=False),
-            score=HealthScore(overall=0.2),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=False),
+                score=HealthScore(overall=0.2),
+            )
+        )
         assert lo.active_tier == LaneTier.SHADOW
 
         # Recover to primary (hysteresis: need 0.6 = threshold + 0.1)
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=True),
-            score=HealthScore(overall=0.65),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=True),
+                score=HealthScore(overall=0.65),
+            )
+        )
         assert lo.active_tier == LaneTier.PRIMARY
 
     def test_cooldown_prevents_flapping(self):
         lo = LaneOrchestrator(health_threshold=0.5, promotion_cooldown=10.0)
         # First failover works
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=False),
-            score=HealthScore(overall=0.2),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=False),
+                score=HealthScore(overall=0.2),
+            )
+        )
         assert lo.active_tier == LaneTier.SHADOW
 
         # Immediate recovery blocked by cooldown
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=True),
-            score=HealthScore(overall=0.9),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=True),
+                score=HealthScore(overall=0.9),
+            )
+        )
         assert lo.active_tier == LaneTier.SHADOW  # Still shadow due to cooldown
 
     def test_force_failover(self):
@@ -369,9 +394,7 @@ class TestSignerLock:
 
     def setup_method(self):
         """Clean up any leftover lock files."""
-        lock_path = os.path.join(
-            os.getenv("CCGV_DATA_DIR", "/tmp"), "x3_signer.lock"
-        )
+        lock_path = os.path.join(os.getenv("CCGV_DATA_DIR", "/tmp"), "x3_signer.lock")
         try:
             os.unlink(lock_path)
         except FileNotFoundError:
@@ -403,7 +426,9 @@ class TestSignerLock:
     def test_stale_lock_recovery(self):
         sl1 = SignerLock(node_id="node-a", redis_url=None, ttl_seconds=0.1)
         sl1.try_acquire()
-        # Don't release — let it expire
+        # Simulate a crashed holder: its renewal thread stops, but the lease
+        # remains on disk until another node observes expiry.
+        sl1._stop_renewal()
         time.sleep(0.2)
         sl2 = SignerLock(node_id="node-b", redis_url=None, ttl_seconds=5)
         assert sl2.try_acquire()  # Should acquire after stale lock expires
@@ -619,19 +644,23 @@ class TestIntegrationPipeline:
         )
 
         # First: fail
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=False),
-            score=HealthScore(overall=0.2),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=False),
+                score=HealthScore(overall=0.2),
+            )
+        )
         dc.on_health_update(False, 0.2)
         assert lo.active_tier == LaneTier.SHADOW
         assert dc.mode == OperatingMode.CPU_ONLY
 
         # Then: recover
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=True),
-            score=HealthScore(overall=0.8),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=True),
+                score=HealthScore(overall=0.8),
+            )
+        )
         dc.on_health_update(True, 0.8)
         assert lo.active_tier == LaneTier.PRIMARY
         assert dc.mode == OperatingMode.FULL_GPU
@@ -640,10 +669,12 @@ class TestIntegrationPipeline:
         lo = LaneOrchestrator(health_threshold=0.5, promotion_cooldown=0)
 
         # Failover
-        lo.on_health_update(NodeHealth(
-            gpu=GpuStats(available=False),
-            score=HealthScore(overall=0.2),
-        ))
+        lo.on_health_update(
+            NodeHealth(
+                gpu=GpuStats(available=False),
+                score=HealthScore(overall=0.2),
+            )
+        )
 
         # Execute still routes through remaining lanes
         result = lo.execute(lambda: "ok")
@@ -653,12 +684,12 @@ class TestIntegrationPipeline:
 # ── Watchdog Tests ────────────────────────────────────────────
 
 from cross_chain_gpu_validator.resilience.watchdog import (
-    Watchdog,
-    WatchdogState,
-    RestartReason,
-    RestartEvent,
     HealthCheck,
     MemoryMonitor,
+    RestartEvent,
+    RestartReason,
+    Watchdog,
+    WatchdogState,
 )
 
 
@@ -710,6 +741,7 @@ class TestWatchdog:
         wd = Watchdog(cmd=["false"], max_restarts=1, restart_delay=0.1)
         wd.start()
         import time
+
         time.sleep(3)
         assert wd.state == WatchdogState.FAILED
         assert wd.restart_count >= 1
@@ -718,6 +750,7 @@ class TestWatchdog:
         wd = Watchdog(cmd=["false"], max_restarts=1, restart_delay=0.1)
         wd.start()
         import time
+
         time.sleep(0.5)
         status = wd.status()
         assert status["total_events"] >= 1
@@ -725,11 +758,13 @@ class TestWatchdog:
 
     def test_pid_file_written(self):
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".pid", delete=False) as f:
             pid_path = f.name
         wd = Watchdog(cmd=["sleep", "5"], pid_file=pid_path)
         wd.start()
         import os
+
         assert os.path.exists(pid_path)
         with open(pid_path) as f:
             pid = int(f.read().strip())
@@ -759,13 +794,16 @@ class TestHealthCheck:
 
     def test_health_check_accepts_custom_checks(self):
         called = []
+
         def custom():
             called.append(True)
             return True
+
         hc = HealthCheck(interval=0.1, custom_checks=[custom])
         hc.set_pid(999999)  # Non-existent PID — will fail liveness
         hc.start()
         import time
+
         time.sleep(0.3)
         hc.stop()
         # Custom check was registered (may or may not have run)
@@ -776,6 +814,7 @@ class TestHealthCheck:
 
     def test_is_alive_returns_true_for_current_process(self):
         import os
+
         assert HealthCheck._is_alive(os.getpid())
 
 
@@ -796,8 +835,8 @@ class TestMemoryMonitor:
 # ── Standby Manager Tests ─────────────────────────────────────
 
 from cross_chain_gpu_validator.resilience.standby import (
-    StandbyManager,
     StandbyConfig,
+    StandbyManager,
     StandbyRole,
     StandbyState,
     StateSyncTracker,
@@ -839,10 +878,12 @@ class TestStateSyncTracker:
     def test_thread_safe_updates(self):
         sst = StateSyncTracker()
         import threading
+
         def updater():
             for i in range(100):
                 sst.update_primary_height(i)
                 sst.update_standby_height(i - 1)
+
         threads = [threading.Thread(target=updater) for _ in range(5)]
         for t in threads:
             t.start()
@@ -893,6 +934,7 @@ class TestStandbyManager:
 
     def test_config_from_env(self):
         import os
+
         os.environ["X3_STANDBY_ROLE"] = "standby"
         os.environ["X3_NODE_ID"] = "env-node"
         config = StandbyConfig.from_env()
@@ -911,11 +953,11 @@ class TestStandbyManager:
 # ── Cluster Coordinator Tests ─────────────────────────────────
 
 from cross_chain_gpu_validator.resilience.cluster import (
-    ClusterCoordinator,
     ClusterConfig,
+    ClusterCoordinator,
+    ClusterNode,
     ClusterRole,
     ClusterState,
-    ClusterNode,
 )
 
 
@@ -947,6 +989,7 @@ class TestClusterConfig:
 
     def test_from_env(self):
         import os
+
         os.environ["X3_CLUSTER_ID"] = "test-cluster"
         os.environ["X3_NODE_ID"] = "env-node"
         os.environ["X3_REGION"] = "us-west"
@@ -960,8 +1003,13 @@ class TestClusterConfig:
         assert "peer1" in config.peers
         assert "peer2" in config.peers
         # Cleanup
-        for key in ["X3_CLUSTER_ID", "X3_NODE_ID", "X3_REGION",
-                     "X3_CLUSTER_ROLE", "X3_CLUSTER_PEERS"]:
+        for key in [
+            "X3_CLUSTER_ID",
+            "X3_NODE_ID",
+            "X3_REGION",
+            "X3_CLUSTER_ROLE",
+            "X3_CLUSTER_PEERS",
+        ]:
             del os.environ[key]
 
     def test_defaults(self):

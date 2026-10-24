@@ -76,6 +76,22 @@ def range_cases() -> None:
         check(f"line {line} is production", line not in covered)
 
 
+def module_path_cases() -> None:
+    print("out-of-line module paths")
+    decl = os.path.join("p", "src", "vm_revert.rs")
+    cases = [
+        ('#[cfg(test)]\n#[path = "tests_x.rs"]\nmod tests_x;', decl, ["p/src/tests_x.rs"]),
+        ("#[cfg(test)]\nmod tests;", decl, ["p/src/vm_revert/tests.rs", "p/src/vm_revert/tests"]),
+        ("#[cfg(test)]\nmod mock;", os.path.join("p", "src", "lib.rs"), ["p/src/mock.rs", "p/src/mock"]),
+        ("#[cfg(all(test, feature = \"std\"))]\nmod tests;", os.path.join("p", "src", "mod.rs"),
+         ["p/src/tests.rs", "p/src/tests"]),
+        ("#[cfg(not(test))]\nmod real;", decl, []),
+    ]
+    for text, declaring, expected in cases:
+        got = scan.out_of_line_test_modules(declaring, text)
+        check(f"{text.splitlines()[-1]} in {os.path.basename(declaring)} -> {expected}", got == expected)
+
+
 def tree_cases() -> None:
     print("this tree")
     roots = ["crates", "pallets", "runtime", "node"]
@@ -84,6 +100,8 @@ def tree_cases() -> None:
         "pallets/x3-settlement-engine/src/tests.rs",
         "crates/x3-state-snapshot/src/tests.rs",
         "runtime/src/tests.rs",
+        # declared from vm_revert.rs, not the crate root, through #[path]
+        "pallets/x3-atomic-kernel/src/tests_vm_revert_hardening.rs",
     ]:
         check(f"{path} is a test-only file", path in test_only)
 
@@ -146,6 +164,7 @@ def main() -> int:
     attribute_cases()
     range_cases()
     raw_string_cases()
+    module_path_cases()
     tree_cases()
     if FAILURES:
         print(f"\npanic_unwrap_self_test: FAIL — {len(FAILURES)} case(s) moved")

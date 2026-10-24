@@ -201,6 +201,39 @@ mod tests {
         );
     }
 
+    /// COMMITTEE-SELECT-008: `next_u32` is the documented oracle —
+    /// `blake2_256(seed || block_index_le)`, word `counter % 8` of the block,
+    /// counter advanced once per call. Every arithmetic mutant of the index
+    /// (%, /, *, +, +=) lands on a different word here.
+    #[test]
+    fn next_u32_walks_hash_words_in_order() {
+        let seed = make_seed(0x5A);
+        let mut counter: u32 = 0;
+
+        let word_at = |block: u32, word: usize| {
+            let mut preimage = [0u8; 36];
+            preimage[..32].copy_from_slice(seed.as_bytes());
+            preimage[32..].copy_from_slice(&block.to_le_bytes());
+            let hash = blake2_256(&preimage);
+            u32::from_le_bytes([
+                hash[word * 4],
+                hash[word * 4 + 1],
+                hash[word * 4 + 2],
+                hash[word * 4 + 3],
+            ])
+        };
+
+        // Words 0..8 come from the first hash block, in order.
+        for word in 0..8 {
+            assert_eq!(next_u32(&seed, &mut counter), word_at(0, word));
+        }
+        assert_eq!(counter, 8, "the counter must advance exactly once per call");
+        // The ninth call opens the next hash block.
+        assert_eq!(next_u32(&seed, &mut counter), word_at(1, 0));
+        assert_eq!(next_u32(&seed, &mut counter), word_at(1, 1));
+        assert_eq!(counter, 10);
+    }
+
     /// COMMITTEE-SELECT-007: output length equals min(k, n)
     #[test]
     fn output_length_is_min_k_n() {

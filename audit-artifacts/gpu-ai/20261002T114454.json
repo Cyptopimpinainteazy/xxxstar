@@ -1,0 +1,309 @@
+{
+  "started": "2026-10-02T17:37:22.537999+00:00",
+  "commit": "e9a81cf3e770e856af01c7df0b203ebcf4411be6",
+  "dirty": true,
+  "host": "x3gpu1",
+  "gpus": [
+    {
+      "index": "0",
+      "uuid": "GPU-e0897c2d-090a-da7b-5679-f5338c4f9f02",
+      "name": "NVIDIA GeForce GTX 1070",
+      "mem_used_mib": "6396",
+      "mem_total_mib": "8192",
+      "util_pct": "0",
+      "temp_c": "50",
+      "power_w": "34.40",
+      "power_limit_w": "151.00",
+      "pcie_gen": "3",
+      "pcie_width": "8",
+      "driver": "580.178.04"
+    },
+    {
+      "index": "1",
+      "uuid": "GPU-baea27c9-70a5-1025-e717-01005f5da6b0",
+      "name": "NVIDIA GeForce RTX 2060 SUPER",
+      "mem_used_mib": "5847",
+      "mem_total_mib": "8192",
+      "util_pct": "0",
+      "temp_c": "50",
+      "power_w": "34.79",
+      "power_limit_w": "175.00",
+      "pcie_gen": "3",
+      "pcie_width": "8",
+      "driver": "580.178.04"
+    }
+  ],
+  "bench": {
+    "rtx": {
+      "model": "qwen2.5-coder:7b",
+      "iterations": 5,
+      "failures": 0,
+      "gpu": {
+        "NVIDIA GeForce GTX 1070": {
+          "peak_mem_mib": 7164,
+          "peak_util_pct": 86,
+          "peak_power_w": 101.77,
+          "peak_temp_c": 57
+        },
+        "NVIDIA GeForce RTX 2060 SUPER": {
+          "peak_mem_mib": 6689,
+          "peak_util_pct": 38,
+          "peak_power_w": 76.71,
+          "peak_temp_c": 54
+        }
+      },
+      "loaded": [
+        {
+          "name": "qwen2.5-coder:7b",
+          "size_vram": 5627717876,
+          "context": 16384
+        },
+        {
+          "name": "qwen3:8b",
+          "size_vram": 8090749501,
+          "context": 16384
+        }
+      ],
+      "gen_tok_s": {
+        "median": 27.06,
+        "p95": 28.46
+      },
+      "prompt_tok_s": {
+        "median": 1560.87,
+        "p95": 1827.39
+      },
+      "first_token_ms": {
+        "median": 47.82,
+        "p95": 128.68
+      },
+      "total_ms": {
+        "median": 6933.96,
+        "p95": 8427.2
+      }
+    },
+    "gtx": {
+      "model": "qwen2.5-coder:7b",
+      "iterations": 5,
+      "failures": 0,
+      "gpu": {
+        "NVIDIA GeForce GTX 1070": {
+          "peak_mem_mib": 7441,
+          "peak_util_pct": 98,
+          "peak_power_w": 63.67,
+          "peak_temp_c": 56
+        },
+        "NVIDIA GeForce RTX 2060 SUPER": {
+          "peak_mem_mib": 6689,
+          "peak_util_pct": 10,
+          "peak_power_w": 44.46,
+          "peak_temp_c": 51
+        }
+      },
+      "loaded": [
+        {
+          "name": "qwen2.5-coder:7b",
+          "size_vram": 198065520,
+          "context": 16384
+        }
+      ],
+      "gen_tok_s": {
+        "median": 5.04,
+        "p95": 5.21
+      },
+      "prompt_tok_s": {
+        "median": 73.56,
+        "p95": 340.02
+      },
+      "first_token_ms": {
+        "median": 1072.4,
+        "p95": 76992.72
+      },
+      "total_ms": {
+        "median": 36774.39,
+        "p95": 110170.7
+      }
+    },
+    "dual_concurrent": {
+      "wall_s": 37.85,
+      "aggregate_gen_tok_s": 8.88,
+      "per_worker_gen_tok_s": [
+        38.13,
+        4.47
+      ],
+      "gpu": {
+        "NVIDIA GeForce GTX 1070": {
+          "peak_mem_mib": 3631,
+          "peak_util_pct": 68,
+          "peak_power_w": 87.98,
+          "peak_temp_c": 51
+        },
+        "NVIDIA GeForce RTX 2060 SUPER": {
+          "peak_mem_mib": 3043,
+          "peak_util_pct": 39,
+          "peak_power_w": 83.13,
+          "peak_temp_c": 50
+        }
+      }
+    }
+  },
+  "checks": [
+    {
+      "check": "router_health",
+      "pass": true,
+      "detail": {
+        "status": "ok",
+        "in_flight": {}
+      }
+    },
+    {
+      "check": "router_models",
+      "pass": true,
+      "detail": [
+        "x3-auto",
+        "x3-fast",
+        "x3-code",
+        "x3-deep",
+        "x3-security",
+        "x3-review",
+        "x3-local"
+      ]
+    },
+    {
+      "check": "bench_rtx",
+      "pass": true,
+      "detail": {
+        "gen_tok_s": {
+          "median": 27.06,
+          "p95": 28.46
+        },
+        "prompt_tok_s": {
+          "median": 1560.87,
+          "p95": 1827.39
+        },
+        "first_token_ms": {
+          "median": 47.82,
+          "p95": 128.68
+        }
+      }
+    },
+    {
+      "check": "bench_gtx",
+      "pass": true,
+      "detail": {
+        "gen_tok_s": {
+          "median": 5.04,
+          "p95": 5.21
+        },
+        "prompt_tok_s": {
+          "median": 73.56,
+          "p95": 340.02
+        },
+        "first_token_ms": {
+          "median": 1072.4,
+          "p95": 76992.72
+        }
+      }
+    },
+    {
+      "check": "dual_concurrent",
+      "pass": true,
+      "detail": {
+        "wall_s": 37.85,
+        "aggregate_gen_tok_s": 8.88,
+        "per_worker_gen_tok_s": [
+          38.13,
+          4.47
+        ],
+        "gpu": {
+          "NVIDIA GeForce GTX 1070": {
+            "peak_mem_mib": 3631,
+            "peak_util_pct": 68,
+            "peak_power_w": 87.98,
+            "peak_temp_c": 51
+          },
+          "NVIDIA GeForce RTX 2060 SUPER": {
+            "peak_mem_mib": 3043,
+            "peak_util_pct": 39,
+            "peak_power_w": 83.13,
+            "peak_temp_c": 50
+          }
+        }
+      }
+    },
+    {
+      "check": "route_review_to_gtx",
+      "pass": true,
+      "detail": {
+        "policy": "x3-review",
+        "agent": "live-ec0dcdc2ec",
+        "providers": [
+          "ollama_gtx_qwen3"
+        ],
+        "ms": 11702
+      }
+    },
+    {
+      "check": "route_code_to_rtx",
+      "pass": true,
+      "detail": {
+        "policy": "x3-code",
+        "agent": "live-798d7912f1",
+        "providers": [
+          "ollama_qwen3"
+        ],
+        "ms": 19955
+      }
+    },
+    {
+      "check": "router_concurrent_uses_both_gpus",
+      "pass": true,
+      "detail": [
+        {
+          "policy": "x3-local",
+          "agent": "live-100f90503e",
+          "providers": [
+            "ollama"
+          ],
+          "ms": 180
+        },
+        {
+          "policy": "x3-local",
+          "agent": "live-41fb8fa35c",
+          "providers": [
+            "ollama_gtx"
+          ],
+          "ms": 9797
+        },
+        {
+          "policy": "x3-local",
+          "agent": "live-8f2f95ed4a",
+          "providers": [
+            "ollama"
+          ],
+          "ms": 127
+        },
+        {
+          "policy": "x3-local",
+          "agent": "live-ce3ae14e09",
+          "providers": [
+            "ollama_gtx"
+          ],
+          "ms": 9799
+        }
+      ]
+    },
+    {
+      "check": "gtx_down_review_fails_over_to_rtx",
+      "pass": true,
+      "detail": {
+        "policy": "x3-review",
+        "agent": "live-2739addfc2",
+        "providers": [
+          "ollama_qwen3"
+        ],
+        "ms": 2235
+      }
+    }
+  ],
+  "finished": "2026-10-02T17:44:54.742256+00:00"
+}

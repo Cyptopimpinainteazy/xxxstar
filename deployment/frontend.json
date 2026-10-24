@@ -18,7 +18,7 @@
         "/dashboard/*": "apps/dashboard/dist/",
         "/inferstructor/*": "apps/inferstructor-dashboard/dist/",
         "/infra-dashboard/*": "infra-structure/dashboard/dist/",
-        "/tps/*": "infra/blockchain-tps/dist/",
+        "/tps/*": "infra-structure/services/blockchain-tps/dist/",
         "/governance/*": "phase5_panel/dist/",
         "/explorer/*": "apps/explorer/dist/",
         "/site/*": "production/public/",

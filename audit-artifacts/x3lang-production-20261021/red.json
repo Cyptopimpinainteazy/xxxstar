@@ -1,0 +1,18 @@
+{
+  "head": "b04d9e1210f037a2f8c171808b91594d68111e6d",
+  "command": "CARGO_TARGET_DIR=/home/lojak/Desktop/xxxstar-master/target cargo test --locked -p x3-x3-integration --features 'std compile' --test x3lang_trading_receipt_replay -- a_resigned --nocapture",
+  "exit_code": 101,
+  "result": "FAIL",
+  "tests_failed": [
+    "a_resigned_execution_height_mismatch_is_refused",
+    "a_resigned_finality_height_mismatch_is_refused"
+  ],
+  "summary": {
+    "passed": 0,
+    "failed": 2,
+    "filtered": 12
+  },
+  "rustc": "1.90.0",
+  "remote_run": 39625154680,
+  "remote_result": "PENDING; not RED evidence"
+}

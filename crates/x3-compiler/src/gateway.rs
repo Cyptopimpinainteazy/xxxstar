@@ -100,6 +100,12 @@ pub enum GatewayLoweringError {
         index: usize,
     },
     EmptyBundle,
+    /// A bundle's first argument is not a list of legs, or one leg is not a six-field tuple.
+    InvalidBundleLeg {
+        call: String,
+        /// The leg's position, or `None` when the argument is not a list of legs at all.
+        leg: Option<usize>,
+    },
 }
 
 impl core::fmt::Display for GatewayLoweringError {
@@ -138,6 +144,19 @@ impl core::fmt::Display for GatewayLoweringError {
                 write!(f, "{call} argument {index} must be a 32-byte hex hash")
             }
             Self::EmptyBundle => f.write_str("atomic bundle must contain at least one leg"),
+            Self::InvalidBundleLeg { call, leg: None } => write!(
+                f,
+                "{call} takes a list of legs as its first argument: \
+                 [(vm, token_in, token_out, amount_in, min_amount_out, deadline), ...]"
+            ),
+            Self::InvalidBundleLeg {
+                call,
+                leg: Some(leg),
+            } => write!(
+                f,
+                "{call} leg {leg} must be a six-field tuple \
+                 (vm, token_in, token_out, amount_in, min_amount_out, deadline)"
+            ),
         }
     }
 }
@@ -216,7 +235,7 @@ fn lower_xvm_transfer(
         destination,
         recipient,
         amount: integer_arg(call, args, 2)? as u128,
-        expires_in: integer_arg(call, args, 3)? as u64,
+        expires_in: integer_arg(call, args, 3)?,
     })
 }
 
@@ -234,34 +253,82 @@ fn lower_submit_atomic_bundle(
     call: &str,
     args: &[Expression],
 ) -> Result<GatewayRuntimeCall, GatewayLoweringError> {
-    // The current `x3-parser` does not produce `Expression::Tuple` or
-    // `Expression::ArrayLiteral` nodes, so the multi-leg calling convention
-    // (`submit_atomic_bundle([leg_tuple, ...], deadline_blocks, chain_id, nonce)`)
-    // cannot be reached from any source the parser accepts. We accept only the
-    // legacy flat single-leg form: nine positional literal arguments.
-    const LEGACY_EXPECTED_ARGS: usize = 9;
-    if args.len() != LEGACY_EXPECTED_ARGS {
-        return Err(GatewayLoweringError::InvalidArgumentCount {
-            call: call.to_string(),
-            expected: LEGACY_EXPECTED_ARGS,
-            got: args.len(),
-        });
-    }
+    // Two calling conventions:
+    //
+    // - multi-leg: `submit_atomic_bundle([leg, ...], deadline_blocks, chain_id, nonce)`, each leg a
+    //   tuple `(vm, token_in, token_out, amount_in, min_amount_out, deadline)` of literals. This was
+    //   the intended form; it was unreachable while the parser had no array or tuple literals.
+    // - single-leg: the same six fields and the three trailing ones, as nine flat arguments.
+    //
+    // How many legs a chain admits is the chain's bound (`MaxLegsPerBundle`), enforced where the
+    // bundle is submitted; here a bundle must have at least one.
+    const MULTI_LEG_ARGS: usize = 4;
+    const SINGLE_LEG_ARGS: usize = 9;
+    const LEG_FIELDS: usize = 6;
 
-    let leg = GatewayAtomicLeg {
-        vm: vm_arg(call, args, 0)?,
-        token_in: hash_arg(call, args, 1)?,
-        token_out: hash_arg(call, args, 2)?,
-        amount_in: integer_arg(call, args, 3)? as u128,
-        min_amount_out: integer_arg(call, args, 4)? as u128,
-        deadline: integer_arg(call, args, 5)? as u64,
+    let (legs, trailing) = match args.len() {
+        MULTI_LEG_ARGS => {
+            let Expression::Array(list) = &args[0] else {
+                return Err(GatewayLoweringError::InvalidBundleLeg {
+                    call: call.to_string(),
+                    leg: None,
+                });
+            };
+            if list.elements.is_empty() {
+                return Err(GatewayLoweringError::EmptyBundle);
+            }
+            let mut legs = Vec::with_capacity(list.elements.len());
+            for (position, element) in list.elements.iter().enumerate() {
+                let Expression::Tuple(fields) = element else {
+                    return Err(GatewayLoweringError::InvalidBundleLeg {
+                        call: call.to_string(),
+                        leg: Some(position),
+                    });
+                };
+                if fields.elements.len() != LEG_FIELDS {
+                    return Err(GatewayLoweringError::InvalidBundleLeg {
+                        call: call.to_string(),
+                        leg: Some(position),
+                    });
+                }
+                legs.push(leg_from(call, &fields.elements)?);
+            }
+            (legs, &args[1..])
+        }
+        SINGLE_LEG_ARGS => (
+            vec![leg_from(call, &args[..LEG_FIELDS])?],
+            &args[LEG_FIELDS..],
+        ),
+        got => {
+            return Err(GatewayLoweringError::InvalidArgumentCount {
+                call: call.to_string(),
+                expected: if matches!(args.first(), Some(Expression::Array(_))) {
+                    MULTI_LEG_ARGS
+                } else {
+                    SINGLE_LEG_ARGS
+                },
+                got,
+            })
+        }
     };
 
     Ok(GatewayRuntimeCall::AtomicSubmitBundle {
-        legs: vec![leg],
-        deadline_blocks: integer_arg(call, args, 6)? as u64,
-        chain_id: integer_arg(call, args, 7)? as u32,
-        nonce: integer_arg(call, args, 8)? as u64,
+        legs,
+        deadline_blocks: integer_arg(call, trailing, 0)?,
+        chain_id: integer_arg(call, trailing, 1)? as u32,
+        nonce: integer_arg(call, trailing, 2)?,
+    })
+}
+
+/// One leg from its six fields, in order.
+fn leg_from(call: &str, fields: &[Expression]) -> Result<GatewayAtomicLeg, GatewayLoweringError> {
+    Ok(GatewayAtomicLeg {
+        vm: vm_arg(call, fields, 0)?,
+        token_in: hash_arg(call, fields, 1)?,
+        token_out: hash_arg(call, fields, 2)?,
+        amount_in: integer_arg(call, fields, 3)? as u128,
+        min_amount_out: integer_arg(call, fields, 4)? as u128,
+        deadline: integer_arg(call, fields, 5)?,
     })
 }
 
@@ -486,16 +553,13 @@ mod tests {
 
     // ── Multi-leg atomic bundle tests ─────────────────────────────────
     //
-    // The current `x3-parser` does not produce `Expression::Tuple` or
-    // `Expression::ArrayLiteral` nodes — the parser rejects `[` outright
-    // and rejects comma-separated parenthesized groups. The
-    // multi-leg calling convention is therefore unreachable from any
-    // source the parser accepts. These tests pin that contract: the
-    // source is rejected at the parser layer with `Parse(_)` rather
-    // than reaching the lowering layer.
+    // The multi-leg calling convention takes a list of leg tuples. It was unreachable while the
+    // parser had no array or tuple literals; these tests used to pin that as a parse failure. Now
+    // the list lowers to one leg per tuple, and the malformed shapes are refused by the gateway,
+    // each with its own reason.
 
     #[test]
-    fn rejects_multi_leg_array_literal_at_parser() {
+    fn lowers_a_multi_leg_bundle_one_leg_per_tuple() {
         let source = r#"
             fn main() {
                 submit_atomic_bundle(
@@ -510,14 +574,29 @@ mod tests {
             }
         "#;
 
-        assert!(matches!(
-            lower_gateway_call(source),
-            Err(GatewayLoweringError::Parse(_))
-        ));
+        let GatewayRuntimeCall::AtomicSubmitBundle {
+            legs,
+            deadline_blocks,
+            chain_id,
+            nonce,
+        } = lower_gateway_call(source).expect("a well-formed bundle lowers")
+        else {
+            panic!("expected atomic bundle");
+        };
+        assert_eq!(legs.len(), 2);
+        assert_eq!(legs[0].vm, GatewayVm::Cross);
+        assert_eq!(legs[0].token_in, [0xaa; 32]);
+        assert_eq!(legs[0].amount_in, 100);
+        assert_eq!(legs[0].deadline, 1_800_000_000);
+        assert_eq!(legs[1].vm, GatewayVm::Evm);
+        assert_eq!(legs[1].token_out, [0xdd; 32]);
+        assert_eq!(legs[1].min_amount_out, 180);
+        assert_eq!(legs[1].deadline, 1_800_000_001);
+        assert_eq!((deadline_blocks, chain_id, nonce), (50, 1, 1));
     }
 
     #[test]
-    fn rejects_multi_leg_single_tuple_at_parser() {
+    fn rejects_a_bundle_whose_legs_are_not_in_a_list() {
         let source = r#"
             fn main() {
                 submit_atomic_bundle(
@@ -531,12 +610,12 @@ mod tests {
 
         assert!(matches!(
             lower_gateway_call(source),
-            Err(GatewayLoweringError::Parse(_))
+            Err(GatewayLoweringError::InvalidBundleLeg { leg: None, .. })
         ));
     }
 
     #[test]
-    fn rejects_empty_array_literal_at_parser() {
+    fn rejects_an_empty_bundle() {
         let source = r#"
             fn main() {
                 submit_atomic_bundle([], 50, 1, 1);
@@ -545,7 +624,44 @@ mod tests {
 
         assert!(matches!(
             lower_gateway_call(source),
-            Err(GatewayLoweringError::Parse(_))
+            Err(GatewayLoweringError::EmptyBundle)
+        ));
+    }
+
+    #[test]
+    fn rejects_a_leg_that_is_not_a_six_field_tuple() {
+        let short = r#"
+            fn main() {
+                submit_atomic_bundle([("cross", 1, 2)], 50, 1, 1);
+            }
+        "#;
+        assert!(matches!(
+            lower_gateway_call(short),
+            Err(GatewayLoweringError::InvalidBundleLeg { leg: Some(0), .. })
+        ));
+
+        let not_a_tuple = r#"
+            fn main() {
+                submit_atomic_bundle([("cross", "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 1, 1, 1), 7], 50, 1, 1);
+            }
+        "#;
+        assert!(matches!(
+            lower_gateway_call(not_a_tuple),
+            Err(GatewayLoweringError::InvalidBundleLeg { leg: Some(1), .. })
+        ));
+    }
+
+    #[test]
+    fn a_leg_field_is_checked_like_a_flat_argument() {
+        // A bad hash inside a leg is refused by the same check the single-leg form uses.
+        let source = r#"
+            fn main() {
+                submit_atomic_bundle([("cross", "0xnot-a-hash", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", 1, 1, 1)], 50, 1, 1);
+            }
+        "#;
+        assert!(matches!(
+            lower_gateway_call(source),
+            Err(GatewayLoweringError::InvalidHashArgument { index: 1, .. })
         ));
     }
 

@@ -16,7 +16,7 @@ set -euo pipefail
 
 KERNEL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_DIR="${KERNEL_DIR}/build"
-GPU_SWARM_DIR="${KERNEL_DIR}/../../crates/gpu-swarm/src/cu_kernels"
+GPU_SWARM_DIR="${KERNEL_DIR}/../../../crates/gpu-swarm/src/cu_kernels"
 
 mkdir -p "${OUTPUT_DIR}"
 
@@ -43,7 +43,8 @@ nvcc ${NVCC_FLAGS} \
   "${KERNEL_DIR}/keccak256_batch.cu" \
   -o "${OUTPUT_DIR}/libkeccak256_batch.so"
 
-# 3-5. SHA-256 / Ed25519 / Stream pipeline (from gpu-swarm crate)
+# 2.5 SHA-256 / Ed25519 / Stream pipeline (from gpu-swarm crate)
+#     Build these before atomic_swap so it can link against them.
 if [[ -d "${GPU_SWARM_DIR}" ]]; then
   GPU_SWARM_BUILD="${GPU_SWARM_DIR}/build"
   mkdir -p "${GPU_SWARM_BUILD}"
@@ -72,6 +73,15 @@ if [[ -d "${GPU_SWARM_DIR}" ]]; then
 else
   echo "[3-5/5] gpu-swarm crate not found at ${GPU_SWARM_DIR}, skipping SHA/Ed25519/Pipeline"
 fi
+
+# 6. Atomic Swap (Cross-Chain Consistency)
+echo "[*] Atomic Swap (Cross-Chain Consistency) ..."
+nvcc ${NVCC_FLAGS} \
+  -I "${KERNEL_DIR}/../third_party/secp256k1-cuda-ecc" \
+  "${KERNEL_DIR}/atomic_swap.cu" \
+  -L "${OUTPUT_DIR}" -lsecp256k1_batch -led25519_batch \
+  -Wl,-rpath,'$ORIGIN' \
+  -o "${OUTPUT_DIR}/libatomic_swap.so"
 
 echo ""
 echo "=== Built kernels ==="

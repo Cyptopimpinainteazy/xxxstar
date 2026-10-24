@@ -4,6 +4,28 @@
 gate it runs is a real command with a real exit code, written to its own log
 under `.ai/runlogs/`.
 
+The separate `scripts/mainnet/run_release_gates_rc6.sh` wrapper records every
+executed stage and returns 1 if any stage fails. It returns 2 (BLOCKED) when the
+executed stages pass but required coverage is skipped. The retired six-route
+live smoke currently blocks certification until its replacement is wired in;
+it is never counted as a passing stage. Reports and stage logs are written
+under the repository's `reports/rc6/`, regardless of the caller's directory.
+The fast gate `RC6 release sequence` tests this reporting and exit behavior
+with isolated test commands; it does not run or certify the chain itself.
+
+Release bundles require a clean checkout (including untracked files), a plain
+chain spec, and explicit Cargo features. For example:
+`bash scripts/mainnet/build-release-artifacts.sh candidate --chain /path/plain.json --features cli,testnet`.
+The builder archives HEAD into a temporary source directory and runs a locked
+release build with default features disabled and a fresh target directory.
+It refuses prebuilt binaries and existing output destinations. The plain spec,
+its generated raw twin, and the binary's embedded runtime must agree. The
+bundle's `SHA256SUMS` covers the specs, runtime, binary and provenance manifest;
+`x3-chain-node.sha256` remains the installer's binary-only checksum. The archive
+is written beside the output directory as `<output>.tar.gz`. This binds a single
+build; independent reproducible-build comparison remains a separate gate.
+SBOM generation must succeed unless `--skip-sbom` is explicitly recorded.
+
 ## Why local CI is the primary CI here
 
 GitHub-hosted runners are unusable for this account: each hosted run finishes in
@@ -24,16 +46,20 @@ scripts/local-ci.sh --live          # + EVM/SVM contract lifecycles (anvil, sola
 scripts/local-ci.sh --cross         # + X3-native and cross-domain lifecycles
 scripts/local-ci.sh --variants      # + runtime migration dry-run, all six variants
 scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned nightly)
+scripts/local-ci.sh --mutants       # + cargo-mutants over the P0 packages
 scripts/local-ci.sh --release       # + make mainnet-check
 scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
+scripts/local-ci.sh --pr-agent      # + the PR-Agent wiring self-test (offline, no model call)
 scripts/local-ci.sh --all           # everything (the release bar)
 scripts/local-ci.sh --list          # show the gate list, run nothing
 scripts/local-ci.sh --pre-push      # what the hook runs
+scripts/local-ci.sh --publish-status # post the verdict as the x3/local-ci commit status
 ```
 
 Equivalent make targets: `make local-ci`, `local-ci-live`, `local-ci-cross`,
 `local-ci-variants`, `local-ci-loom`, `local-ci-release`, `local-ci-all`,
-`local-ci-prepush`, `local-ci-list`, `local-ci-dry-run`, `local-ci-deep`.
+`local-ci-prepush`, `local-ci-list`, `local-ci-dry-run`, `local-ci-deep`,
+`local-ci-pr-agent`.
 
 `--loom` adds `bash scripts/run-loom-tests.sh`, which runs
 `tests/loom-concurrency` the way its header documents:
@@ -49,6 +75,111 @@ automated check the repository has (all test targets in all workspace members;
 5,068 tests across 358 binaries as of 2026-09-18). It is slow, so it is opt-in
 and `--all`/`make local-ci-deep` include it for release-candidate runs.
 
+`--pr-agent` adds `bash services/pr-agent/selftest.sh`: it parses `.pr_agent.toml`,
+checks the scripts, and drives `services/pr-agent/review.sh` against a recording
+shim to assert the argv PR-Agent receives. It is offline and calls no model, so it
+is deterministic; the paid review path is covered by `services/pr-agent/check.sh`
+and is not part of any gate. `--all` includes it.
+
+`--mutants` adds `bash scripts/x3-mutants-gate.sh`, a bounded `cargo-mutants`
+campaign over `pallet-x3-supply-ledger` — the pallet that enforces the king
+invariant. Every surviving mutant is a behaviour change no test observed; the
+first campaign (2026-10-02) found two survivors in the `on_finalize` proof
+pruning guard that the whole suite missed, now pinned by `tests_retention.rs`
+(#576).
+
+The campaign compiles the pallet with `runtime-benchmarks`
+(`X3_MUTANTS_FEATURES`). `benchmarking.rs` is
+`#![cfg(feature = "runtime-benchmarks")]`; without the feature the module is not
+in the test build at all, so mutants there can only "survive" — mutations of code
+no test compiles (6 of them in the second campaign). With the feature, the
+benchmark helper mutation is caught and bodies erased to `Ok(())` no longer
+compile (UNVIABLE): the erasure removes the `#[extrinsic_call]` the macro needs.
+
+The second campaign (#577) produced the first honest survivorship picture at
+`241264807`: of 125 mutants, 33 survived the whole suite — constant bodies for the
+nonce/metadata/policy queries, `current_timestamp`, `ledger` and `is_halted`; the
+`DomainId::X3Svm` arm of `domain_slot_mut`; the `SupplyLedgerGovern` mint/burn
+shims; a zero merkle combinator; and every `WeightInfo` body (a zero weight is a
+free extrinsic). All 33 are now resolved: 28 pinned by tests and 5 body-erasures
+that do not compile under the gate's feature set. The pins live in
+`tests_public_api.rs`, `tests_weights.rs` (`every_dispatch_weight_is_nonzero`),
+and additions to `tests_conservation.rs`, `tests_retention.rs` and
+`supply_verification.rs`.
+
+The third campaign extended the gate to `pallet-x3-atomic-kernel`, which had
+never been mutated. Its first run left 141 survivors: 57 in `lib.rs` (the
+off-chain worker's storage protocol, auto-expiry in `on_initialize`, every
+`ValidateUnsigned` guard, the revert-failure counter, read-only getters) and 84
+in `vm_revert.rs` (bound checks in the four diff decoders, storage-key
+derivations, log-only counters). All are resolved: the decoders were rewritten
+around a checked `DiffReader` (removing two real panic paths on truncated
+diffs), the guards that only gated log lines were folded into the adjacent
+unconditional logs, and the behavior is pinned by `tests_vm_revert_hardening.rs`,
+`tests_weights.rs` and `tests_gate_pins.rs`. Pinning the expiry path surfaced a
+real defect: `on_initialize` slashed the 5% penalty without ever unreserving the
+rest of the bond, and `RolledBack` is terminal, so the remainder was locked
+forever — it now unreserves before slashing, mirroring rollback. Final campaign:
+187 mutants, 150 caught, 37 unviable, 0 missed, 0 TIMEOUT (six shards in
+parallel, ~20 minutes wall on a 32-core box).
+
+The fourth campaign covers `pallet-x3-settlement-engine` — intents, escrow, the
+atomic lock manager, the BTC gateway, the SPV verifier, the finality oracle and
+the cross-domain proof checks. Its first pass (`bac836ea2`) left 383 distinct
+survivors, the largest census so far: `decode_compact_u32` (51), the
+receipt-trie fixture (20), `is_valid_receipt_rlp` (16), `btc_target_le` (12),
+`check_no_cross_vm_partial_state` (11), `should_wait` (9) and all 27
+`WeightInfo` bodies carried most of them, the rest spread over money-path
+helpers no test observed. All 383 are resolved without skips: the decoders were
+restructured so the remaining mutants are behavioural (`decode_compact_u32` no
+longer ORs disjoint lanes, `is_valid_receipt_rlp` matches on the list tag,
+`verify_svm_proof` drops length checks subsumed by the parser, `btc_target_le`
+copies within a bounded window), and ~40 tests in `tests_gate_pins.rs`,
+`mod gate_pins_money_path`, `tests_weights.rs`, the atomic-lock manager tests
+and `benchmarking.rs`'s `mod gate_pins` pin the rest: RLP and compact-u32
+boundaries, a full EVM receipt-proof trie walk, a signed SVM transaction at the
+account boundary, native custody and its expiry index, the intent deadline
+index, finality urgency and the reorg curve, escrow ops, intent planning,
+adaptor recovery against real secp256k1, the SPV merkle walk and every
+invariant checker. Pinning surfaced a real defect:
+`AdaptorSignature::verify_with_recovery_id` compared the recovered key against
+the struct's own `adapted_pubkey` and ignored its `pubkey` argument, so the
+caller's claimed key was never checked; it now compares `r == *pubkey`. The
+re-run over the pinned revision classified 776 mutants (702 caught, 55
+unviable, 19 missed, 0 timeouts); those 19 are then pinned or restructured
+away — boundaries on the EVM confirmation floor, the SVM account boundary and
+the BTC admission guard, zero claimed legs, `FromIntentError`'s Display arms
+and `proof_domain_key`'s chain/VM/operation binding, plus equivalent mutants
+deleted outright (dead fixed-size `len()` checks, subsumed Solana bounds, an
+empty BTC "invariant" loop, and a benchmark dedup comparing a field the local
+match derives). Final pass at the pinned revision: 744 mutants, 689 caught, 55
+unviable, 0 missed, 0 TIMEOUT, run with `--test-tool cargo` on 16 shards
+(~45 s per mutant in steady state; the gate itself still runs nextest, so the
+census is a phase of the campaign, not a change to the gate).
+
+A full campaign is tens of minutes of parallel cargo builds, so it is opt-in like
+`--loom`/`--fuzz`; `X3_MUTANTS_JOBS` (default 4) and `X3_MUTANTS_TIMEOUT`
+(default 600s, generous enough that build contention under `--jobs` cannot turn a
+caught mutant into a build timeout) tune it. The suite runs under
+`cargo-nextest` with the `mutants` profile from `.config/nextest.toml`, whose
+60-second per-test watchdog converts a mutant that hangs a test into an ordinary
+test failure (CAUGHT) instead of a cargo-mutants TIMEOUT (not caught). Without
+`cargo-mutants` or `cargo-nextest` installed the gate reports **BLOCKED**, not
+PASS.
+
+### Publishing the verdict
+
+Every workflow in this repository is `workflow_dispatch` on a local runner, so no
+GitHub check runs automatically against a pull request. `--publish-status` posts
+the run's verdict as the commit status `x3/local-ci` on the exact SHA the run
+tested (`scripts/x3-publish-status.sh` wraps the API call). `success` is posted
+only when every gate passed, the tree was clean, **and** the run was the
+unscoped default set. A dirty tree or a scoped run (`--only`/`--skip`/
+`--changed-from`/`--pre-push`) posts `error`, because the status means "the gate
+of record passed for this SHA" and neither case is evidence of that. That is the
+status branch protection requires, so a red gate cannot merge and a green local
+run is attributable to exactly one commit.
+
 ### Scheduling and scoping
 
 | flag | meaning |
@@ -58,6 +189,7 @@ and `--all`/`make local-ci-deep` include it for release-candidate runs.
 | `--only a,b` | run exactly these gate slugs (slugs come from `--list`) |
 | `--skip a,b` | drop these gates; the summary records each skip loudly |
 | `--changed-from REF` | add the gates the diff `REF...HEAD` implies |
+| `--publish-status` | post `x3/local-ci` success/failure/error for the tested SHA (needs `gh`) |
 | `--dry-run` | print what would run |
 | `--fail-fast` | stop scheduling once a gate has failed |
 

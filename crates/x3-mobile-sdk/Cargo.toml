@@ -2,6 +2,7 @@
 name = "x3-mobile-sdk"
 version = "1.0.0"
 edition = "2021"
+license.workspace = true
 description = "X3 Mobile Wallet SDK for iOS/Android via React Native"
 
 [dependencies]

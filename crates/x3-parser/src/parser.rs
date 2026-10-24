@@ -3,11 +3,13 @@ use crate::error::{ParseError, ParseResult};
 use crate::grammar::{binary_binding_power, symbol_to_binary_op, PREFIX_BP};
 use crate::tokens::MAX_NESTING_DEPTH;
 use x3_ast::{
-    Agent, AssignExpression, AtomicBlock, BinaryExpression, Block, BreakStatement, CallExpression,
-    Const, ContinueStatement, EmitStatement, Expression, FieldAccessExpression, ForLoopKind,
-    ForStatement, Function, GlobalLet, Identifier, IfStatement, Item, LetStatement,
-    LiteralExpression, LoopStatement, Module, Param, RangeExpression, Statement, TypeAnnotation,
-    UnaryExpression, UnaryOp, WhileStatement,
+    Agent, ArrayExpression, AssignExpression, AtomicBlock, Automation, BinaryExpression, Block,
+    BreakStatement, CallExpression, Const, ContinueStatement, EmitStatement, Expression,
+    FieldAccessExpression, FieldAssignExpression, FieldInit, ForLoopKind, ForStatement, Function,
+    GlobalLet, Identifier, IfStatement, IndexAssignExpression, IndexExpression, Item, LetStatement,
+    LiteralExpression, LoopStatement, Module, Param, Permission, PermissionKind, RangeExpression,
+    Statement, StructDef, StructField, StructLiteralExpression, TupleExpression, TypeAnnotation,
+    TypeShape, UnaryExpression, UnaryOp, WhileStatement,
 };
 use x3_common::{Keyword, Literal, Span, Symbol, Token, TokenKind};
 use x3_lexer::Lexer;
@@ -16,6 +18,9 @@ use x3_lexer::Lexer;
 pub struct Parser {
     cursor: Cursor,
     nesting_depth: usize,
+    /// False while parsing an `if`/`while` condition, where `name {` opens the body, not a struct
+    /// literal (Rust's rule). Parentheses, brackets and call arguments turn it back on.
+    struct_literals: bool,
 }
 
 impl Parser {
@@ -24,6 +29,7 @@ impl Parser {
         Self {
             cursor: Cursor::new(Lexer::lex_all(source)),
             nesting_depth: 0,
+            struct_literals: true,
         }
     }
 
@@ -43,6 +49,8 @@ impl Parser {
             TokenKind::Keyword(Keyword::Agent) => self.parse_agent_item(),
             TokenKind::Keyword(Keyword::Const) => self.parse_const_item(),
             TokenKind::Keyword(Keyword::Let) => self.parse_global_let(),
+            TokenKind::Keyword(Keyword::Struct) => self.parse_struct_item(),
+            TokenKind::Keyword(Keyword::Automation) => self.parse_automation_item(),
             TokenKind::Eof => Err(ParseError::new("unexpected end of input", self.peek().span)),
             token => Err(ParseError::new(
                 format!("unexpected token {token:?} at top-level"),
@@ -111,6 +119,92 @@ impl Parser {
         }))
     }
 
+    /// `struct Name { field: Type, ... }` (a trailing comma is allowed).
+    fn parse_struct_item(&mut self) -> ParseResult<Item> {
+        let keyword = self.expect_keyword(Keyword::Struct)?;
+        let name = self.expect_identifier()?;
+        self.expect_symbol(Symbol::LeftBrace)?;
+        let mut fields = Vec::new();
+        while !self.peek_symbol(Symbol::RightBrace) {
+            let field_name = self.expect_identifier()?;
+            self.expect_symbol(Symbol::Colon)?;
+            let ty = self.parse_type_annotation()?;
+            let span = field_name.span.merge(ty.span);
+            fields.push(StructField {
+                name: field_name,
+                ty,
+                span,
+            });
+            if !self.accept_symbol(Symbol::Comma) {
+                break;
+            }
+        }
+        let close = self.expect_symbol(Symbol::RightBrace)?;
+        Ok(Item::Struct(StructDef {
+            name,
+            fields,
+            span: keyword.span.merge(close.span),
+        }))
+    }
+
+    /// Parse with struct literals allowed or not, restoring the previous setting.
+    fn with_struct_literals<R>(
+        &mut self,
+        allowed: bool,
+        parse: impl FnOnce(&mut Self) -> ParseResult<R>,
+    ) -> ParseResult<R> {
+        let previous = std::mem::replace(&mut self.struct_literals, allowed);
+        let result = parse(self);
+        self.struct_literals = previous;
+        result
+    }
+
+    /// A condition: an expression in which `name {` opens the block that follows. Inside
+    /// parentheses a struct literal is allowed again (`if (S { v: 1 }).v == 1 {`).
+    fn parse_condition(&mut self) -> ParseResult<Expression> {
+        self.with_struct_literals(false, |p| p.parse_expression_bp(0))
+    }
+
+    /// After a name, `{ }` or `{ field :` starts a struct literal.
+    fn at_struct_literal(&self) -> bool {
+        if !self.struct_literals || !self.peek_symbol(Symbol::LeftBrace) {
+            return false;
+        }
+        match self.cursor.peek_n(1).map(|t| &t.kind) {
+            Some(TokenKind::Symbol(Symbol::RightBrace)) => true,
+            Some(TokenKind::Identifier(_)) => {
+                self.cursor.peek_n(2).and_then(|t| t.kind.symbol()) == Some(Symbol::Colon)
+            }
+            _ => false,
+        }
+    }
+
+    fn parse_struct_literal(&mut self, name: Identifier) -> ParseResult<Expression> {
+        self.expect_symbol(Symbol::LeftBrace)?;
+        let mut fields = Vec::new();
+        while !self.peek_symbol(Symbol::RightBrace) {
+            let field = self.expect_identifier()?;
+            self.expect_symbol(Symbol::Colon)?;
+            let value = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+            let span = field.span.merge(value.span());
+            fields.push(FieldInit {
+                name: field,
+                value,
+                span,
+            });
+            if !self.accept_symbol(Symbol::Comma) {
+                break;
+            }
+        }
+        let close = self.expect_symbol(Symbol::RightBrace)?;
+        let span = name.span.merge(close.span);
+        Ok(Expression::StructLiteral(StructLiteralExpression {
+            name,
+            fields,
+            span,
+        }))
+    }
+
     fn parse_agent_item(&mut self) -> ParseResult<Item> {
         self.expect_keyword(Keyword::Agent)?;
         let name = self.expect_identifier()?;
@@ -125,6 +219,100 @@ impl Parser {
             items,
             span: Span::new(0, 0), // Span tracking requires token position propagation
         }))
+    }
+
+    /// `automation Name { trigger <expr> permissions {..} execute {..} on_failure {..} }`
+    ///
+    /// `trigger` is a single expression so it can name a chain-observable fact
+    /// (`BlockNumber(100)`, `PriceThreshold { asset_id: 1, threshold: 1000,
+    /// above: true }`); `on_failure` is optional.
+    fn parse_automation_item(&mut self) -> ParseResult<Item> {
+        let start = self.expect_keyword(Keyword::Automation)?.span;
+        // A quoted name is allowed so a workflow can carry the human-facing
+        // title it was generated from: `automation "X3 Autonomous Trading"`.
+        let name = match self.peek().kind.clone() {
+            TokenKind::Literal(Literal::String(text)) => {
+                let token = self.cursor.bump();
+                Identifier {
+                    name: text,
+                    span: token.span,
+                }
+            }
+            _ => self.expect_identifier()?,
+        };
+        self.expect_symbol(Symbol::LeftBrace)?;
+
+        let trigger = if self.accept_keyword(Keyword::Trigger) {
+            self.expect_symbol(Symbol::LeftBrace)?;
+            let expr = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+            self.expect_symbol(Symbol::RightBrace)?;
+            expr
+        } else {
+            return Err(ParseError::new(
+                "automation requires a `trigger` section",
+                self.peek().span,
+            ));
+        };
+
+        let mut permissions = Vec::new();
+        if self.accept_keyword(Keyword::Permissions) {
+            self.expect_symbol(Symbol::LeftBrace)?;
+            while !self.peek_symbol(Symbol::RightBrace) {
+                permissions.push(self.parse_permission()?);
+            }
+            self.expect_symbol(Symbol::RightBrace)?;
+        }
+
+        if !self.accept_keyword(Keyword::Execute) {
+            return Err(ParseError::new(
+                "automation requires an `execute` section",
+                self.peek().span,
+            ));
+        }
+        let execute = self.parse_block()?;
+
+        let on_failure = if self.accept_keyword(Keyword::OnFailure) {
+            Some(self.parse_block()?)
+        } else {
+            None
+        };
+
+        let end = self.expect_symbol(Symbol::RightBrace)?.span;
+        Ok(Item::Automation(Automation {
+            name,
+            trigger,
+            permissions,
+            execute,
+            on_failure,
+            span: start.merge(end),
+        }))
+    }
+
+    /// One `kind: value` capability declaration.
+    fn parse_permission(&mut self) -> ParseResult<Permission> {
+        let token = self.peek().clone();
+        let kind = match &token.kind {
+            TokenKind::Identifier(text) => match text.as_str() {
+                "wallet" => PermissionKind::Wallet,
+                "max_trade" => PermissionKind::MaxTrade,
+                "daily_loss_limit" => PermissionKind::DailyLossLimit,
+                "allowed_chains" => PermissionKind::AllowedChains,
+                other => {
+                    return Err(ParseError::new(
+                        format!("unknown automation permission `{other}`"),
+                        token.span,
+                    ))
+                }
+            },
+            _ => return Err(ParseError::new("expected a permission name", token.span)),
+        };
+        self.cursor.bump();
+        self.expect_symbol(Symbol::Colon)?;
+        let value = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+        let span = token.span.merge(value.span());
+        // Optional separator, so `wallet: w` and `wallet: w,` both parse.
+        let _ = self.accept_symbol(Symbol::Comma);
+        Ok(Permission { kind, value, span })
     }
 
     fn parse_parameter_list(&mut self) -> ParseResult<Vec<Param>> {
@@ -154,16 +342,149 @@ impl Parser {
         Ok(params)
     }
 
+    /// Run `parse` one nesting level deeper, refusing past [`MAX_NESTING_DEPTH`].
+    ///
+    /// Expressions, blocks and types all recurse, and every later pass walks the tree the same
+    /// way, so each of them counts against one budget: a program nested past it is refused with a
+    /// parse error instead of overflowing the stack of whatever compiles it.
+    fn descend<R>(&mut self, parse: impl FnOnce(&mut Self) -> ParseResult<R>) -> ParseResult<R> {
+        self.nesting_depth += 1;
+        if self.nesting_depth > MAX_NESTING_DEPTH {
+            let span = self.peek().span;
+            self.nesting_depth -= 1;
+            return Err(ParseError::new(
+                format!("maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded"),
+                span,
+            ));
+        }
+        let result = parse(self);
+        self.nesting_depth -= 1;
+        result
+    }
+
+    /// A type: a name (`i64`), an array (`[T; N]`, `[T]`), or a tuple (`(T1, T2, ...)`).
     fn parse_type_annotation(&mut self) -> ParseResult<TypeAnnotation> {
+        self.descend(Self::parse_type_annotation_inner)
+    }
+
+    fn parse_type_annotation_inner(&mut self) -> ParseResult<TypeAnnotation> {
+        if self.peek_symbol(Symbol::LeftBracket) {
+            let open = self.expect_symbol(Symbol::LeftBracket)?;
+            let element = self.parse_type_annotation()?;
+            let size = if self.accept_symbol(Symbol::Semicolon) {
+                let token = self.bump();
+                match token.kind {
+                    TokenKind::Literal(Literal::Integer(n)) if n >= 0 => Some(n as usize),
+                    other => {
+                        return Err(ParseError::new(
+                            format!(
+                                "an array size must be a non-negative integer, found {other:?}"
+                            ),
+                            token.span,
+                        ))
+                    }
+                }
+            } else {
+                None
+            };
+            let close = self.expect_symbol(Symbol::RightBracket)?;
+            let span = open.span.merge(close.span);
+            let (name, shape) = match size {
+                Some(size) => (
+                    "array",
+                    TypeShape::Array {
+                        element: Box::new(element),
+                        size,
+                    },
+                ),
+                None => (
+                    "vec",
+                    TypeShape::Vector {
+                        element: Box::new(element),
+                    },
+                ),
+            };
+            return Ok(TypeAnnotation {
+                name: Identifier {
+                    name: name.to_string(),
+                    span,
+                },
+                span,
+                shape,
+            });
+        }
+        if self.peek_symbol(Symbol::LeftParen) {
+            let open = self.expect_symbol(Symbol::LeftParen)?;
+            let mut elements = Vec::new();
+            if !self.peek_symbol(Symbol::RightParen) {
+                loop {
+                    elements.push(self.parse_type_annotation()?);
+                    if !self.accept_symbol(Symbol::Comma) {
+                        break;
+                    }
+                }
+            }
+            let close = self.expect_symbol(Symbol::RightParen)?;
+            let span = open.span.merge(close.span);
+            if elements.is_empty() {
+                // `()` is the unit type, as `unit` is.
+                return Ok(TypeAnnotation {
+                    name: Identifier {
+                        name: "()".to_string(),
+                        span,
+                    },
+                    span,
+                    shape: TypeShape::Named,
+                });
+            }
+            return Ok(TypeAnnotation {
+                name: Identifier {
+                    name: "tuple".to_string(),
+                    span,
+                },
+                span,
+                shape: TypeShape::Tuple { elements },
+            });
+        }
         let identifier = self.expect_identifier()?;
         let span = identifier.span;
         Ok(TypeAnnotation {
             name: identifier,
             span,
+            shape: TypeShape::Named,
         })
     }
 
+    /// The elements of a bracketed or parenthesised list, up to and including `close`.
+    fn parse_expression_list(&mut self, close: Symbol) -> ParseResult<(Vec<Expression>, Span)> {
+        self.with_struct_literals(true, |p| p.parse_expression_list_inner(close))
+    }
+
+    fn parse_expression_list_inner(
+        &mut self,
+        close: Symbol,
+    ) -> ParseResult<(Vec<Expression>, Span)> {
+        let mut elements = Vec::new();
+        if !self.peek_symbol(close) {
+            loop {
+                elements.push(self.parse_expression_bp(0)?);
+                if !self.accept_symbol(Symbol::Comma) {
+                    break;
+                }
+                if self.peek_symbol(close) {
+                    break; // trailing comma
+                }
+            }
+        }
+        let end = self.expect_symbol(close)?;
+        Ok((elements, end.span))
+    }
+
     fn parse_block(&mut self) -> ParseResult<Block> {
+        self.descend(Self::parse_block_inner)
+    }
+
+    fn parse_block_inner(&mut self) -> ParseResult<Block> {
         let left = self.expect_symbol(Symbol::LeftBrace)?;
         let mut statements = Vec::new();
         while !self.accept_symbol(Symbol::RightBrace) {
@@ -226,13 +547,7 @@ impl Parser {
 
     fn parse_if_statement(&mut self) -> ParseResult<IfStatement> {
         let if_token = self.expect_keyword(Keyword::If)?;
-        let condition = if self.accept_symbol(Symbol::LeftParen) {
-            let expr = self.parse_expression_bp(0)?;
-            self.expect_symbol(Symbol::RightParen)?;
-            expr
-        } else {
-            self.parse_expression_bp(0)?
-        };
+        let condition = self.parse_condition()?;
         let then_block = self.parse_block()?;
         let else_block = if self.accept_keyword(Keyword::Else) {
             Some(self.parse_block()?)
@@ -250,13 +565,7 @@ impl Parser {
 
     fn parse_while_statement(&mut self) -> ParseResult<WhileStatement> {
         let while_token = self.expect_keyword(Keyword::While)?;
-        let condition = if self.accept_symbol(Symbol::LeftParen) {
-            let expr = self.parse_expression_bp(0)?;
-            self.expect_symbol(Symbol::RightParen)?;
-            expr
-        } else {
-            self.parse_expression_bp(0)?
-        };
+        let condition = self.parse_condition()?;
         let body = self.parse_block()?;
         let span = while_token.span.merge(body.span);
         Ok(WhileStatement {
@@ -464,20 +773,7 @@ impl Parser {
     }
 
     fn parse_expression_bp(&mut self, min_bp: u8) -> ParseResult<Expression> {
-        // Track nesting depth for bounded memory
-        self.nesting_depth += 1;
-        if self.nesting_depth > MAX_NESTING_DEPTH {
-            let span = self.peek().span;
-            self.nesting_depth -= 1;
-            return Err(ParseError::new(
-                format!("maximum nesting depth ({MAX_NESTING_DEPTH}) exceeded"),
-                span,
-            ));
-        }
-
-        let result = self.parse_expression_bp_inner(min_bp);
-        self.nesting_depth -= 1;
-        result
+        self.descend(|parser| parser.parse_expression_bp_inner(min_bp))
     }
 
     fn parse_expression_bp_inner(&mut self, min_bp: u8) -> ParseResult<Expression> {
@@ -515,6 +811,45 @@ impl Parser {
     fn parse_assignment(&mut self, lhs: Expression) -> ParseResult<Expression> {
         let equals = self.expect_symbol(Symbol::Equals)?;
         match lhs {
+            // `name[index] = value`. Only a named array can be written: arrays have value
+            // semantics, so the write rebinds the variable.
+            Expression::Index(IndexExpression { base, index, span }) => match *base {
+                Expression::Identifier(target) => {
+                    let rhs = self.parse_expression_bp(1)?;
+                    let span = span.merge(rhs.span());
+                    Ok(Expression::IndexAssign(IndexAssignExpression {
+                        target,
+                        index,
+                        value: Box::new(rhs),
+                        span,
+                    }))
+                }
+                _ => Err(ParseError::new(
+                    "an element can only be assigned through a named array (`a[i] = v`)",
+                    equals.span,
+                )),
+            },
+            // `name.field = value`, rebinding `name` as `a[i] = v` does.
+            Expression::FieldAccess(FieldAccessExpression {
+                object,
+                field,
+                span,
+            }) => match *object {
+                Expression::Identifier(target) => {
+                    let rhs = self.parse_expression_bp(1)?;
+                    let span = span.merge(rhs.span());
+                    Ok(Expression::FieldAssign(FieldAssignExpression {
+                        target,
+                        field,
+                        value: Box::new(rhs),
+                        span,
+                    }))
+                }
+                _ => Err(ParseError::new(
+                    "a field can only be assigned through a named value (`s.f = v`)",
+                    equals.span,
+                )),
+            },
             Expression::Identifier(ident) => {
                 let rhs = self.parse_expression_bp(1)?;
                 let span = ident.span.merge(rhs.span());
@@ -599,13 +934,37 @@ impl Parser {
             }
             TokenKind::Identifier(_) => {
                 let identifier = self.expect_identifier()?;
+                if self.at_struct_literal() {
+                    let literal = self.parse_struct_literal(identifier)?;
+                    return self.finish_postfix(literal);
+                }
                 Ok(self.finish_postfix(Expression::Identifier(identifier))?)
             }
             TokenKind::Symbol(Symbol::LeftParen) => {
-                let _ = self.expect_symbol(Symbol::LeftParen)?;
-                let expr = self.parse_expression_bp(0)?;
+                let open = self.expect_symbol(Symbol::LeftParen)?;
+                let first = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+                if self.accept_symbol(Symbol::Comma) {
+                    // `(a, b, ...)`: a tuple. `(a)` stays a parenthesised expression.
+                    let (mut rest, end) = self.parse_expression_list(Symbol::RightParen)?;
+                    let mut elements = vec![first];
+                    elements.append(&mut rest);
+                    let tuple = Expression::Tuple(TupleExpression {
+                        elements,
+                        span: open.span.merge(end),
+                    });
+                    return self.finish_postfix(tuple);
+                }
                 self.expect_symbol(Symbol::RightParen)?;
-                Ok(self.finish_postfix(expr)?)
+                Ok(self.finish_postfix(first)?)
+            }
+            TokenKind::Symbol(Symbol::LeftBracket) => {
+                let open = self.expect_symbol(Symbol::LeftBracket)?;
+                let (elements, end) = self.parse_expression_list(Symbol::RightBracket)?;
+                let array = Expression::Array(ArrayExpression {
+                    elements,
+                    span: open.span.merge(end),
+                });
+                Ok(self.finish_postfix(array)?)
             }
             other => Err(ParseError::new(
                 format!("unexpected token {other:?} in expression"),
@@ -621,7 +980,7 @@ impl Parser {
                 let mut args = Vec::new();
                 if !self.peek_symbol(Symbol::RightParen) {
                     loop {
-                        args.push(self.parse_expression_bp(0)?);
+                        args.push(self.with_struct_literals(true, |p| p.parse_expression_bp(0))?);
                         if !self.accept_symbol(Symbol::Comma) {
                             break;
                         }
@@ -632,6 +991,16 @@ impl Parser {
                 base = Expression::Call(CallExpression {
                     callee: Box::new(base),
                     args,
+                    span,
+                });
+            } else if self.peek_symbol(Symbol::LeftBracket) {
+                self.expect_symbol(Symbol::LeftBracket)?;
+                let index = self.with_struct_literals(true, |p| p.parse_expression_bp(0))?;
+                let close = self.expect_symbol(Symbol::RightBracket)?;
+                let span = base.span().merge(close.span);
+                base = Expression::Index(IndexExpression {
+                    base: Box::new(base),
+                    index: Box::new(index),
                     span,
                 });
             } else if self.peek_symbol(Symbol::Dot) {
@@ -648,9 +1017,18 @@ impl Parser {
                         span,
                     });
                 } else {
-                    // Field access
+                    // Field access: `s.name`, or `t.0` for a tuple's element.
                     self.expect_symbol(Symbol::Dot)?;
-                    let field = self.expect_identifier()?;
+                    let field = match self.peek().kind.clone() {
+                        TokenKind::Literal(Literal::Integer(n)) if n >= 0 => {
+                            let token = self.bump();
+                            Identifier {
+                                name: n.to_string(),
+                                span: token.span,
+                            }
+                        }
+                        _ => self.expect_identifier()?,
+                    };
                     let span = base.span().merge(field.span);
                     base = Expression::FieldAccess(FieldAccessExpression {
                         object: Box::new(base),

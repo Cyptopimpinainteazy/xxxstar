@@ -2,11 +2,18 @@
 //
 // pallet-x3-launchpad — Token launch/presale pallet with on-chain graduation.
 //
-// Phase 7 completion: open_launch creates a launch, close_launch on success:
-//   1. Mints tokens via TokenFactory (creates asset in registry)
-//   2. Creates an AMM pool via DEX
-//   3. Locks LP tokens via LP Locker for anti-rug protection
-//   4. Emits LaunchGraduated event
+// Every amount a launch handles is a `CanonicalLedger` balance held by the launch's own custody
+// account (`launch_account`):
+//   * `contribute` pays the quote asset into custody; `claim_refund` pays it back from a failed
+//     launch.
+//   * `graduate_launch` mints the token into custody (the contributors' allocation plus the pool's
+//     side), creates a DEX pool and seeds it from custody with `LiquidityBps` of the raised quote
+//     asset and the matching tokens at the launch price. Custody owns the LP position, so nobody
+//     can remove that liquidity until `claim_lp` releases it to the creator after
+//     `lp_lock_duration_blocks`.
+//   * `claim_allocation` pays a contributor's tokens from custody; `withdraw_raised_funds` pays the
+//     creator the raised quote asset the pool did not take.
+// Before this, every one of those calls only updated counters: nothing moved.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_code)]
@@ -33,6 +40,7 @@ pub mod pallet {
     use scale_info::TypeInfo;
     use sp_runtime::traits::Saturating;
     use sp_std::vec::Vec;
+    use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
 
     #[pallet::pallet]
     pub struct Pallet<T>(_);
@@ -94,23 +102,41 @@ pub mod pallet {
         ) -> Result<u32, DispatchError>;
     }
 
-    /// DEX pool creation interface: must be implemented by DEX pallet.
+    /// The DEX a graduating launch seeds: pools of ledger assets, liquidity paid from the
+    /// provider's ledger balances, and LP positions owned by an account.
     pub trait DexPoolCreate<AccountId> {
+        /// Create a pool of ledger assets `token_a` / `token_b`; returns its id.
         fn create_pool(
             creator: &AccountId,
             token_a: u32,
             token_b: u32,
         ) -> Result<u64, DispatchError>;
+        /// Deposit `amount_a` / `amount_b` from `provider` into `pool_id`; returns the LP
+        /// position, owned by `provider`.
+        fn add_liquidity(
+            provider: &AccountId,
+            pool_id: u64,
+            amount_a: u128,
+            amount_b: u128,
+        ) -> Result<u64, DispatchError>;
+        /// Hand LP position `position_id` from `from` to `to`.
+        fn transfer_position(position_id: u64, from: &AccountId, to: &AccountId) -> DispatchResult;
     }
 
-    /// LP lock interface: must be implemented by LP Locker pallet.
-    pub trait LpLockCreate<AccountId, BlockNumber> {
-        fn lock_lp_for(
-            owner: &AccountId,
-            pool_id: u64,
-            lp_amount: u128,
-            unlock_at_block: BlockNumber,
-        ) -> DispatchResult;
+    /// A graduated launch's pool, its locked LP position, and what the graduation set aside.
+    #[derive(Clone, Eq, PartialEq, Encode, Decode, MaxEncodedLen, TypeInfo, RuntimeDebug)]
+    pub struct Graduation<BlockNumber> {
+        /// The launched token's ledger asset id.
+        pub token_asset: u32,
+        pub pool_id: u64,
+        /// The LP position custody holds until `unlock_at`.
+        pub position_id: u64,
+        pub unlock_at: BlockNumber,
+        pub lp_claimed: bool,
+        /// Quote asset the pool took from the raised funds.
+        pub pool_quote: u128,
+        /// Tokens set aside for contributors, claimed pro rata to their contributions.
+        pub contributor_tokens: u128,
     }
 
     // ── Pallet ──────────────────────────────────────────────────────────────
@@ -142,10 +168,19 @@ pub mod pallet {
         /// DEX pallet for AMM pool creation upon graduation.
         type Dex: DexPoolCreate<Self::AccountId>;
 
-        /// LP Locker pallet for anti-rug LP token locking upon graduation.
-        type LpLocker: LpLockCreate<Self::AccountId, BlockNumberFor<Self>>;
+        /// The ledger launches hold their funds on (the kernel's `CanonicalLedger`).
+        type Ledger: x3_asset_kernel_types::traits::CanonicalLedgerTransfer<Self::AccountId>;
 
-        /// Asset ID of the quote token (e.g. X3 native, USDC).
+        /// Derives each launch's custody account.
+        #[pallet::constant]
+        type PalletId: Get<frame_support::PalletId>;
+
+        /// Share of the raised quote asset, in basis points, that seeds the DEX pool at
+        /// graduation; the creator withdraws the rest.
+        #[pallet::constant]
+        type LiquidityBps: Get<u16>;
+
+        /// Ledger asset id of the quote token (e.g. X3 native, USDC).
         #[pallet::constant]
         type QuoteAssetId: Get<u32>;
 
@@ -218,6 +253,11 @@ pub mod pallet {
         ValueQuery,
     >;
 
+    /// Each graduated launch's pool, locked LP position and set-asides.
+    #[pallet::storage]
+    pub type Graduations<T: Config> =
+        StorageMap<_, Blake2_128Concat, LaunchId, Graduation<BlockNumberFor<T>>, OptionQuery>;
+
     /// Track graduated launches for external queries.
     #[pallet::storage]
     pub type GraduatedLaunches<T: Config> = StorageMap<
@@ -277,6 +317,12 @@ pub mod pallet {
             creator: T::AccountId,
             amount: u128,
         },
+        /// The locked LP position was released to the creator.
+        LpClaimed {
+            launch_id: LaunchId,
+            creator: T::AccountId,
+            position_id: u64,
+        },
     }
 
     // ── Errors ─────────────────────────────────────────────────────────────────
@@ -302,6 +348,14 @@ pub mod pallet {
         LpLockFailed,
         AlreadyGraduated,
         QuoteAssetZeroBalance,
+        /// The launch has not graduated yet.
+        NotGraduated,
+        /// The LP position is still locked.
+        LpStillLocked,
+        /// The raised funds are too small to seed a pool at this price.
+        RaiseTooSmallForPool,
+        /// An amount overflowed.
+        ArithmeticOverflow,
     }
 
     // ── Extrinsics ─────────────────────────────────────────────────────────────
@@ -330,6 +384,17 @@ pub mod pallet {
                 Error::<T>::SoftCapExceeded
             );
             ensure!(price_per_token > 0, Error::<T>::BadDuration);
+            // A launch that reaches its soft cap must be able to graduate: the pool's share of the
+            // smallest successful raise has to buy at least one token at the launch price.
+            // Otherwise contributors' funds would sit in custody with no path out.
+            let smallest_pool_quote = soft_cap
+                .checked_mul(u128::from(T::LiquidityBps::get()))
+                .ok_or(Error::<T>::ArithmeticOverflow)?
+                / 10_000;
+            ensure!(
+                smallest_pool_quote >= price_per_token,
+                Error::<T>::RaiseTooSmallForPool
+            );
 
             let duration = end_block.saturating_sub(start_block);
             ensure!(
@@ -410,10 +475,23 @@ pub mod pallet {
                     );
                     state.contributor_count = state.contributor_count.saturating_add(1);
                 }
-                let new_total = state.total_raised.saturating_add(amount);
+                let new_total = state
+                    .total_raised
+                    .checked_add(amount)
+                    .ok_or(Error::<T>::ArithmeticOverflow)?;
                 ensure!(new_total <= state.hard_cap, Error::<T>::HardCapExceeded);
+                let contributed = prev
+                    .checked_add(amount)
+                    .ok_or(Error::<T>::ArithmeticOverflow)?;
 
-                Contributions::<T>::insert(launch_id, &contributor, prev.saturating_add(amount));
+                // The contribution is paid into the launch's custody, not just counted.
+                T::Ledger::ledger_transfer(
+                    T::QuoteAssetId::get(),
+                    &contributor,
+                    &Self::launch_account(launch_id),
+                    amount,
+                )?;
+                Contributions::<T>::insert(launch_id, &contributor, contributed);
                 state.total_raised = new_total;
 
                 Self::deposit_event(Event::ContributionMade {
@@ -459,22 +537,23 @@ pub mod pallet {
             })
         }
 
-        /// Graduate a successful launch: create token, create DEX pool, lock LP.
+        /// Graduate a successful launch: mint its token into custody, create a DEX pool and seed
+        /// it from custody with `LiquidityBps` of the raised funds plus the matching tokens at the
+        /// launch price. Custody owns the LP position until `claim_lp`.
         ///
-        /// Only callable by the launch creator after funds have been withdrawn
-        /// (launch in Completed status). This protects contributors: the creator
-        /// cannot graduate without first finalizing and withdrawing funds, which
-        /// proves they have committed to the launch.
+        /// Any signed account, on a `Successful` launch: the outcome is fixed by the raise, so a
+        /// creator who walks away cannot hold contributors' funds hostage. After it, contributors
+        /// `claim_allocation` and the creator `withdraw_raised_funds` (the share the pool did not
+        /// take).
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::graduate_launch())]
         #[transactional]
         pub fn graduate_launch(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
-            let caller = ensure_signed(origin)?;
+            ensure_signed(origin)?;
 
             let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
-            ensure!(state.creator == caller, Error::<T>::NotCreator);
             ensure!(
-                state.status == LaunchStatus::Completed,
+                state.status == LaunchStatus::Successful,
                 Error::<T>::LaunchNotSuccessful
             );
             ensure!(
@@ -482,46 +561,93 @@ pub mod pallet {
                 Error::<T>::AlreadyGraduated
             );
 
-            let total_tokens = state.total_raised / state.price_per_token;
-            ensure!(total_tokens > 0, Error::<T>::TokenFactoryFailed);
+            // The split, at the launch price: contributors' tokens for everything raised, and the
+            // pool's side for `LiquidityBps` of it.
+            let raised = state.total_raised;
+            let price = state.price_per_token;
+            let contributor_tokens = raised / price;
+            let pool_quote = raised
+                .checked_mul(u128::from(T::LiquidityBps::get()))
+                .ok_or(Error::<T>::ArithmeticOverflow)?
+                / 10_000;
+            let pool_tokens = pool_quote / price;
+            ensure!(
+                contributor_tokens > 0 && pool_quote > 0 && pool_tokens > 0,
+                Error::<T>::RaiseTooSmallForPool
+            );
+            let minted = contributor_tokens
+                .checked_add(pool_tokens)
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
 
-            // Step 1: Create the token via TokenFactory
+            // Step 1: the token, minted into the launch's custody.
+            let custody = Self::launch_account(launch_id);
             let symbol = format!("TKN{}", launch_id).into_bytes();
             let name = format!("Launch Token {}", launch_id).into_bytes();
-            let new_asset_id = T::TokenFactory::create_token(
-                &caller,
-                symbol,
-                name,
-                18u8, // standard decimals
-                total_tokens,
-            )
-            .map_err(|_| Error::<T>::TokenFactoryFailed)?;
+            let token_asset = T::TokenFactory::create_token(&custody, symbol, name, 18u8, minted)
+                .map_err(|_| Error::<T>::TokenFactoryFailed)?;
 
-            // Step 2: Create AMM pool with quote token
+            // Step 2: the pool, seeded from custody; custody owns the LP position.
             let quote_asset = T::QuoteAssetId::get();
-            let pool_id = T::Dex::create_pool(&caller, quote_asset, new_asset_id)
+            let pool_id = T::Dex::create_pool(&custody, quote_asset, token_asset)
+                .map_err(|_| Error::<T>::DexPoolCreationFailed)?;
+            let position_id = T::Dex::add_liquidity(&custody, pool_id, pool_quote, pool_tokens)
                 .map_err(|_| Error::<T>::DexPoolCreationFailed)?;
 
-            // Step 3: Lock LP tokens for anti-rug protection
-            // For simplicity, lock 100% of initial LP tokens. In production,
-            // the creator can call lock_lp with a specific amount.
-            let unlock_block = frame_system::Pallet::<T>::block_number()
+            // Step 3: the lock. Custody has no key, so the position cannot be withdrawn by anyone
+            // until `claim_lp` hands it to the creator.
+            let unlock_at = frame_system::Pallet::<T>::block_number()
                 .saturating_add(state.lp_lock_duration_blocks);
-            let lp_amount = total_tokens; // proxy: LP amount ~= initial token supply
-            T::LpLocker::lock_lp_for(&caller, pool_id, lp_amount, unlock_block)
-                .map_err(|_| Error::<T>::LpLockFailed)?;
-
-            // Record graduation
-            GraduatedLaunches::<T>::insert(launch_id, (new_asset_id, pool_id));
+            Graduations::<T>::insert(
+                launch_id,
+                Graduation {
+                    token_asset,
+                    pool_id,
+                    position_id,
+                    unlock_at,
+                    lp_claimed: false,
+                    pool_quote,
+                    contributor_tokens,
+                },
+            );
+            GraduatedLaunches::<T>::insert(launch_id, (token_asset, pool_id));
 
             Self::deposit_event(Event::LaunchGraduated {
                 launch_id,
-                token_asset_id: new_asset_id,
+                token_asset_id: token_asset,
                 pool_id,
-                total_lp_locked: lp_amount,
+                total_lp_locked: pool_tokens,
             });
 
             Ok(())
+        }
+
+        /// Release a graduated launch's LP position to its creator once the lock has expired.
+        #[pallet::call_index(8)]
+        #[pallet::weight(T::WeightInfo::graduate_launch())]
+        pub fn claim_lp(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
+            let caller = ensure_signed(origin)?;
+            let state = Launches::<T>::get(launch_id).ok_or(Error::<T>::LaunchNotFound)?;
+            ensure!(state.creator == caller, Error::<T>::NotCreator);
+            Graduations::<T>::try_mutate(launch_id, |maybe| -> DispatchResult {
+                let graduation = maybe.as_mut().ok_or(Error::<T>::NotGraduated)?;
+                ensure!(!graduation.lp_claimed, Error::<T>::AlreadyClaimed);
+                ensure!(
+                    frame_system::Pallet::<T>::block_number() >= graduation.unlock_at,
+                    Error::<T>::LpStillLocked
+                );
+                T::Dex::transfer_position(
+                    graduation.position_id,
+                    &Self::launch_account(launch_id),
+                    &caller,
+                )?;
+                graduation.lp_claimed = true;
+                Self::deposit_event(Event::LpClaimed {
+                    launch_id,
+                    creator: caller.clone(),
+                    position_id: graduation.position_id,
+                });
+                Ok(())
+            })
         }
 
         /// Claim a refund on a failed launch.
@@ -541,6 +667,12 @@ pub mod pallet {
                 Error::<T>::AlreadyClaimed
             );
             RefundClaimed::<T>::insert(launch_id, &contributor, true);
+            T::Ledger::ledger_transfer(
+                T::QuoteAssetId::get(),
+                &Self::launch_account(launch_id),
+                &contributor,
+                amount,
+            )?;
             Self::deposit_event(Event::RefundClaimed {
                 launch_id,
                 contributor,
@@ -565,13 +697,20 @@ pub mod pallet {
                 !AllocationClaimed::<T>::get(launch_id, &contributor),
                 Error::<T>::AlreadyClaimed
             );
-            let total_tokens = state.total_raised / state.price_per_token;
-            let tokens = if state.total_raised > 0 {
-                contribution.saturating_mul(total_tokens) / state.total_raised
-            } else {
-                0
-            };
+            // Tokens exist once the launch graduates; a contributor's share is pro rata to what
+            // they paid in (floor), so the shares never exceed the contributors' set-aside.
+            let graduation = Graduations::<T>::get(launch_id).ok_or(Error::<T>::NotGraduated)?;
+            let tokens = contribution
+                .checked_mul(graduation.contributor_tokens)
+                .ok_or(Error::<T>::ArithmeticOverflow)?
+                / state.total_raised;
             AllocationClaimed::<T>::insert(launch_id, &contributor, true);
+            T::Ledger::ledger_transfer(
+                graduation.token_asset,
+                &Self::launch_account(launch_id),
+                &contributor,
+                tokens,
+            )?;
             Self::deposit_event(Event::AllocationClaimed {
                 launch_id,
                 contributor,
@@ -580,20 +719,25 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Cancel a launch.
+        /// Cancel a launch: an `Active` one, or a `Successful` one that has not graduated (when
+        /// graduation cannot complete, e.g. the token factory or DEX refuse it). Either way the
+        /// launch becomes `Failed` and every contributor can `claim_refund` from custody.
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::cancel_launch())]
         pub fn cancel_launch(origin: OriginFor<T>, launch_id: LaunchId) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             Launches::<T>::try_mutate(launch_id, |maybe_state| -> DispatchResult {
                 let state = maybe_state.as_mut().ok_or(Error::<T>::LaunchNotFound)?;
-                ensure!(
-                    state.status == LaunchStatus::Active,
-                    Error::<T>::LaunchNotActive
-                );
-                ExpiryQueue::<T>::remove(state.end_block, launch_id);
+                match state.status {
+                    LaunchStatus::Active => {
+                        ExpiryQueue::<T>::remove(state.end_block, launch_id);
+                        ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
+                    }
+                    LaunchStatus::Successful
+                        if !GraduatedLaunches::<T>::contains_key(launch_id) => {}
+                    _ => return Err(Error::<T>::LaunchNotActive.into()),
+                }
                 state.status = LaunchStatus::Failed;
-                ActiveLaunchCount::<T>::mutate(|c| *c = c.saturating_sub(1));
                 Self::deposit_event(Event::LaunchCancelled { launch_id });
                 Ok(())
             })
@@ -611,7 +755,19 @@ pub mod pallet {
                     Error::<T>::LaunchNotSuccessful
                 );
                 ensure!(state.creator == caller, Error::<T>::NotCreator);
-                let amount = state.total_raised;
+                // The pool's share is set aside at graduation, so the creator withdraws after it.
+                let graduation =
+                    Graduations::<T>::get(launch_id).ok_or(Error::<T>::NotGraduated)?;
+                let amount = state
+                    .total_raised
+                    .checked_sub(graduation.pool_quote)
+                    .ok_or(Error::<T>::ArithmeticOverflow)?;
+                T::Ledger::ledger_transfer(
+                    T::QuoteAssetId::get(),
+                    &Self::launch_account(launch_id),
+                    &caller,
+                    amount,
+                )?;
                 state.status = LaunchStatus::Completed;
                 Self::deposit_event(Event::FundsWithdrawn {
                     launch_id,
@@ -620,6 +776,14 @@ pub mod pallet {
                 });
                 Ok(())
             })
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        /// The account that holds launch `launch_id`'s funds, tokens and locked LP position.
+        pub fn launch_account(launch_id: LaunchId) -> T::AccountId {
+            use sp_runtime::traits::AccountIdConversion;
+            T::PalletId::get().into_sub_account_truncating(launch_id)
         }
     }
 

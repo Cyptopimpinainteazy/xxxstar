@@ -1,0 +1,61 @@
+{
+  "scope": "router database startup and validator launcher orchestration",
+  "git_commit": "05fc6b01b97c3ab95ac21c120a44d43d65e15b59",
+  "tested_tree": "beecca1793475746130c121dee33f66263b65369",
+  "checks": [
+    {
+      "command": "python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 137
+    },
+    {
+      "command": "python3 tests/test_validator_launcher.py -v",
+      "exit_code": 0,
+      "result": "PASS",
+      "tests": 5,
+      "limitations": "Test-only shell stand-ins exercise launch selection; no live chain/finality evidence."
+    },
+    {
+      "command": "bash -n scripts/local-ci.sh scripts/testnet/run-7-validators-local.sh",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 -m py_compile services/x3-ai-router/router.py services/x3-ai-router/test_router.py tests/test_validator_launcher.py",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py stubs",
+      "exit_code": 0,
+      "result": "PASS",
+      "findings": 1573,
+      "baseline": 1702
+    },
+    {
+      "command": "python3 scripts/x3_fake_code_scan.py cheats",
+      "exit_code": 1,
+      "result": "FAIL",
+      "reason": "skip count 141 exceeds baseline 139; also reproduced at unmodified ff57d15dd6e93ba4bcc19081d18bcd5632954941"
+    }
+  ],
+  "regression_reproduction": {
+    "database": "Three errors before fix; four startup cases passed after fix.",
+    "launcher": "--only 3 launched [1,3], --only 1 launched [1,1] before fix; after fix launch only [3] and [1]."
+  },
+  "production_gate": "NOT_RUN",
+  "blocked": [
+    "Rust toolchain unavailable",
+    "Docker unavailable",
+    "Built X3 node unavailable",
+    "Live configured providers unavailable",
+    "Live seven-validator, nonce stress, state durability, cross-domain atomic, and chaos gates not run"
+  ],
+  "completion_percent": null
+}

@@ -1,7 +1,10 @@
 //! Tests for the x3-sequencer pallet.
 
 use crate::{mock::*, pallet::*};
-use frame_support::{assert_noop, assert_ok, traits::Hooks};
+use frame_support::{
+    assert_noop, assert_ok,
+    traits::{Currency, Hooks},
+};
 use sp_core::H256;
 
 fn h256(n: u8) -> H256 {
@@ -343,5 +346,54 @@ fn source_chain_stored_correctly() {
             42 // rollup 42
         ));
         assert_eq!(X3Sequencer::pending_count(), 3);
+    });
+}
+
+// ── TICKET-154: the sequencing fee is a charge, not a reserve that is never released ──
+
+#[test]
+fn sequencing_fee_leaves_the_submitter_and_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        let treasury = Treasury::get();
+        let (payer_before, treasury_before) =
+            (Balances::free_balance(1), Balances::free_balance(treasury));
+
+        assert_ok!(X3Sequencer::submit_transaction(
+            RuntimeOrigin::signed(1),
+            h256(0x54),
+            64,
+            0
+        ));
+
+        let fee = BaseFee::get() + PerByteFee::get() * 64;
+        assert_eq!(Balances::reserved_balance(1), 0, "nothing is left locked");
+        assert_eq!(Balances::free_balance(1), payer_before - fee);
+        assert_eq!(Balances::free_balance(treasury), treasury_before + fee);
+        System::assert_has_event(Event::<Test>::SequencingFeeCollected { who: 1, fee }.into());
+    });
+}
+
+#[test]
+fn a_treasury_that_cannot_take_the_fee_refuses_the_submission() {
+    new_test_ext().execute_with(|| {
+        ExistentialDeposit::set(10_000);
+        Balances::make_free_balance_be(&Treasury::get(), 0);
+
+        assert_noop!(
+            X3Sequencer::submit_transaction(RuntimeOrigin::signed(1), h256(0x55), 64, 0),
+            Error::<Test>::FeeDestinationRefused
+        );
+    });
+}
+
+#[test]
+fn a_submitter_without_the_fee_is_insufficient_funds() {
+    new_test_ext().execute_with(|| {
+        Balances::make_free_balance_be(&1, 0);
+
+        assert_noop!(
+            X3Sequencer::submit_transaction(RuntimeOrigin::signed(1), h256(0x56), 64, 0),
+            Error::<Test>::InsufficientFee
+        );
     });
 }

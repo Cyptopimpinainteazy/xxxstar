@@ -1,0 +1,21 @@
+{
+  "tested_code_commit": "761c8251ec401e4421faa9ce593bbf18a5da7adb",
+  "tested_code_tree": "5dc8cbbd75eeeb527dfc4abf9d8808745ec579c3",
+  "checks": {
+    "archive_tests": 8,
+    "restore_smoke": "passed",
+    "python_compile": "passed",
+    "diff_check": "passed",
+    "cheat_scan": "passed",
+    "stub_scan": "passed"
+  },
+  "regressions_reproduced": [
+    "Directory mode 0700 became 0755",
+    "Duplicate archive file returned target-occupied status 3 instead of archive-corrupt status 4"
+  ],
+  "limitations": [
+    "No live validator or RocksDB restore performed",
+    "Rust toolchain and built chain node unavailable",
+    "Linux /proc stopped-node check cannot prevent subsequent process startup"
+  ]
+}

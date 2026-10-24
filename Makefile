@@ -5,6 +5,7 @@
 local-ci local-ci-live local-ci-cross local-ci-release local-ci-variants local-ci-loom local-ci-list\
  local-ci-all local-ci-prepush local-ci-dry-run\
  local-ci-deep srtool-install\
+ local-ci-pr-agent\
  batch-runner provider-drill\
  bench bench-criterion bench-k6 bench-pallets bench-report bench-all
 
@@ -34,6 +35,11 @@ local-ci-loom:
 
 local-ci-list:
 	@bash scripts/local-ci.sh --list
+
+# The PR-Agent wiring self-test: offline, deterministic, no model call. The paid
+# review path is services/pr-agent/check.sh and is deliberately not a gate.
+local-ci-pr-agent:
+	@bash scripts/local-ci.sh --pr-agent --only pr-agent-wiring
 
 # Everything (live + cross-domain + release + variants). This is the release bar.
 local-ci-all:

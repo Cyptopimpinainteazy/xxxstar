@@ -1,0 +1,18 @@
+# Hang policy for cargo-nextest runs.
+#
+# The mutation gate (scripts/x3-mutants-gate.sh) runs the supply ledger under
+# NEXTEST_PROFILE=mutants. A mutant that turns a loop into a non-terminating
+# spin -- today: SupplyMerkleTree::build_tree `while level_size > 1` mutated to
+# `>= 1` / `== 1` in pallets/x3-supply-ledger/src/supply_verification.rs -- must
+# fail the suite in bounded time. nextest terminates the hung test and reports
+# an ordinary failure, which cargo-mutants classifies as CAUGHT. Without the
+# watchdog the campaign only ends when cargo-mutants' outer --timeout fires,
+# which is classified TIMEOUT (not caught) and fails the gate without pinning
+# the hang.
+[profile.default]
+# Kill a test that is still running after 120s x 3 = 6 minutes.
+slow-timeout = { period = "120s", terminate-after = 3 }
+
+[profile.mutants]
+# Campaigns want a much shorter leash: kill after 20s x 3 = 60 seconds.
+slow-timeout = { period = "20s", terminate-after = 3 }

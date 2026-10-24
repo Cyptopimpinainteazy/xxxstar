@@ -2952,7 +2952,7 @@ fn adaptor_swap_completion_rejects_non_taker_caller() {
 use secp256k1::ecdsa::RecoverableSignature;
 use secp256k1::{Message, PublicKey, Scalar, Secp256k1, SecretKey};
 
-fn real_adaptor_signature(
+pub(crate) fn real_adaptor_signature(
     msg: [u8; 32],
 ) -> (BtcAdaptorSignature, [u8; 33], BtcSignature65, [u8; 32]) {
     let secp = Secp256k1::new();
@@ -3119,7 +3119,7 @@ fn hex32(value: H256) -> String {
 /// passed validation before this change, which is exactly the gap these tests
 /// pin. `bundle_needs_verified_proof` is the rule that now refuses it on a Live
 /// network.
-fn fabricated_bundle(
+pub(crate) fn fabricated_bundle(
     runtime_intent_id: [u8; 32],
     chain_id: &str,
     vm_type: VmType,
@@ -3157,7 +3157,7 @@ fn fabricated_bundle(
 }
 
 /// Create an intent with an Ethereum leg and a Solana leg, both escrowed.
-fn intent_with_two_external_legs() -> H256 {
+pub(crate) fn intent_with_two_external_legs() -> H256 {
     let maker = ALICE;
     let taker = BOB;
     let secret_hash = H256::from(sp_io::hashing::sha2_256(
@@ -4450,6 +4450,37 @@ fn a_real_bitcoin_transaction_proof_is_rejected_until_its_block_is_anchored() {
             Ok(true),
             "once anchored, the real node's bytes verify"
         );
+
+        // The admission guard is two conditions, not one: the record must say
+        // anchored AND name the header's own height. Replacing the guard with
+        // `true`, or its `&&` with `||`, accepts one of these two proofs; the
+        // chain must refuse both.
+        let block_hash = Pallet::<Test>::compute_btc_block_hash(&header);
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT,
+                anchored: false,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an unanchored record must not be accepted on the strength of its height"
+        );
+
+        crate::BtcHeaderMetaStore::<Test>::insert(
+            block_hash,
+            crate::types::BtcHeaderMeta {
+                height: regtest_capture::HEIGHT + 1,
+                anchored: true,
+            },
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_proof(&ExternalChainId::Bitcoin, &proof),
+            Ok(false),
+            "an anchored record at another height is a statement about another block"
+        );
     });
 }
 /// Genesis pins the SPV trust root, so a chain can be born anchored.
@@ -5429,5 +5460,205 @@ fn a_refund_by_a_third_party_or_before_the_timeout_is_refused() {
             "by an account that is neither maker nor taker"
         );
         assert_eq!(reserved(ALICE), held, "the held funds stay held");
+    });
+}
+
+// ── GAP-SILENT-FEE-WAIVER: a settlement fee the treasury did not receive is recorded ──
+
+/// Runs the EVM→EVM lifecycle of `settlement_lifecycle_evm_to_evm` to finalization, calling
+/// `before_last_claim` just before the claim that finalizes. Returns the intent id.
+fn finalize_evm_settlement_with(before_last_claim: impl FnOnce(u64)) -> H256 {
+    let (maker, taker) = (ALICE, BOB);
+    let secret = H256::from([43u8; 32]);
+    let secret_hash = H256::from(sp_io::hashing::sha2_256(secret.as_bytes()));
+    let asset = AssetSpec {
+        chain: ExternalChainId::Ethereum,
+        token: TokenId::Native,
+        amount: 1000u128,
+    };
+    assert_ok!(Pallet::<Test>::create_intent(
+        RuntimeOrigin::signed(maker),
+        taker,
+        asset.clone(),
+        asset,
+        secret_hash,
+        Some(3600),
+    ));
+    let intent_id = SettlementIntents::<Test>::iter()
+        .find(|(_, intent)| intent.maker == maker)
+        .map(|(id, _)| id)
+        .expect("intent exists");
+    for (who, leg) in [(taker, 0), (maker, 1)] {
+        assert_ok!(Pallet::<Test>::lock_escrow(
+            RuntimeOrigin::signed(who),
+            intent_id,
+            leg,
+            ExternalChainId::Ethereum,
+            1000u128,
+            vec![],
+        ));
+    }
+    assert_ok!(Pallet::<Test>::submit_proof(
+        RuntimeOrigin::signed(maker),
+        intent_id,
+        ExternalChainId::Ethereum,
+        create_evm_receipt_proof(),
+    ));
+    submit_canonical_claim_proof_set(intent_id);
+    assert_ok!(Pallet::<Test>::claim_settlement(
+        RuntimeOrigin::signed(taker),
+        intent_id,
+        secret,
+    ));
+    before_last_claim(maker);
+    assert_ok!(Pallet::<Test>::claim_settlement(
+        RuntimeOrigin::signed(maker),
+        intent_id,
+        secret,
+    ));
+    assert!(matches!(
+        crate::IntentStates::<Test>::get(intent_id),
+        IntentState::Finalized
+    ));
+    intent_id
+}
+
+#[test]
+fn a_collected_settlement_fee_reaches_the_treasury() {
+    new_test_ext().execute_with(|| {
+        crate::mock::set_settlement_fee_bps(20);
+        let intent_id = finalize_evm_settlement_with(|_| {});
+        // 20 bps of the 2000 settled volume.
+        let fee = 4u128;
+        assert_eq!(
+            pallet_balances::Pallet::<Test>::free_balance(crate::mock::ProtocolTreasury::get()),
+            fee
+        );
+        frame_system::Pallet::<Test>::assert_has_event(RuntimeEvent::from(
+            crate::Event::<Test>::SettlementFeeCollected { intent_id, fee },
+        ));
+    });
+}
+
+#[test]
+fn an_uncollected_settlement_fee_is_recorded_as_waived() {
+    new_test_ext().execute_with(|| {
+        crate::mock::set_settlement_fee_bps(20);
+        // The maker cannot pay: finalization still succeeds, and the lost fee is now on record.
+        let intent_id = finalize_evm_settlement_with(|maker| {
+            use frame_support::traits::Currency;
+            pallet_balances::Pallet::<Test>::make_free_balance_be(&maker, 0);
+        });
+        frame_system::Pallet::<Test>::assert_has_event(RuntimeEvent::from(
+            crate::Event::<Test>::SettlementFeeWaived { intent_id, fee: 4 },
+        ));
+        assert_eq!(
+            pallet_balances::Pallet::<Test>::free_balance(crate::mock::ProtocolTreasury::get()),
+            0
+        );
+    });
+}
+
+/// `count` mined headers above `parent`, marked with `tag` so two branches differ.
+fn mined_branch(parent: &BtcBlockHeader, count: u64, tag: u8) -> Vec<BtcBlockHeader> {
+    let mut out = Vec::new();
+    let mut prev = parent.clone();
+    for i in 1..=count {
+        let header = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::from(btc_wire_hash(&prev)),
+            merkle_root: H256::from([tag; 32]),
+            timestamp: parent.timestamp + (600 * i as u32),
+            bits: parent.bits,
+            nonce: 0,
+            height: parent.height + i,
+        });
+        out.push(header.clone());
+        prev = header;
+    }
+    out
+}
+
+#[test]
+fn only_the_best_branch_counts_and_a_reorg_moves_the_index() {
+    new_test_ext().execute_with(|| {
+        let anchor = batch_anchor();
+        let anchor_hash = Pallet::<Test>::compute_btc_block_hash(&anchor);
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&anchor_hash),
+            Some(anchor.height)
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height)
+        );
+
+        let a = mined_branch(&anchor, 2, 0xa0);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a.clone()
+        ));
+        let a1 = Pallet::<Test>::compute_btc_block_hash(&a[0]);
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&a1),
+            Some(anchor.height + 1)
+        );
+
+        // A taller branch from the anchor takes over: branch A's blocks stop counting, even though
+        // they are admitted and anchored, and the tall branch's tip is the one confirmations are
+        // measured to.
+        let b = mined_branch(&anchor, 3, 0xb0);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            b.clone()
+        ));
+        assert!(
+            crate::BtcHeaderMetaStore::<Test>::get(a1)
+                .expect("still admitted")
+                .anchored
+        );
+        assert_eq!(Pallet::<Test>::btc_best_chain_height(&a1), None);
+        for header in &b {
+            assert_eq!(
+                Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(
+                    header
+                )),
+                Some(header.height)
+            );
+        }
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height + 3)
+        );
+
+        // A shorter extension of the losing branch does not move the tip.
+        let a3 = mined_branch(&a[1], 1, 0xa3);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a3.clone()
+        ));
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(&a3[0])),
+            None
+        );
+
+        // Branch A outgrowing branch B reorganises back, and B's top block is cleared.
+        let a4 = mined_branch(&a3[0], 1, 0xa4);
+        assert_ok!(Pallet::<Test>::submit_btc_headers(
+            RuntimeOrigin::root(),
+            a4.clone()
+        ));
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&a1),
+            Some(anchor.height + 1)
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_height(&Pallet::<Test>::compute_btc_block_hash(&b[2])),
+            None
+        );
+        assert_eq!(
+            Pallet::<Test>::btc_best_chain_tip_height(),
+            Some(anchor.height + 4)
+        );
     });
 }

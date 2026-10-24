@@ -123,6 +123,9 @@ impl Resolver {
                 Item::Agent(agent) => {
                     self.declare_agent(agent);
                 }
+                // Struct names are types; the type checker resolves them.
+                Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
     }
@@ -266,6 +269,8 @@ impl Resolver {
             Item::Const(const_item) => self.resolve_const(const_item),
             Item::ArbProgram(_) => {}
             Item::Agent(agent) => self.resolve_agent(agent),
+            Item::Struct(_) => {}
+            Item::Automation(_) => {}
         }
     }
 
@@ -355,6 +360,8 @@ impl Resolver {
                         agent.span,
                     ));
                 }
+                Item::Struct(_) => {}
+                Item::Automation(_) => {}
             }
         }
 
@@ -602,6 +609,36 @@ impl Resolver {
             Expression::Assign(assign) => self.resolve_assign_expression(assign),
             Expression::FieldAccess(field_access) => self.resolve_field_access(field_access),
             Expression::Range(range) => self.resolve_range_expression(range),
+            Expression::Array(array) => {
+                for element in &array.elements {
+                    self.resolve_expression(element);
+                }
+            }
+            Expression::Tuple(tuple) => {
+                for element in &tuple.elements {
+                    self.resolve_expression(element);
+                }
+            }
+            Expression::Index(index) => {
+                self.resolve_expression(&index.base);
+                self.resolve_expression(&index.index);
+            }
+            Expression::IndexAssign(assign) => {
+                self.resolve_expression(&assign.value);
+                self.resolve_expression(&assign.index);
+                // `a[i] = v` rebinds `a`, so `a` must be a mutable variable, as for `a = v`.
+                self.resolve_assignment_target(&assign.target);
+            }
+            Expression::StructLiteral(literal) => {
+                for field in &literal.fields {
+                    self.resolve_expression(&field.value);
+                }
+            }
+            Expression::FieldAssign(assign) => {
+                self.resolve_expression(&assign.value);
+                // `s.f = v` rebinds `s`, as `a[i] = v` rebinds `a`.
+                self.resolve_assignment_target(&assign.target);
+            }
         }
     }
 
@@ -697,24 +734,27 @@ impl Resolver {
         self.resolve_expression(&assign.value);
 
         // Then resolve the target and check mutability
-        if let Some(symbol_id) = self.scopes.lookup(self.current_scope, &assign.target.name) {
-            self.resolutions.push((assign.target.span, symbol_id));
-            self.symbols.add_reference(symbol_id, assign.target.span);
+        self.resolve_assignment_target(&assign.target);
+    }
+
+    /// Resolve the variable an assignment rebinds, and refuse it if it is not mutable.
+    fn resolve_assignment_target(&mut self, target: &Identifier) {
+        if let Some(symbol_id) = self.scopes.lookup(self.current_scope, &target.name) {
+            self.resolutions.push((target.span, symbol_id));
+            self.symbols.add_reference(symbol_id, target.span);
 
             // Check mutability
             if let Some(symbol) = self.symbols.get(symbol_id) {
                 if !symbol.kind.is_mutable() {
                     self.errors.push(SemanticError::assignment_to_immutable(
-                        &assign.target.name,
-                        assign.target.span,
+                        &target.name,
+                        target.span,
                     ));
                 }
             }
         } else {
-            self.errors.push(SemanticError::undefined_variable(
-                &assign.target.name,
-                assign.target.span,
-            ));
+            self.errors
+                .push(SemanticError::undefined_variable(&target.name, target.span));
         }
     }
 

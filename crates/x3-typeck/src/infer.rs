@@ -272,6 +272,9 @@ impl<'env> TypeInference<'env> {
             // Agent types: must match by name
             (TypeKind::Agent(a1), TypeKind::Agent(a2)) if a1.name == a2.name => Ok(()),
 
+            // Structs are nominal.
+            (TypeKind::Struct(s1), TypeKind::Struct(s2)) if s1.name == s2.name => Ok(()),
+
             // Error type unifies with anything (to allow error recovery)
             (TypeKind::Error, _) | (_, TypeKind::Error) => Ok(()),
 

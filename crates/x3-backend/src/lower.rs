@@ -419,11 +419,16 @@ impl BytecodeCompiler {
                 field,
                 field_ty,
             } => {
-                let obj_reg = self.compile_expr(hir, object)?;
-                let val_reg = self.compile_expr(hir, value)?;
-                // Field index resolution requires type layout from type checker
-                let field_idx = 0u16; // Placeholder
-                self.emitter.emit_store_field(obj_reg, field_idx, val_reg);
+                // The HIR names the field but carries no struct layout, so its index is unknown
+                // here. This emitted index 0 for every field — a write to the wrong field that
+                // compiled cleanly — and now the VM executes `store_field`, that would be real.
+                return Err(BackendError::new(
+                    BackendErrorKind::NotImplemented(format!(
+                        "assignment to field `{field:?}`: the HIR-direct backend has no struct \
+                         layout to resolve its index"
+                    )),
+                    value.span,
+                ));
             }
 
             AssignTarget::Index {
@@ -517,10 +522,14 @@ impl BytecodeCompiler {
             }
 
             HirExprKind::Field { object, field } => {
-                let obj_reg = self.compile_expr(hir, object)?;
-                // Field index resolution requires struct layout from type checker
-                let field_idx = 0u16;
-                self.emitter.emit_load_field(dst, obj_reg, field_idx);
+                // Same reason as the field assignment above: no layout, so no honest index.
+                return Err(BackendError::new(
+                    BackendErrorKind::NotImplemented(format!(
+                        "read of field `{field:?}`: the HIR-direct backend has no struct layout \
+                         to resolve its index"
+                    )),
+                    expr.span,
+                ));
             }
 
             HirExprKind::Index { array, index } => {
@@ -815,13 +824,13 @@ impl BytecodeCompiler {
     /// Evaluate a constant expression to a constant pool index.
     fn eval_const_expr(&mut self, expr: &HirExpr) -> BackendResult<ConstIdx> {
         match &expr.kind {
-            HirExprKind::Literal(lit) => match lit {
-                Literal::Integer(v) => self.emitter.const_pool.add_integer(*v),
-                Literal::Float(v) => self.emitter.const_pool.add_float(*v),
-                Literal::String(s) => self.emitter.const_pool.add_string(s.clone()),
-                Literal::Bool(b) => self.emitter.const_pool.add_bool(*b),
-                Literal::Unit => self.emitter.const_pool.add_integer(0),
-            },
+            HirExprKind::Literal(lit) => Ok(match lit {
+                Literal::Integer(v) => self.emitter.const_pool.add_integer(*v)?,
+                Literal::Float(v) => self.emitter.const_pool.add_float(*v)?,
+                Literal::String(s) => self.emitter.const_pool.add_string(s.clone())?,
+                Literal::Bool(b) => self.emitter.const_pool.add_bool(*b)?,
+                Literal::Unit => self.emitter.const_pool.add_integer(0)?,
+            }),
             _ => Err(BackendError::new(
                 BackendErrorKind::NotImplemented(
                     "non-constant global initializer: only literals are supported".to_string(),

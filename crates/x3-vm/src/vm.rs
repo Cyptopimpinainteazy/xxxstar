@@ -26,19 +26,47 @@
 //! └─────────────────────────────────────────────────┘
 //! ```
 
+use crate::prelude::*;
 use x3_backend::bc_format::{BytecodeModule, ConstValue};
 use x3_backend::opcode::Opcode;
 
+use crate::context::BlockContext;
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::events::{EventBuffer, VmEvent};
 use crate::hostcall::HostcallRegistry;
 use crate::isolation::IsolationContext;
+#[cfg(feature = "std")]
 use crate::jit_compiler::{JitCompiler, JitConfig, JitStats};
 use crate::state::{StateMachine, VmState};
 use crate::storage::{StorageValue, VmStorage, WriteRecord};
 
 /// Maximum register count.
 pub const MAX_REGISTERS: usize = 256;
+
+/// Whether this interpreter has an implementation for `opcode`.
+///
+/// Read from the canonical spec (`x3bc_core::spec`, whose `match` has no wildcard arm, so an
+/// opcode added to the instruction set does not compile until someone decides whether the engine
+/// runs it). The on-chain verifier refuses every opcode this returns `false` for, and
+/// `engine_executes_matches_the_interpreter` (below) checks each answer against what the
+/// interpreter actually does.
+///
+/// `true` means the interpreter has an arm, not that every context may run it: GPU intrinsics,
+/// debug opcodes and floating-point arithmetic are executed off chain and refused on chain by
+/// separate verifier rules, and trading opcodes need a trading section and a seeded session.
+pub const fn engine_executes(opcode: Opcode) -> bool {
+    matches!(
+        x3bc_core::spec::of(opcode).execution,
+        x3bc_core::spec::Execution::Interpreted
+    )
+}
+
+/// Deepest nesting of atomic windows one execution may open.
+///
+/// Each open window holds a copy of the registers and globals, so this bounds the memory a program
+/// can make the engine hold. The figure is the one the runtime interpreter enforced before this
+/// engine replaced it.
+pub const MAX_ATOMIC_DEPTH: usize = 32;
 
 /// Maximum call stack depth.
 pub const MAX_CALL_DEPTH: usize = 64;
@@ -88,12 +116,85 @@ pub enum Value {
     Bytes(Vec<u8>),
     /// Address/pointer.
     Addr(u64),
+    /// Array: an ordered, growable list (`new_array`, `array_push`, `load_index`, ...).
+    Array(Vec<Value>),
+    /// Tuple: a fixed list (`new_tuple`, `tuple_get`). A struct is held as the tuple of its
+    /// fields, addressed by field index (`load_field`, `store_field`).
+    Tuple(Vec<Value>),
     /// Unit (void/null).
     #[default]
     Unit,
 }
 
+/// Most values one aggregate may hold, counting nested elements and the aggregate itself.
+///
+/// Registers, atomic snapshots and `mov` all copy whole values, so an unbounded aggregate is a
+/// memory amplification: `a = [a, a]` doubles in two pushes. The cap bounds what any one register
+/// can hold, and so what a snapshot of 256 registers can cost.
+pub const MAX_AGGREGATE_SIZE: usize = 256;
+
 impl Value {
+    /// How many values this one holds, itself included: 1 for a scalar, 1 plus each element's size
+    /// for an aggregate.
+    pub fn size(&self) -> usize {
+        match self {
+            Value::Array(items) | Value::Tuple(items) => {
+                1 + items.iter().map(Value::size).sum::<usize>()
+            }
+            _ => 1,
+        }
+    }
+
+    /// The bytes a receipt carries for this value when an execution returns it.
+    ///
+    /// A scalar is its own little-endian bytes (an integer, a float's bits, a bool's byte, a byte
+    /// string or a string's UTF-8), unchanged from before aggregates existed. An aggregate is
+    /// self-describing so a reader can walk it without knowing its type: `[ARRAY|TUPLE tag]`,
+    /// a `u16` element count, then each element as `[tag][u32 length][its return bytes]`.
+    pub fn return_bytes(&self) -> Vec<u8> {
+        match self {
+            Value::I64(v) => v.to_le_bytes().to_vec(),
+            Value::F64(v) => v.to_bits().to_le_bytes().to_vec(),
+            Value::Bool(v) => vec![u8::from(*v)],
+            Value::Bytes(v) => v.clone(),
+            Value::String(s) => s.as_bytes().to_vec(),
+            Value::Addr(a) => a.to_le_bytes().to_vec(),
+            Value::Unit => Vec::new(),
+            Value::Array(items) | Value::Tuple(items) => {
+                let kind = if matches!(self, Value::Array(_)) {
+                    x3_common::value_tags::ARRAY
+                } else {
+                    x3_common::value_tags::TUPLE
+                };
+                // `MAX_AGGREGATE_SIZE` keeps the count far below `u16::MAX`.
+                let mut out = vec![kind];
+                out.extend_from_slice(&(items.len() as u16).to_le_bytes());
+                for item in items {
+                    let body = item.return_bytes();
+                    out.push(item.kind_tag());
+                    out.extend_from_slice(&(body.len() as u32).to_le_bytes());
+                    out.extend_from_slice(&body);
+                }
+                out
+            }
+        }
+    }
+
+    fn kind_tag(&self) -> u8 {
+        use x3_common::value_tags as tag;
+        match self {
+            Value::I64(_) => tag::INT,
+            Value::Bool(_) => tag::BOOL,
+            Value::F64(_) => tag::F64,
+            Value::Addr(_) => tag::ADDR,
+            Value::Bytes(_) => tag::BYTES,
+            Value::String(_) => tag::STRING,
+            Value::Array(_) => tag::ARRAY,
+            Value::Tuple(_) => tag::TUPLE,
+            Value::Unit => tag::UNIT,
+        }
+    }
+
     /// Convert constant value to runtime value.
     pub fn from_const(c: &ConstValue) -> Self {
         match c {
@@ -189,6 +290,8 @@ pub struct VM {
     gas_used: u64,
     /// Atomic nesting depth.
     atomic_depth: usize,
+    /// What the host told the engine about this execution (see `context.rs`).
+    context: BlockContext,
     /// Snapshot stack for atomic windows (regs, globals)
     atomic_snapshots: Vec<(Vec<Value>, Vec<Value>)>,
     /// Global storage (module.globals length)
@@ -205,7 +308,12 @@ pub struct VM {
     event_buffer: EventBuffer,
     /// Journaled VM storage.
     storage: VmStorage,
+    /// The trading host, when the module carries a trading section and the caller seeded it
+    /// (`set_trading`). Snapshotted with every atomic window.
+    trading: Option<crate::trading::TradingSession>,
     /// Hot-path tracker and compiled-function cache.
+    // The JIT has no backend outside tests (`backend_available()` is false), and needs std.
+    #[cfg(feature = "std")]
     jit: JitCompiler,
 }
 
@@ -265,6 +373,7 @@ impl VM {
             config,
             gas_used: 0,
             atomic_depth: 0,
+            context: BlockContext::unknown(),
             atomic_snapshots: Vec::new(),
             globals,
             hostcalls: HostcallRegistry::with_standard(),
@@ -273,6 +382,8 @@ impl VM {
             isolation: IsolationContext::new([0u8; 32]).with_max_call_depth(isolation_depth),
             event_buffer: EventBuffer::new(),
             storage,
+            trading: None,
+            #[cfg(feature = "std")]
             jit: JitCompiler::new(JitConfig::default()),
         })
     }
@@ -312,12 +423,44 @@ impl VM {
         events
     }
 
+    /// Tell the engine what the host knows about this execution.
+    ///
+    /// Without a call to this every context opcode refuses with `ContextUnavailable`, and so does
+    /// one whose field is `None` here.
+    pub fn set_context(&mut self, context: BlockContext) {
+        self.context = context;
+    }
+
+    /// The context the engine is executing with.
+    pub fn context(&self) -> &BlockContext {
+        &self.context
+    }
+
+    /// Seed the trading host with the chain's state for this execution.
+    ///
+    /// Refused when the module has no trading section: there is nothing for the state to serve.
+    pub fn set_trading(&mut self, pre: crate::trading::TradingPreState) -> VMResult<()> {
+        let section = self.module.trading.clone().ok_or_else(|| {
+            VMError::without_ip(VMErrorKind::ModuleLoadError(
+                "the module carries no trading section".to_string(),
+            ))
+        })?;
+        self.trading = Some(crate::trading::TradingSession::new(section, pre));
+        Ok(())
+    }
+
+    /// The trading session, after (or during) an execution.
+    pub fn trading(&self) -> Option<&crate::trading::TradingSession> {
+        self.trading.as_ref()
+    }
+
     /// Drain storage writes for cross-VM delta sync.
     pub fn drain_storage_journal(&mut self) -> Vec<WriteRecord> {
         self.storage.drain_journal()
     }
 
     /// Snapshot JIT counters and compilation cache statistics.
+    #[cfg(feature = "std")]
     pub fn jit_stats(&self) -> JitStats {
         self.jit.stats()
     }
@@ -468,6 +611,18 @@ impl VM {
         self.call_function(func_idx, args)
     }
 
+    /// Charge gas an instruction owes beyond its table cost (a cost that depends on its operands),
+    /// with the same rule as the table charge: refused unless the whole amount fits the limit.
+    fn charge_extra_gas(&mut self, ip: usize, amount: u64) -> VMResult<()> {
+        let charged = self
+            .gas_used
+            .checked_add(amount)
+            .filter(|charged| *charged <= self.config.gas_limit)
+            .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+        self.gas_used = charged;
+        Ok(())
+    }
+
     /// Main execution loop.
     fn execute(&mut self) -> VMResult<Option<Value>> {
         loop {
@@ -494,8 +649,15 @@ impl VM {
             let opcode = Opcode::from_byte(opcode_byte)
                 .ok_or_else(|| self.error_at(ip, VMErrorKind::InvalidOpcode(opcode_byte)))?;
 
-            // Consume gas
-            self.gas_used += self.opcode_gas_cost(opcode);
+            // Consume gas. Checked before the instruction runs, so no instruction executes on
+            // gas the caller did not provide: the check above alone let the last instruction run
+            // past the limit by up to its own cost.
+            let charged = self
+                .gas_used
+                .checked_add(self.opcode_gas_cost(opcode))
+                .filter(|charged| *charged <= self.config.gas_limit)
+                .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+            self.gas_used = charged;
             self.instruction_count += 1;
 
             // Trace if enabled
@@ -612,15 +774,18 @@ impl VM {
                     ));
                 }
 
-                let func_id = func_idx as u32;
-                self.jit.record_execution(func_id);
-                if self.jit.should_compile(func_id)
-                    && self.jit.get_compiled(func_id).is_none()
-                    && self.jit.backend_available()
+                #[cfg(feature = "std")]
                 {
-                    self.jit
-                        .compile(func_id, &self.module.code)
-                        .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    let func_id = func_idx as u32;
+                    self.jit.record_execution(func_id);
+                    if self.jit.should_compile(func_id)
+                        && self.jit.get_compiled(func_id).is_none()
+                        && self.jit.backend_available()
+                    {
+                        self.jit
+                            .compile(func_id, &self.module.code)
+                            .map_err(|err| self.error_at(ip, VMErrorKind::HostcallError(err)))?;
+                    }
                 }
 
                 self.isolation.enter_call().map_err(|err| {
@@ -924,6 +1089,19 @@ impl VM {
                 Ok(StepResult::Continue(ip + 4))
             }
 
+            Opcode::ModF => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let a = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let b = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let va = self.regs[a].as_f64()?;
+                let vb = self.regs[b].as_f64()?;
+                // IEEE remainder with the sign of the dividend, like `DivF` producing infinity
+                // rather than an error: `x % 0.0` is NaN. Floats are refused on chain by the
+                // verifier (`deny_float_arithmetic`), so this arm only serves off-chain tools.
+                self.regs[dst] = Value::F64(va % vb);
+                Ok(StepResult::Continue(ip + 4))
+            }
+
             Opcode::NegF => {
                 let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
                 let src = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
@@ -1162,10 +1340,21 @@ impl VM {
             // Atomic Operations
             // ================================================================
             Opcode::AtomicBegin => {
+                // Every open window holds a full copy of the registers and globals, so the nesting
+                // depth bounds the memory a program can make the engine hold on the chain's behalf.
+                // An unbounded `AtomicBegin` in a loop is a memory amplification; refuse it.
+                if self.atomic_depth >= MAX_ATOMIC_DEPTH {
+                    return Err(
+                        self.error_at(ip, VMErrorKind::AtomicDepthExceeded(MAX_ATOMIC_DEPTH))
+                    );
+                }
                 // snapshot regs + globals
                 self.atomic_snapshots
                     .push((self.regs.clone(), self.globals.clone()));
                 self.storage.snapshot();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.savepoint();
+                }
                 self.atomic_depth += 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
             }
@@ -1180,8 +1369,237 @@ impl VM {
                     self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
                 })?;
                 self.event_buffer.commit();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.release();
+                }
                 self.atomic_depth -= 1;
                 Ok(StepResult::Continue(ip + 3)) // opcode + id:u16
+            }
+
+            // ================================================================
+            // Aggregates: arrays, tuples, and structs held as tuples of fields.
+            //
+            // Operand layouts are the emitter's (`x3-backend/src/emit.rs`): field, capacity and
+            // tuple indices are u16. Every write that can grow a value is checked against
+            // `MAX_AGGREGATE_SIZE` before it lands.
+            // ================================================================
+            Opcode::Inc | Opcode::Dec => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let src = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let v = self.regs[src].as_i64()?;
+                // Wrapping, like `AddI`/`SubI`.
+                self.regs[dst] = Value::I64(if opcode == Opcode::Inc {
+                    v.wrapping_add(1)
+                } else {
+                    v.wrapping_sub(1)
+                });
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::NewArray => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let capacity = self.read_u16(ip + 2)? as usize;
+                // The capacity is a hint; the size cap, not it, bounds what the array can hold.
+                self.regs[dst] = Value::Array(Vec::with_capacity(capacity.min(MAX_AGGREGATE_SIZE)));
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::ArrayLen => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let len = match &self.regs[arr] {
+                    Value::Array(items) | Value::Tuple(items) => items.len(),
+                    Value::Bytes(bytes) => bytes.len(),
+                    Value::String(text) => text.len(),
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                self.regs[dst] = Value::I64(len as i64);
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::ArrayPush => {
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let item = self.regs[val].clone();
+                let grown = self.regs[arr].size() + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                match &mut self.regs[arr] {
+                    Value::Array(items) => items.push(item),
+                    other => {
+                        let other = other.clone();
+                        return Err(self.type_mismatch(ip, "array", &other));
+                    }
+                }
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::ArrayPop => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let popped = match &mut self.regs[arr] {
+                    Value::Array(items) => items.pop(),
+                    other => {
+                        let other = other.clone();
+                        return Err(self.type_mismatch(ip, "array", &other));
+                    }
+                };
+                let item = popped.ok_or_else(|| self.error_at(ip, VMErrorKind::EmptyArray))?;
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            Opcode::LoadIndex => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let idx = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let index = self.regs[idx].as_i64()?;
+                let item = match &self.regs[arr] {
+                    Value::Array(items) | Value::Tuple(items) => {
+                        let at = self.checked_index(ip, index, items.len())?;
+                        items[at].clone()
+                    }
+                    Value::Bytes(bytes) => {
+                        let at = self.checked_index(ip, index, bytes.len())?;
+                        Value::I64(i64::from(bytes[at]))
+                    }
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::StoreIndex => {
+                let arr = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let idx = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 3)? as usize, ip)?;
+                let index = self.regs[idx].as_i64()?;
+                let item = self.regs[val].clone();
+                let (at, replaced_size) = match &self.regs[arr] {
+                    Value::Array(items) => {
+                        let at = self.checked_index(ip, index, items.len())?;
+                        (at, items[at].size())
+                    }
+                    // A tuple's shape is fixed by its constructor; its elements change through
+                    // `store_field`, which names them by position at compile time.
+                    other => return Err(self.type_mismatch(ip, "array", other)),
+                };
+                let grown = self.regs[arr].size() - replaced_size + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                if let Value::Array(items) = &mut self.regs[arr] {
+                    items[at] = item;
+                }
+                Ok(StepResult::Continue(ip + 4))
+            }
+
+            Opcode::NewTuple => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let count = self.read_u16(ip + 2)? as usize;
+                let mut items = Vec::with_capacity(count.min(MAX_AGGREGATE_SIZE));
+                let mut size = 1usize;
+                for i in 0..count {
+                    let reg = self.resolve_reg_checked(self.read_u8(ip + 4 + i)? as usize, ip)?;
+                    size += self.regs[reg].size();
+                    self.check_aggregate_size(ip, size)?;
+                    items.push(self.regs[reg].clone());
+                }
+                self.regs[dst] = Value::Tuple(items);
+                Ok(StepResult::Continue(ip + 4 + count))
+            }
+
+            Opcode::TupleGet | Opcode::LoadField => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let obj = self.resolve_reg_checked(self.read_u8(ip + 2)? as usize, ip)?;
+                let field = self.read_u16(ip + 3)?;
+                let item = match &self.regs[obj] {
+                    Value::Tuple(items) => items.get(field as usize).cloned().ok_or_else(|| {
+                        self.error_at(ip, VMErrorKind::TupleIndexOutOfBounds(field, items.len()))
+                    })?,
+                    other => return Err(self.type_mismatch(ip, "tuple", other)),
+                };
+                self.regs[dst] = item;
+                Ok(StepResult::Continue(ip + 5))
+            }
+
+            Opcode::StoreField => {
+                let obj = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let field = self.read_u16(ip + 2)?;
+                let val = self.resolve_reg_checked(self.read_u8(ip + 4)? as usize, ip)?;
+                let item = self.regs[val].clone();
+                let replaced_size = match &self.regs[obj] {
+                    Value::Tuple(items) => {
+                        items.get(field as usize).map(Value::size).ok_or_else(|| {
+                            self.error_at(
+                                ip,
+                                VMErrorKind::TupleIndexOutOfBounds(field, items.len()),
+                            )
+                        })?
+                    }
+                    other => return Err(self.type_mismatch(ip, "tuple", other)),
+                };
+                let grown = self.regs[obj].size() - replaced_size + item.size();
+                self.check_aggregate_size(ip, grown)?;
+                if let Value::Tuple(items) = &mut self.regs[obj] {
+                    items[field as usize] = item;
+                }
+                Ok(StepResult::Continue(ip + 5))
+            }
+
+            // ================================================================
+            // Block context (see `context.rs`): a field the host did not supply is refused,
+            // never answered with a default.
+            // ================================================================
+            Opcode::CtxSender => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let sender = self
+                    .context
+                    .sender
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::ContextUnavailable("sender")))?;
+                self.regs[dst] = Value::Bytes(sender.to_vec());
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxBlockHeight => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let height = self.context.block_height.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("block height"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, height as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxTimestamp => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let millis = self.context.timestamp_ms.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("timestamp"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, millis as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxValue => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let value = self
+                    .context
+                    .value
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::ContextUnavailable("value")))?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, value)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::CtxChainId => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let chain = self.context.chain_id.ok_or_else(|| {
+                    self.error_at(ip, VMErrorKind::ContextUnavailable("chain id"))
+                })?;
+                self.regs[dst] = Value::I64(self.context_i64(ip, chain as u128)?);
+                Ok(StepResult::Continue(ip + 2))
+            }
+
+            Opcode::AtomicCheck => {
+                // `atomic_check dst`: whether an atomic window is open at this instruction.
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                self.regs[dst] = Value::Bool(self.atomic_depth > 0);
+                Ok(StepResult::Continue(ip + 2))
             }
 
             Opcode::AtomicRollback => {
@@ -1197,6 +1615,9 @@ impl VM {
                     self.error_at(ip, VMErrorKind::HostcallError(format!("{err:?}")))
                 })?;
                 self.event_buffer.rollback();
+                if let Some(trading) = self.trading.as_mut() {
+                    trading.rollback();
+                }
                 self.atomic_depth -= 1;
                 Err(self.error_at(ip, VMErrorKind::AtomicAborted))
             }
@@ -1283,6 +1704,12 @@ impl VM {
                     data.push(bytes.len() as u8);
                     data.extend_from_slice(&bytes);
                 }
+                // The payload is priced per byte before it is journaled, so an event the program
+                // cannot pay for is never recorded.
+                let data_gas = (data.len() as u64)
+                    .checked_mul(x3bc_core::spec::EMIT_GAS_PER_DATA_BYTE)
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::GasLimitExceeded))?;
+                self.charge_extra_gas(ip, data_gas)?;
                 let topic = sp_core::hashing::sha2_256(&name);
                 // The emitter is the contract identity, which this engine does not have: an
                 // execution here is a module, not a deployed account. It stays zero rather than
@@ -1505,6 +1932,56 @@ impl VM {
             }
 
             // ================================================================
+            // Trading extension (format 1.1)
+            // ================================================================
+            Opcode::TradeBegin => {
+                self.trade(ip, |session| session.begin())?;
+                Ok(StepResult::Continue(ip + 1))
+            }
+            Opcode::TradeCommit => {
+                self.trade(ip, |session| session.commit())?;
+                Ok(StepResult::Continue(ip + 1))
+            }
+            Opcode::TradeLoadProfit => {
+                let dst = self.resolve_reg_checked(self.read_u8(ip + 1)? as usize, ip)?;
+                let profit = self.trade(ip, |session| session.load_profit())?;
+                self.regs[dst] = Value::I64(profit);
+                Ok(StepResult::Continue(ip + 2))
+            }
+            Opcode::TradeChargeCosts => {
+                let index = self.read_u16(ip + 1)?;
+                // Gas for everything through the end of the function: what has been charged so far
+                // (this instruction included) plus the straight-line tail the verifier guarantees.
+                let tail = self.tail_gas(ip + 3)?;
+                let through_end = self
+                    .gas_used
+                    .checked_add(tail)
+                    .ok_or_else(|| self.error_at(ip, VMErrorKind::IntegerOverflow))?;
+                let limit = self.config.gas_limit;
+                self.trade(ip, |session| {
+                    session.charge_costs(index, through_end, limit)
+                })?;
+                Ok(StepResult::Continue(ip + 3))
+            }
+            Opcode::TradeBorrow
+            | Opcode::TradeSwap
+            | Opcode::TradeRepay
+            | Opcode::TradeAssertProfit
+            | Opcode::TradeAssertDebtsClosed
+            | Opcode::TradeAssertSolvent => {
+                let index = self.read_u16(ip + 1)?;
+                self.trade(ip, |session| match opcode {
+                    Opcode::TradeBorrow => session.borrow(index),
+                    Opcode::TradeSwap => session.swap(index),
+                    Opcode::TradeRepay => session.repay(index),
+                    Opcode::TradeAssertProfit => session.assert_profit(index),
+                    Opcode::TradeAssertDebtsClosed => session.assert_debts_closed(index),
+                    _ => session.assert_solvent(index),
+                })?;
+                Ok(StepResult::Continue(ip + 3))
+            }
+
+            // ================================================================
             // Unimplemented opcodes return error
             // ================================================================
             _ => {
@@ -1512,6 +1989,36 @@ impl VM {
                 Err(self.error_at(ip, VMErrorKind::UnimplementedOpcode(opc)))
             }
         }
+    }
+
+    /// Run one trading step against the session, turning a trap into the error that aborts the
+    /// execution (and with it, through the atomic window, every effect of the trade).
+    fn trade<T>(
+        &mut self,
+        ip: usize,
+        step: impl FnOnce(&mut crate::trading::TradingSession) -> Result<T, x3bc_core::trap::TrapId>,
+    ) -> VMResult<T> {
+        let session = self.trading.as_mut().ok_or_else(|| {
+            VMError::at_ip(
+                ip,
+                VMErrorKind::ModuleLoadError(
+                    "a trading opcode ran with no trading state seeded".to_string(),
+                ),
+            )
+        })?;
+        step(session).map_err(|trap| VMError::at_ip(ip, VMErrorKind::Trade(trap)))
+    }
+
+    /// Static gas of every instruction from `from` to the end of the code.
+    fn tail_gas(&self, from: usize) -> VMResult<u64> {
+        let tail = self.module.code.get(from..).unwrap_or(&[]);
+        let instrs = crate::verifier::Verifier::decode_all_instructions(tail).map_err(|error| {
+            VMError::at_ip(from, VMErrorKind::VerificationFailed(format!("{error}")))
+        })?;
+        instrs.iter().try_fold(0u64, |sum, instr| {
+            sum.checked_add(instr.gas_cost)
+                .ok_or_else(|| VMError::at_ip(from, VMErrorKind::IntegerOverflow))
+        })
     }
 
     // ========================================================================
@@ -1560,38 +2067,37 @@ impl VM {
         VMError::at_ip(ip, kind)
     }
 
-    fn opcode_gas_cost(&self, opcode: Opcode) -> u64 {
-        match opcode {
-            Opcode::Nop => 1,
-            Opcode::Jump | Opcode::JumpIf | Opcode::JumpUnless => 2,
-            Opcode::Call => 10,
-            Opcode::Ret | Opcode::RetVoid => 2,
-            Opcode::Halt => 1,
-            Opcode::LoadConst | Opcode::Mov | Opcode::LoadImm => 1,
-            Opcode::LoadGlobal | Opcode::StoreGlobal => 3,
-            Opcode::AddI | Opcode::SubI | Opcode::MulI => 1,
-            Opcode::DivI | Opcode::ModI => 5,
-            Opcode::AddF | Opcode::SubF | Opcode::MulF | Opcode::DivF => 2,
-            Opcode::EqI | Opcode::NeI | Opcode::LtI | Opcode::LeI | Opcode::GtI | Opcode::GeI => 1,
-            Opcode::And | Opcode::Or | Opcode::Xor | Opcode::Not => 1,
-            Opcode::Shl | Opcode::Shr | Opcode::UShr => 1,
-            Opcode::AtomicBegin | Opcode::AtomicCommit => 5,
-            Opcode::AtomicRollback => 10,
-            // Same figures as the verifier's table (`verifier::opcode_gas_cost`), so
-            // the bound a module is verified against is the bound it is charged.
-            Opcode::EvmSload => 200,
-            Opcode::EvmSstore => 5000,
-            // GPU intrinsics — expensive (real CUDA kernel launch)
-            Opcode::GpuSha256Batch
-            | Opcode::GpuEd25519Verify
-            | Opcode::GpuPohChain
-            | Opcode::GpuKeccak256Batch => 500,
-            Opcode::GpuSecp256k1Verify => 600, // ECC scalar mul is heavier
-            Opcode::GpuSha256Streamed => 750,  // stream pipeline setup overhead
-            Opcode::GpuDeviceCount => 10,      // device query only
-            Opcode::GpuBenchmark => 1000,      // full benchmark run
-            _ => 1,
+    fn type_mismatch(&self, ip: usize, expected: &str, found: &Value) -> VMError {
+        self.error_at(
+            ip,
+            VMErrorKind::TypeMismatch(expected.to_string(), format!("{found:?}")),
+        )
+    }
+
+    /// `index` as a position in a sequence of `len`, refused when negative or past the end.
+    fn checked_index(&self, ip: usize, index: i64, len: usize) -> VMResult<usize> {
+        usize::try_from(index)
+            .ok()
+            .filter(|at| *at < len)
+            .ok_or_else(|| self.error_at(ip, VMErrorKind::ArrayIndexOutOfBounds(index, len)))
+    }
+
+    fn check_aggregate_size(&self, ip: usize, size: usize) -> VMResult<()> {
+        if size > MAX_AGGREGATE_SIZE {
+            return Err(self.error_at(ip, VMErrorKind::AggregateTooLarge(size, MAX_AGGREGATE_SIZE)));
         }
+        Ok(())
+    }
+
+    /// A context figure as the engine's integer, refused rather than wrapped when it does not fit.
+    fn context_i64(&self, ip: usize, figure: u128) -> VMResult<i64> {
+        i64::try_from(figure).map_err(|_| self.error_at(ip, VMErrorKind::IntegerOverflow))
+    }
+
+    /// What one execution of `opcode` costs: the verifier's table, the only one (see
+    /// `verifier::opcode_gas_cost`).
+    fn opcode_gas_cost(&self, opcode: Opcode) -> u64 {
+        crate::verifier::opcode_gas_cost(opcode as u8)
     }
 }
 
@@ -1674,6 +2180,11 @@ fn tagged_value(value: &Value) -> Result<(u8, Vec<u8>), String> {
         // Deleting a slot is not spelled this way, and an event argument that is Unit is a value
         // the program never computed.
         Value::Unit => return Err("unit is not a storable value".to_string()),
+        // A slot is 32 bytes and an event argument is one tagged scalar; an aggregate is neither,
+        // and flattening it would store something the program did not write.
+        Value::Array(_) | Value::Tuple(_) => {
+            return Err("an array or tuple is not a storable value".to_string())
+        }
     };
     if data.len() > u8::MAX as usize {
         return Err(format!(
@@ -1777,7 +2288,9 @@ fn value_to_storage_value(value: &Value) -> Option<[u8; 32]> {
             out[..len].copy_from_slice(&bytes[..len]);
         }
         Value::Addr(value) => out[..8].copy_from_slice(&value.to_le_bytes()),
-        Value::Unit => return None,
+        // An aggregate has no 32-byte form, so a global holding one is not mirrored to storage,
+        // as with Unit; the global itself still holds the whole value.
+        Value::Unit | Value::Array(_) | Value::Tuple(_) => return None,
     }
     Some(out)
 }
@@ -2433,7 +2946,7 @@ mod tests {
             let bytes = storage_module(store_then_load(0), 1, 4);
             let mut vm = VM::from_bytes(&bytes).expect("module should load");
             let result = vm
-                .call_function(0, std::slice::from_ref(&input))
+                .call_function(0, core::slice::from_ref(&input))
                 .unwrap_or_else(|e| panic!("store/load of {input:?} failed: {e:?}"));
             assert_eq!(
                 result.value,
@@ -2689,5 +3202,524 @@ mod tests {
         // default-initialised map would hand back.
         assert_ne!(evm_slot_key(0), evm_slot_key(1));
         assert_ne!(evm_slot_key(0), [0u8; 32]);
+    }
+
+    // ------------------------------------------------------------------------
+    // The engine's own table of what it executes, held to the interpreter
+    // ------------------------------------------------------------------------
+
+    /// Run `instruction` as the first instruction of `main`, padded so an engine that steps past it
+    /// reaches a clean `RetVoid`.
+    fn run_single(instruction: &[u8]) -> VMResult<ExecutionResult> {
+        let mut code = instruction.to_vec();
+        code.extend_from_slice(&[Opcode::Nop as u8; 16]);
+        code.push(Opcode::RetVoid as u8);
+        let bytes = storage_module(code, 0, 16);
+        let mut vm = VM::from_bytes(&bytes).expect("the module loads");
+        // Above the dearest single opcode (32_000): gas is charged before an instruction runs, so a
+        // lower limit would refuse an opcode for its price before the interpreter could say whether
+        // it implements it.
+        vm.config.gas_limit = 100_000;
+        vm.call_function(0, &[])
+    }
+
+    #[test]
+    fn engine_executes_matches_the_interpreter() {
+        let mut wrong = Vec::new();
+        for byte in 0u8..=255 {
+            let Some(opcode) = Opcode::from_byte(byte) else {
+                continue;
+            };
+            // Operand bytes are zero: register r0, index 0, count 0, jump target 0.
+            let mut instruction = vec![byte];
+            instruction.extend_from_slice(&[0u8; 9]);
+            let refused_as_unimplemented = matches!(
+                run_single(&instruction),
+                Err(VMError {
+                    kind: VMErrorKind::UnimplementedOpcode(b),
+                    ..
+                }) if b == byte
+            );
+            if engine_executes(opcode) == refused_as_unimplemented {
+                wrong.push(format!(
+                    "{opcode:?} (0x{byte:02X}): table says {}, interpreter {}",
+                    engine_executes(opcode),
+                    if refused_as_unimplemented {
+                        "refuses it"
+                    } else {
+                        "runs it"
+                    }
+                ));
+            }
+        }
+        assert!(
+            wrong.is_empty(),
+            "table and interpreter disagree:\n  {}",
+            wrong.join("\n  ")
+        );
+    }
+
+    #[test]
+    fn atomic_check_reports_whether_a_window_is_open() {
+        // r1 = atomic_check (outside); begin; r2 = atomic_check (inside); commit; r3 = r1 + 2*r2 ...
+        // Booleans are returned through a branch so the result is one integer.
+        let code = vec![
+            Opcode::AtomicCheck as u8,
+            1, // r1 = false
+            Opcode::AtomicBegin as u8,
+            0,
+            0,
+            Opcode::AtomicCheck as u8,
+            2, // r2 = true
+            Opcode::AtomicCommit as u8,
+            0,
+            0,
+            Opcode::AtomicCheck as u8,
+            3, // r3 = false again
+            Opcode::Ret as u8,
+            2,
+        ];
+        let bytes = storage_module(code.clone(), 0, 16);
+        let mut vm = VM::from_bytes(&bytes).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(true))
+        );
+
+        let mut outside = code;
+        let last = outside.len() - 1;
+        outside[last] = 1; // return r1, read before the window opened
+        let mut vm = VM::from_bytes(&storage_module(outside.clone(), 0, 16)).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(false))
+        );
+        outside[last] = 3; // and r3, read after it closed
+        let mut vm = VM::from_bytes(&storage_module(outside, 0, 16)).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::Bool(false))
+        );
+    }
+
+    #[test]
+    fn the_atomic_window_past_the_depth_cap_is_refused() {
+        let mut code = Vec::new();
+        for _ in 0..=MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicBegin as u8, 0, 0]);
+        }
+        code.push(Opcode::RetVoid as u8);
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        let err = vm.call_function(0, &[]).expect_err("one window too many");
+        assert!(
+            matches!(err.kind, VMErrorKind::AtomicDepthExceeded(MAX_ATOMIC_DEPTH)),
+            "{err:?}"
+        );
+
+        // The control: exactly the cap is allowed.
+        let mut code = Vec::new();
+        for _ in 0..MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicBegin as u8, 0, 0]);
+        }
+        for _ in 0..MAX_ATOMIC_DEPTH {
+            code.extend_from_slice(&[Opcode::AtomicCommit as u8, 0, 0]);
+        }
+        code.push(Opcode::RetVoid as u8);
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        vm.call_function(0, &[]).expect("32 nested windows run");
+    }
+
+    #[test]
+    fn mod_f_is_the_ieee_remainder() {
+        let mut module = x3_backend::bc_format::BytecodeModule::new();
+        let seven_half = module.const_pool.add_float(7.5).unwrap();
+        let two = module.const_pool.add_float(2.0).unwrap();
+        let mut code = vec![Opcode::LoadConst as u8, 1];
+        code.extend_from_slice(&seven_half.0.to_le_bytes());
+        code.extend_from_slice(&[Opcode::LoadConst as u8, 2]);
+        code.extend_from_slice(&two.0.to_le_bytes());
+        code.extend_from_slice(&[Opcode::ModF as u8, 3, 1, 2, Opcode::Ret as u8, 3]);
+        module.functions.push(x3_backend::bc_format::FunctionEntry {
+            name: "main".to_string(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 16,
+            max_stack: 8,
+            return_type_tag: 1,
+        });
+        module.code = code;
+        let mut vm = VM::from_bytes(&module.to_bytes()).expect("loads");
+        assert_eq!(
+            vm.call_function(0, &[]).unwrap().value,
+            Some(Value::F64(1.5))
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // Block context
+    // ------------------------------------------------------------------------
+
+    fn run_with_context(code: Vec<u8>, context: Option<BlockContext>) -> VMResult<ExecutionResult> {
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        if let Some(context) = context {
+            vm.set_context(context);
+        }
+        vm.call_function(0, &[])
+    }
+
+    fn full_context() -> BlockContext {
+        BlockContext {
+            sender: Some([7u8; 32]),
+            block_height: Some(1_234),
+            timestamp_ms: Some(1_760_000_000_000),
+            value: Some(0),
+            chain_id: Some(650_000),
+        }
+    }
+
+    #[test]
+    fn each_context_opcode_reads_its_own_field() {
+        let cases: [(Opcode, Value); 5] = [
+            (Opcode::CtxSender, Value::Bytes(vec![7u8; 32])),
+            (Opcode::CtxBlockHeight, Value::I64(1_234)),
+            (Opcode::CtxTimestamp, Value::I64(1_760_000_000_000)),
+            (Opcode::CtxValue, Value::I64(0)),
+            (Opcode::CtxChainId, Value::I64(650_000)),
+        ];
+        for (opcode, expected) in cases {
+            let code = vec![opcode as u8, 1, Opcode::Ret as u8, 1];
+            let result = run_with_context(code, Some(full_context()))
+                .unwrap_or_else(|e| panic!("{opcode:?}: {e:?}"));
+            assert_eq!(result.value, Some(expected), "{opcode:?}");
+        }
+    }
+
+    #[test]
+    fn a_context_field_the_host_did_not_supply_is_refused_not_answered_as_zero() {
+        for opcode in [
+            Opcode::CtxSender,
+            Opcode::CtxBlockHeight,
+            Opcode::CtxTimestamp,
+            Opcode::CtxValue,
+            Opcode::CtxChainId,
+        ] {
+            let code = vec![opcode as u8, 1, Opcode::Ret as u8, 1];
+            // No context at all.
+            let err = run_with_context(code.clone(), None).expect_err("no context was given");
+            assert!(
+                matches!(err.kind, VMErrorKind::ContextUnavailable(_)),
+                "{opcode:?}: {err:?}"
+            );
+            // A context missing only this field is refused the same way: the others do not leak.
+            let mut partial = full_context();
+            match opcode {
+                Opcode::CtxSender => partial.sender = None,
+                Opcode::CtxBlockHeight => partial.block_height = None,
+                Opcode::CtxTimestamp => partial.timestamp_ms = None,
+                Opcode::CtxValue => partial.value = None,
+                _ => partial.chain_id = None,
+            }
+            let err = run_with_context(code, Some(partial)).expect_err("this field is missing");
+            assert!(
+                matches!(err.kind, VMErrorKind::ContextUnavailable(_)),
+                "{opcode:?}: {err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_value_too_large_for_the_engines_integer_is_refused_not_wrapped() {
+        let mut context = full_context();
+        context.value = Some(u128::from(u64::MAX) + 1);
+        let code = vec![Opcode::CtxValue as u8, 1, Opcode::Ret as u8, 1];
+        let err = run_with_context(code, Some(context)).expect_err("does not fit an i64");
+        assert!(matches!(err.kind, VMErrorKind::IntegerOverflow), "{err:?}");
+    }
+
+    // ------------------------------------------------------------------------
+    // Aggregates
+    // ------------------------------------------------------------------------
+
+    fn run_code(code: Vec<u8>) -> VMResult<ExecutionResult> {
+        let mut vm = VM::from_bytes(&storage_module(code, 0, 16)).expect("loads");
+        vm.call_function(0, &[])
+    }
+
+    fn op(o: Opcode) -> u8 {
+        o as u8
+    }
+
+    #[test]
+    fn an_array_is_built_indexed_written_measured_and_popped() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            4,
+            0, // r1 = []
+            op(Opcode::LoadImm),
+            2,
+            10,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 10
+            op(Opcode::LoadImm),
+            2,
+            20,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 20
+            op(Opcode::LoadImm),
+            2,
+            30,
+            op(Opcode::ArrayPush),
+            1,
+            2, // push 30
+            op(Opcode::LoadImm),
+            3,
+            1,
+            op(Opcode::LoadImm),
+            4,
+            99, //
+            op(Opcode::StoreIndex),
+            1,
+            3,
+            4, // r1[1] = 99
+            op(Opcode::ArrayPop),
+            5,
+            1, // r5 = pop() = 30
+            op(Opcode::ArrayLen),
+            6,
+            1, // r6 = 2
+            op(Opcode::LoadIndex),
+            7,
+            1,
+            3, // r7 = r1[1] = 99
+            op(Opcode::NewTuple),
+            8,
+            3,
+            0,
+            5,
+            6,
+            7, // r8 = (30, 2, 99)
+            op(Opcode::Ret),
+            8,
+        ];
+        let result = run_code(code).expect("runs");
+        assert_eq!(
+            result.value,
+            Some(Value::Tuple(vec![
+                Value::I64(30),
+                Value::I64(2),
+                Value::I64(99)
+            ]))
+        );
+    }
+
+    #[test]
+    fn a_struct_is_a_tuple_whose_fields_are_read_and_written_by_index() {
+        let code = vec![
+            op(Opcode::LoadImm),
+            1,
+            7,
+            op(Opcode::LoadTrue),
+            2, //
+            op(Opcode::NewTuple),
+            3,
+            2,
+            0,
+            1,
+            2, // r3 = (7, true)
+            op(Opcode::LoadImm),
+            4,
+            8, //
+            op(Opcode::StoreField),
+            3,
+            0,
+            0,
+            4, // r3.0 = 8
+            op(Opcode::LoadField),
+            5,
+            3,
+            0,
+            0, // r5 = r3.0
+            op(Opcode::TupleGet),
+            6,
+            3,
+            1,
+            0, // r6 = r3.1
+            op(Opcode::Inc),
+            5,
+            5, // r5 = 9
+            op(Opcode::NewTuple),
+            7,
+            2,
+            0,
+            5,
+            6, //
+            op(Opcode::Ret),
+            7,
+        ];
+        let result = run_code(code).expect("runs");
+        assert_eq!(
+            result.value,
+            Some(Value::Tuple(vec![Value::I64(9), Value::Bool(true)]))
+        );
+    }
+
+    #[test]
+    fn indexing_past_the_end_or_below_zero_is_refused() {
+        for index in [3i8, -1] {
+            let code = vec![
+                op(Opcode::NewArray),
+                1,
+                0,
+                0, //
+                op(Opcode::LoadImm),
+                2,
+                5,
+                op(Opcode::ArrayPush),
+                1,
+                2, //
+                op(Opcode::LoadImm),
+                3,
+                index as u8, //
+                op(Opcode::LoadIndex),
+                4,
+                1,
+                3, //
+                op(Opcode::Ret),
+                4,
+            ];
+            let err = run_code(code).expect_err("out of bounds");
+            assert!(
+                matches!(err.kind, VMErrorKind::ArrayIndexOutOfBounds(i, 1) if i == index as i64),
+                "{err:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn popping_an_empty_array_is_refused() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0,
+            op(Opcode::ArrayPop),
+            2,
+            1,
+            op(Opcode::Ret),
+            2,
+        ];
+        let err = run_code(code).expect_err("nothing to pop");
+        assert!(matches!(err.kind, VMErrorKind::EmptyArray), "{err:?}");
+    }
+
+    #[test]
+    fn a_self_doubling_array_hits_the_size_cap_instead_of_exhausting_memory() {
+        // r1 = [0]; loop { push r1 into a copy of itself } — size doubles each round.
+        let mut code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0, //
+            op(Opcode::LoadImm),
+            2,
+            0,
+            op(Opcode::ArrayPush),
+            1,
+            2, //
+        ];
+        for _ in 0..12 {
+            code.extend_from_slice(&[op(Opcode::Mov), 3, 1, op(Opcode::ArrayPush), 1, 3]);
+        }
+        code.extend_from_slice(&[op(Opcode::RetVoid)]);
+        let err = run_code(code).expect_err("2^12 values would exceed the cap");
+        assert!(
+            matches!(
+                err.kind,
+                VMErrorKind::AggregateTooLarge(_, MAX_AGGREGATE_SIZE)
+            ),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn an_aggregate_cannot_be_stored_in_a_slot() {
+        let code = vec![
+            op(Opcode::NewArray),
+            1,
+            0,
+            0, //
+            op(Opcode::LoadImm),
+            2,
+            0, //
+            op(Opcode::EvmSstore),
+            2,
+            1, //
+            op(Opcode::RetVoid),
+        ];
+        let err = run_code(code).expect_err("a slot holds a scalar");
+        assert!(
+            matches!(err.kind, VMErrorKind::UnencodableStorageValue(_)),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn a_returned_aggregate_is_self_describing() {
+        let value = Value::Tuple(vec![Value::I64(1), Value::Array(vec![Value::Bool(true)])]);
+        let bytes = value.return_bytes();
+        // [TUPLE][count=2]
+        assert_eq!(&bytes[..3], &[x3_common::value_tags::TUPLE, 2, 0]);
+        // element 0: [INT][len=8][1i64]
+        assert_eq!(bytes[3], x3_common::value_tags::INT);
+        assert_eq!(&bytes[4..8], &8u32.to_le_bytes());
+        assert_eq!(&bytes[8..16], &1i64.to_le_bytes());
+        // element 1: [ARRAY][len][ARRAY][count=1][BOOL][len=1][1]
+        assert_eq!(bytes[16], x3_common::value_tags::ARRAY);
+        assert_eq!(&bytes[21..24], &[x3_common::value_tags::ARRAY, 1, 0]);
+        assert_eq!(&bytes[24..], &[x3_common::value_tags::BOOL, 1, 0, 0, 0, 1]);
+        // A scalar's bytes are unchanged from before aggregates existed.
+        assert_eq!(Value::I64(5).return_bytes(), 5i64.to_le_bytes().to_vec());
+    }
+
+    #[test]
+    fn the_interpreter_charges_exactly_the_verifiers_table() {
+        // A straight-line program: the charge must be the sum of the table over what ran.
+        let code = vec![
+            op(Opcode::LoadImm),
+            1,
+            3, // 1
+            op(Opcode::LoadImm),
+            2,
+            4, // 1
+            op(Opcode::MulI),
+            3,
+            1,
+            2, // 3
+            op(Opcode::AtomicBegin),
+            0,
+            0, // 100
+            op(Opcode::AtomicCommit),
+            0,
+            0,               // 100
+            op(Opcode::Nop), // 1
+            op(Opcode::Ret),
+            3, // 2
+        ];
+        let mut vm = VM::from_bytes(&storage_module(code.clone(), 0, 16)).expect("loads");
+        vm.call_function(0, &[]).expect("runs");
+        let instrs = crate::verifier::Verifier::decode_all_instructions(&code).expect("decodes");
+        let expected: u64 = instrs
+            .iter()
+            .map(|i| crate::verifier::opcode_gas_cost(i.opcode))
+            .sum();
+        assert_eq!(expected, 208);
+        assert_eq!(
+            vm.gas_used(),
+            expected,
+            "one table: the verifier's figure is the charge"
+        );
     }
 }

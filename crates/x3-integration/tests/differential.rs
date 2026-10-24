@@ -1,5 +1,10 @@
 //! Differential end-to-end tests for the chain compiler.
 //!
+//! **Since the runtime switched engines:** blocks execute `crates/x3-vm` through
+//! `X3Executor::execute_on_chain` in every build (`tests/chain_engine.rs`). `mini_x3` is no longer
+//! on any chain path; it stays as the reference this file holds the new engine to, until the old
+//! engines are retired. Where the text below says a block runs `mini_x3`, read "used to run".
+//!
 //! One program is compiled at every optimization level and in two function orders (as written,
 //! and with `main` moved to the front), and every build is executed on **both** of the runtime's
 //! engines — `X3Executor` (the std on-chain path) and `mini_x3` (the no-std reader the kernel's
@@ -661,4 +666,87 @@ fn unbounded_recursion_is_a_stack_overflow_at_every_level() {
             "[{level}] x3-vm: {reason}"
         );
     }
+}
+
+// ─── Aggregates ─────────────────────────────────────────────────────────────────────────────────
+//
+// Arrays and tuples run on the chain's engine (`x3-vm`), not on `mini_x3`, which is retired from
+// every chain path; so these builds are executed by `execute_on_chain` only. They are still checked
+// at every optimization level and in both function orders, because array writes inside loops are
+// exactly where a pass that misreads a value's lifetime would miscompile.
+
+const AGGREGATES: &[(&str, &str, i64)] = &[
+    (
+        "array_sum_loop",
+        "fn main() -> i64 {\n    let xs = [3, 5, 8, 13];\n    let mut i = 0;\n    let mut sum = 0;\n    while i < xs.len() {\n        sum = sum + xs[i];\n        i = i + 1;\n    }\n    return sum;\n}\n",
+        29,
+    ),
+    (
+        "array_filled_in_loop_and_passed",
+        "fn total(xs: [i64; 4]) -> i64 {\n    let mut i = 0;\n    let mut s = 0;\n    while i < xs.len() {\n        s = s + xs[i];\n        i = i + 1;\n    }\n    return s;\n}\n\nfn main() -> i64 {\n    let mut a = [0, 0, 0, 0];\n    let mut i = 0;\n    while i < 4 {\n        a[i] = i * i;\n        i = i + 1;\n    }\n    return total(a);\n}\n",
+        14,
+    ),
+    (
+        "value_semantics",
+        "fn main() -> i64 {\n    let mut a = [1, 2, 3];\n    let before = a;\n    a[1] = 20;\n    return a[1] * 100 + before[1];\n}\n",
+        2002,
+    ),
+    (
+        "write_under_a_branch_in_a_loop",
+        "fn main() -> i64 {\n    let mut a = [0, 0, 0, 0, 0];\n    let mut i = 0;\n    while i < 5 {\n        if i % 2 == 0 {\n            a[i] = 10;\n        } else {\n            a[i] = 1;\n        }\n        i = i + 1;\n    }\n    return a[0] + a[1] + a[2] + a[3] + a[4];\n}\n",
+        32,
+    ),
+    (
+        "mutated_array_parameter",
+        "fn bump(xs: [i64; 3]) -> i64 {\n    let mut ys = xs;\n    ys[0] = ys[0] + 100;\n    return ys[0] + xs[0];\n}\n\nfn main() -> i64 {\n    return bump([1, 2, 3]);\n}\n",
+        102,
+    ),
+    (
+        "tuple_positions",
+        "fn main() -> i64 {\n    let t = (7, 9, 4);\n    return t[0] * 100 + t[1] * 10 + t[2];\n}\n",
+        794,
+    ),
+    (
+        "nested_arrays",
+        "fn main() -> i64 {\n    let grid = [[1, 2], [3, 4]];\n    let row = grid[1];\n    return row[0] * 10 + grid[0][1];\n}\n",
+        32,
+    ),
+];
+
+fn run_on_chain(source: &str, options: CompilationOptions, expected: i64) -> Result<(), String> {
+    let output = Compiler::compile(source, options).map_err(|e| format!("compile: {e:?}"))?;
+    let receipt = X3Executor::execute_on_chain(&output.bytecode.to_bytes(), KERNEL_GAS, &[], false)
+        .map_err(|e| format!("execute_on_chain: {e:?}"))?;
+    if !receipt.success {
+        return Err(format!(
+            "failed: {}",
+            String::from_utf8_lossy(&receipt.return_data)
+        ));
+    }
+    if receipt.return_data != expected.to_le_bytes().to_vec() {
+        return Err(format!(
+            "returned {:?}, expected {expected}",
+            receipt.return_data
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn aggregates_compute_what_the_source_states_at_every_level_and_order() {
+    let mut failures = Vec::new();
+    for (name, source, expected) in AGGREGATES {
+        let mut orders = vec![("as-written", source.to_string())];
+        if let Some(reordered) = main_first(source) {
+            orders.push(("main-first", reordered));
+        }
+        for (order, text) in &orders {
+            for (level, options) in levels() {
+                if let Err(why) = run_on_chain(text, options, *expected) {
+                    failures.push(format!("{name} [{level}, {order}]: {why}"));
+                }
+            }
+        }
+    }
+    assert_no_failures(failures);
 }

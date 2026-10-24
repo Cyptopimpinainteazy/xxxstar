@@ -763,6 +763,63 @@ pub mod traits {
         fn is_halted() -> bool;
     }
 
+    /// Value movement on the kernel's `CanonicalLedger` (account, ledger asset id) -> balance.
+    ///
+    /// Implemented by the runtime over `pallet-x3-kernel`, and used by the pallets that custody
+    /// funds on that ledger (`pallet-x3-dex` pools, `pallet-x3-flashloan` asset pools) so a pool's
+    /// reserves are real balances rather than numbers nobody paid in. Amounts and ids are the
+    /// runtime's `u128` balance and `u32` ledger asset id; an implementation must use checked
+    /// arithmetic and fail (never saturate) on an insufficient balance or an overflow.
+    pub trait CanonicalLedgerTransfer<AccountId> {
+        /// Move `amount` of `asset` from `from` to `to`.
+        fn ledger_transfer(
+            asset: u32,
+            from: &AccountId,
+            to: &AccountId,
+            amount: u128,
+        ) -> Result<(), DispatchError>;
+
+        /// `who`'s balance of `asset`.
+        fn ledger_balance(asset: u32, who: &AccountId) -> u128;
+    }
+
+    /// Issues a new asset on the account-level ledger (the kernel's `CanonicalLedger`) and mints
+    /// or burns its balances. A token factory uses it so a launched token has real balances:
+    /// before, a factory token existed only as per-domain totals, and nothing could custody it.
+    pub trait LedgerAssetIssuer<AccountId> {
+        /// Register a new ledger asset and return its id. `Ok(None)` when the runtime keeps no
+        /// account-level ledger for issued tokens (see [`NoLedgerAssets`]).
+        fn issue(symbol: &[u8], decimals: u8) -> Result<Option<u32>, DispatchError>;
+        /// Credit `amount` of `asset` to `who`; checked, never saturating.
+        fn mint(asset: u32, who: &AccountId, amount: u128) -> Result<(), DispatchError>;
+        /// Debit `amount` of `asset` from `who`; refused when `who` holds less.
+        fn burn(asset: u32, who: &AccountId, amount: u128) -> Result<(), DispatchError>;
+    }
+
+    /// No account-level ledger: tokens are issued as per-domain totals only. Mint and burn are
+    /// refused, because there is no ledger asset to move.
+    pub struct NoLedgerAssets;
+
+    impl<AccountId> LedgerAssetIssuer<AccountId> for NoLedgerAssets {
+        fn issue(_symbol: &[u8], _decimals: u8) -> Result<Option<u32>, DispatchError> {
+            Ok(None)
+        }
+        fn mint(_asset: u32, _who: &AccountId, _amount: u128) -> Result<(), DispatchError> {
+            Err(DispatchError::Other("no account-level ledger"))
+        }
+        fn burn(_asset: u32, _who: &AccountId, _amount: u128) -> Result<(), DispatchError> {
+            Err(DispatchError::Other("no account-level ledger"))
+        }
+    }
+
+    /// Benchmark-only funding of ledger balances, so a benchmark can measure a call that moves
+    /// funds. A runtime wires this only under its `runtime-benchmarks` feature; nothing in a
+    /// production build can reach it.
+    pub trait LedgerBenchmarkFunding<AccountId> {
+        /// Credit `amount` of `asset` to `who`.
+        fn fund(asset: u32, who: &AccountId, amount: u128);
+    }
+
     /// Default open gate for pallets/tests that do not wire a halt provider.
     pub struct NoEconomicHalt;
 
@@ -1054,5 +1111,196 @@ mod tests {
         let mut different = base.clone();
         different.nonce = 2;
         assert_ne!(derive_message_id(&different), id1);
+    }
+
+    #[test]
+    fn convert_amount_zero_is_zero_in_both_directions() {
+        assert_eq!(convert_amount(0, 6, 12), Some(0));
+        assert_eq!(convert_amount(0, 18, 0), Some(0));
+    }
+
+    #[test]
+    fn convert_amount_same_scale_is_identity() {
+        assert_eq!(convert_amount(0, 6, 6), Some(0));
+        assert_eq!(convert_amount(u128::MAX, 18, 18), Some(u128::MAX));
+    }
+
+    #[test]
+    fn convert_amount_rejects_upscale_overflow() {
+        // u128::MAX * 10^18 overflows u128, so the amount cannot be scaled.
+        assert_eq!(convert_amount(u128::MAX, 0, 18), None);
+    }
+
+    #[test]
+    fn convert_amount_rejects_scale_difference_that_overflows_u128() {
+        // 10^40 > u128::MAX, so the scale factor itself is unrepresentable.
+        assert_eq!(convert_amount(1, 0, 40), None);
+    }
+
+    #[test]
+    fn convert_amount_round_trips_when_conversion_is_exact() {
+        let up = convert_amount(1_000_000, 6, 18).expect("exact upscale");
+        assert_eq!(up, 1_000_000_000_000_000_000);
+        assert_eq!(convert_amount(up, 18, 6), Some(1_000_000));
+    }
+
+    #[test]
+    fn derive_asset_id_is_length_prefixed_so_fields_cannot_be_smuggled() {
+        // Without the symbol length prefix both preimages would be b"AABB" and
+        // collide. The prefix keeps the address/symbol boundary unambiguous.
+        let a = derive_asset_id(DomainId::Ethereum, 1, b"AA", b"BB", 1);
+        let b = derive_asset_id(DomainId::Ethereum, 1, b"AAB", b"B", 1);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn derive_asset_id_changes_with_decimals() {
+        let six = derive_asset_id(DomainId::Ethereum, 1, b"\x00", b"USDC", 6);
+        let eight = derive_asset_id(DomainId::Ethereum, 1, b"\x00", b"USDC", 8);
+        assert_ne!(six, eight);
+    }
+
+    #[test]
+    fn domain_id_is_x3_internal_only_for_internal_vms() {
+        for d in [DomainId::X3Native, DomainId::X3Evm, DomainId::X3Svm] {
+            assert!(d.is_x3_internal(), "{:?} must be internal", d);
+        }
+        for d in [
+            DomainId::Ethereum,
+            DomainId::Base,
+            DomainId::Arbitrum,
+            DomainId::Bsc,
+            DomainId::Solana,
+            DomainId::Bitcoin,
+        ] {
+            assert!(!d.is_x3_internal(), "{:?} must be external", d);
+        }
+    }
+
+    #[test]
+    fn account_bytes_natural_domain_and_raw_cover_every_variant() {
+        let native = AccountBytes::X3Native([7u8; 32]);
+        assert_eq!(native.natural_domain(), DomainId::X3Native);
+        assert_eq!(native.raw(), vec![7u8; 32]);
+
+        let evm = AccountBytes::Evm([9u8; 20]);
+        assert_eq!(evm.natural_domain(), DomainId::X3Evm);
+        assert_eq!(evm.raw(), vec![9u8; 20]);
+
+        let svm = AccountBytes::Svm([3u8; 32]);
+        assert_eq!(svm.natural_domain(), DomainId::X3Svm);
+        assert_eq!(svm.raw(), vec![3u8; 32]);
+
+        let btc = AccountBytes::Bitcoin(BoundedVec::try_from(vec![0x51u8, 0x52]).unwrap());
+        assert_eq!(btc.natural_domain(), DomainId::Bitcoin);
+        assert_eq!(btc.raw(), vec![0x51u8, 0x52]);
+    }
+
+    #[test]
+    fn account_bytes_compatibility_covers_external_domains_and_mismatches() {
+        let evm = AccountBytes::Evm([0u8; 20]);
+        for d in [
+            DomainId::X3Evm,
+            DomainId::Ethereum,
+            DomainId::Base,
+            DomainId::Arbitrum,
+            DomainId::Bsc,
+        ] {
+            assert!(evm.is_compatible_with(d), "{:?} must accept EVM", d);
+        }
+        for d in [
+            DomainId::X3Native,
+            DomainId::X3Svm,
+            DomainId::Solana,
+            DomainId::Bitcoin,
+        ] {
+            assert!(!evm.is_compatible_with(d), "{:?} must reject EVM", d);
+        }
+
+        let svm = AccountBytes::Svm([0u8; 32]);
+        assert!(svm.is_compatible_with(DomainId::X3Svm));
+        assert!(svm.is_compatible_with(DomainId::Solana));
+        assert!(!svm.is_compatible_with(DomainId::Ethereum));
+
+        let btc = AccountBytes::Bitcoin(BoundedVec::try_from(vec![0x00u8]).unwrap());
+        assert!(btc.is_compatible_with(DomainId::Bitcoin));
+        assert!(!btc.is_compatible_with(DomainId::X3Native));
+    }
+
+    #[test]
+    fn supply_ledger_representation_overflow_is_arithmetic_overflow() {
+        let l = SupplyLedger {
+            native_supply: u128::MAX,
+            evm_supply: 1,
+            svm_supply: 0,
+            external_locked_supply: 0,
+            pending_supply: 0,
+            canonical_supply: u128::MAX,
+        };
+        assert_eq!(l.represented(), None);
+        assert_eq!(l.check_invariant(), Err(InvariantError::ArithmeticOverflow));
+    }
+
+    #[test]
+    fn supply_ledger_accepts_exactly_the_canonical_ceiling() {
+        // Invariant is represented <= canonical, so equality is valid.
+        let l = SupplyLedger {
+            native_supply: 60,
+            evm_supply: 30,
+            svm_supply: 10,
+            external_locked_supply: 0,
+            pending_supply: 0,
+            canonical_supply: 100,
+        };
+        assert_eq!(l.represented(), Some(100));
+        assert_eq!(l.check_invariant(), Ok(()));
+    }
+
+    #[test]
+    fn token_class_capability_matrix() {
+        assert!(!TokenClass::FixedSupply.allows_post_launch_mint());
+        assert!(!TokenClass::FixedSupply.allows_burn());
+        assert!(TokenClass::FixedSupply.is_supported_at_launch());
+
+        assert!(TokenClass::CappedMintable.allows_post_launch_mint());
+        assert!(!TokenClass::CappedMintable.allows_burn());
+
+        assert!(!TokenClass::Burnable.allows_post_launch_mint());
+        assert!(TokenClass::Burnable.allows_burn());
+
+        assert!(TokenClass::GovernanceMintable.allows_post_launch_mint());
+        assert!(!TokenClass::GovernanceMintable.allows_burn());
+
+        assert!(!TokenClass::WrappedExternal.allows_post_launch_mint());
+        assert!(!TokenClass::WrappedExternal.allows_burn());
+        assert!(!TokenClass::WrappedExternal.is_supported_at_launch());
+    }
+
+    #[test]
+    fn x3_transfer_message_scale_round_trip() {
+        let msg = X3TransferMessage::<u32> {
+            version: MESSAGE_FORMAT_VERSION,
+            asset_id: H256::repeat_byte(0x22),
+            source_domain: DomainId::X3Native,
+            destination_domain: DomainId::X3Evm,
+            sender: AccountBytes::X3Native([1u8; 32]),
+            recipient: AccountBytes::Evm([2u8; 20]),
+            amount: 123_456,
+            nonce: 9,
+            created_at: 7,
+            expires_at: 700,
+        };
+        let encoded = msg.encode();
+        let decoded =
+            X3TransferMessage::<u32>::decode(&mut &encoded[..]).expect("round trip decodes");
+        assert_eq!(decoded, msg);
+        assert_eq!(derive_message_id(&decoded), derive_message_id(&msg));
+    }
+
+    #[test]
+    fn route_config_scale_round_trip() {
+        let cfg = RouteConfig::internal(RouteLimits::MAINNET_CONSERVATIVE_INITIAL, 500);
+        let encoded = cfg.encode();
+        assert_eq!(RouteConfig::decode(&mut &encoded[..]).unwrap(), cfg);
     }
 }

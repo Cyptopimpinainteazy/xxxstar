@@ -86,7 +86,7 @@ impl RuleMiner {
         }
 
         // Sort by frequency descending for prioritization
-        rules.sort_by(|a, b| b.frequency.cmp(&a.frequency));
+        rules.sort_by_key(|rule| std::cmp::Reverse(rule.frequency));
         rules
     }
 
