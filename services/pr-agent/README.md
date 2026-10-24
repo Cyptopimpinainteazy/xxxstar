@@ -26,10 +26,13 @@ Two things this measured that changed the wrapper:
 - **PR-Agent's default `ai_timeout` is 120 s, and an 8B here exceeds it.** The first #672 review
   died at exactly 120 s and was retried, wasting a minute. `--local` now passes
   `--config.ai_timeout=600` (`PR_AGENT_LOCAL_TIMEOUT` overrides); the cloud path keeps 120 s.
-- **`extra_instructions` cannot raise local review quality.** The config now demands `path:line`
-  findings and refuses an unqualified all-clear; `qwen3:8b` still answers
-  "No major issues detected" on a diff that deletes a fabricated-liquidity fallback. The
-  instruction is aimed at the DeepSeek path, where a model can follow it.
+- **`extra_instructions` works on small focused diffs, not on real PRs.** On a four-line diff
+  that injects `let fee = 0.5_f64;` into a `u128` money path, the routed local model reported
+  *"Float Usage — use of f64 for a value that should be an exact integer without
+  float-exemption comment"*: the AGENTS.md rule reached the model and it applied it. On the
+  multi-file #671/#672 diffs the same model returned "No major issues detected". So the
+  instruction is worth having, and a clean verdict from an 8B on a large PR is still not
+  evidence of anything.
 
 So `config.model` is `deepseek/deepseek-chat`, and `qwen3:8b` is both the `--local` model and the
 last fallback. `qwen2.5-coder:7b` is no longer used: it cannot produce the review schema at all.
@@ -113,9 +116,10 @@ Two checks, deliberately different:
   [fixtures/usage.json](fixtures/usage.json) so cost formatting is covered without a router. It is
   the `pr-agent wiring` gate: `scripts/local-ci.sh --pr-agent --only pr-agent-wiring`
   (or `make local-ci-pr-agent`).
-- `services/pr-agent/check.sh` — live dependencies: binary, repo config, GitHub token, local model,
-  DeepSeek key. Reports PASS / FAIL / BLOCKED with the reason and exits non-zero only on FAIL.
-  A missing key is BLOCKED, not a green light: it means cloud reviews cannot run.
+- `services/pr-agent/check.sh [cloud|local|router]` — live dependencies: binary, repo config,
+  GitHub token, local model, router, DeepSeek key. Reports PASS / FAIL / INFO per row and exits
+  non-zero only when a dependency the *selected mode* needs has failed; the other providers are
+  INFO. `cloud` is the default, so a bare `check.sh` answers "can a DeepSeek review run".
 
 Run `check.sh` after changing the model or endpoint, and `selftest.sh` after changing the scripts.
 
@@ -137,7 +141,26 @@ the file on the default branch, and it is not pushed yet.
 
 ## Notes
 
-- `PR_AGENT_VENV`, `PR_AGENT_LOCAL_MODEL`, `PR_AGENT_ROUTER_MODEL`, `X3_ROUTER_BASE`,
-  `OLLAMA_BASE` and `DEEPSEEK_BASE` override the defaults.
+- `PR_AGENT_VENV`, `PR_AGENT_LOCAL_MODEL`, `PR_AGENT_LOCAL_TIMEOUT`, `PR_AGENT_ROUTER_MODEL`,
+  `X3_ROUTER_BASE`, `X3_ROUTER_TOKEN`, `OLLAMA_BASE`, `DEEPSEEK_BASE` and `PR_AGENT_MODE`
+  override the defaults.
+
+## Mode isolation
+
+Three things `--local` and `--via-router` must not do, and how each is prevented:
+
+- **Leave the machine.** PR-Agent walks `[model] + fallback_models`, so a `--local` run that
+  failed its first attempt would have called DeepSeek. Both modes now export
+  `CONFIG__FALLBACK_MODELS='[]'`, leaving the model as the only attempt. This cannot be a
+  `--config` override: PR-Agent treats `fallback_models` as host-only and rejects the argument,
+  but dynaconf reads it from the environment and that outranks the repo config.
+- **Bypass the router's accounting.** Same mechanism; the router does its own fallback internally.
+- **Be blocked by the other mode's requirements.** `check.sh` takes a mode (`cloud`, `local`,
+  `router`) and only the provider that mode uses can fail the check — a rejected cloud key does
+  not stop a `--local` run and a missing local model does not stop a cloud review. The workflow
+  derives the mode from its inputs.
+
+Credentials are also direction-safe: the empty `DEEPSEEK_API_KEY=` / `GITHUB_TOKEN=` placeholders
+`install.sh` writes no longer blank values a runner injected into the environment.
 - The local model must be pulled first: `ollama pull qwen3:8b`.
 - PR-Agent is licensed under Apache-2.0 (`pr-agent` 0.48.0).

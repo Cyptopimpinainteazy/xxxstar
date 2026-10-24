@@ -90,12 +90,35 @@ fi
 command_name="${1:-review}"
 [ $# -gt 0 ] && shift
 
-if [ -f "$ENV_FILE" ]; then
+# The secrets file is a fallback, never an override. install.sh writes empty
+# `DEEPSEEK_API_KEY=` / `GITHUB_TOKEN=` placeholders, and a plain `. file` would
+# blank credentials a runner injected into the environment.
+load_env_file() {
+  local file="$1" name
+  [ -f "$file" ] || return 0
+  local -A preset=()
+  while read -r name; do
+    [ -n "${!name:-}" ] && preset["$name"]="${!name}"
+  done < <(sed -nE 's/^([A-Za-z_][A-Za-z0-9_]*)=.*/\1/p' "$file")
   set -a
   # shellcheck disable=SC1090
-  . "$ENV_FILE"
+  . "$file"
   set +a
-fi
+  for name in "${!preset[@]}"; do
+    printf -v "$name" '%s' "${preset[$name]}"
+    export "${name?}"
+  done
+}
+
+router_curl() {
+  if [ -n "${X3_ROUTER_TOKEN:-}" ]; then
+    curl -H "Authorization: Bearer $X3_ROUTER_TOKEN" "$@"
+  else
+    curl "$@"
+  fi
+}
+
+load_env_file "$ENV_FILE"
 
 args=()
 overrides=()
@@ -124,6 +147,13 @@ fi
 
 if [ "$local_model" = 1 ]; then
   overrides+=("--config.model=$LOCAL_MODEL")
+  # PR-Agent builds `[model] + fallback_models` and walks it, so leaving
+  # .pr_agent.toml's DeepSeek fallbacks in place means a --local run that fails
+  # sends the diff to a paid cloud provider. Local means local: no fallback.
+  # This cannot be a --config override: PR-Agent treats fallback_models as
+  # host-only and rejects the argument. dynaconf reads CONFIG__FALLBACK_MODELS
+  # from the environment and that outranks the repo config, so it is set here.
+  export CONFIG__FALLBACK_MODELS='[]'
   # PR-Agent's default ai_timeout is 120 s. An 8B on a reviewed diff regularly
   # needs more: PR #672 timed out at exactly 120 s before the retry answered, so
   # the first attempt was wasted. The cloud path keeps the default.
@@ -131,9 +161,14 @@ if [ "$local_model" = 1 ]; then
 elif [ "$via_router" = 1 ]; then
   # litellm treats an `openai/`-prefixed id as OpenAI-wire, so the router's
   # OpenAI-compatible surface is the transport and its policy name is the model.
+  # No fallback here either: the router falls back internally, and a PR-Agent
+  # fallback would reach the provider directly and escape its accounting.
   export OPENAI_API_BASE="$ROUTER_BASE"
   export OPENAI_API_KEY="${X3_ROUTER_TOKEN:-local-router}"
   overrides+=("--config.model=openai/${model_override:-$ROUTER_MODEL}")
+  # Same reason as --local: a PR-Agent fallback would reach a provider directly
+  # and escape the router's accounting.
+  export CONFIG__FALLBACK_MODELS='[]'
 elif [ -n "$model_override" ]; then
   overrides+=("--config.model=$model_override")
 fi
@@ -143,8 +178,15 @@ if [ "$dry_run" = 1 ]; then
 fi
 
 if [ "$via_router" = 1 ]; then
-  curl -sf -m 5 -o /dev/null "${ROUTER_BASE%/v1}/health" \
-    || die "x3-ai-router is not answering at $ROUTER_BASE; start it with: systemctl --user start x3-ai-router"
+  # 401 here is a real answer, not a missing service: report what came back
+  # rather than claiming the router is down.
+  health="$(router_curl -sS -m 5 -o /dev/null -w '%{http_code}' "${ROUTER_BASE%/v1}/health" 2>/dev/null || true)"
+  case "$health" in
+    200) : ;;
+    401|403) die "x3-ai-router rejected the request at $ROUTER_BASE (HTTP $health); check X3_ROUTER_TOKEN" ;;
+    "") die "x3-ai-router is not answering at $ROUTER_BASE; start it with: systemctl --user start x3-ai-router" ;;
+    *) die "x3-ai-router health returned HTTP $health at $ROUTER_BASE" ;;
+  esac
 fi
 
 # pr-agent only accepts settings overrides after the command name.
