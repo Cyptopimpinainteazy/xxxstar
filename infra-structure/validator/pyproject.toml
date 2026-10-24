@@ -1,8 +1,8 @@
 [project]
 name = "cross-chain-gpu-validator"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cross-chain GPU validator stack for Solana and Ethereum testnets."
-readme = "docs/root/README.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "X3 Chain" }]
@@ -10,10 +10,21 @@ authors = [{ name = "X3 Chain" }]
 dependencies = [
   "redis>=5.0.0",
   "pycryptodome>=3.19.0",
+  "cryptography>=42.0.0",
 ]
 
 [project.scripts]
 ccgv = "cross_chain_gpu_validator.cli:main"
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+  "PyNaCl>=1.5.0",
+  "requests>=2.31.0",
+]
+benchmark = [
+  "aiohttp>=3.9.0",
+]
 
 [tool.black]
 line-length = 88
@@ -23,6 +34,8 @@ profile = "black"
 
 [tool.pytest.ini_options]
 addopts = "-q"
+testpaths = ["tests"]
+norecursedirs = ["tests/inferstructor"]
 
 [tool.mypy]
 python_version = "3.10"

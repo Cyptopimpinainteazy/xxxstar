@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
-from typing import Iterable
+from typing import Iterable, cast
 
-from cross_chain_gpu_validator.gpu import Secp256k1BatchVerifier
-from cross_chain_gpu_validator.chain_adapter import ChainValidator, ChainConfig, ChainTransaction
+from cross_chain_gpu_validator.chain_adapter import (
+    ChainConfig,
+    ChainTransaction,
+    ChainValidator,
+)
+from cross_chain_gpu_validator.gpu import Ed25519BatchVerifier
 
 
 @dataclass(frozen=True)
@@ -18,9 +21,9 @@ class SvmTransaction:
 
 
 class SvmValidator(ChainValidator):
-    """Validates SVM transactions using GPU-accelerated batch verification."""
+    """Validates SVM transactions using Ed25519 batch verification."""
 
-    def __init__(self, config: ChainConfig, sig_verifier: Secp256k1BatchVerifier) -> None:
+    def __init__(self, config: ChainConfig, sig_verifier: Ed25519BatchVerifier) -> None:
         super().__init__(config)
         self._sig_verifier = sig_verifier
 
@@ -29,28 +32,36 @@ class SvmValidator(ChainValidator):
         result = self.validate_transactions([tx])
         return result[0] if result else False
 
-    def validate_transactions(self, transactions: Iterable[ChainTransaction] | Iterable[SvmTransaction]) -> list[bool]:
+    def validate_transactions(
+        self, transactions: Iterable[ChainTransaction] | Iterable[SvmTransaction]
+    ) -> list[bool]:
         """Validate a batch of transactions using GPU acceleration."""
         txs = list(transactions)
         if not txs:
             return []
-        
+
         # Support both ChainTransaction and legacy SvmTransaction
-        if isinstance(txs[0], SvmTransaction):
-            return self._validate_svm_transactions(txs)
-        else:
-            return self._validate_chain_transactions(txs)
+        svm_flags = [isinstance(tx, SvmTransaction) for tx in txs]
+        if all(svm_flags):
+            return self._validate_svm_transactions(cast(list[SvmTransaction], txs))
+        if any(svm_flags):
+            raise ValueError("cannot mix SVM and generic transactions in one batch")
+        return self._validate_chain_transactions(cast(list[ChainTransaction], txs))
 
-    def _validate_svm_transactions(self, transactions: Iterable[SvmTransaction]) -> list[bool]:
+    def _validate_svm_transactions(
+        self, transactions: Iterable[SvmTransaction]
+    ) -> list[bool]:
         """Validate legacy SvmTransaction format."""
-        signatures = [tx.signature for tx in transactions]
-        messages = [hashlib.sha256(tx.payload).digest() for tx in transactions]
-        pubkeys = [tx.pubkey for tx in transactions]
-        return self._sig_verifier.verify_batch(signatures, messages, pubkeys)
+        return self.verify_signed_batch(
+            transactions,
+            self._sig_verifier,
+            lambda payload: payload,
+        )
 
-    def _validate_chain_transactions(self, transactions: Iterable[ChainTransaction]) -> list[bool]:
+    def _validate_chain_transactions(
+        self, transactions: Iterable[ChainTransaction]
+    ) -> list[bool]:
         """Validate generic ChainTransaction format."""
-        signatures = [tx.signature for tx in transactions]
-        messages = [self.prepare_message(tx.payload) for tx in transactions]
-        pubkeys = [tx.pubkey for tx in transactions]
-        return self._sig_verifier.verify_batch(signatures, messages, pubkeys)
+        return self.verify_signed_batch(
+            transactions, self._sig_verifier, lambda payload: payload
+        )

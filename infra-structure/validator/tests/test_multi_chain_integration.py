@@ -3,18 +3,26 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 from cross_chain_gpu_validator.chain_adapter import (
-    ChainValidator,
     ChainConfig,
     ChainTransaction,
-    SignatureAlgorithm,
+    ChainValidator,
     HashAlgorithm,
+    SignatureAlgorithm,
 )
-from cross_chain_gpu_validator.chain_registry import ChainRegistry, load_default_chain_configs
-from cross_chain_gpu_validator.orchestrator import MultiChainOrchestrator, MultiChainSwapPayload
+from cross_chain_gpu_validator.chain_registry import (
+    ChainRegistry,
+    load_default_chain_configs,
+)
+from cross_chain_gpu_validator.cli import _build_chain_registry
 from cross_chain_gpu_validator.metrics import MetricsStore
+from cross_chain_gpu_validator.orchestrator import (
+    MultiChainOrchestrator,
+    MultiChainSwapPayload,
+)
+from cross_chain_gpu_validator.svm import SvmValidator
 
 
 class MockValidator(ChainValidator):
@@ -63,7 +71,28 @@ class TestChainRegistry(unittest.TestCase):
         self.assertGreater(len(configs), 100)  # Should have 100+ chains
         # Just verify some key networks are loaded - exact IDs may vary
         self.assertIn("eth", configs)  # Ethereum mainnet
-        # Solana, Cosmos, Polkadot may have different IDs in registry
+        self.assertEqual(configs["solana"].sig_algorithm, SignatureAlgorithm.ED25519)
+        self.assertEqual(configs["solana"].sig_pubkey_size, 32)
+        self.assertEqual(configs["solana"].sig_signature_size, 64)
+
+    def test_cli_selects_ed25519_for_svm(self):
+        """The CLI must wire ED25519 chains to the Ed25519 verifier."""
+        secp_verifier = Mock()
+        ed25519_verifier = Mock()
+        keccak_hasher = Mock()
+        logger = Mock()
+
+        registry = _build_chain_registry(
+            Mock(),
+            secp_verifier,
+            ed25519_verifier,
+            keccak_hasher,
+            logger,
+        )
+
+        solana = registry.get_validator("solana")
+        self.assertIsInstance(solana, SvmValidator)
+        self.assertIs(solana._sig_verifier, ed25519_verifier)
 
     def test_validate_enabled_chains(self):
         """Test checking if chains are registered."""
@@ -82,7 +111,9 @@ class TestChainRegistry(unittest.TestCase):
         registry.register_chain(config, validator)
 
         self.assertTrue(registry.validate_enabled_chains(["test-chain"]))
-        self.assertFalse(registry.validate_enabled_chains(["test-chain", "missing-chain"]))
+        self.assertFalse(
+            registry.validate_enabled_chains(["test-chain", "missing-chain"])
+        )
 
     def test_duplicate_registration_fails(self):
         """Test that duplicate chain registration fails."""
@@ -110,7 +141,7 @@ class TestMultiChainOrchestrator(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.registry = ChainRegistry()
-        
+
         # Register test chains
         for chain_id in ["chain-a", "chain-b", "chain-c"]:
             config = ChainConfig(
@@ -128,7 +159,7 @@ class TestMultiChainOrchestrator(unittest.TestCase):
 
         self.atomic_registry = Mock()
         self.atomic_registry.pending_swaps.return_value = []
-        
+
         self.metrics = MetricsStore()
         self.orchestrator = MultiChainOrchestrator(
             self.atomic_registry,
@@ -324,7 +355,7 @@ class TestChainAdapterInterface(unittest.TestCase):
         # Look for cosmos chain - may have different ID
         cosmos_id = None
         for chain_id in configs:
-            if 'cosmos' in chain_id.lower() or 'atom' in chain_id.lower():
+            if "cosmos" in chain_id.lower() or "atom" in chain_id.lower():
                 cosmos_id = chain_id
                 break
         if cosmos_id:
@@ -337,14 +368,8 @@ class TestChainAdapterInterface(unittest.TestCase):
     def test_substrate_signature_algorithm(self):
         """Test Substrate chain uses correct signature algorithm."""
         configs = load_default_chain_configs()
-        # Look for polkadot in the registry
-        polka_id = None
-        for chain_id in configs:
-            if 'polka' in chain_id.lower() or 'dot' in chain_id.lower():
-                polka_id = chain_id
-                break
-        if polka_id:
-            substrate_config = configs[polka_id]
+        if "polkadot" in configs:
+            substrate_config = configs["polkadot"]
             self.assertEqual(substrate_config.sig_algorithm, SignatureAlgorithm.ED25519)
             self.assertEqual(substrate_config.hash_algorithm, HashAlgorithm.SHA256)
         else:
