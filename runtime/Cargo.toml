@@ -197,9 +197,13 @@ x3-packet-schema = { path = "../crates/x3-packet-schema" }
 default = ["std"]
 dev = ["pallet-sudo"]
 
-# Testnet feature: enables NoOpCrossChainValidator (accepts all proofs),
-# ExternalBridgesEnabled=true in genesis, and other testnet-only config.
-# Use `--features testnet` to build the bridge-enabled testnet runtime WASM.
+# Testnet marker. Forwards nothing: no pallet feature, no genesis change, and
+# `grep -rn 'feature = "testnet"' runtime/src/` finds no cfg site. The runtime does
+# not wire `NoOpCrossChainValidator` (it appears only in
+# `pallets/x3-settlement-engine/src/bridge_tests.rs`), and no genesis field sets
+# `ExternalBridgesEnabled` — the router pallet declares no `#[pallet::genesis_config]`
+# at all, so that storage is `false` on every surface until governance calls
+# `set_external_bridges_enabled`. Kept declared because `node/Cargo.toml` forwards it.
 testnet = []
 
 # Narrow pallet set for first public testnet / mainnet-rc1 release.
@@ -207,7 +211,31 @@ testnet = []
 # swarm, evolution, compute market, automation, oracle, VRF, DA, sequencer,
 # DePIN marketplace, private execution).
 # Use `--features mainnet-rc1` to build the RC1 runtime WASM.
-mainnet-rc1 = []
+#
+# The router pallet carries the mainnet scope lock: its `mainnet-rc1` feature is a
+# pure guard token whose only effect is to arm six `compile_error!` scope-violation
+# checks (external-gateway, parallel-executor, appzone-factory, pq-experimental,
+# advanced-dex, ai-optimizer, gpu-acceleration). Forwarding it is what makes those
+# guards live. Without this line a `mainnet-v1` runtime activated the external
+# gateway while every scope guard stayed disarmed — verified with
+# `cargo tree -e features -i pallet-x3-cross-vm-router`, which resolved the pallet to
+# `external-gateway, serde, std` and nothing else.
+mainnet-rc1 = ["pallet-x3-cross-vm-router/mainnet-rc1"]
+# The only runtime surface permitted to back a public mainnet artifact. It
+# retains the narrowed RC-1 runtime, activates the audited external gateway
+# path, and requires the native real-VM adapters. Testnet/NoOp verification and
+# experimental consensus acceleration are intentionally absent.
+#
+# `pallet-x3-cross-vm-router/mainnet-v1` is the pallet's explicit exception to the
+# scope lock: it permits `mainnet-rc1` and `external-gateway` together. Forwarding
+# both it and `mainnet-rc1` is what keeps the other six guards armed while this one
+# is satisfied.
+mainnet-v1 = [
+    "mainnet-rc1",
+    "external-gateway",
+    "native-real-vm-adapters",
+    "pallet-x3-cross-vm-router/mainnet-v1",
+]
 # Reserved for an audited PQC backend. The runtime fails closed while the
 # in-tree research implementation remains in use.
 pq = ["quantum-crypto"]
@@ -413,6 +441,7 @@ native-real-vm-adapters = []
 # Bridge support features
 evm-bridge = []
 solana-integration = []
+external-gateway = ["pallet-x3-cross-vm-router/external-gateway"]
 
 # Real Frontier EVM execution path (post-RC1; OFF by default).
 # Enabling this pulls pallet-evm/pallet-ethereum/precompiles/fp-evm into the

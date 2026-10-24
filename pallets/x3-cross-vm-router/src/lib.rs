@@ -76,7 +76,11 @@ compile_error!(
      `mainnet-rc1` is enabled. It is feature-gated for post-RC-1 audit."
 );
 
-#[cfg(all(feature = "mainnet-rc1", feature = "external-gateway"))]
+#[cfg(all(
+    feature = "mainnet-rc1",
+    feature = "external-gateway",
+    not(feature = "mainnet-v1")
+))]
 compile_error!(
     "MAINNET SCOPE VIOLATION: `external-gateway` must not be active when \
      `mainnet-rc1` is enabled. External bridge gateway is gated for post-RC-1 audit."
@@ -422,9 +426,8 @@ pub mod pallet {
         /// foreign chain, and the body used to accept **any non-empty byte string** while
         /// calling it "proof against chain consensus" — a data-shape check in the same class as
         /// the settlement verifier's, which was fixed the same way. A runtime that has not wired
-        /// a verifier must therefore refuse to register a root: `RefuseExternalRoots` is that
-        /// implementation, and it is what this runtime wires until a per-chain verifier (SPV /
-        /// light client) exists. Returning `Ok(())` from a verifier is a claim that the proof
+        /// a verifier must therefore bind the root before registration. Returning `Ok(())`
+        /// from a verifier is a claim that the proof
         /// binds the root to the chain's consensus, not merely that it is well-formed.
         type ExternalRootVerifier: crate::ExternalRootVerifier<Self>;
 
@@ -578,9 +581,9 @@ pub mod pallet {
         /// No verifier can bind an external chain's root to that chain's consensus.
         ///
         /// Distinct from `InvalidProof`: this is not "the proof was bad" but "nothing here can
-        /// check a proof at all", and it is what `Config::ExternalRootVerifier` returns when the
-        /// runtime has wired `RefuseExternalRoots` (the state of this runtime until an external
-        /// light client exists).
+        /// check a proof at all". `RefuseExternalRoots` returns it for test or incomplete
+        /// runtimes; the production runtime instead binds EVM/SVM roots to attested headers
+        /// and Bitcoin roots to admitted best-chain headers.
         ExternalRootVerificationUnavailable,
         /// Root hash mismatch
         RootHashMismatch,
@@ -797,19 +800,17 @@ pub mod pallet {
             // a verifier, in the same class as the settlement verifier's fabricated acceptance,
             // and worse in consequence: the value it accepted is written to `BridgeRoots` and
             // read by everything downstream as *the* state of that chain. The check is now a
-            // call to a configured verifier, and the runtime wires one that refuses, so a root
-            // cannot be established at all until a real per-chain verifier exists.
+            // call to a configured verifier. The production runtime binds EVM/SVM roots to its
+            // attested headers and Bitcoin roots to its admitted best chain.
             T::ExternalRootVerifier::verify_root(chain_id, root_hash, block_number, &proof)?;
 
-            // P5: Verify block_number is reasonable (not too far in future)
+            // P5: Store the verifier-bound root. The external block height is
+            // deliberately not compared to this chain's block number: Ethereum,
+            // Solana, and Bitcoin have unrelated height domains.
             let current_block = frame_system::Pallet::<T>::block_number();
-            let block_number_t: BlockNumberFor<T> = block_number.saturated_into();
-            ensure!(block_number_t <= current_block, Error::<T>::InvalidProof);
-
-            // P6: Store root in bridge state
             BridgeRoots::<T>::insert(chain_id, (root_hash, block_number, current_block));
 
-            // P7: Emit RootRegistered event with context
+            // P6: Emit RootRegistered event with context
             Self::deposit_event(Event::BridgeRootRegistered {
                 chain_id,
                 root_hash,
@@ -991,6 +992,23 @@ pub mod pallet {
                     source.is_x3_internal() && destination.is_x3_internal(),
                     Error::<T>::NonInternalRouteNotSupported
                 );
+
+                // Runtime scope gate for an external leg. `external-gateway`
+                // compiles the capability in; this is the switch that opens it, and
+                // it is the same one that gates `register_external_root` and
+                // `emergency_pause_bridge`. Without this, a build could initiate a
+                // transfer it had no switch to pause, and `ExternalBridgeAuditGate`
+                // — documented as "set to true only after documented bridge audit
+                // completion" — would gate nothing a user can reach.
+                //
+                // Unreachable with `external-gateway` off: the ensure above has
+                // already rejected the non-internal leg.
+                if !(source.is_x3_internal() && destination.is_x3_internal()) {
+                    ensure!(
+                        ExternalBridgesEnabled::<T>::get(),
+                        Error::<T>::ExternalBridgesDisabled
+                    );
+                }
 
                 // Recipient/sender typing.
                 ensure!(
