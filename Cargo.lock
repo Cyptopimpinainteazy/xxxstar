@@ -11664,6 +11664,7 @@ dependencies = [
 name = "pallet-cross-chain-validator"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek 2.2.0",
  "frame-benchmarking",
  "frame-support",
  "frame-system",

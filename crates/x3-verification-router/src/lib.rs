@@ -24,6 +24,7 @@ pub mod bitcoin_spv;
 pub mod evm_receipt;
 pub mod external_root;
 pub mod gateway_types;
+pub mod header_finality;
 
 pub use evm_receipt::{
     deposit_locked_selector, withdrawal_released_selector, ProductionEvmReceiptVerifier,

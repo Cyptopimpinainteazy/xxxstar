@@ -3122,7 +3122,7 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
 
         let result = match chain_id {
             EXTERNAL_ROOT_ETHEREUM => {
-                let header = pallet_cross_chain_validator::LastEvmHeader::<Runtime>::get()
+                let header = pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::get()
                     .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
                 verify_evm_root(
                     block_number as u64,
@@ -3137,7 +3137,7 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
                 )
             }
             EXTERNAL_ROOT_SOLANA => {
-                let header = pallet_cross_chain_validator::LastSvmHeader::<Runtime>::get()
+                let header = pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::get()
                     .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
                 verify_svm_root(
                     block_number as u64,

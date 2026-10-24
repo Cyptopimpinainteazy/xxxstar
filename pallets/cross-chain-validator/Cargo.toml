@@ -19,6 +19,7 @@ frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", defau
 x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false }
 
 [dev-dependencies]
+ed25519-dalek = { workspace = true, features = ["std"] }
 
 [features]
 default = ["std"]

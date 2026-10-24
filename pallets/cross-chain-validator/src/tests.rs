@@ -1,6 +1,6 @@
 use crate::mock::*;
 use crate::LastEvmHeader;
-use frame_support::{assert_err, assert_ok};
+use frame_support::{assert_err, assert_noop, assert_ok};
 use sp_core::H256;
 use sp_runtime::BuildStorage;
 
@@ -320,6 +320,247 @@ fn test_c01_fail_closed_when_no_authorized_submitters() {
     });
 }
 
+fn finality_key(seed: u8) -> ed25519_dalek::SigningKey {
+    ed25519_dalek::SigningKey::from_bytes(&[seed; 32])
+}
+
+fn finality_certificate(
+    chain: u8,
+    height: u64,
+    block_hash: H256,
+    state_root: H256,
+    auxiliary_root: H256,
+    keys: &[ed25519_dalek::SigningKey],
+) -> Vec<u8> {
+    use ed25519_dalek::Signer;
+    use x3_verification_router::header_finality::{
+        encode_header_certificate, header_finality_message, FinalizedHeader,
+    };
+
+    let header = FinalizedHeader {
+        chain,
+        height,
+        block_hash: block_hash.0,
+        state_root: state_root.0,
+        auxiliary_root: auxiliary_root.0,
+    };
+    let message = header_finality_message(&header);
+    let attestations = keys
+        .iter()
+        .map(|key| {
+            (
+                key.verifying_key().to_bytes(),
+                key.sign(&message).to_bytes(),
+            )
+        })
+        .collect::<Vec<_>>();
+    encode_header_certificate(header, &attestations)
+}
+
+#[test]
+fn finalized_evm_and_svm_headers_require_distinct_attester_quorum() {
+    new_test_ext().execute_with(|| {
+        use x3_verification_router::header_finality::{
+            HEADER_FINALITY_ETHEREUM, HEADER_FINALITY_SOLANA,
+        };
+
+        let evm_keys = [finality_key(1), finality_key(2), finality_key(3)];
+        let svm_keys = [finality_key(4), finality_key(5), finality_key(6)];
+        assert_ok!(crate::Pallet::<MockRuntime>::set_header_attesters(
+            RuntimeOrigin::root(),
+            evm_keys
+                .iter()
+                .map(|key| key.verifying_key().to_bytes())
+                .collect(),
+            2,
+            svm_keys
+                .iter()
+                .map(|key| key.verifying_key().to_bytes())
+                .collect(),
+            2,
+        ));
+
+        let evm_block = H256::repeat_byte(0x11);
+        let evm_state = H256::repeat_byte(0x22);
+        let evm_receipts = H256::repeat_byte(0x33);
+        let evm_cert = finality_certificate(
+            HEADER_FINALITY_ETHEREUM,
+            42,
+            evm_block,
+            evm_state,
+            evm_receipts,
+            &evm_keys[..2],
+        );
+        assert_ok!(crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+            RuntimeOrigin::signed(99),
+            42,
+            evm_block,
+            evm_state,
+            evm_receipts,
+            evm_cert,
+        ));
+        assert_eq!(
+            crate::LastFinalizedEvmHeader::<MockRuntime>::get().map(|header| (
+                header.block_number,
+                header.block_hash,
+                header.state_root
+            )),
+            Some((42, evm_block, evm_state))
+        );
+        assert_eq!(
+            crate::EvmMerkleRoots::<MockRuntime>::get(42),
+            Some(evm_receipts)
+        );
+
+        let svm_block = H256::repeat_byte(0x44);
+        let svm_state = H256::repeat_byte(0x55);
+        let svm_validators = H256::repeat_byte(0x66);
+        let svm_cert = finality_certificate(
+            HEADER_FINALITY_SOLANA,
+            7,
+            svm_block,
+            svm_state,
+            svm_validators,
+            &svm_keys[..1],
+        );
+        assert_noop!(
+            crate::Pallet::<MockRuntime>::validate_finalized_svm_header(
+                RuntimeOrigin::signed(99),
+                7,
+                svm_block,
+                svm_state,
+                svm_validators,
+                svm_cert,
+            ),
+            crate::Error::<MockRuntime>::InvalidHeaderCertificate
+        );
+        assert!(!crate::LastFinalizedSvmHeader::<MockRuntime>::exists());
+
+        let svm_cert = finality_certificate(
+            HEADER_FINALITY_SOLANA,
+            7,
+            svm_block,
+            svm_state,
+            svm_validators,
+            &svm_keys[..2],
+        );
+        assert_ok!(crate::Pallet::<MockRuntime>::validate_finalized_svm_header(
+            RuntimeOrigin::signed(99),
+            7,
+            svm_block,
+            svm_state,
+            svm_validators,
+            svm_cert,
+        ));
+        assert_eq!(
+            crate::LastFinalizedSvmHeader::<MockRuntime>::get().map(|header| (
+                header.slot,
+                header.block_hash,
+                header.state_root
+            )),
+            Some((7, svm_block, svm_state))
+        );
+        assert_eq!(
+            crate::SvmValidatorSets::<MockRuntime>::get(7),
+            Some(svm_validators)
+        );
+    });
+}
+
+#[test]
+fn governance_can_revoke_header_attesters_and_the_path_fails_closed() {
+    new_test_ext().execute_with(|| {
+        use x3_verification_router::header_finality::{
+            HEADER_FINALITY_ETHEREUM, MAX_HEADER_CERTIFICATE_BYTES,
+        };
+
+        let keys = [finality_key(1), finality_key(2)];
+        assert_ok!(crate::Pallet::<MockRuntime>::set_header_attesters(
+            RuntimeOrigin::root(),
+            keys.iter()
+                .map(|key| key.verifying_key().to_bytes())
+                .collect(),
+            1,
+            Vec::new(),
+            0,
+        ));
+
+        let block_hash = H256::repeat_byte(0x11);
+        let state_root = H256::repeat_byte(0x22);
+        let receipts_root = H256::repeat_byte(0x33);
+        let certificate = finality_certificate(
+            HEADER_FINALITY_ETHEREUM,
+            42,
+            block_hash,
+            state_root,
+            receipts_root,
+            &keys[..1],
+        );
+        assert_ok!(crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+            RuntimeOrigin::signed(99),
+            42,
+            block_hash,
+            state_root,
+            receipts_root,
+            certificate.clone(),
+        ));
+
+        assert_ok!(crate::Pallet::<MockRuntime>::set_header_attesters(
+            RuntimeOrigin::root(),
+            Vec::new(),
+            0,
+            Vec::new(),
+            0,
+        ));
+        assert_noop!(
+            crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+                RuntimeOrigin::signed(99),
+                43,
+                H256::repeat_byte(0x44),
+                H256::repeat_byte(0x55),
+                H256::repeat_byte(0x66),
+                certificate,
+            ),
+            crate::Error::<MockRuntime>::InvalidHeaderCertificate
+        );
+        assert_eq!(
+            crate::LastFinalizedEvmHeader::<MockRuntime>::get().map(|header| header.block_number),
+            Some(42)
+        );
+
+        assert_noop!(
+            crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+                RuntimeOrigin::signed(99),
+                43,
+                H256::repeat_byte(0x44),
+                H256::repeat_byte(0x55),
+                H256::repeat_byte(0x66),
+                vec![0u8; MAX_HEADER_CERTIFICATE_BYTES + 1],
+            ),
+            crate::Error::<MockRuntime>::PayloadTooLarge
+        );
+    });
+}
+
+#[test]
+fn duplicate_attesters_are_rejected_without_overwriting_the_previous_set() {
+    new_test_ext().execute_with(|| {
+        let key = finality_key(1).verifying_key().to_bytes();
+        assert_noop!(
+            crate::Pallet::<MockRuntime>::set_header_attesters(
+                RuntimeOrigin::root(),
+                vec![key, key],
+                1,
+                vec![finality_key(2).verifying_key().to_bytes()],
+                1,
+            ),
+            crate::Error::<MockRuntime>::InvalidAttesterSet
+        );
+        assert!(crate::EvmHeaderAttesters::<MockRuntime>::get().is_empty());
+        assert!(crate::SvmHeaderAttesters::<MockRuntime>::get().is_empty());
+    });
+}
+
 /// (b) Arbitrary one-byte "junk" proof is rejected (not a multiple of 32) by an
 /// otherwise authorized submitter, with no write.
 #[test]
@@ -496,19 +737,20 @@ fn the_anchor_reports_the_attested_root_and_head() {
     use x3_verification_router::evm_receipt::EvmHeaderAnchor;
 
     new_test_ext().execute_with(|| {
-        enroll(1);
         let block_number = 100u64;
         let block_hash = H256::from([1u8; 32]);
         let state_root = H256::from([2u8; 32]);
         let merkle_root = H256::from([4u8; 32]);
-        assert_ok!(crate::Pallet::<MockRuntime>::validate_evm_header(
-            RuntimeOrigin::signed(1),
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(crate::EvmHeaderInfo {
             block_number,
             block_hash,
             state_root,
             merkle_root,
-            evm_leaf(4),
-        ));
+            validator_set_hash: H256::from([3u8; 32]),
+            verified_at_block: 1,
+            validation_proof: Vec::new(),
+        });
+        crate::EvmMerkleRoots::<MockRuntime>::insert(block_number, merkle_root);
 
         let anchored = crate::Pallet::<MockRuntime>::anchored_header(block_number)
             .expect("an attested height answers with its header");
@@ -536,15 +778,18 @@ fn an_unattested_height_is_never_anchored_even_when_a_later_one_exists() {
     use x3_verification_router::evm_receipt::EvmHeaderAnchor;
 
     new_test_ext().execute_with(|| {
-        enroll(1);
-        assert_ok!(crate::Pallet::<MockRuntime>::validate_evm_header(
-            RuntimeOrigin::signed(1),
-            200,
-            H256::from([9u8; 32]),
-            H256::from([8u8; 32]),
-            H256::from([7u8; 32]),
-            evm_leaf(7),
-        ));
+        let block_number = 200u64;
+        let merkle_root = H256::from([7u8; 32]);
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(crate::EvmHeaderInfo {
+            block_number,
+            block_hash: H256::from([9u8; 32]),
+            state_root: H256::from([8u8; 32]),
+            merkle_root,
+            validator_set_hash: H256::from([6u8; 32]),
+            verified_at_block: 1,
+            validation_proof: Vec::new(),
+        });
+        crate::EvmMerkleRoots::<MockRuntime>::insert(block_number, merkle_root);
 
         assert_eq!(
             crate::Pallet::<MockRuntime>::attested_head(),

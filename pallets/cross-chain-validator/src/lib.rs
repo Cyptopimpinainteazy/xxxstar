@@ -2,25 +2,26 @@
 
 //! # Cross-Chain Validator Pallet
 //!
-//! Stores finalized EVM/SVM header attestations that the settlement engine relies on.
+//! Stores external EVM/SVM header attestations and finalized headers that the
+//! settlement engine relies on.
 //!
-//! **Security model (post C01 remediation):**
+//! **Security models:**
 //!
-//! This pallet is an **authorized-relayer header store**, not an on-chain light
-//! client. Authenticity of a stored header rests on the originating account being a
-//! member of the pallet's storage-backed `AuthorizedSubmitters` set, and that set is
-//! only mutable by a governance `AdminOrigin`. Arbitrary signed accounts are rejected
-//! *before* any storage write.
+//! The legacy `LastEvmHeader` / `LastSvmHeader` path is an **authorized-relayer
+//! header store**, not an on-chain light client. Authenticity rests on the
+//! originating account being a member of `AuthorizedSubmitters`.
 //!
-//! We deliberately **no longer fabricate** a consensus/quorum proof from caller
-//! supplied byte length (the old `proof.len()/32` and `validator_set.len()/32`
-//! laundering). A BFT quorum over a real external validator set requires a trusted
-//! snapshot/finality oracle that this pallet does not have; pretending otherwise was
-//! audit finding C01. When the `AuthorizedSubmitters` set is empty the submit path is
-//! **fail-closed** (nothing can be accepted). A full authenticated finalized-header
-//! client (per-chain light client / finality oracle that cryptographically binds
-//! headers to the external EVM/SVM chains) is out of scope here and is tracked as
-//! residual risk.
+//! The `LastFinalizedEvmHeader` / `LastFinalizedSvmHeader` path verifies a
+//! domain-separated Ed25519 certificate from a governance-approved, distinct
+//! attester set. The certificate binds the chain, height/slot, block hash, state
+//! commitment, and chain-specific auxiliary root. It is the source used by the
+//! runtime external-root and settlement verifiers.
+//!
+//! This is a threshold attester model, not a native Ethereum sync-committee or
+//! Solana stake-weighted consensus verifier. Governance configuration and key
+//! custody are therefore part of the trust boundary. An empty attester set or a
+//! zero threshold fails closed; governance may publish an empty/zero pair to
+//! revoke a verifier immediately.
 //!
 //! **Validation Flow (EVM / SVM):**
 //! 1. Origin must be an authorized submitter (fail closed when the set is empty).
@@ -48,7 +49,7 @@
 //! `proof` really has the claimed root as its root, so a submitter cannot store a root
 //! they cannot open. The *meaning* of the root is their claim.
 //!
-//! The failure mode is liveness rather than theft — a root of the wrong kind is refused
+//! The failure mode is liveness rather than theft - a root of the wrong kind is refused
 //! by the walk rather than settled against — which is why it is stated here rather than
 //! enforced: there is nothing to enforce against. An operator wiring the settlement path
 //! has to set this field to the receipts root, and
@@ -120,6 +121,28 @@ pub mod pallet {
     /// Last validated SVM (Solana) block header
     #[pallet::storage]
     pub type LastSvmHeader<T: Config> = StorageValue<_, SvmHeaderInfo, OptionQuery>;
+
+    /// Headers whose finality certificate reached the independently configured quorum.
+    #[pallet::storage]
+    pub type LastFinalizedEvmHeader<T: Config> = StorageValue<_, EvmHeaderInfo, OptionQuery>;
+
+    #[pallet::storage]
+    pub type LastFinalizedSvmHeader<T: Config> = StorageValue<_, SvmHeaderInfo, OptionQuery>;
+
+    /// Governance-approved Ed25519 attesters for finality certificates.
+    #[pallet::storage]
+    pub type EvmHeaderAttesters<T: Config> =
+        StorageValue<_, BoundedVec<[u8; 32], ConstU32<64>>, ValueQuery>;
+
+    #[pallet::storage]
+    pub type SvmHeaderAttesters<T: Config> =
+        StorageValue<_, BoundedVec<[u8; 32], ConstU32<64>>, ValueQuery>;
+
+    #[pallet::storage]
+    pub type EvmHeaderAttesterThreshold<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+    #[pallet::storage]
+    pub type SvmHeaderAttesterThreshold<T: Config> = StorageValue<_, u32, ValueQuery>;
 
     /// Merkle root cache for EVM blocks (block_number -> merkle_root)
     #[pallet::storage]
@@ -208,6 +231,27 @@ pub mod pallet {
         ValidationFailed { chain: Vec<u8>, reason: Vec<u8> },
         /// The authorized-submitter set was replaced by governance.
         AuthorizedSubmittersUpdated { submitters: Vec<T::AccountId> },
+        /// The independently signed header-attester sets were replaced.
+        HeaderAttestersUpdated {
+            evm_count: u32,
+            evm_threshold: u32,
+            svm_count: u32,
+            svm_threshold: u32,
+        },
+        /// An independently finalized EVM header became the runtime anchor.
+        EvmHeaderFinalized {
+            block_number: u64,
+            block_hash: H256,
+            state_root: H256,
+            receipts_root: H256,
+        },
+        /// An independently finalized Solana header became the runtime anchor.
+        SvmHeaderFinalized {
+            slot: u64,
+            block_hash: H256,
+            state_root: H256,
+            validator_set_hash: H256,
+        },
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -254,6 +298,10 @@ pub mod pallet {
         DuplicateValidator,
         /// Submission payload exceeds the configured size bound
         PayloadTooLarge,
+        /// Header attester set or threshold is invalid.
+        InvalidAttesterSet,
+        /// The header certificate did not reach the configured independent quorum.
+        InvalidHeaderCertificate,
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -305,6 +353,178 @@ pub mod pallet {
 
             Self::deposit_event(Event::AuthorizedSubmittersUpdated {
                 submitters: new_submitters,
+            });
+            Ok(())
+        }
+
+        /// Governance: configure independent Ed25519 finality attesters.
+        #[pallet::call_index(3)]
+        #[pallet::weight(T::WeightInfo::set_header_attesters())]
+        pub fn set_header_attesters(
+            origin: OriginFor<T>,
+            evm_attesters: Vec<[u8; 32]>,
+            evm_threshold: u32,
+            svm_attesters: Vec<[u8; 32]>,
+            svm_threshold: u32,
+        ) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)?;
+            ensure!(
+                Self::attester_set_is_valid(&evm_attesters, evm_threshold)
+                    && Self::attester_set_is_valid(&svm_attesters, svm_threshold),
+                Error::<T>::InvalidAttesterSet
+            );
+            let evm_count = evm_attesters.len() as u32;
+            let svm_count = svm_attesters.len() as u32;
+            let evm: BoundedVec<[u8; 32], ConstU32<64>> = evm_attesters
+                .try_into()
+                .map_err(|_| Error::<T>::InvalidAttesterSet)?;
+            let svm: BoundedVec<[u8; 32], ConstU32<64>> = svm_attesters
+                .try_into()
+                .map_err(|_| Error::<T>::InvalidAttesterSet)?;
+            EvmHeaderAttesters::<T>::put(evm);
+            SvmHeaderAttesters::<T>::put(svm);
+            EvmHeaderAttesterThreshold::<T>::put(evm_threshold);
+            SvmHeaderAttesterThreshold::<T>::put(svm_threshold);
+            Self::deposit_event(Event::HeaderAttestersUpdated {
+                evm_count,
+                evm_threshold,
+                svm_count,
+                svm_threshold,
+            });
+            Ok(())
+        }
+
+        /// Accept an independently finalized EVM header.
+        #[pallet::call_index(4)]
+        #[pallet::weight(T::WeightInfo::validate_finalized_evm_header())]
+        pub fn validate_finalized_evm_header(
+            origin: OriginFor<T>,
+            block_number: u64,
+            block_hash: H256,
+            state_root: H256,
+            receipts_root: H256,
+            certificate: Vec<u8>,
+        ) -> DispatchResult {
+            ensure_signed(origin)?;
+            ensure!(
+                block_hash != H256::zero()
+                    && state_root != H256::zero()
+                    && receipts_root != H256::zero(),
+                Error::<T>::InvalidEvmHeader
+            );
+            ensure!(
+                certificate.len()
+                    <= x3_verification_router::header_finality::MAX_HEADER_CERTIFICATE_BYTES,
+                Error::<T>::PayloadTooLarge
+            );
+            let expected = x3_verification_router::header_finality::FinalizedHeader {
+                chain: x3_verification_router::header_finality::HEADER_FINALITY_ETHEREUM,
+                height: block_number,
+                block_hash: block_hash.0,
+                state_root: state_root.0,
+                auxiliary_root: receipts_root.0,
+            };
+            x3_verification_router::header_finality::verify_header_certificate(
+                expected.chain,
+                expected,
+                &EvmHeaderAttesters::<T>::get(),
+                EvmHeaderAttesterThreshold::<T>::get(),
+                &certificate,
+            )
+            .map_err(|_| Error::<T>::InvalidHeaderCertificate)?;
+            if let Some(last) = LastFinalizedEvmHeader::<T>::get() {
+                ensure!(
+                    block_number > last.block_number,
+                    Error::<T>::NonMonotonicTimestamp
+                );
+            }
+            LastFinalizedEvmHeader::<T>::put(EvmHeaderInfo {
+                block_number,
+                block_hash,
+                state_root,
+                merkle_root: receipts_root,
+                validator_set_hash: H256::from(sp_io::hashing::blake2_256(&certificate)),
+                verified_at_block: frame_system::Pallet::<T>::block_number()
+                    .saturated_into::<u32>(),
+                validation_proof: certificate,
+            });
+            EvmMerkleRoots::<T>::insert(block_number, receipts_root);
+            ValidationStats::<T>::mutate(|stats| {
+                stats.evm_headers_validated = stats.evm_headers_validated.saturating_add(1);
+                stats.last_validation_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
+            });
+            Self::deposit_event(Event::EvmHeaderFinalized {
+                block_number,
+                block_hash,
+                state_root,
+                receipts_root,
+            });
+            Ok(())
+        }
+
+        /// Accept an independently finalized Solana header.
+        #[pallet::call_index(5)]
+        #[pallet::weight(T::WeightInfo::validate_finalized_svm_header())]
+        pub fn validate_finalized_svm_header(
+            origin: OriginFor<T>,
+            slot: u64,
+            block_hash: H256,
+            state_root: H256,
+            validator_set_hash: H256,
+            certificate: Vec<u8>,
+        ) -> DispatchResult {
+            ensure_signed(origin)?;
+            ensure!(
+                block_hash != H256::zero()
+                    && state_root != H256::zero()
+                    && validator_set_hash != H256::zero(),
+                Error::<T>::InvalidSvmHeader
+            );
+            ensure!(
+                certificate.len()
+                    <= x3_verification_router::header_finality::MAX_HEADER_CERTIFICATE_BYTES,
+                Error::<T>::PayloadTooLarge
+            );
+            let expected = x3_verification_router::header_finality::FinalizedHeader {
+                chain: x3_verification_router::header_finality::HEADER_FINALITY_SOLANA,
+                height: slot,
+                block_hash: block_hash.0,
+                state_root: state_root.0,
+                auxiliary_root: validator_set_hash.0,
+            };
+            x3_verification_router::header_finality::verify_header_certificate(
+                expected.chain,
+                expected,
+                &SvmHeaderAttesters::<T>::get(),
+                SvmHeaderAttesterThreshold::<T>::get(),
+                &certificate,
+            )
+            .map_err(|_| Error::<T>::InvalidHeaderCertificate)?;
+            if let Some(last) = LastFinalizedSvmHeader::<T>::get() {
+                ensure!(slot > last.slot, Error::<T>::InvalidSvmHeader);
+            }
+            LastFinalizedSvmHeader::<T>::put(SvmHeaderInfo {
+                slot,
+                block_hash,
+                state_root,
+                validator_set_hash,
+                verified_at_block: frame_system::Pallet::<T>::block_number()
+                    .saturated_into::<u32>(),
+                validation_proof: certificate,
+                parent_slot_hashes: Vec::new(),
+            });
+            SvmValidatorSets::<T>::insert(slot, validator_set_hash);
+            ValidationStats::<T>::mutate(|stats| {
+                stats.svm_headers_validated = stats.svm_headers_validated.saturating_add(1);
+                stats.last_validation_block =
+                    frame_system::Pallet::<T>::block_number().saturated_into::<u32>();
+            });
+            Self::deposit_event(Event::SvmHeaderFinalized {
+                slot,
+                block_hash,
+                state_root,
+                validator_set_hash,
             });
             Ok(())
         }
@@ -510,6 +730,24 @@ pub mod pallet {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     impl<T: Config> Pallet<T> {
+        fn attester_set_is_valid(keys: &[[u8; 32]], threshold: u32) -> bool {
+            if keys.len() > x3_verification_router::header_finality::MAX_ATTESTERS {
+                return false;
+            }
+            if keys.is_empty() {
+                return threshold == 0;
+            }
+            if threshold == 0 || threshold as usize > keys.len() {
+                return false;
+            }
+            for (index, key) in keys.iter().enumerate() {
+                if key.iter().all(|byte| *byte == 0) || keys[..index].contains(key) {
+                    return false;
+                }
+            }
+            true
+        }
+
         /// True iff the caller is in the storage-backed authorized-submitter set.
         /// An empty set means nobody is authorized → header path is fail-closed.
         fn ensure_authorized_submitter(who: &T::AccountId) -> DispatchResult {
@@ -656,7 +894,7 @@ pub mod pallet {
             merkle_root: H256,
         ) -> bool {
             // Check if header exists and all fields match
-            if let Some(stored_header) = LastEvmHeader::<T>::get() {
+            if let Some(stored_header) = LastFinalizedEvmHeader::<T>::get() {
                 stored_header.block_number == block_number
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
@@ -675,7 +913,7 @@ pub mod pallet {
             validator_set_hash: H256,
         ) -> bool {
             // Check if header exists and all fields match
-            if let Some(stored_header) = LastSvmHeader::<T>::get() {
+            if let Some(stored_header) = LastFinalizedSvmHeader::<T>::get() {
                 stored_header.slot == slot
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
@@ -687,12 +925,12 @@ pub mod pallet {
 
         /// Bridge Integration: Get latest EVM header hash for settlement verification
         pub fn get_latest_evm_header_hash() -> Option<H256> {
-            LastEvmHeader::<T>::get().map(|header| header.block_hash)
+            LastFinalizedEvmHeader::<T>::get().map(|header| header.block_hash)
         }
 
         /// Bridge Integration: Get latest SVM header hash for settlement verification
         pub fn get_latest_svm_header_hash() -> Option<H256> {
-            LastSvmHeader::<T>::get().map(|header| header.block_hash)
+            LastFinalizedSvmHeader::<T>::get().map(|header| header.block_hash)
         }
 
         /// Bridge Integration: Deposit settlement verification event
@@ -717,19 +955,20 @@ pub mod pallet {
         }
     }
 
-    /// This pallet is the chain's store of attested external headers, which is
+    /// This pallet is the chain's store of finalized external headers, which is
     /// what an EVM receipt proof has to be checked against: the proof carries a
     /// header of its own, so a verifier without an anchor would be checking the
     /// receipt against the root the prover chose.
     ///
-    /// Both answers come from storage written by an authorized submitter, and
-    /// both fail closed when nothing has been attested:
+    /// Both answers come from storage written only after the configured
+    /// independent attester quorum verifies a chain-bound certificate, and both
+    /// fail closed when no such header exists:
     ///
     /// - `anchored_header` reads the receipts root recorded for a height. That
     ///   root is the one the settlement engine walks a receipt proof to, so a
     ///   proof for a height with no recorded root is refused rather than checked
     ///   against the one it carries.
-    /// - `attested_head` is the newest attested header's height, and it is what
+    /// - `attested_head` is the newest finalized header's height, and it is what
     ///   confirmation depth is measured from. The proof's own idea of the head
     ///   (`current_block_number` in the wire format) is not consulted.
     impl<T: Config> x3_verification_router::evm_receipt::EvmHeaderAnchor for Pallet<T> {
@@ -741,8 +980,8 @@ pub mod pallet {
             // this pallet stores; for an older height the receipts root is what
             // the proof is checked against, and the other two are left zeroed
             // rather than filled in from something unrelated.
-            let newest =
-                LastEvmHeader::<T>::get().filter(|header| header.block_number == block_number);
+            let newest = LastFinalizedEvmHeader::<T>::get()
+                .filter(|header| header.block_number == block_number);
             Some(x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number: block_number,
                 receipts_root: receipts_root.0,
@@ -752,7 +991,7 @@ pub mod pallet {
         }
 
         fn attested_head() -> Option<u64> {
-            LastEvmHeader::<T>::get().map(|header| header.block_number)
+            LastFinalizedEvmHeader::<T>::get().map(|header| header.block_number)
         }
     }
 }
