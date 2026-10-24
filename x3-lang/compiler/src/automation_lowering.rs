@@ -9,7 +9,7 @@
 //!
 //! * **Unsupported source fails explicitly.** A trigger or action the pallet
 //!   cannot represent is an error naming the construct, never a silent drop or a
-//!   defaulted `Manual`/`Noop`. A declaration that compiled must mean what it
+//!   defaulted `Manual`/`NoChange`. A declaration that compiled must mean what it
 //!   says.
 //! * **Budgets are numbers or they are refused.** A `max_trade` that is not a
 //!   non-negative integer is an error here rather than a value coerced later by
@@ -134,7 +134,7 @@ fn lower_execute(block: &Block, automation: &str) -> Result<Action, X3Error> {
     let name = callee_name(callee).ok_or_else(|| unsupported_action(automation, "a non-name callee in `execute`"))?;
 
     match (name.as_str(), args.len()) {
-        ("noop", 0) => Ok(Action::Noop),
+        ("no_change", 0) => Ok(Action::NoChange),
         ("transfer_native", 2) => Ok(Action::TransferNative {
             recipient: account_arg(args, 0, automation)?,
             amount: int_arg(args, 1)?,
@@ -294,7 +294,7 @@ fn account_arg(args: &[Expression], index: usize, automation: &str) -> Result<[u
 fn parse_error(message: impl Into<String>) -> X3Error {
     X3Error::ParseError {
         message: message.into(),
-        span: x3_lang_common::Span::DUMMY,
+        span: x3_lang_common::Span::default(),
         expected: vec![],
         found: String::new(),
     }
@@ -311,7 +311,7 @@ fn unsupported_trigger(construct: &str) -> X3Error {
 fn unsupported_action(automation: &str, construct: &str) -> X3Error {
     parse_error(format!(
         "automation `{automation}`: {construct} is not an executable action. \
-         Supported: noop(), transfer_native(recipient, amount), \
+         Supported: no_change(), transfer_native(recipient, amount), \
          transfer_asset(asset, recipient, amount)"
     ))
 }

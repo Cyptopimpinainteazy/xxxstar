@@ -418,7 +418,7 @@ fn price_band_triggers_only_inside_the_band() {
                     lower: 100,
                     upper: 200
                 },
-                Action::Noop,
+                Action::NoChange,
                 1000
             ));
             let task_id = Automation::account_tasks(1)[0];
@@ -436,7 +436,7 @@ fn price_band_triggers_only_inside_the_band() {
                     lower: 100,
                     upper: 200
                 },
-                Action::Noop,
+                Action::NoChange,
                 1000
             ));
             let task_id = Automation::account_tasks(1)[0];
@@ -459,7 +459,7 @@ fn an_inverted_price_band_cannot_be_registered() {
                     lower: 200,
                     upper: 100
                 },
-                Action::Noop,
+                Action::NoChange,
                 1000
             ),
             Error::<Test>::InvalidTask
@@ -522,7 +522,7 @@ fn attempt_numbers_are_unique_so_a_replay_cannot_double_pay() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::Manual,
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
@@ -553,7 +553,7 @@ fn a_noop_action_is_recorded_as_noop_not_as_a_transfer() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::Manual,
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
@@ -562,7 +562,7 @@ fn a_noop_action_is_recorded_as_noop_not_as_a_transfer() {
         assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
 
         let receipt = Automation::receipt(task_id, 1).unwrap();
-        assert_eq!(receipt.outcome, ActionOutcome::Noop);
+        assert_eq!(receipt.outcome, ActionOutcome::NoChange);
         // No funds were moved: the owner only paid the execution fee, net of
         // the registration reservation returned on terminal status.
         assert_eq!(
@@ -578,7 +578,7 @@ fn an_unaffordable_execution_fee_fails_the_call_instead_of_paying_zero() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::Manual,
-            Action::Noop,
+            Action::NoChange,
             0
         ));
         let task_id = Automation::account_tasks(1)[0];
@@ -596,7 +596,7 @@ fn timestamp_trigger_uses_the_configured_clock() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::Timestamp(MOCK_NOW_MS - 1),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let due = Automation::account_tasks(1)[0];
@@ -606,7 +606,7 @@ fn timestamp_trigger_uses_the_configured_clock() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::Timestamp(MOCK_NOW_MS + 60_000),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let not_due = Automation::account_tasks(1)[0];
@@ -623,7 +623,7 @@ fn an_expired_task_never_dispatches_and_releases_the_reservation() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::BlockNumber(50),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
@@ -651,7 +651,7 @@ fn cleanup_expires_stale_tasks_without_dispatching() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::BlockNumber(50),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
@@ -673,13 +673,13 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::BlockNumber(50),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         assert_ok!(Automation::register_task(
             RuntimeOrigin::signed(1),
             Condition::BlockNumber(500),
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
         // A price trigger is not a time trigger and is not surfaced by a scan.
@@ -690,7 +690,7 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
                 threshold: 1,
                 above: true
             },
-            Action::Noop,
+            Action::NoChange,
             1000
         ));
 

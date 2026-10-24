@@ -1239,7 +1239,7 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
     ) -> Result<(x3_automation::ActionOutcome, Weight, [u8; 64]), DispatchError> {
         use x3_automation::{Action, ActionOutcome};
         match action {
-            Action::Noop => Ok((ActionOutcome::Noop, Weight::zero(), [0u8; 64])),
+            Action::NoChange => Ok((ActionOutcome::NoChange, Weight::zero(), [0u8; 64])),
             Action::TransferNative { recipient, amount } => {
                 let destination = AccountId::decode(&mut &recipient[..])
                     .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
@@ -1280,7 +1280,7 @@ impl pallet_x3_automation::Config for Runtime {
     type Now = AutomationNow;
     type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
     type Oracle = AutomationOracle;
-    type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
+    type CustomEvaluator = pallet_x3_automation::RefuseCustomEvaluator;
     type Dispatcher = RuntimeActionDispatcher;
 }
 

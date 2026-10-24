@@ -97,7 +97,7 @@ def test_the_bridge_kill_switch_is_never_set_at_genesis() -> None:
 def test_the_runtime_testnet_feature_is_inert() -> None:
     """`testnet` forwards no pallet feature and has no cfg site in the runtime.
 
-    Pinned because `runtime/Cargo.toml` claimed it enabled a NoOp validator, set
+    Pinned because `runtime/Cargo.toml` claimed it enabled a legacy non-native validator, set
     `ExternalBridgesEnabled=true` in genesis and applied "other testnet-only config".
     All three were false. This test fails if someone makes the feature real, which is
     the point: the change should be deliberate and the comment updated with it.

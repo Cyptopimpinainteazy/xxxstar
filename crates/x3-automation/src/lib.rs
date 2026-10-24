@@ -106,9 +106,9 @@ pub enum Action {
     ///
     /// Exists so a task can be registered, scheduled and observed without moving
     /// funds — rehearsal, monitoring and the automation test suite all need a
-    /// harmless verb. It is reported as `ActionOutcome::Noop`, never as a
+    /// harmless verb. It is reported as `ActionOutcome::NoChange`, never as a
     /// transfer that happened.
-    Noop,
+    NoChange,
     /// Action interpreted by a runtime-configured dispatcher.
     ///
     /// The runtime must opt in explicitly; an unwired dispatcher returns
@@ -188,8 +188,8 @@ impl TaskStatus {
 pub enum ActionOutcome {
     /// The action changed state.
     Applied,
-    /// The action is a deliberate no-op.
-    Noop,
+    /// The action completes without changing state.
+    NoChange,
 }
 
 /// Record that one execution attempt happened.
@@ -420,13 +420,13 @@ mod tests {
 
     #[test]
     fn a_noop_is_never_reported_as_applied() {
-        assert_eq!(Action::Noop, Action::Noop);
-        assert_ne!(ActionOutcome::Noop, ActionOutcome::Applied);
+        assert_eq!(Action::NoChange, Action::NoChange);
+        assert_ne!(ActionOutcome::NoChange, ActionOutcome::Applied);
         let transfer = Action::TransferNative {
             recipient: [7; 32],
             amount: 1_000,
         };
-        assert_ne!(transfer, Action::Noop);
+        assert_ne!(transfer, Action::NoChange);
     }
 
     #[test]
