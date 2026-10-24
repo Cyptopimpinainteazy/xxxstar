@@ -285,6 +285,21 @@ impl VerificationRouter {
         verifier.verify(proof)
     }
 
+    /// Verify and atomically consume a proof ID when verification succeeds.
+    ///
+    /// [`Self::route`] remains the read-only inspection API. Consensus-facing
+    /// callers must use this method so a successful proof cannot be replayed.
+    pub fn route_once(
+        &mut self,
+        proof: &ProofEnvelope,
+    ) -> Result<VerificationOutcome, VerificationError> {
+        let outcome = self.route(proof)?;
+        if outcome.accepted {
+            self.mark_used(proof.proof_id);
+        }
+        Ok(outcome)
+    }
+
     /// Mark a proof as used (for replay protection after successful verification)
     pub fn mark_used(&mut self, proof_id: [u8; 32]) {
         self.used_proofs.insert(proof_id, true);
@@ -314,7 +329,7 @@ impl VerificationRouter {
             expected_beneficiary: request.recipient.as_bytes().to_vec(),
         };
 
-        match self.route(&proof) {
+        match self.route_once(&proof) {
             Ok(outcome) => VerificationResult {
                 proof_id: request.proof_id,
                 verified: outcome.accepted,
@@ -662,6 +677,22 @@ mod tests {
     use super::*;
     use alloc::vec;
 
+    struct AcceptingEvmVerifier;
+
+    impl Verifier for AcceptingEvmVerifier {
+        fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+            Ok(VerificationOutcome {
+                accepted: true,
+                reason: "test_acceptance",
+                verified_at_height: Some(1),
+            })
+        }
+
+        fn strategy(&self) -> VerificationStrategy {
+            VerificationStrategy::EvmReceiptProof
+        }
+    }
+
     fn dummy_proof(strategy: VerificationStrategy) -> ProofEnvelope {
         ProofEnvelope {
             proof_id: [1u8; 32],
@@ -691,6 +722,51 @@ mod tests {
         let proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
         let result = router.route(&proof);
         assert!(matches!(result, Err(VerificationError::MissingVerifier)));
+    }
+
+    #[test]
+    fn route_once_consumes_a_successful_proof() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(AcceptingEvmVerifier));
+        let proof = dummy_proof(VerificationStrategy::EvmReceiptProof);
+
+        assert!(router.route_once(&proof).unwrap().accepted);
+        assert_eq!(
+            router.route_once(&proof),
+            Err(VerificationError::ReplayDetected)
+        );
+    }
+
+    #[test]
+    fn gateway_verification_request_is_replay_protected() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(AcceptingEvmVerifier));
+        let request = gateway_types::VerificationRequest {
+            proof_id: [7u8; 32],
+            source_chain: gateway_types::ExternalChainId::EthereumMainnet,
+            source_block: 1,
+            source_tx_hash: [8u8; 32],
+            external_asset: gateway_types::ExternalAssetRef {
+                chain_id: gateway_types::ExternalChainId::EthereumMainnet,
+                token_address_or_mint: "0x01".into(),
+                decimals: 18,
+                symbol: "ETH".into(),
+            },
+            sender: "sender".into(),
+            recipient: "recipient".into(),
+            amount: 1,
+            nonce: 1,
+            proof_payload: vec![1; 96],
+            strategy: VerificationStrategy::EvmReceiptProof,
+        };
+
+        assert!(router.route_verification_request(request.clone()).verified);
+        let replay = router.route_verification_request(request);
+        assert!(!replay.verified);
+        assert_eq!(
+            replay.failure_reason.as_deref(),
+            Some("replay detected: proof already used")
+        );
     }
 
     /// The permissive path is opt-in (`test-verifier`, and never together with
