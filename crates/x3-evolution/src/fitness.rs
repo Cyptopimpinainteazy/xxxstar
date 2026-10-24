@@ -40,6 +40,8 @@ pub struct FitnessScore {
     pub execution_latency_ms: f64,
     /// Canonical accounting-state hash produced by a simulation evaluator.
     pub simulation_state_hash: [u8; 32],
+    /// Digest of the canonical simulation receipt.
+    pub simulation_receipt_hash: [u8; 32],
 }
 
 impl FitnessScore {
@@ -92,6 +94,7 @@ impl FitnessScore {
             execution_instructions: 0,
             execution_latency_ms: 0.0,
             simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         }
     }
 
@@ -307,6 +310,7 @@ impl FitnessEvaluator for MockFitness {
             execution_instructions: 0,
             execution_latency_ms: 0.0,
             simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         })
     }
 
@@ -357,6 +361,7 @@ mod tests {
             execution_instructions: 0,
             execution_latency_ms: 0.0,
             simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         };
 
         let total = score.total_score();

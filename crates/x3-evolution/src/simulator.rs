@@ -6,6 +6,7 @@ use crate::fitness::{FitnessEvaluator, FitnessScore};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use x3_vm::{BytecodeModule, VMConfig, Value, Verifier, VerifyOptions, VM};
+use x3bc_core::codec::{Reader, Writer};
 
 /// Versioned entrypoint every strategy module must expose as function 0.
 pub const STRATEGY_ENTRYPOINT: &str = "x3_strategy_decide_v1";
@@ -17,6 +18,12 @@ pub const STRATEGY_PARAM_COUNT: u16 = 8;
 
 /// Scale for every monetary and quantity argument in strategy ABI v1.
 pub const STRATEGY_VALUE_SCALE: u64 = 100_000_000;
+
+/// Canonical strategy-simulation receipt format.
+pub const SIMULATION_RECEIPT_VERSION: u16 = 1;
+
+/// Domain separator for simulation receipt digests.
+pub const SIMULATION_RECEIPT_DOMAIN: &[u8] = b"x3-strategy-simulation-receipt-v1";
 
 type Fixed = i64;
 
@@ -396,10 +403,162 @@ pub struct SimulationResult {
     pub instructions_executed: u64,
     /// Canonical hash of the final portfolio accounting state.
     pub state_hash: [u8; 32],
+    /// Persistable evidence binding inputs, work, and final state.
+    pub receipt: SimulationReceipt,
     /// Simulation duration
     pub duration: Duration,
     /// Errors encountered
     pub errors: Vec<String>,
+}
+
+impl SimulationResult {
+    /// Verify that the receipt agrees with the result fields it accompanies.
+    pub fn receipt_matches_result(&self) -> bool {
+        self.receipt.is_well_formed()
+            && self.receipt.state_hash == self.state_hash
+            && self.receipt.ticks_processed == self.ticks_processed as u64
+            && self.receipt.gas_used == self.gas_used
+            && self.receipt.instructions_executed == self.instructions_executed
+            && self.receipt.final_cash == self.portfolio.cash
+            && self.receipt.final_total_value == self.portfolio.total_value
+            && self.receipt.final_realized_pnl == self.portfolio.realized_pnl
+            && self.receipt.trade_count == self.portfolio.trades.len() as u64
+            && self.receipt.errors == self.errors
+    }
+}
+
+/// Canonical evidence binding simulation inputs, VM work, and final fixed-point state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimulationReceipt {
+    pub version: u16,
+    pub strategy_hash: [u8; 32],
+    pub market_hash: [u8; 32],
+    pub config_hash: [u8; 32],
+    pub state_hash: [u8; 32],
+    pub ticks_processed: u64,
+    pub gas_used: u64,
+    pub instructions_executed: u64,
+    pub final_cash: Fixed,
+    pub final_total_value: Fixed,
+    pub final_realized_pnl: Fixed,
+    pub trade_count: u64,
+    pub errors: Vec<String>,
+}
+
+impl SimulationReceipt {
+    /// Canonical bytes for persistence and signing.
+    pub fn encode(&self) -> Vec<u8> {
+        let mut writer = Writer::new();
+        writer.u16(self.version);
+        writer.array32(&self.strategy_hash);
+        writer.array32(&self.market_hash);
+        writer.array32(&self.config_hash);
+        writer.array32(&self.state_hash);
+        writer.u64(self.ticks_processed);
+        writer.u64(self.gas_used);
+        writer.u64(self.instructions_executed);
+        writer.i128(self.final_cash as i128);
+        writer.i128(self.final_total_value as i128);
+        writer.i128(self.final_realized_pnl as i128);
+        writer.u64(self.trade_count);
+        writer.seq(&self.errors, |writer, error| writer.str(error));
+        writer.finish()
+    }
+
+    /// Decode and validate canonical receipt bytes.
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
+        let mut reader = Reader::new(bytes);
+        let receipt = Self {
+            version: reader.u16()?,
+            strategy_hash: reader.array32()?,
+            market_hash: reader.array32()?,
+            config_hash: reader.array32()?,
+            state_hash: reader.array32()?,
+            ticks_processed: reader.u64()?,
+            gas_used: reader.u64()?,
+            instructions_executed: reader.u64()?,
+            final_cash: Fixed::try_from(reader.i128()?).map_err(|_| {
+                EvolutionError::SerializationError("receipt final cash out of range".into())
+            })?,
+            final_total_value: Fixed::try_from(reader.i128()?).map_err(|_| {
+                EvolutionError::SerializationError("receipt final value out of range".into())
+            })?,
+            final_realized_pnl: Fixed::try_from(reader.i128()?).map_err(|_| {
+                EvolutionError::SerializationError("receipt realized PnL out of range".into())
+            })?,
+            trade_count: reader.u64()?,
+            errors: reader.seq(|reader| reader.string())?,
+        };
+        reader.finish()?;
+        if receipt.version != SIMULATION_RECEIPT_VERSION {
+            return Err(EvolutionError::SerializationError(format!(
+                "unsupported simulation receipt version {}",
+                receipt.version
+            )));
+        }
+        Ok(receipt)
+    }
+
+    /// Digest the canonical receipt bytes under the simulation domain.
+    pub fn digest(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(SIMULATION_RECEIPT_DOMAIN);
+        hasher.update(&self.encode());
+        hasher.finalize().into()
+    }
+
+    /// Cheap structural checks before a receiver chooses to replay.
+    pub fn is_well_formed(&self) -> bool {
+        self.version == SIMULATION_RECEIPT_VERSION
+            && self.strategy_hash != [0u8; 32]
+            && self.market_hash != [0u8; 32]
+            && self.config_hash != [0u8; 32]
+            && self.state_hash != [0u8; 32]
+            && self.trade_count as usize <= self.ticks_processed as usize
+    }
+}
+
+fn simulation_config_hash(config: &SimulationConfig, fixed: &FixedSimulationConfig) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"x3-strategy-simulation-config-v1");
+    hasher.update(STRATEGY_ENTRYPOINT.as_bytes());
+    hasher.update(&STRATEGY_PARAM_COUNT.to_le_bytes());
+    hasher.update(&STRATEGY_VALUE_SCALE.to_le_bytes());
+    hasher.update(&fixed.initial_capital.to_le_bytes());
+    hasher.update(&fixed.fee_rate.to_le_bytes());
+    hasher.update(&fixed.slippage_rate.to_le_bytes());
+    hasher.update(&fixed.max_position_size.to_le_bytes());
+    hasher.update(&config.risk_free_rate.to_bits().to_le_bytes());
+    hasher.update(&config.timeout.as_nanos().to_le_bytes());
+    hasher.update(&config.gas_limit_per_tick.to_le_bytes());
+    hasher.update(&[u8::from(config.realistic_execution)]);
+    hasher.finalize().into()
+}
+
+fn simulation_market_hash(market: &[PreparedTick]) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"x3-strategy-simulation-market-v1");
+    hasher.update(&(market.len() as u64).to_le_bytes());
+    for tick in market {
+        hasher.update(&tick.timestamp.to_le_bytes());
+        hasher.update(&(tick.symbol.len() as u64).to_le_bytes());
+        hasher.update(tick.symbol.as_bytes());
+        hasher.update(&tick.price.to_le_bytes());
+        hasher.update(&tick.volume.to_le_bytes());
+        hasher.update(&tick.bid.to_le_bytes());
+        hasher.update(&tick.ask.to_le_bytes());
+    }
+    hasher.finalize().into()
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    encoded
 }
 
 /// Strategy simulator
@@ -559,11 +718,15 @@ impl Simulator {
     ) -> Result<SimulationResult> {
         let start = Instant::now();
         let config = self.fixed_config()?;
-        let strategy = StrategyProgram::verify(&chromosome.to_bytecode())?;
+        let strategy_bytecode = chromosome.to_bytecode();
+        let strategy_hash = blake3::hash(&strategy_bytecode).into();
+        let strategy = StrategyProgram::verify(&strategy_bytecode)?;
         let prepared: Vec<PreparedTick> = market_data
             .iter()
             .map(prepare_tick)
             .collect::<Result<_>>()?;
+        let market_hash = simulation_market_hash(&prepared);
+        let config_hash = simulation_config_hash(&self.config, &config);
         let mut portfolio = PortfolioState::new(config.initial_capital);
         let mut errors = Vec::new();
         let mut ticks_processed = 0;
@@ -621,6 +784,22 @@ impl Simulator {
             duration,
         )?;
         fitness.simulation_state_hash = state_hash;
+        let receipt = SimulationReceipt {
+            version: SIMULATION_RECEIPT_VERSION,
+            strategy_hash,
+            market_hash,
+            config_hash,
+            state_hash,
+            ticks_processed: ticks_processed as u64,
+            gas_used,
+            instructions_executed,
+            final_cash: portfolio.cash,
+            final_total_value: portfolio.total_value,
+            final_realized_pnl: portfolio.realized_pnl,
+            trade_count: portfolio.trades.len() as u64,
+            errors: errors.clone(),
+        };
+        fitness.simulation_receipt_hash = receipt.digest();
 
         Ok(SimulationResult {
             portfolio,
@@ -629,9 +808,28 @@ impl Simulator {
             gas_used,
             instructions_executed,
             state_hash,
+            receipt,
             duration,
             errors,
         })
+    }
+
+    /// Re-run a simulation and require exact receipt agreement.
+    pub fn replay(
+        &self,
+        chromosome: &Chromosome,
+        market_data: &[MarketTick],
+        expected: &SimulationReceipt,
+    ) -> Result<SimulationResult> {
+        let result = self.simulate(chromosome, market_data)?;
+        if &result.receipt != expected {
+            return Err(EvolutionError::SimulationFailed(format!(
+                "simulation receipt mismatch: expected {}, replay produced {}",
+                hex_digest(&expected.digest()),
+                hex_digest(&result.receipt.digest())
+            )));
+        }
+        Ok(result)
     }
 
     /// Execute a trade based on action
@@ -791,6 +989,7 @@ impl Simulator {
             execution_instructions: instructions_executed,
             execution_latency_ms: duration.as_secs_f64() * 1_000.0,
             simulation_state_hash: [0u8; 32],
+            simulation_receipt_hash: [0u8; 32],
         })
     }
 
@@ -928,6 +1127,12 @@ impl SimulatorFitness {
 impl FitnessEvaluator for SimulatorFitness {
     fn evaluate(&self, chromosome: &Chromosome) -> Result<FitnessScore> {
         let result = self.simulator.simulate(chromosome, &self.market_data)?;
+        if !result.errors.is_empty() {
+            return Err(EvolutionError::SimulationFailed(format!(
+                "simulation did not complete: {}",
+                result.errors.join("; ")
+            )));
+        }
         Ok(result.fitness)
     }
 
@@ -1183,6 +1388,56 @@ mod tests {
         assert_eq!(first.portfolio.equity_curve, second.portfolio.equity_curve);
         assert_eq!(first.portfolio.cash, second.portfolio.cash);
         assert_eq!(first.portfolio.positions, second.portfolio.positions);
+    }
+
+    #[test]
+    fn simulation_receipt_round_trips_and_replays_exactly() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 1)).unwrap();
+        let market = vec![
+            MarketTick::new(1_000, "ETH", 2_000.0),
+            MarketTick::new(2_000, "ETH", 2_100.0),
+        ];
+        let result = simulator.simulate(&chromosome, &market).unwrap();
+        assert!(result.receipt_matches_result());
+
+        let encoded = result.receipt.encode();
+        let decoded = SimulationReceipt::decode(&encoded).expect("canonical receipt");
+        assert_eq!(decoded, result.receipt);
+        assert_eq!(decoded.digest(), result.receipt.digest());
+
+        simulator
+            .replay(&chromosome, &market, &decoded)
+            .expect("exact replay");
+    }
+
+    #[test]
+    fn replay_refuses_a_tampered_receipt() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 1)).unwrap();
+        let market = vec![MarketTick::new(1_000, "ETH", 2_000.0)];
+        let result = simulator.simulate(&chromosome, &market).unwrap();
+        let mut tampered = result.receipt;
+        tampered.final_cash += 1;
+
+        let error = simulator
+            .replay(&chromosome, &market, &tampered)
+            .expect_err("tampered receipt must be refused");
+        assert!(error.to_string().contains("receipt mismatch"), "{error}");
+    }
+
+    #[test]
+    fn truncated_receipt_bytes_are_refused() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 0)).unwrap();
+        let result = simulator
+            .simulate(&chromosome, &[MarketTick::new(1, "ETH", 2_000.0)])
+            .unwrap();
+        let bytes = result.receipt.encode();
+        assert!(SimulationReceipt::decode(&bytes[..bytes.len() - 1]).is_err());
     }
 
     #[test]

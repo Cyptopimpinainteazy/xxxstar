@@ -63,8 +63,9 @@ pub use selection::{
 };
 pub use simulator::{
     decimal_to_fixed, fixed_to_decimal, generate_synthetic_data, generate_synthetic_data_seeded,
-    MarketTick, PortfolioState, SimulationConfig, SimulationResult, Simulator, SimulatorFitness,
-    Trade, TradeAction, STRATEGY_ENTRYPOINT, STRATEGY_PARAM_COUNT, STRATEGY_VALUE_SCALE,
+    MarketTick, PortfolioState, SimulationConfig, SimulationReceipt, SimulationResult, Simulator,
+    SimulatorFitness, Trade, TradeAction, SIMULATION_RECEIPT_DOMAIN, SIMULATION_RECEIPT_VERSION,
+    STRATEGY_ENTRYPOINT, STRATEGY_PARAM_COUNT, STRATEGY_VALUE_SCALE,
 };
 
 use rand::{Rng, SeedableRng};

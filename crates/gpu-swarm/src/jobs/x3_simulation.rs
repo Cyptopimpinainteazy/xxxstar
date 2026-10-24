@@ -79,6 +79,8 @@ pub struct StrategyCandidate {
     pub fitness: Option<FitnessMetrics>,
     /// Canonical portfolio state hash from the strategy simulation.
     pub state_hash: [u8; 32],
+    /// Canonical simulation receipt digest.
+    pub receipt_hash: [u8; 32],
 }
 
 /// Fitness metrics for strategy evaluation
@@ -300,6 +302,7 @@ impl X3SimulationJob {
                         self.config.initial_capital,
                     )),
                     state_hash: fitness.simulation_state_hash,
+                    receipt_hash: fitness.simulation_receipt_hash,
                 })
             })
             .collect();
@@ -371,6 +374,7 @@ fn simulation_result_hash(result: &SimulationResult) -> [u8; 32] {
             hasher.update(parent);
         }
         hasher.update(&strategy.state_hash);
+        hasher.update(&strategy.receipt_hash);
         if let Some(fitness) = &strategy.fitness {
             for value in [
                 fitness.pnl_pct,
@@ -566,6 +570,7 @@ mod tests {
         assert_eq!(result.generation_stats.len(), 1);
         assert!(!result.top_strategies.is_empty());
         assert_ne!(result.top_strategies[0].state_hash, [0u8; 32]);
+        assert_ne!(result.top_strategies[0].receipt_hash, [0u8; 32]);
         assert!(result.compute_units > 0);
         assert!(!job.requires_gpu());
         assert!(job.verify(&output).expect("verification"));
