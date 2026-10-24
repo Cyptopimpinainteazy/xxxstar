@@ -262,11 +262,13 @@ impl FitnessEvaluator for ParetoFitness {
 }
 
 /// Mock fitness evaluator for testing
+#[cfg(test)]
 pub struct MockFitness {
     base_score: f64,
     variance: f64,
 }
 
+#[cfg(test)]
 impl MockFitness {
     pub fn new(base_score: f64, variance: f64) -> Self {
         Self {
@@ -276,6 +278,7 @@ impl MockFitness {
     }
 }
 
+#[cfg(test)]
 impl FitnessEvaluator for MockFitness {
     fn evaluate(&self, chromosome: &Chromosome) -> Result<FitnessScore> {
         // Generate deterministic score based on chromosome hash

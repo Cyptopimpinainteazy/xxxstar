@@ -49,7 +49,9 @@ pub use crossover::{
     TwoPointCrossover, UniformCrossover,
 };
 pub use error::{EvolutionError, Result};
-pub use fitness::{FitnessEvaluator, FitnessScore, MockFitness, PnLFitness};
+#[cfg(test)]
+pub use fitness::MockFitness;
+pub use fitness::{FitnessEvaluator, FitnessScore, PnLFitness};
 pub use mutation::{
     CompositeMutation, GaussianMutation, LogicMutation, MutationOperator, ParameterMutation,
     SwapMutation,
