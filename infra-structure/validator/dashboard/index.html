@@ -33,6 +33,21 @@
           <div class="metric" id="chains_active">0</div>
           <div class="label">Active Chains</div>
         </div>
+        <div class="card highlight">
+          <h2>Our Profile: Max Lane Throughput</h2>
+          <div class="metric large" id="our_chain_max_tps">0</div>
+          <div class="label" id="our_chain_label">Chain: --</div>
+          <div class="metric" id="global_max_tps">0</div>
+          <div class="label">Best Profile (tx/s, local lanes)</div>
+          <div class="label" id="bench_updated">Benchmarks: --</div>
+        </div>
+        <div class="card">
+          <h2>Chain Profiles Benchmarked</h2>
+          <div class="metric" id="bench_chain_count">0</div>
+          <div class="label">Profiles With Results</div>
+          <div class="metric" id="bench_run_levels">--</div>
+          <div class="label">Load Levels Used</div>
+        </div>
 
         <!-- Row 2: GPU utilization -->
         <div class="card highlight">
@@ -93,6 +108,23 @@
           <div class="label">SVM RPC Latency</div>
           <div class="metric" id="evm_rpc">0 ms</div>
           <div class="label">EVM RPC Latency</div>
+        </div>
+
+        <div class="card table-card">
+          <h2>Accelerator Throughput by Chain Profile</h2>
+          <p class="label">Batches posted to this host's GPU lanes (scripts/benchmark_all_chains_tps.py). This is local verification throughput, not on-chain TPS.</p>
+          <table class="chain-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Chain</th>
+                <th>Chain ID</th>
+                <th>Max tx/s (lanes)</th>
+                <th>Best Load</th>
+              </tr>
+            </thead>
+            <tbody id="chain_tps_rows"></tbody>
+          </table>
         </div>
       </section>
 
