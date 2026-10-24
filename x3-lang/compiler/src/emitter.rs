@@ -919,21 +919,7 @@ fn static_guard_quantity(op: &Operation) -> Result<(u16, u8), X3Error> {
 }
 
 /// Return the stable opcode for a trading operation variant.
-pub fn trading_opcode(op: &TradingOperation) -> u8 {
-    match op {
-        TradingOperation::BeginAtomicTrade { .. } => TRADING_BEGIN,
-        TradingOperation::OpenDebt { .. } => TRADING_OPEN_DEBT,
-        TradingOperation::ExecuteSwap { .. } => TRADING_EXECUTE_SWAP,
-        TradingOperation::CloseDebt { .. } => TRADING_CLOSE_DEBT,
-        TradingOperation::AssertMinNetProfit { .. } => TRADING_ASSERT_MIN_PROFIT,
-        TradingOperation::AssertAllDebtsClosed => TRADING_ASSERT_ALL_DEBTS,
-        TradingOperation::AssertInvariant { .. } => TRADING_ASSERT_INVARIANT,
-        TradingOperation::Bridge { .. } => TRADING_BRIDGE,
-        TradingOperation::EmitTradeReceipt => TRADING_EMIT_RECEIPT,
-        TradingOperation::CommitAtomicTrade => TRADING_COMMIT,
-        TradingOperation::AbortAtomicTrade => TRADING_ABORT,
-    }
-}
+pub use x3_lang_execution::artifact::trading_opcode;
 
 /// Encode a trading operation payload deterministically.
 pub fn encode_trading_operation(op: &TradingOperation) -> Result<Vec<u8>, X3Error> {
@@ -945,17 +931,8 @@ pub fn encode_trading_operation(op: &TradingOperation) -> Result<Vec<u8>, X3Erro
 
 /// Decode and authenticate a trading operation payload against its opcode.
 pub fn decode_trading_operation(opcode: u8, payload: &[u8]) -> Result<TradingOperation, X3Error> {
-    let op: TradingOperation = serde_json::from_slice(payload).map_err(|err| X3Error::CodegenError {
-        message: format!("failed to decode trading operation: {err}"),
-        span: None,
-    })?;
-    if trading_opcode(&op) != opcode {
-        return Err(X3Error::CodegenError {
-            message: format!("trading payload does not match opcode 0x{opcode:02x}"),
-            span: None,
-        });
-    }
-    Ok(op)
+    x3_lang_execution::artifact::decode_trading_operation(opcode, payload)
+        .map_err(|message| X3Error::CodegenError { message, span: None })
 }
 
 /// Decode every Trading Core instruction from emitted X3 bytecode.

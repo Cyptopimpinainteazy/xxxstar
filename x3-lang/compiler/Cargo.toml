@@ -7,6 +7,7 @@ license.workspace = true
 description = "Compiler for X3: lowering, codegen, regalloc, and bytecode emitter"
 
 [dependencies]
+x3-lang-execution = { path = "../crates/x3-execution" }
 x3-lang-common = { path = "../crates/x3-common" }
 x3-lang-ast = { path = "../crates/x3-ast" }
 x3-lang-lexer = { path = "../crates/x3-lexer", features = ["logos"] }

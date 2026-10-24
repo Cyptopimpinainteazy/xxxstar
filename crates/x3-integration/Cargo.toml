@@ -6,6 +6,8 @@ description = "X3 Chain integration for X3 virtual machine and compiler"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+x3-lang-compiler = { path = "../../x3-lang/compiler", optional = true }
+x3-lang-execution = { path = "../../x3-lang/crates/x3-execution", default-features = false }
 # X3 core (std-only — heavy deps; not used in WASM runtime)
 x3-vm = { path = "../x3-vm", optional = true }
 x3-compiler = { path = "../x3-compiler", optional = true }
@@ -38,6 +40,7 @@ thiserror = { version = "1.0", optional = true }
 log = { version = "0.4", default-features = false }
 
 [dev-dependencies]
+x3-lang-compiler = { path = "../../x3-lang/compiler" }
 env_logger = "0.10"
 # An artifact attestation travels as a JSON sidecar beside the artifact; the test round-trips one.
 serde_json = { workspace = true }
@@ -65,6 +68,8 @@ std = [
     # x3-svm-integration excluded from std: solana-program 3.x dual solana-address conflict
     "x3-vm",
     "x3-compiler",
+    "x3-lang-compiler",
+    "x3-lang-execution/std",
     "x3-backend",
     "x3-verifier",
 ]

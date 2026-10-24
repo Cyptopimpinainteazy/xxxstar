@@ -549,7 +549,7 @@ fn kernel_test_ext() -> sp_io::TestExternalities {
 #[test]
 fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded() {
     let submitter = account(7);
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -623,7 +623,7 @@ fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_record
 #[test]
 fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
     let submitter = account(7);
-    let mut program = x3_x3_integration::compiler_bridge::compile_source(
+    let mut program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");

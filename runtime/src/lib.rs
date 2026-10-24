@@ -392,7 +392,10 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // a genesis-named gateway account since 19) or `finalize_with_settlement` (`SettlementOrigin`).
     // One call and one weight entry removed, no storage key changes shape, so no migration.
     // `transaction_version` is unchanged: no existing call's encoding moved.
-    spec_version: 20,
+    // v21: canonical X3Lang native trading, shared WASM verifier/interpreter,
+    // and appended asset/lender/venue registration calls. Existing call/event
+    // indices and transaction_version remain stable.
+    spec_version: 21,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 1,
@@ -1762,6 +1765,7 @@ impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltControlle
 impl pallet_x3_kernel::Config for Runtime {
     type Balance = Balance;
     type AssetId = AssetId;
+    type NativeFeeAssetId = frame_support::traits::ConstU32<0>;
     type AtlasId = AtlasId;
     type MaxAssetsPerAccount = MaxAssetsPerAccount;
     type MaxAssetSymbolLength = MaxAssetSymbolLength;

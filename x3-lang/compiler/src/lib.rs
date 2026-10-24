@@ -463,3 +463,6 @@ fn verify_bytecode(bytecode: &[u8]) -> Result<(), X3Error> {
 
     Ok(())
 }
+
+/// Compiler build identity carried by canonical compilation provenance.
+pub const COMPILER_VERSION: &str = concat!("x3-lang-compiler/", env!("CARGO_PKG_VERSION"));

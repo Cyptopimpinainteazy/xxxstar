@@ -1581,7 +1581,7 @@ fn supply_is_conserved_on_every_validator_under_distributed_traffic() {
     ];
 
     // Compile the program in the test: this is the compiler's output, not a fixture blob.
-    let program = x3_x3_integration::compiler_bridge::compile_source(PROGRAM_SOURCE)
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(PROGRAM_SOURCE)
         .expect("the fixture must compile");
     assert!(
         program.starts_with(X3BC_MAGIC),

@@ -41,6 +41,45 @@ Explicit v1 boundaries:
 - fixture capabilities are rejected in production/mainnet execution mode;
 - no live-DEX or mainnet claim is made without real adapter evidence.
 
+## Canonical native trading runtime
+
+`crates/x3-integration::compiler_bridge::compile_source` now uses this workspace's
+compiler. Compilation mode can be selected explicitly with `compile_source_with_mode`;
+`compile_artifact` returns source/artifact hashes and the compiler build version.
+The old contract grammar is available through `compile_legacy_source` and produces
+legacy X3BC. Canonical compilation never falls back to that grammar.
+
+`crates/x3-execution` owns the trading IR, sequence verifier, accounting and
+transactional interpreter used by both developer tooling and validator WASM.
+The validator's initial canonical profile accepts version-bound trading instructions
+and the exact private-submission gate. Unsupported instructions, metadata semantics,
+unknown policy fields, mismatched versions, and missing policy bindings are rejected.
+Other canonical VM instructions have not been enabled on this runtime path.
+
+`pallet-x3-kernel::submit_comit_v2` executes that profile against the canonical
+ledger through the native host. Governance must first bind exact native asset
+identities to registered assets; the gas identity must match `NativeFeeAssetId`.
+A lender or pool owner signs its own registration. These registrations opt actual
+ledger balances into zero-fee same-dispatch lending or zero-fee constant-product
+swaps. An unfunded lender/pool cannot provide liquidity. The host uses the existing
+AMM arithmetic and checks the projected affected-ledger commitment before commit.
+Trade rejection, insufficient fee payment and later prepare-root rejection roll
+back the entire dispatch, including balances, fees, nonce and events.
+
+The host has no external DEX, bridge, oracle aggregation, MEV attestation, protected
+ordering or persistent strategy-loss capability. Programs requiring those capabilities
+are refused. Private submission depends on the runtime's configured channel and is
+unavailable by default. Native execution receipts bind the artifact, affected ledger,
+operations, typed deltas and costs; they are not independent finality attestations.
+The cost input is the kernel execution fee; outer transaction-payment charges
+and tips are not yet reconciled into this economic receipt.
+
+`examples/native_trading.x3` is the deterministic native test route. The tests seed
+actual FRAME ledger storage with explicit test assets and reserves. Live deployment
+requires matching chain asset metadata and funded, signed capability registrations.
+This is implementation and component-test evidence; live validator tests, calibrated
+runtime weights, restart tests and security review remain release requirements.
+
 ## VM Opcode Surface — Per-Feature Readiness
 
 The atomic_router feature owns VM control-flow execution. Its readiness score is **85%** (derived from `FEATURE_REGISTRY.toml`).

@@ -47,7 +47,7 @@ const X3_SOURCE: &str = "fn main() -> i64 {\n    return 42;\n}\n";
 
 /// An X3BC artifact compiled under the deployment policy that demands private submission.
 fn artifact_demanding_private_submission() -> Vec<u8> {
-    x3_x3_integration::compiler_bridge::compile_source_with_policy(
+    x3_x3_integration::compiler_bridge::compile_legacy_source_with_policy(
         X3_SOURCE,
         x3_x3_integration::CompilationPolicy::private_submission_required(),
     )
@@ -56,7 +56,7 @@ fn artifact_demanding_private_submission() -> Vec<u8> {
 
 /// The same source compiled under the default policy: no demand recorded.
 fn artifact_without_a_demand() -> Vec<u8> {
-    x3_x3_integration::compiler_bridge::compile_source(X3_SOURCE)
+    x3_x3_integration::compiler_bridge::compile_legacy_source(X3_SOURCE)
         .expect("the fixture source compiles")
 }
 

@@ -1192,6 +1192,17 @@ struct HostWithoutBridgeSupport {
 }
 
 impl TradingHost for HostWithoutBridgeSupport {
+    // This fixture records results only; it has no external state to journal.
+    fn begin_transaction(&mut self) -> Result<(), HostError> {
+        Ok(())
+    }
+    fn commit_transaction(&mut self) -> Result<(), HostError> {
+        Ok(())
+    }
+    fn rollback_transaction(&mut self) -> Result<(), HostError> {
+        Ok(())
+    }
+
     fn capabilities(&self) -> &CapabilityManifest {
         &self.manifest
     }

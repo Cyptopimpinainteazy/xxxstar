@@ -373,6 +373,11 @@ impl X3Executor {
     ) -> X3Result<X3ExecutionReceipt> {
         use crate::mini_x3;
         Self::verify_on_chain(bytecode)?;
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return Err(X3IntegrationError::ExecutionFailed(
+                "canonical trading requires an authenticated ledger host".into(),
+            ));
+        }
         match mini_x3::execute_x3bc_with_slots_and_policy(
             bytecode,
             gas_limit,
@@ -426,18 +431,31 @@ impl X3Executor {
 
     /// Validate a program the way the chain does, in every build (see `execute_on_chain`).
     pub fn verify_on_chain(bytecode: &[u8]) -> X3Result<()> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|_| ())
+                .map_err(X3IntegrationError::VerificationFailed);
+        }
         crate::mini_x3::validate_x3bc(bytecode)
             .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))
     }
 
     /// The chain's gas estimate for a program, in every build (see `execute_on_chain`).
     pub fn estimate_gas_on_chain(bytecode: &[u8]) -> u64 {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|artifact| artifact.gas_used)
+                .unwrap_or(u64::MAX);
+        }
         crate::mini_x3::estimate_gas_x3bc(bytecode)
     }
 
     /// Verify bytecode without execution
     #[cfg(feature = "std")]
     pub fn verify(bytecode: &[u8], allow_debug_ops: bool) -> X3Result<()> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return Self::verify_on_chain(bytecode);
+        }
         let opts = if allow_debug_ops {
             VerifyOptions::default()
         } else {
@@ -457,6 +475,11 @@ impl X3Executor {
     /// Estimate gas for bytecode execution
     #[cfg(feature = "std")]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|artifact| artifact.gas_used)
+                .map_err(X3IntegrationError::VerificationFailed);
+        }
         // Use verifier's gas estimation
         let report = x3_verifier::Verifier::new(x3_verifier::SafetyRules::default())
             .verify_bytecode(bytecode)
