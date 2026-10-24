@@ -76,7 +76,7 @@ PY
 fi
 
 # ── syntax ────────────────────────────────────────────────────────────────
-for script in install.sh review.sh check.sh selftest.sh usage.sh; do
+for script in install.sh review.sh check.sh selftest.sh usage.sh on-comment.sh; do
   if bash -n "$ROOT_DIR/services/pr-agent/$script" 2>/dev/null; then
     pass "$script is valid bash"
   else
@@ -187,6 +187,58 @@ expect_entry() { # <label> <expected entry: dry_run.py|pr-agent> [wrapper args..
 expect_entry "a PR dry run prints the unpublished result via dry_run.py" dry_run.py --dry-run 672 review
 expect_entry "a plain-diff dry run calls pr-agent directly (it already prints)" pr-agent --dry-run --diff /tmp/x.diff
 expect_entry "a publishing run calls pr-agent directly" pr-agent 672
+# ── dry_run.py itself, against a stub pr_agent package ────────────────────
+# The shim above replaces the interpreter, so this runs the real dry_run.py:
+# the handle_request wrapper, the artifact/answer lookup and the exit codes.
+stub="$tmp/stub/pr_agent"
+mkdir -p "$stub/agent"
+: > "$stub/__init__.py"
+: > "$stub/agent/__init__.py"
+cat > "$stub/config_loader.py" <<'PY'
+class _Settings:
+    pass
+_settings = _Settings()
+def get_settings():
+    return _settings
+PY
+cat > "$stub/agent/pr_agent.py" <<'PY'
+import json, os
+from pr_agent.config_loader import get_settings
+class PRAgent:
+    async def handle_request(self, url, args):
+        if "STUB_DATA" in os.environ:
+            get_settings().data = json.loads(os.environ["STUB_DATA"])
+        return True
+PY
+cat > "$stub/cli.py" <<'PY'
+import asyncio, os
+from pr_agent.agent.pr_agent import PRAgent
+def run():
+    asyncio.run(PRAgent().handle_request("url", ["review"]))
+    return int(os.environ.get("STUB_STATUS", "0")) or None
+PY
+
+expect_dry_run() { # <label> <expected exit> <expected stdout substring> [env...]
+  local label="$1" want_status="$2" want_out="$3"; shift 3
+  local status=0
+  env "$@" PYTHONPATH="$tmp/stub" python3 "$ROOT_DIR/services/pr-agent/dry_run.py" \
+    >"$tmp/dry.out" 2>"$tmp/dry.err" || status=$?
+  if [ "$status" = "$want_status" ] && { [ -z "$want_out" ] || grep -qF -- "$want_out" "$tmp/dry.out" "$tmp/dry.err"; }; then
+    pass "$label"
+  else
+    fail "$label (exit $status, want $want_status)"
+  fi
+}
+
+expect_dry_run "dry_run.py prints an unpublished review artifact" 0 "## PR Reviewer Guide" \
+  STUB_DATA='{"artifact": "## PR Reviewer Guide"}'
+expect_dry_run "dry_run.py prints an /ask answer" 0 "every leg rolls back" \
+  STUB_DATA='{"answer": "every leg rolls back"}'
+expect_dry_run "dry_run.py reports an empty improve result as a result" 0 "nothing to publish" \
+  STUB_DATA='{"artifact": ""}'
+expect_dry_run "dry_run.py exits 3 when the tool left nothing to print" 3 "produced no output"
+expect_dry_run "dry_run.py passes a CLI failure status through" 1 "" STUB_STATUS=1
+
 expect_argv "--model overrides the configured model" \
   "--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=deepseek/deepseek-flash" \
   --model deepseek/deepseek-flash --diff /tmp/x.diff
@@ -194,6 +246,8 @@ expect_dies "an unreachable router fails loudly" --via-router --diff /tmp/x.diff
 expect_dies "--local and --via-router are rejected together" --local --via-router 672
 expect_dies "a non-numeric target is rejected" not-a-pr
 expect_dies "a wrapper flag after the target is rejected, not run as a command" 672 --dry-run
+expect_dies "a wrapper flag after the command is rejected, not silently dropped" 672 review --dry-run
+expect_dies "--model after the command is rejected" 672 review --model x/y
 
 # ── on-comment.sh: PR comment -> review.sh, against the same shim ──────────
 run_comment() { # <comment body> -> argv log; status in $comment_status
@@ -204,16 +258,19 @@ run_comment() { # <comment body> -> argv log; status in $comment_status
     bash "$ROOT_DIR/services/pr-agent/on-comment.sh" 672 >"$tmp/out" 2>&1 || comment_status=$?
 }
 
-expect_comment() { # <label> <comment body> <expected argv, empty = no run>
-  local label="$1" body="$2" expected="$3"
+expect_comment() { # <label> <comment body> [expected argv, one word each; none = no run]
+  # Compared one argument per line, so a question split into words fails.
+  local label="$1" body="$2"; shift 2
   run_comment "$body"
+  local expected=""
+  [ $# -gt 0 ] && expected="$(printf '%s\n' "$@")"
   local actual
-  actual="$(tr '\n' ' ' < "$argv_log" | sed 's/ $//')"
+  actual="$(cat "$argv_log")"
   if [ "$comment_status" = 0 ] && [ "$actual" = "$expected" ]; then
     pass "$label"
   else
     fail "$label (status $comment_status)"
-    printf '        expected: %s\n        actual:   %s\n' "$expected" "$actual"
+    printf '        expected: %s\n        actual:   %s\n' "$(printf '%s|' "$@")" "$(tr '\n' '|' < "$argv_log")"
   fi
 }
 
@@ -227,13 +284,19 @@ expect_comment_dies() { # <label> <comment body>
   fi
 }
 
-pr_args="--pr_url=https://github.com/$repo_slug/pull/672 --extra_config_url=$CONFIG"
-expect_comment "/review comment runs a review" "/review" "$pr_args review"
+pr_url_arg="--pr_url=https://github.com/$repo_slug/pull/672"
+cfg_arg="--extra_config_url=$CONFIG"
+expect_comment "/review comment runs a review" "/review" "$pr_url_arg" "$cfg_arg" review
+expect_comment "/Review is matched case-insensitively" "/Review" "$pr_url_arg" "$cfg_arg" review
+expect_comment "a CRLF comment body still matches" $'/improve\r\nmore' "$pr_url_arg" "$cfg_arg" improve
 expect_comment "/improve drops trailing words instead of forwarding overrides" \
-  "/improve --config.model=evil/model" "$pr_args improve"
+  "/improve --config.model=evil/model" "$pr_url_arg" "$cfg_arg" improve
 expect_comment "/ask passes the question as one argument, first line only" \
-  $'/ask does every leg roll back?\nsecond line is ignored' "$pr_args ask does every leg roll back?"
-expect_comment "an unknown slash command is ignored without a model call" "/lgtm" ""
+  $'/ask does every leg roll back?\nsecond line is ignored' "$pr_url_arg" "$cfg_arg" ask "does every leg roll back?"
+expect_comment "/ask keeps a mid-question --x=y inside the one question argument" \
+  "/ask is this safe --config.openai.api_base=http://x" "$pr_url_arg" "$cfg_arg" ask "is this safe --config.openai.api_base=http://x"
+expect_comment "an unknown slash command is ignored without a model call" "/lgtm"
+expect_comment "a bare / is ignored without a model call" "/"
 expect_comment_dies "/ask with no question is rejected" "/ask"
 expect_comment_dies "/ask shaped like a settings override is rejected" "/ask --config.openai.api_base=http://x"
 
