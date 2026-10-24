@@ -304,15 +304,7 @@ impl VerificationRouter {
         let proof = ProofEnvelope {
             proof_id: request.proof_id,
             strategy: request.strategy,
-            source_chain: match request.source_chain {
-                gateway_types::ExternalChainId::EthereumSepolia
-                | gateway_types::ExternalChainId::BaseSepolia
-                | gateway_types::ExternalChainId::EthereumMainnet
-                | gateway_types::ExternalChainId::BaseMainnet
-                | gateway_types::ExternalChainId::Other(_) => ChainKind::Evm { chain_id: 1 },
-                gateway_types::ExternalChainId::SolanaDevnet
-                | gateway_types::ExternalChainId::SolanaMainnet => ChainKind::Solana,
-            },
+            source_chain: gateway_chain_kind(request.source_chain),
             destination_chain: ChainKind::X3,
             payload: request.proof_payload,
             expected_asset_id: [0u8; 32],
@@ -346,6 +338,20 @@ impl VerificationRouter {
                 confidence_bps: 0,
             },
         }
+    }
+}
+
+fn gateway_chain_kind(chain: gateway_types::ExternalChainId) -> ChainKind {
+    match chain {
+        gateway_types::ExternalChainId::EthereumSepolia => ChainKind::Evm {
+            chain_id: 11_155_111,
+        },
+        gateway_types::ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 84_532 },
+        gateway_types::ExternalChainId::EthereumMainnet => ChainKind::Evm { chain_id: 1 },
+        gateway_types::ExternalChainId::BaseMainnet => ChainKind::Evm { chain_id: 8_453 },
+        gateway_types::ExternalChainId::Other(chain_id) => ChainKind::Evm { chain_id },
+        gateway_types::ExternalChainId::SolanaDevnet
+        | gateway_types::ExternalChainId::SolanaMainnet => ChainKind::Solana,
     }
 }
 
@@ -634,11 +640,13 @@ impl Verifier for X3InternalVerifier {
         VerificationStrategy::X3Internal
     }
 
-    /// Internal-only strategy: an X3-internal transfer is proven by the kernel
-    /// itself, so there is nothing external to verify. The router only routes
-    /// `VerificationStrategy::X3Internal` proofs here, and this verifier must
-    /// never be registered under an external-chain strategy.
-    fn verify(&self, _proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+    /// Internal-only strategy: both endpoints must be X3. Without this check a
+    /// caller could relabel an external proof as `X3Internal` and have the
+    /// unconditional internal-kernel rule accept it without external evidence.
+    fn verify(&self, proof: &ProofEnvelope) -> Result<VerificationOutcome, VerificationError> {
+        if proof.source_chain != ChainKind::X3 || proof.destination_chain != ChainKind::X3 {
+            return Err(VerificationError::UnsupportedChain);
+        }
         Ok(VerificationOutcome {
             accepted: true,
             reason: "x3_internal_kernel_is_the_proof",
@@ -775,9 +783,48 @@ mod tests {
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(X3InternalVerifier));
 
-        let proof = dummy_proof(VerificationStrategy::X3Internal);
+        let mut proof = dummy_proof(VerificationStrategy::X3Internal);
+        proof.source_chain = ChainKind::X3;
         let outcome = router.route(&proof).expect("should verify");
         assert!(outcome.accepted);
+    }
+
+    #[test]
+    fn an_external_chain_cannot_select_the_x3_internal_bypass() {
+        let mut router = VerificationRouter::new();
+        router.register_verifier(Arc::new(X3InternalVerifier));
+        let proof = dummy_proof(VerificationStrategy::X3Internal);
+
+        assert_eq!(
+            router.route(&proof),
+            Err(VerificationError::UnsupportedChain)
+        );
+    }
+
+    #[test]
+    fn gateway_chain_ids_remain_chain_specific() {
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::EthereumMainnet),
+            ChainKind::Evm { chain_id: 1 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::EthereumSepolia),
+            ChainKind::Evm {
+                chain_id: 11_155_111
+            }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::BaseMainnet),
+            ChainKind::Evm { chain_id: 8_453 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::BaseSepolia),
+            ChainKind::Evm { chain_id: 84_532 }
+        );
+        assert_eq!(
+            gateway_chain_kind(gateway_types::ExternalChainId::SolanaMainnet),
+            ChainKind::Solana
+        );
     }
 
     #[test]
