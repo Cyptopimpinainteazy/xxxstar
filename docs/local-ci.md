@@ -49,6 +49,7 @@ scripts/local-ci.sh --loom          # + the loom model checks (needs the pinned 
 scripts/local-ci.sh --mutants       # + cargo-mutants over the P0 packages
 scripts/local-ci.sh --release       # + make mainnet-check
 scripts/local-ci.sh --deep          # + cargo test --workspace (slow, broadest signal)
+scripts/local-ci.sh --pr-agent      # + the PR-Agent wiring self-test (offline, no model call)
 scripts/local-ci.sh --all           # everything (the release bar)
 scripts/local-ci.sh --list          # show the gate list, run nothing
 scripts/local-ci.sh --pre-push      # what the hook runs
@@ -57,7 +58,8 @@ scripts/local-ci.sh --publish-status # post the verdict as the x3/local-ci commi
 
 Equivalent make targets: `make local-ci`, `local-ci-live`, `local-ci-cross`,
 `local-ci-variants`, `local-ci-loom`, `local-ci-release`, `local-ci-all`,
-`local-ci-prepush`, `local-ci-list`, `local-ci-dry-run`, `local-ci-deep`.
+`local-ci-prepush`, `local-ci-list`, `local-ci-dry-run`, `local-ci-deep`,
+`local-ci-pr-agent`.
 
 `--loom` adds `bash scripts/run-loom-tests.sh`, which runs
 `tests/loom-concurrency` the way its header documents:
@@ -72,6 +74,12 @@ depends on `generator`); on a box without the pinned toolchain the gate reports
 automated check the repository has (all test targets in all workspace members;
 5,068 tests across 358 binaries as of 2026-09-18). It is slow, so it is opt-in
 and `--all`/`make local-ci-deep` include it for release-candidate runs.
+
+`--pr-agent` adds `bash services/pr-agent/selftest.sh`: it parses `.pr_agent.toml`,
+checks the scripts, and drives `services/pr-agent/review.sh` against a recording
+shim to assert the argv PR-Agent receives. It is offline and calls no model, so it
+is deterministic; the paid review path is covered by `services/pr-agent/check.sh`
+and is not part of any gate. `--all` includes it.
 
 `--mutants` adds `bash scripts/x3-mutants-gate.sh`, a bounded `cargo-mutants`
 campaign over `pallet-x3-supply-ledger` — the pallet that enforces the king
