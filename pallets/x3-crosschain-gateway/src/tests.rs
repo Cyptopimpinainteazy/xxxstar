@@ -1867,3 +1867,20 @@ fn the_payload_the_old_bitcoin_verifier_accepted_is_refused() {
         );
     });
 }
+
+#[test]
+fn enable_route_refuses_x3_internal_verification() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        assert_noop!(
+            X3CrosschainGateway::enable_route(
+                RuntimeOrigin::root(),
+                RouteConfig {
+                    verification_level: crate::RouteVerificationLevel::X3Internal,
+                    ..route()
+                },
+            ),
+            Error::<Test>::InternalVerificationOnExternalRoute
+        );
+    });
+}

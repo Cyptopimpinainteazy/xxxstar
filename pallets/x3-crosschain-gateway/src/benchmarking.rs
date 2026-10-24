@@ -93,8 +93,13 @@ mod benchmarks {
             daily_reset_at_block: 0,
             pending_limit: 10,
             finality_requirement: 12,
-            // The one level whose verifier accepts a proof this repository can build.
-            verification_level: RouteVerificationLevel::X3Internal,
+            // `X3Internal` is refused on a gateway route (it needs no external evidence). The
+            // quorum verifier accepts this payload only under `test-verifier`; in a production
+            // build it fails closed and the proof-dependent benchmarks report `Weightless`.
+            verification_level: RouteVerificationLevel::ValidatorQuorum {
+                threshold: 2,
+                total: 3,
+            },
             fee_bps: 10,
             mode: GatewayMode::TestnetLive,
             require_dispute_window: false,

@@ -169,7 +169,12 @@ pub fn route() -> RouteConfig {
         daily_reset_at_block: 0,
         pending_limit: 10,
         finality_requirement: 12,
-        verification_level: RouteVerificationLevel::X3Internal,
+        // A gateway route needs external evidence; under `test-verifier` the quorum stub
+        // accepts any non-empty payload, which is what these accounting tests need.
+        verification_level: RouteVerificationLevel::ValidatorQuorum {
+            threshold: 2,
+            total: 3,
+        },
         fee_bps: 10,
         mode: GatewayMode::TestnetLive,
         require_dispute_window: false,

@@ -873,6 +873,10 @@ pub mod pallet {
         InvalidSolanaStakeThreshold,
         /// The total or signed stake could not be represented.
         SolanaStakeOverflow,
+        /// `X3Internal` verification on a gateway route. Every gateway route has an external
+        /// source chain, and the internal strategy needs no external evidence, so a route
+        /// configured with it would credit deposits nobody proved.
+        InternalVerificationOnExternalRoute,
     }
 
     // ── Hooks ───────────────────────────────────────────────────────────
@@ -927,6 +931,10 @@ pub mod pallet {
             ensure!(
                 config.min_amount <= config.max_amount,
                 Error::<T>::AmountAboveMaximum
+            );
+            ensure!(
+                config.verification_level != RouteVerificationLevel::X3Internal,
+                Error::<T>::InternalVerificationOnExternalRoute
             );
             match config.mode {
                 GatewayMode::Disabled | GatewayMode::DryRun => {}
