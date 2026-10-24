@@ -8,6 +8,7 @@ const TEST_DATABASE_URL_ENV: &str = "X3_GATEWAY_TEST_DATABASE_URL";
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires a real Postgres instance; run via scripts/gateway-postgres-integration.sh"]
 async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
+    funding_workflow_enforces_state_and_preserves_audit().await;
     fresh_schema_supports_chain_queries().await;
     gateway_schema_upgrades_both_legacy_histories().await;
     control_plane_roundtrip_and_duplicate_vote_rejection().await;
@@ -30,10 +31,28 @@ async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
         .await
         .expect("read seeded funding swarm scoreboard");
 
-    assert!(
-        before.total_grants >= 3,
-        "migration seed data should create the three demo grants"
-    );
+    let examples: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM funding_swarm_grants WHERE grant_id LIKE 'grant-demo-%'",
+    )
+    .fetch_one(db.pool())
+    .await
+    .unwrap();
+    assert_eq!(examples, 3, "historical examples must remain inspectable");
+    assert_eq!(before.funded_grants, 0, "examples are not verified awards");
+    assert_eq!(before.total_awarded_usd, 0.0);
+    assert!(db
+        .list_funding_swarm_grants(100, 0)
+        .await
+        .unwrap()
+        .iter()
+        .all(|g| !g.grant_id.starts_with("grant-demo-")));
+    assert!(db
+        .list_funding_swarm_timeline(100, 0)
+        .await
+        .unwrap()
+        .iter()
+        .all(|item| !item.item_id.starts_with("event-demo-")
+            && !item.item_id.starts_with("pub-demo-")));
 
     let external_id = format!("IT-{}", uuid::Uuid::new_v4());
     let created = db
@@ -70,6 +89,118 @@ async fn migrations_and_funding_swarm_roundtrip_against_postgres() {
 
     assert_eq!(after.total_grants, before.total_grants + 1);
     assert_eq!(after.open_grants, before.open_grants + 1);
+}
+
+async fn funding_workflow_enforces_state_and_preserves_audit() {
+    use x3_gateway::error::GatewayError;
+    let url = std::env::var(TEST_DATABASE_URL_ENV).unwrap();
+    let db = Database::connect(&DatabaseConfig::new(url.clone()))
+        .await
+        .unwrap();
+    let grant = db
+        .admin_create_funding_swarm_grant(NewFundingSwarmGrant {
+            external_id: uuid::Uuid::new_v4().to_string(),
+            title: "Funding security regression".into(),
+            sponsor: "X3 test".into(),
+            amount_usd: Some(100.0),
+            metadata: None,
+        })
+        .await
+        .unwrap();
+    let id = &grant.grant_id;
+    assert!(
+        matches!(
+            db.admin_advance_funding_swarm_stage(id, "approved", "approved")
+                .await,
+            Err(GatewayError::BadRequest(_))
+        ),
+        "cannot approve before research and drafting"
+    );
+    assert!(
+        matches!(
+            db.admin_advance_funding_swarm_stage(id, "submitted", "award_paid")
+                .await,
+            Err(GatewayError::BadRequest(_))
+        ),
+        "cannot invent an award or payment"
+    );
+    assert!(
+        matches!(
+            db.admin_advance_funding_swarm_stage(id, "research", "funded")
+                .await,
+            Err(GatewayError::BadRequest(_))
+        ),
+        "stage/status pair must be canonical"
+    );
+    let (left, right) = tokio::join!(
+        db.admin_advance_funding_swarm_stage(id, "research", "open"),
+        db.admin_advance_funding_swarm_stage(id, "research", "open")
+    );
+    assert_eq!(
+        usize::from(left.is_ok()) + usize::from(right.is_ok()),
+        1,
+        "exactly one concurrent transition may commit"
+    );
+    let events: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM funding_swarm_events WHERE grant_id = $1")
+            .bind(id)
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+    assert_eq!(events, 1, "rejected actions cannot emit success events");
+
+    // Make only the audit insertion fail. State and audit must roll back together.
+    sqlx::raw_sql("CREATE FUNCTION reject_funding_audit_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'audit unavailable'; END $$;
+        CREATE TRIGGER reject_funding_audit_test BEFORE INSERT ON funding_swarm_events FOR EACH ROW EXECUTE FUNCTION reject_funding_audit_test();")
+        .execute(db.pool()).await.unwrap();
+    assert!(db
+        .admin_advance_funding_swarm_stage(id, "draft", "pending_human_approval")
+        .await
+        .is_err());
+    sqlx::raw_sql("DROP TRIGGER reject_funding_audit_test ON funding_swarm_events; DROP FUNCTION reject_funding_audit_test();")
+        .execute(db.pool()).await.unwrap();
+    let stage: String =
+        sqlx::query_scalar("SELECT stage FROM funding_swarm_grants WHERE grant_id=$1")
+            .bind(id)
+            .fetch_one(db.pool())
+            .await
+            .unwrap();
+    assert_eq!(stage, "research", "failed audit must not advance state");
+    db.admin_advance_funding_swarm_stage(id, "draft", "pending_human_approval")
+        .await
+        .unwrap();
+    db.admin_advance_funding_swarm_stage(id, "approved", "approved")
+        .await
+        .unwrap();
+    assert!(db
+        .admin_advance_funding_swarm_stage(id, "approved", "approved")
+        .await
+        .is_err());
+    let reopened = Database::connect(&DatabaseConfig::new(url)).await.unwrap();
+    let events: Vec<(String, String)> = sqlx::query_as("SELECT event_type, visibility FROM funding_swarm_events WHERE grant_id=$1 ORDER BY created_at, event_id")
+        .bind(id).fetch_all(reopened.pool()).await.unwrap();
+    assert_eq!(
+        events,
+        vec![
+            ("ai_research_started".into(), "private".into()),
+            ("ai_draft_ready".into(), "private".into()),
+            ("human_approved".into(), "public".into())
+        ]
+    );
+    assert!(reopened
+        .admin_advance_funding_swarm_stage("unknown", "research", "open")
+        .await
+        .unwrap()
+        .is_none());
+    sqlx::query("UPDATE funding_swarm_grants SET stage='corrupted' WHERE grant_id=$1")
+        .bind(id)
+        .execute(db.pool())
+        .await
+        .unwrap();
+    assert!(reopened
+        .admin_advance_funding_swarm_stage(id, "research", "open")
+        .await
+        .is_err());
 }
 
 async fn fresh_schema_supports_chain_queries() {
