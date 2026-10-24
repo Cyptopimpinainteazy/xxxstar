@@ -1,0 +1,32 @@
+---
+# X3 testnet — shared, public deployment config. Key material never lives here: it stays
+# in the gitignored genesis output directory on the controller (x3_genesis_outdir).
+
+x3_repo_root: "{{ playbook_dir }}/../.."
+x3_validator_count: 7
+x3_genesis_force: false
+
+# Controller-side artifacts.
+x3_binary_src: "{{ x3_repo_root }}/target/release/x3-chain-node"
+x3_genesis_outdir: "{{ x3_repo_root }}/deployment/chain-specs/fresh/generated"
+x3_keys_dir: "{{ x3_genesis_outdir }}/validator-keys"
+x3_spec_src: "{{ x3_genesis_outdir }}/x3-testnet-plain.json"
+
+# Per-host layout (operator user, no root).
+x3_home: "{{ ansible_env.HOME }}/x3-testnet"
+x3_bin: "{{ x3_home }}/bin/x3-chain-node"
+x3_spec: "{{ x3_home }}/spec/x3-testnet-plain.json"
+
+# Ports: validator N listens on base+N, so several validators share a host.
+x3_p2p_base: 30340
+x3_rpc_base: 9960
+x3_prometheus_base: 9640
+
+# RPC stays loopback + Safe. Verification queries it over SSH.
+x3_rpc_methods: Safe
+
+# Health expectations for 30-verify.yml.
+x3_verify_timeout_sec: 180
+# 4 of 6 possible: GRANDPA needs 5 of 7 voters, so a validator with fewer peers is
+# one partition away from stalling finality.
+x3_min_peers: 4
