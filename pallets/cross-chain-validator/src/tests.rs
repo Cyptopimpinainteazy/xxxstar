@@ -543,6 +543,59 @@ fn governance_can_revoke_header_attesters_and_the_path_fails_closed() {
 }
 
 #[test]
+fn delayed_finalized_headers_are_retained_without_regressing_the_head() {
+    new_test_ext().execute_with(|| {
+        use x3_verification_router::header_finality::HEADER_FINALITY_ETHEREUM;
+
+        let key = finality_key(3);
+        assert_ok!(crate::Pallet::<MockRuntime>::set_header_attesters(
+            RuntimeOrigin::root(),
+            vec![key.verifying_key().to_bytes()],
+            1,
+            Vec::new(),
+            0,
+        ));
+
+        let finalize = |height: u64, seed: u8| {
+            let block_hash = H256::repeat_byte(seed);
+            let state_root = H256::repeat_byte(seed.wrapping_add(1));
+            let receipts_root = H256::repeat_byte(seed.wrapping_add(2));
+            let certificate = finality_certificate(
+                HEADER_FINALITY_ETHEREUM,
+                height,
+                block_hash,
+                state_root,
+                receipts_root,
+                std::slice::from_ref(&key),
+            );
+            crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+                RuntimeOrigin::signed(99),
+                height,
+                block_hash,
+                state_root,
+                receipts_root,
+                certificate,
+            )
+        };
+
+        assert_ok!(finalize(44, 0x10));
+        assert_ok!(finalize(43, 0x20));
+        assert_eq!(
+            crate::LastFinalizedEvmHeader::<MockRuntime>::get().map(|header| header.block_number),
+            Some(44)
+        );
+        assert_eq!(
+            crate::FinalizedEvmHeaders::<MockRuntime>::get(43).map(|header| header.block_hash),
+            Some(H256::repeat_byte(0x20))
+        );
+        assert_eq!(
+            crate::FinalizedEvmHeaders::<MockRuntime>::get(44).map(|header| header.block_hash),
+            Some(H256::repeat_byte(0x10))
+        );
+    });
+}
+
+#[test]
 fn duplicate_attesters_are_rejected_without_overwriting_the_previous_set() {
     new_test_ext().execute_with(|| {
         let key = finality_key(1).verifying_key().to_bytes();

@@ -594,10 +594,12 @@ pub mod pallet {
                 )
                 .map_err(|_| Error::<T>::InvalidEthereumExecutionProof)?;
 
-            if let Some(last) = LastFinalizedEvmHeader::<T>::get() {
+            if let Some(existing) = FinalizedEvmHeaders::<T>::get(verified.block_number) {
                 ensure!(
-                    verified.block_number > last.block_number,
-                    Error::<T>::NonMonotonicTimestamp
+                    existing.block_hash == verified.block_hash
+                        && existing.state_root == verified.state_root
+                        && existing.merkle_root == verified.receipts_root,
+                    Error::<T>::InvalidEvmHeader
                 );
             }
             let proof_bytes = proof.encode();
@@ -611,7 +613,11 @@ pub mod pallet {
                     .saturated_into::<u32>(),
                 validation_proof: proof_bytes,
             };
-            LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            if LastFinalizedEvmHeader::<T>::get()
+                .is_none_or(|last| verified.block_number > last.block_number)
+            {
+                LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            }
             FinalizedEvmHeaders::<T>::insert(verified.block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::BeaconSyncCommittee);
             EvmMerkleRoots::<T>::insert(verified.block_number, verified.receipts_root);
@@ -672,10 +678,12 @@ pub mod pallet {
                 &certificate,
             )
             .map_err(|_| Error::<T>::InvalidHeaderCertificate)?;
-            if let Some(last) = LastFinalizedEvmHeader::<T>::get() {
+            if let Some(existing) = FinalizedEvmHeaders::<T>::get(block_number) {
                 ensure!(
-                    block_number > last.block_number,
-                    Error::<T>::NonMonotonicTimestamp
+                    existing.block_hash == block_hash
+                        && existing.state_root == state_root
+                        && existing.merkle_root == receipts_root,
+                    Error::<T>::InvalidEvmHeader
                 );
             }
             let header_info = EvmHeaderInfo {
@@ -688,7 +696,11 @@ pub mod pallet {
                     .saturated_into::<u32>(),
                 validation_proof: certificate,
             };
-            LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            if LastFinalizedEvmHeader::<T>::get()
+                .is_none_or(|last| block_number > last.block_number)
+            {
+                LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            }
             FinalizedEvmHeaders::<T>::insert(block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::AttesterQuorum);
             EvmMerkleRoots::<T>::insert(block_number, receipts_root);
