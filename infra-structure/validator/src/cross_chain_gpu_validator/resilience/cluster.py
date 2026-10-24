@@ -47,7 +47,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable
 
-from cross_chain_gpu_validator.resilience.signer_lock import SignerLock, SignerAuthority
+from cross_chain_gpu_validator.resilience.signer_lock import SignerAuthority, SignerLock
 
 logger = logging.getLogger("x3.cluster")
 
@@ -65,20 +65,22 @@ DEFAULT_QUORUM_MAJORITY = 0.51  # 51% majority
 
 class ClusterRole(Enum):
     """Role of a node in the cluster."""
-    LEADER = "leader"           # Active primary, holds signer lock
-    FOLLOWER = "follower"       # Warm standby, ready to promote
-    OBSERVER = "observer"       # Cold standby, not in quorum
-    CANDIDATE = "candidate"     # Running for election
-    UNKNOWN = "unknown"         # Not yet determined
+
+    LEADER = "leader"  # Active primary, holds signer lock
+    FOLLOWER = "follower"  # Warm standby, ready to promote
+    OBSERVER = "observer"  # Cold standby, not in quorum
+    CANDIDATE = "candidate"  # Running for election
+    UNKNOWN = "unknown"  # Not yet determined
 
 
 class ClusterState(Enum):
     """State of the cluster."""
-    STABLE = "stable"           # Leader is healthy
-    ELECTION = "election"       # Leader election in progress
-    DEGRADED = "degraded"       # Some nodes unreachable
-    SPLIT_BRAIN = "split_brain" # Multiple leaders detected
-    RECOVERING = "recovering"   # Healing from split-brain
+
+    STABLE = "stable"  # Leader is healthy
+    ELECTION = "election"  # Leader election in progress
+    DEGRADED = "degraded"  # Some nodes unreachable
+    SPLIT_BRAIN = "split_brain"  # Multiple leaders detected
+    RECOVERING = "recovering"  # Healing from split-brain
 
 
 # ─── Data Types ───────────────────────────────────────────────
@@ -87,6 +89,7 @@ class ClusterState(Enum):
 @dataclass
 class ClusterNode:
     """Represents a node in the validator cluster."""
+
     node_id: str
     region: str
     role: ClusterRole
@@ -114,6 +117,7 @@ class ClusterNode:
 @dataclass
 class ClusterConfig:
     """Configuration for the cluster coordinator."""
+
     cluster_id: str = "x3-default"
     node_id: str = ""
     region: str = "unknown"
@@ -136,7 +140,11 @@ class ClusterConfig:
             node_id=os.getenv("X3_NODE_ID", ""),
             region=os.getenv("X3_REGION", "unknown"),
             role=ClusterRole(os.getenv("X3_CLUSTER_ROLE", "follower")),
-            peers=os.getenv("X3_CLUSTER_PEERS", "").split(",") if os.getenv("X3_CLUSTER_PEERS") else [],
+            peers=(
+                os.getenv("X3_CLUSTER_PEERS", "").split(",")
+                if os.getenv("X3_CLUSTER_PEERS")
+                else []
+            ),
             rpc_endpoint=os.getenv("X3_RPC_ENDPOINT", "http://127.0.0.1:9933"),
             redis_url=os.getenv("CCGV_REDIS_URL", "redis://127.0.0.1:6379/0"),
             heartbeat_interval=float(os.getenv("X3_HEARTBEAT_INTERVAL", "5.0")),
@@ -178,6 +186,7 @@ class ClusterCoordinator:
         # Generate node ID if not set
         if not self._config.node_id:
             import uuid
+
             self._config.node_id = f"{self._config.region}-{uuid.uuid4().hex[:6]}"
 
         self._on_leader_elected = on_leader_elected
@@ -185,7 +194,9 @@ class ClusterCoordinator:
         self._on_split_brain = on_split_brain
 
         # State
-        self._lock = threading.Lock()
+        # Several status and election paths inspect helper properties while
+        # holding this lock. Re-entrant locking keeps those snapshots atomic.
+        self._lock = threading.RLock()
         self._stop = threading.Event()
         self._cluster_state = ClusterState.STABLE
         self._current_term = 0
@@ -258,8 +269,10 @@ class ClusterCoordinator:
         """Start the cluster coordinator."""
         logger.info(
             "ClusterCoordinator starting — cluster=%s, node=%s, region=%s, role=%s",
-            self._config.cluster_id, self._config.node_id,
-            self._config.region, self._config.role.value,
+            self._config.cluster_id,
+            self._config.node_id,
+            self._config.region,
+            self._config.role.value,
         )
 
         os.makedirs(self._config.data_dir, exist_ok=True)
@@ -293,7 +306,8 @@ class ClusterCoordinator:
 
         logger.info(
             "ClusterCoordinator started — %d nodes, %d peers",
-            len(self._nodes), len(self._config.peers),
+            len(self._nodes),
+            len(self._config.peers),
         )
 
     def stop(self) -> None:
@@ -316,7 +330,9 @@ class ClusterCoordinator:
 
     def _heartbeat_sender_loop(self) -> None:
         """Send heartbeats to Redis at regular intervals."""
-        redis_key = f"x3:cluster:{self._config.cluster_id}:heartbeat:{self._config.node_id}"
+        redis_key = (
+            f"x3:cluster:{self._config.cluster_id}:heartbeat:{self._config.node_id}"
+        )
 
         while not self._stop.is_set():
             try:
@@ -347,6 +363,7 @@ class ClusterCoordinator:
         """Write heartbeat to Redis (best-effort)."""
         try:
             import redis as redis_lib
+
             r = redis_lib.Redis.from_url(
                 self._config.redis_url,
                 socket_timeout=2,
@@ -391,12 +408,16 @@ class ClusterCoordinator:
                 if was_alive and not node.is_alive:
                     logger.warning(
                         "Node %s (%s) is DEAD — last heartbeat %.1fs ago",
-                        node_id, node.region, elapsed,
+                        node_id,
+                        node.region,
+                        elapsed,
                     )
                     state_changed = True
                 elif not was_alive and node.is_alive:
                     logger.info(
-                        "Node %s (%s) RECOVERED", node_id, node.region,
+                        "Node %s (%s) RECOVERED",
+                        node_id,
+                        node.region,
                     )
                     state_changed = True
 
@@ -416,7 +437,9 @@ class ClusterCoordinator:
             self._cluster_state = ClusterState.DEGRADED
             logger.warning(
                 "Cluster DEGRADED — %d/%d nodes alive (quorum: %.0f%%)",
-                alive, total, self._config.quorum_majority * 100,
+                alive,
+                total,
+                self._config.quorum_majority * 100,
             )
 
     # ── Leader Election ───────────────────────────────────────
@@ -449,7 +472,9 @@ class ClusterCoordinator:
                 return
 
             if self._leader_id not in self._nodes:
-                logger.warning("Leader %s not in registry — starting election", self._leader_id)
+                logger.warning(
+                    "Leader %s not in registry — starting election", self._leader_id
+                )
                 self._start_election()
                 return
 
@@ -457,7 +482,8 @@ class ClusterCoordinator:
             if not leader.is_alive:
                 logger.warning(
                     "Leader %s (%s) is DEAD — starting election",
-                    self._leader_id, leader.region,
+                    self._leader_id,
+                    leader.region,
                 )
                 self._start_election()
                 return
@@ -472,7 +498,8 @@ class ClusterCoordinator:
 
         logger.info(
             "Starting election — term=%d, candidate=%s",
-            self._current_term, self._config.node_id,
+            self._current_term,
+            self._config.node_id,
         )
 
         # Check if we can become leader
@@ -516,8 +543,10 @@ class ClusterCoordinator:
 
         logger.warning(
             "ELECTED LEADER — node=%s, term=%d, region=%s (change #%d)",
-            self._config.node_id, self._current_term,
-            self._config.region, self._leader_changes,
+            self._config.node_id,
+            self._current_term,
+            self._config.region,
+            self._leader_changes,
         )
 
         if old_leader and self._on_leader_lost:
@@ -575,7 +604,8 @@ class ClusterCoordinator:
 
             logger.error(
                 "SPLIT-BRAIN DETECTED — %d leaders: %s",
-                len(leaders), leaders,
+                len(leaders),
+                leaders,
             )
 
             if self._on_split_brain:
@@ -606,7 +636,8 @@ class ClusterCoordinator:
 
         logger.warning(
             "Split-brain resolved — leader=%s (term=%d)",
-            best_leader, best_term,
+            best_leader,
+            best_term,
         )
 
         # If we're a false leader, step down
@@ -683,12 +714,12 @@ class ClusterCoordinator:
                 "is_leader": self.is_leader,
                 "is_signer": self._signer.is_signer,
                 "signer_authority": self._signer.authority.value,
-                "nodes": {
-                    nid: node.to_dict() for nid, node in self._nodes.items()
-                },
+                "nodes": {nid: node.to_dict() for nid, node in self._nodes.items()},
                 "alive_count": self.alive_count,
                 "total_count": self.node_count,
-                "quorum_needed": max(1, int(self.node_count * self._config.quorum_majority)),
+                "quorum_needed": max(
+                    1, int(self.node_count * self._config.quorum_majority)
+                ),
                 "elections": self._elections,
                 "leader_changes": self._leader_changes,
                 "split_brain_events": self._split_brain_events,
@@ -712,47 +743,62 @@ def main() -> None:
         description="X3 Cluster Coordinator — multi-machine validator failover"
     )
     parser.add_argument(
-        "--cluster-id", default="x3-default",
+        "--cluster-id",
+        default="x3-default",
         help="Unique cluster identifier",
     )
     parser.add_argument(
-        "--node-id", default="",
+        "--node-id",
+        default="",
         help="Unique node identifier",
     )
     parser.add_argument(
-        "--region", default="unknown",
+        "--region",
+        default="unknown",
         help="Region/AZ of this node",
     )
     parser.add_argument(
-        "--role", choices=["leader", "follower", "observer"], default="follower",
+        "--role",
+        choices=["leader", "follower", "observer"],
+        default="follower",
         help="Initial role (default: follower)",
     )
     parser.add_argument(
-        "--peers", default="",
+        "--peers",
+        default="",
         help="Comma-separated peer node IDs",
     )
     parser.add_argument(
-        "--rpc-endpoint", default="http://127.0.0.1:9933",
+        "--rpc-endpoint",
+        default="http://127.0.0.1:9933",
         help="RPC endpoint for this node",
     )
     parser.add_argument(
-        "--redis-url", default="redis://127.0.0.1:6379/0",
+        "--redis-url",
+        default="redis://127.0.0.1:6379/0",
         help="Redis connection URL",
     )
     parser.add_argument(
-        "--heartbeat-interval", type=float, default=DEFAULT_HEARTBEAT_INTERVAL,
+        "--heartbeat-interval",
+        type=float,
+        default=DEFAULT_HEARTBEAT_INTERVAL,
         help="Heartbeat interval in seconds",
     )
     parser.add_argument(
-        "--heartbeat-timeout", type=float, default=DEFAULT_HEARTBEAT_TIMEOUT,
+        "--heartbeat-timeout",
+        type=float,
+        default=DEFAULT_HEARTBEAT_TIMEOUT,
         help="Heartbeat timeout before declaring node dead",
     )
     parser.add_argument(
-        "--election-timeout", type=float, default=DEFAULT_ELECTION_TIMEOUT,
+        "--election-timeout",
+        type=float,
+        default=DEFAULT_ELECTION_TIMEOUT,
         help="Timeout before triggering leader election",
     )
     parser.add_argument(
-        "--log-level", default="INFO",
+        "--log-level",
+        default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="Logging level",
     )

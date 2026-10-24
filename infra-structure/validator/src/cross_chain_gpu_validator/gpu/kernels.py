@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import Iterable
 
 from .cuda_loader import CudaRuntime
+from .ed25519_gpu import Ed25519BatchVerifier
 from .keccak_gpu import KeccakBatchHasher
 from .secp256k1_gpu import Secp256k1BatchVerifier
 
@@ -47,6 +48,12 @@ class GPUKernels:
             parity_check=parity_check,
             allow_failover=allow_failover,
         )
+        self._ed25519 = Ed25519BatchVerifier(
+            self.runtime,
+            kernel_dir,
+            parity_check=parity_check,
+            allow_failover=allow_failover,
+        )
 
     def sha256_batch(self, data: Iterable[bytes]) -> list[bytes]:
         """Batch SHA-256 hashing.
@@ -63,8 +70,11 @@ class GPUKernels:
         signatures: Iterable[bytes],
         pubkeys: Iterable[bytes],
     ) -> list[bool]:
-        """Batch Ed25519 signature verification."""
-        raise GPUKernelError("Ed25519 GPU execution must go through x3-vm GPU hostcalls")
+        """Batch Ed25519 verification with GPU preference and CPU failover."""
+        try:
+            return self._ed25519.verify_batch(signatures, messages, pubkeys)
+        except Exception as exc:
+            raise GPUKernelError(str(exc)) from exc
 
     def poh_verify(self, hashes: list[bytes], count: int) -> bool:
         """Verify Proof-of-History sequence."""

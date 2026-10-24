@@ -18,26 +18,32 @@ Lock Protocol
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
 import uuid
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from redis import Redis
 
 
 class SignerAuthority(Enum):
     """Current signing authority status."""
-    HOLDER = "holder"       # We hold the lock — may sign
-    STANDBY = "standby"     # Lock held by another node — must NOT sign
-    ACQUIRING = "acquiring" # Trying to acquire
-    RELEASED = "released"   # Explicitly released
+
+    HOLDER = "holder"  # We hold the lock — may sign
+    STANDBY = "standby"  # Lock held by another node — must NOT sign
+    ACQUIRING = "acquiring"  # Trying to acquire
+    RELEASED = "released"  # Explicitly released
 
 
 @dataclass
 class SignerLockState:
     """Snapshot of the signer lock."""
+
     authority: SignerAuthority
     holder_id: str
     fencing_token: int
@@ -92,7 +98,7 @@ class SignerLock:
         self._fencing_token = 0
         self._acquired_at = 0.0
         self._renewals = 0
-        self._redis = None
+        self._redis: Redis | None = None
 
         self._renewal_thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -109,13 +115,15 @@ class SignerLock:
             return
         try:
             import redis
-            self._redis = redis.Redis.from_url(
+
+            client = redis.Redis.from_url(
                 self._redis_url,
                 decode_responses=True,
                 socket_timeout=5,
                 socket_connect_timeout=5,
             )
-            self._redis.ping()
+            client.ping()
+            self._redis = client
         except Exception:
             self._redis = None
 
@@ -140,13 +148,13 @@ class SignerLock:
                 self._acquired_at = time.time()
                 self._renewals = 0
                 self._start_renewal()
-                if self._on_acquired:
-                    try:
-                        self._on_acquired()
-                    except Exception:
-                        pass
             else:
                 self._authority = SignerAuthority.STANDBY
+        if acquired and self._on_acquired:
+            try:
+                self._on_acquired()
+            except Exception:
+                pass
         return acquired
 
     def release(self) -> None:
@@ -232,8 +240,11 @@ class SignerLock:
     """
 
     def _acquire_redis(self) -> bool:
+        client = self._redis
+        if client is None:
+            return False
         try:
-            token = self._redis.eval(
+            token = client.eval(
                 self._ACQUIRE_SCRIPT,
                 2,
                 self._lock_key,
@@ -250,16 +261,20 @@ class SignerLock:
             return False
 
     def _release_redis(self) -> None:
+        client = self._redis
+        if client is None:
+            return
         try:
-            self._redis.eval(
-                self._RELEASE_SCRIPT, 1, self._lock_key, self._node_id
-            )
+            client.eval(self._RELEASE_SCRIPT, 1, self._lock_key, self._node_id)
         except Exception:
             pass
 
     def _renew_redis(self) -> bool:
+        client = self._redis
+        if client is None:
+            return False
         try:
-            result = self._redis.eval(
+            result = client.eval(
                 self._RENEW_SCRIPT, 1, self._lock_key, self._node_id, int(self._ttl)
             )
             if result and int(result) == 1:
@@ -287,45 +302,93 @@ class SignerLock:
                 os.O_CREAT | os.O_EXCL | os.O_WRONLY,
                 0o600,
             )
-            os.write(fd, self._node_id.encode())
-            os.close(fd)
+            payload = json.dumps(
+                {
+                    "node_id": self._node_id,
+                    "expires_at": time.time() + self._ttl,
+                }
+            ).encode()
+            try:
+                written = 0
+                while written < len(payload):
+                    chunk = os.write(fd, payload[written:])
+                    if chunk <= 0:
+                        raise OSError("failed to write signer lock payload")
+                    written += chunk
+                os.fsync(fd)
+            finally:
+                os.close(fd)
             with self._lock:
                 self._fencing_token += 1
             return True
         except FileExistsError:
-            # Check if lock is stale
             try:
-                mtime = os.path.getmtime(self._local_lock_path)
-                if time.time() - mtime > self._ttl:
-                    os.unlink(self._local_lock_path)
-                    return self._acquire_local()
+                state = self._read_local_state()
+                expires_at = (
+                    state[1]
+                    if state is not None
+                    else os.path.getmtime(self._local_lock_path) + self._ttl
+                )
             except OSError:
-                pass
+                return False
+
+            if time.time() >= expires_at:
+                stale_path = f"{self._local_lock_path}.stale.{uuid.uuid4().hex}"
+                try:
+                    os.replace(self._local_lock_path, stale_path)
+                except FileNotFoundError:
+                    return self._acquire_local()
+                except OSError:
+                    return False
+                try:
+                    os.unlink(stale_path)
+                except OSError:
+                    pass
+                return self._acquire_local()
             return False
         except OSError:
             return False
 
+    def _read_local_state(self) -> tuple[str, float] | None:
+        """Read the node id and lease expiry from the local lock file."""
+        with open(self._local_lock_path, "r", encoding="utf-8") as handle:
+            raw = handle.read().strip()
+        try:
+            payload = json.loads(raw)
+            return str(payload["node_id"]), float(payload["expires_at"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return raw, os.path.getmtime(self._local_lock_path) + self._ttl
+
     def _release_local(self) -> None:
         try:
-            with open(self._local_lock_path, "r") as f:
-                holder = f.read().strip()
-            if holder == self._node_id:
+            state = self._read_local_state()
+            if state is not None and state[0] == self._node_id:
                 os.unlink(self._local_lock_path)
         except OSError:
             pass
 
     def _renew_local(self) -> bool:
         try:
-            with open(self._local_lock_path, "r") as f:
-                holder = f.read().strip()
-            if holder == self._node_id:
-                os.utime(self._local_lock_path, None)
+            state = self._read_local_state()
+            if state is None or state[0] != self._node_id:
                 with self._lock:
-                    self._renewals += 1
-                return True
+                    self._authority = SignerAuthority.STANDBY
+                return False
+            payload = json.dumps(
+                {
+                    "node_id": self._node_id,
+                    "expires_at": time.time() + self._ttl,
+                }
+            ).encode()
+            with open(self._local_lock_path, "r+b") as handle:
+                handle.seek(0)
+                handle.truncate()
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
             with self._lock:
-                self._authority = SignerAuthority.STANDBY
-            return False
+                self._renewals += 1
+            return True
         except OSError:
             return False
 

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import os
-from typing import Iterable, Sequence
 import ctypes
+import logging
+import os
+from dataclasses import dataclass
+from typing import Iterable, Sequence
 
 from .cuda_loader import CudaRuntime
-
 
 # ---------------------------------------------------------------------------
 # secp256k1 curve constants (precomputed once at import time)
@@ -18,6 +18,8 @@ _N = int("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
 _GX = int("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16)
 _GY = int("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16)
 _G = (_GX, _GY)
+
+logger = logging.getLogger(__name__)
 
 # Type alias
 _Point = tuple[int, int] | None
@@ -173,6 +175,7 @@ class Secp256k1BatchVerifier:
         self.parity_check = parity_check
         self.allow_failover = allow_failover
         self._lib = None
+        self._gpu_ok = True
         if self.runtime.available:
             lib_path = os.path.join(self.kernel_dir, "build", "libsecp256k1_batch.so")
             if os.path.exists(lib_path):
@@ -186,27 +189,97 @@ class Secp256k1BatchVerifier:
                 ]
                 self._lib.secp256k1_ecdsa_verify_host.restype = ctypes.c_int
             elif not self.allow_failover:
-                raise RuntimeError("Missing libsecp256k1_batch.so for required GPU mode")
+                raise RuntimeError(
+                    "Missing libsecp256k1_batch.so for required GPU mode"
+                )
+        elif not self.allow_failover:
+            raise RuntimeError("CUDA runtime unavailable for required GPU mode")
+
+        if self.parity_check and self._lib is not None:
+            try:
+                self._run_gpu_parity_check()
+            except Exception as exc:
+                self._disable_gpu("parity_check_failed", exc=exc)
+
+    def _disable_gpu(self, reason: str, exc: Exception | None = None) -> None:
+        """Mark the GPU path unusable for subsequent batches."""
+        if not self._gpu_ok:
+            return
+        self._gpu_ok = False
+        message = f"GPU secp256k1 disabled (reason={reason}) -> using CPU fallback"
+        if exc is None:
+            logger.warning(message)
+        else:
+            logger.warning("%s: %s", message, exc)
+        if not self.allow_failover:
+            raise RuntimeError(message) from exc
+
+    def _run_gpu_parity_check(self) -> None:
+        """Verify a deterministic signature before trusting the GPU path."""
+        import hashlib
+
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+
+        digest = hashlib.sha256(b"x3-secp256k1-gpu-self-test").digest()
+        self_test_signer = ec.derive_private_key(0x123456789ABCDEF, ec.SECP256K1())
+        der_signature = self_test_signer.sign(
+            digest, ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+        )
+        r, s = utils.decode_dss_signature(der_signature)
+        signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+        numbers = self_test_signer.public_key().public_numbers()
+        pubkey = numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
+
+        if not self._verify_gpu([signature], [digest], [pubkey])[0]:
+            raise RuntimeError("GPU secp256k1 self-test rejected a valid signature")
 
     def verify_batch(
-        self, signatures: Iterable[bytes], messages: Iterable[bytes], pubkeys: Iterable[bytes]
+        self,
+        signatures: Iterable[bytes],
+        messages: Iterable[bytes],
+        pubkeys: Iterable[bytes],
     ) -> list[bool]:
-        """Verify a batch of signatures with GPU preference.
+        """Verify a batch with GPU preference and a real CPU parity reference."""
 
-        This uses a placeholder CPU parity check for now; replace with actual
-        secp256k1 GPU kernel bindings.
-        """
+        signatures = list(signatures)
+        messages = list(messages)
+        pubkeys = list(pubkeys)
+        if not (len(signatures) == len(messages) == len(pubkeys)):
+            raise ValueError("signature, message, and pubkey batch sizes must match")
+        if not signatures:
+            return []
+
+        # The CUDA kernel consumes uncompressed affine x||y keys. Chains such
+        # as Cosmos provide compressed SEC1 keys, which use the CPU reference.
+        if any(len(pubkey) != 64 for pubkey in pubkeys):
+            if not self.allow_failover:
+                raise RuntimeError(
+                    "GPU secp256k1 verification requires 64-byte public keys"
+                )
+            return self._verify_cpu(signatures, messages, pubkeys)
 
         try:
-            if self.runtime.available and self._lib is not None:
+            if self.runtime.available and self._lib is not None and self._gpu_ok:
                 return self._verify_gpu(signatures, messages, pubkeys)
-        except Exception:
+        except Exception as exc:
+            self._disable_gpu("runtime_failure", exc=exc)
             if self.allow_failover:
                 return self._verify_cpu(signatures, messages, pubkeys)
             raise
+        if not self.allow_failover:
+            raise RuntimeError("GPU execution unavailable and CPU failover is disabled")
         return self._verify_cpu(signatures, messages, pubkeys)
 
-    def _verify_gpu(self, signatures: Iterable[bytes], messages: Iterable[bytes], pubkeys: Iterable[bytes]) -> list[bool]:
+    def _verify_gpu(
+        self,
+        signatures: Iterable[bytes],
+        messages: Iterable[bytes],
+        pubkeys: Iterable[bytes],
+    ) -> list[bool]:
+        lib = self._lib
+        if lib is None:
+            raise RuntimeError("GPU secp256k1 library is not loaded")
         signatures_list = list(signatures)
         messages_list = list(messages)
         pubkeys_list = list(pubkeys)
@@ -217,11 +290,13 @@ class Secp256k1BatchVerifier:
         if len(signatures_list) != count or len(pubkeys_list) != count:
             raise ValueError("signature, message, and pubkey batch sizes must match")
 
-        u1_bytes, u2_bytes, r_values = self._compute_u1_u2(signatures_list, messages_list)
+        u1_bytes, u2_bytes, r_values = self._compute_u1_u2(
+            signatures_list, messages_list
+        )
         packed_pubkeys = self._pack_bytes(pubkeys_list, 64, "pubkeys")
 
         out_x = (ctypes.c_ubyte * (count * 32))()
-        status = self._lib.secp256k1_ecdsa_verify_host(
+        status = lib.secp256k1_ecdsa_verify_host(
             ctypes.c_char_p(u1_bytes),
             ctypes.c_char_p(u2_bytes),
             ctypes.c_char_p(packed_pubkeys),
@@ -240,6 +315,7 @@ class Secp256k1BatchVerifier:
         if self.parity_check:
             cpu_results = self._verify_cpu(signatures_list, messages_list, pubkeys_list)
             if gpu_results != cpu_results:
+                self._disable_gpu("parity_mismatch")
                 raise RuntimeError("GPU secp256k1 results diverged from CPU")
         return gpu_results
 
@@ -291,11 +367,34 @@ class Secp256k1BatchVerifier:
     def _verify_cpu(
         signatures: Iterable[bytes], messages: Iterable[bytes], pubkeys: Iterable[bytes]
     ) -> list[bool]:
-        """CPU fallback using Shamir's trick for ~40% faster verification."""
+        """Verify r||s signatures against x||y public keys on SECP256K1."""
+        signature_list = list(signatures)
+        message_list = list(messages)
+        pubkey_list = list(pubkeys)
+        if not (len(signature_list) == len(message_list) == len(pubkey_list)):
+            raise ValueError("signature, message, and pubkey batch sizes must match")
+
+        try:
+            from cryptography.exceptions import InvalidSignature
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.asymmetric import ec, utils
+        except ImportError:
+            return [False] * len(signature_list)
+
         results: list[bool] = []
 
-        for signature, message, pubkey in zip(signatures, messages, pubkeys):
-            if len(signature) != 64 or len(message) != 32 or len(pubkey) != 64:
+        for signature, message, pubkey in zip(
+            signature_list, message_list, pubkey_list
+        ):
+            if (
+                len(signature) != 64
+                or len(message) != 32
+                or len(pubkey)
+                not in (
+                    33,
+                    64,
+                )
+            ):
                 results.append(False)
                 continue
             r = int.from_bytes(signature[:32], "big")
@@ -303,17 +402,24 @@ class Secp256k1BatchVerifier:
             if r == 0 or s == 0 or r >= _N or s >= _N:
                 results.append(False)
                 continue
-            z = int.from_bytes(message, "big")
-            w = _inv(s, _N)
-            u1 = (z * w) % _N
-            u2 = (r * w) % _N
-            pub_x = int.from_bytes(pubkey[:32], "big")
-            pub_y = int.from_bytes(pubkey[32:], "big")
-            # Shamir's trick: compute u1*G + u2*Q in one pass
-            point = _multi_scalar_mul(u1, u2, (pub_x, pub_y))
-            if point is None:
+            try:
+                if len(pubkey) == 33:
+                    verifying_key = ec.EllipticCurvePublicKey.from_encoded_point(
+                        ec.SECP256K1(), pubkey
+                    )
+                else:
+                    pub_x = int.from_bytes(pubkey[:32], "big")
+                    pub_y = int.from_bytes(pubkey[32:], "big")
+                    verifying_key = ec.EllipticCurvePublicNumbers(
+                        pub_x, pub_y, ec.SECP256K1()
+                    ).public_key()
+                der_signature = utils.encode_dss_signature(r, s)
+                verifying_key.verify(
+                    der_signature,
+                    message,
+                    ec.ECDSA(utils.Prehashed(hashes.SHA256())),
+                )
+                results.append(True)
+            except (InvalidSignature, ValueError):
                 results.append(False)
-                continue
-            x_coord = point[0] % _N
-            results.append(x_coord == r)
         return results
