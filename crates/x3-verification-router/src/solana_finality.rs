@@ -453,7 +453,7 @@ fn verify_ed25519(pubkey: &[u8; 32], signature: &[u8; 64], message: &[u8; 32]) -
         .unwrap_or(false)
 }
 
-fn solana_finality_message_v2(
+pub fn solana_finality_message_v2(
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,

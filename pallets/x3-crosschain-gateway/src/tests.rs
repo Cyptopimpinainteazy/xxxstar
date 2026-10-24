@@ -40,6 +40,87 @@ fn solana_payload_v1(
     frame_support::BoundedVec::try_from(payload).expect("payload fits the proof bound")
 }
 
+fn solana_stake_committee(
+    keys: &[&ed25519_dalek::SigningKey],
+    stakes: &[u64],
+) -> frame_support::BoundedVec<crate::SolanaStakeEntry, crate::MaxSvmValidators> {
+    let mut entries = keys
+        .iter()
+        .zip(stakes)
+        .map(|(key, stake)| crate::SolanaStakeEntry {
+            pubkey: key.verifying_key().to_bytes(),
+            stake: *stake,
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|entry| entry.pubkey);
+    frame_support::BoundedVec::try_from(entries).expect("test stake committee fits the bound")
+}
+
+fn solana_deposit_proof_v2(
+    proof_id: [u8; 32],
+    amount: u128,
+    nonce: u64,
+    finality: (u64, u64, [u8; 32], [u8; 32]),
+    keys: &[(&ed25519_dalek::SigningKey, u64)],
+) -> crate::DepositProof {
+    use ed25519_dalek::Signer;
+
+    let (finalized_slot, parent_slot, finalized_bank_hash, parent_bank_hash) = finality;
+    let mut proof = deposit_proof_with(
+        proof_id,
+        amount,
+        ExternalChainId::SolanaDevnet,
+        solana_asset(),
+        nonce,
+        bounded_payload(""),
+    );
+    let route = solana_route();
+    let envelope = Pallet::<Test>::envelope_from_deposit(&proof, &route);
+    let mut stakes = keys
+        .iter()
+        .map(
+            |(key, stake)| x3_verification_router::SolanaValidatorStake {
+                pubkey: key.verifying_key().to_bytes(),
+                stake: *stake,
+            },
+        )
+        .collect::<Vec<_>>();
+    stakes.sort_by_key(|entry| entry.pubkey);
+    let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
+    let message = x3_verification_router::solana_finality_message_v2(
+        x3_verification_router::SolanaCluster::Devnet,
+        finalized_slot,
+        parent_slot,
+        &finalized_bank_hash,
+        &parent_bank_hash,
+        &stake_digest,
+        &envelope,
+    )
+    .expect("test proof intent fits");
+    let votes = keys
+        .iter()
+        .map(|(key, _)| {
+            (
+                key.verifying_key().to_bytes(),
+                key.sign(&message).to_bytes(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let payload = x3_verification_router::encode_solana_finality_v2(
+        x3_verification_router::SolanaCluster::Devnet,
+        finalized_slot,
+        parent_slot,
+        finalized_bank_hash,
+        parent_bank_hash,
+        stake_digest,
+        &votes,
+    )
+    .expect("test proof fits");
+    proof.proof_payload =
+        frame_support::BoundedVec::try_from(payload).expect("payload fits the proof bound");
+    proof
+}
+
 fn signing_key(seed: u8) -> ed25519_dalek::SigningKey {
     ed25519_dalek::SigningKey::from_bytes(&[seed; 32])
 }
@@ -1259,6 +1340,81 @@ fn set_svm_validators_rejects_degenerate_sets() {
 }
 
 #[test]
+fn set_solana_stake_committee_validates_the_canonical_table() {
+    new_test_ext().execute_with(|| {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let committee = solana_stake_committee(&[&a, &b], &[60, 40]);
+
+        assert_noop!(
+            X3CrosschainGateway::set_solana_stake_committee(
+                RuntimeOrigin::signed(1),
+                ExternalChainId::SolanaDevnet,
+                committee.clone(),
+                2,
+                3,
+            ),
+            sp_runtime::DispatchError::BadOrigin
+        );
+        assert_noop!(
+            X3CrosschainGateway::set_solana_stake_committee(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                committee.clone(),
+                0,
+                3,
+            ),
+            Error::<Test>::InvalidSolanaStakeThreshold
+        );
+        assert_noop!(
+            X3CrosschainGateway::set_solana_stake_committee(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                committee.clone(),
+                4,
+                3,
+            ),
+            Error::<Test>::InvalidSolanaStakeThreshold
+        );
+
+        let zero_stake = solana_stake_committee(&[&a, &b], &[60, 0]);
+        assert_noop!(
+            X3CrosschainGateway::set_solana_stake_committee(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                zero_stake,
+                2,
+                3,
+            ),
+            Error::<Test>::ZeroSolanaStake
+        );
+
+        let unsorted = frame_support::BoundedVec::try_from(
+            committee.iter().copied().rev().collect::<Vec<_>>(),
+        )
+        .expect("same bounded size");
+        assert_noop!(
+            X3CrosschainGateway::set_solana_stake_committee(
+                RuntimeOrigin::root(),
+                ExternalChainId::SolanaDevnet,
+                unsorted,
+                2,
+                3,
+            ),
+            Error::<Test>::InvalidSolanaStakeOrder
+        );
+
+        assert_ok!(X3CrosschainGateway::set_solana_stake_committee(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            committee,
+            2,
+            3,
+        ));
+        assert!(crate::SolanaStakeCommittees::<Test>::get(ExternalChainId::SolanaDevnet).is_some());
+    });
+}
+
+#[test]
 fn solana_deposit_requires_authorized_attestations() {
     new_test_ext().execute_with(|| {
         let (a, b, rogue) = (signing_key(1), signing_key(2), signing_key(9));
@@ -1353,6 +1509,125 @@ fn clearing_svm_validators_fails_closed() {
                     solana_asset(),
                     4,
                     solana_payload_v1(100, [7u8; 32], &[&a, &b]),
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+    });
+}
+
+#[test]
+fn solana_mainnet_never_falls_back_to_the_legacy_key_count_verifier() {
+    new_test_ext().execute_with(|| {
+        let a = signing_key(1);
+        let asset = ExternalAssetRef {
+            chain_id: ExternalChainId::SolanaMainnet,
+            token_address_or_mint: bounded("0xSOLTOKEN"),
+        };
+        register_asset(ExternalChainId::SolanaMainnet, "0xSOLTOKEN", [12u8; 32]);
+        let mut route = solana_route();
+        route.route_id = [12u8; 32];
+        route.external_chain_id = ExternalChainId::SolanaMainnet;
+        route.external_asset = asset.clone();
+        route.x3_asset_id = [12u8; 32];
+        enable_route_for(route);
+        assert_ok!(X3CrosschainGateway::set_svm_validators(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaMainnet,
+            validator_keys(&[&a]),
+            1,
+        ));
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [12u8; 32],
+                deposit_proof_with(
+                    [31u8; 32],
+                    100,
+                    ExternalChainId::SolanaMainnet,
+                    asset,
+                    31,
+                    solana_payload_v1(400, [7u8; 32], &[&a]),
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+    });
+}
+
+#[test]
+fn stake_weighted_solana_finality_advances_and_enforces_the_slot_floor() {
+    new_test_ext().execute_with(|| {
+        let (a, b) = (signing_key(1), signing_key(2));
+        register_asset(ExternalChainId::SolanaDevnet, "0xSOLTOKEN", [10u8; 32]);
+        enable_route_for(solana_route());
+        assert_ok!(X3CrosschainGateway::set_solana_stake_committee(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            solana_stake_committee(&[&a, &b], &[60, 40]),
+            2,
+            3,
+        ));
+
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [3u8; 32],
+            solana_deposit_proof_v2(
+                [21u8; 32],
+                100,
+                21,
+                (400, 399, [8u8; 32], [7u8; 32]),
+                &[(&a, 60), (&b, 40)],
+            ),
+        ));
+        assert_eq!(
+            crate::SolanaFinalizedSlots::<Test>::get(ExternalChainId::SolanaDevnet),
+            400
+        );
+        assert_eq!(Pallet::<Test>::external_locked([10u8; 32]), 100);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [3u8; 32],
+                solana_deposit_proof_v2(
+                    [22u8; 32],
+                    100,
+                    22,
+                    (399, 398, [6u8; 32], [5u8; 32]),
+                    &[(&a, 60), (&b, 40)],
+                ),
+            ),
+            Error::<Test>::VerificationFailed
+        );
+    });
+}
+
+#[test]
+fn stake_weighted_solana_finality_rejects_less_than_two_thirds_stake() {
+    new_test_ext().execute_with(|| {
+        let (a, b) = (signing_key(1), signing_key(2));
+        register_asset(ExternalChainId::SolanaDevnet, "0xSOLTOKEN", [10u8; 32]);
+        enable_route_for(solana_route());
+        assert_ok!(X3CrosschainGateway::set_solana_stake_committee(
+            RuntimeOrigin::root(),
+            ExternalChainId::SolanaDevnet,
+            solana_stake_committee(&[&a, &b], &[60, 40]),
+            2,
+            3,
+        ));
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(
+                RuntimeOrigin::signed(1),
+                [3u8; 32],
+                solana_deposit_proof_v2(
+                    [23u8; 32],
+                    100,
+                    23,
+                    (400, 399, [8u8; 32], [7u8; 32]),
+                    &[(&a, 60)],
                 ),
             ),
             Error::<Test>::VerificationFailed
