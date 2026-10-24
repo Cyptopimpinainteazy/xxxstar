@@ -29,6 +29,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use frame_support::pallet_prelude::*;
 use parity_scale_codec::{Decode, DecodeWithMemTracking, Encode};
+use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_io::hashing::blake2_256;
 use sp_runtime::traits::{CheckedAdd, CheckedSub, Get, Zero};
@@ -260,7 +261,22 @@ pub struct TradeConstraints {
     /// Blocks a trade may remain pending past its `submitted_at_block`. `0` disables the check;
     /// the compiled deadline still applies independently.
     pub deadline_blocks: u32,
+    /// Most of the settlement asset the trader may part with in one trade. `None` leaves the
+    /// spend uncapped beyond what the module itself compiles in.
+    ///
+    /// This is the "maximum approved spending" control: it bounds how much value can leave the
+    /// trader's balance, measured from the receipt rather than trusted from the module.
+    pub max_spend: Option<u128>,
+    /// Assets a committed trade may move. Empty means unrestricted, which is the behaviour every
+    /// chain had before this control existed.
+    ///
+    /// A trade touching an asset outside the list is refused before settlement, so a module cannot
+    /// reach an asset the chain never authorized it for.
+    pub allowed_assets: BoundedVec<u32, ConstU32<{ MAX_CONSTRAINED_ASSETS }>>,
 }
+
+/// How many assets a ProfitLock allow-list may name.
+pub const MAX_CONSTRAINED_ASSETS: u32 = 16;
 
 impl TradeConstraints {
     /// Constraints that admit every trade, used as the chain default.
@@ -269,7 +285,18 @@ impl TradeConstraints {
             min_net_profit: 0,
             max_execution_cost: u128::MAX,
             deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }
+    }
+
+    /// Whether this constraint set turns any check on at all.
+    pub fn enables_any_check(&self) -> bool {
+        self.min_net_profit > 0
+            || self.max_execution_cost < u128::MAX
+            || self.deadline_blocks != 0
+            || self.max_spend.is_some()
+            || !self.allowed_assets.is_empty()
     }
 }
 
@@ -783,6 +810,25 @@ impl<T: Config> Pallet<T> {
             outcome.charged <= constraints.max_execution_cost,
             Error::<T>::TradeConstraintsUnsatisfied
         );
+
+        // Maximum approved spending: how much of the settlement asset may leave the trader. Derived
+        // from the receipt's own balances, so a module cannot under-report its draw.
+        if let Some(cap) = constraints.max_spend {
+            let spent = outcome.pre.saturating_sub(outcome.post);
+            ensure!(spent <= cap, Error::<T>::TradeConstraintsUnsatisfied);
+        }
+
+        // Allowed assets: every asset the trade moves must be on the list. An empty list means the
+        // chain has not narrowed this trade's asset surface, which is the pre-existing behaviour.
+        if !constraints.allowed_assets.is_empty() {
+            for intent in &receipt.intents {
+                ensure!(
+                    constraints.allowed_assets.contains(&intent.asset),
+                    Error::<T>::TradeConstraintsUnsatisfied
+                );
+            }
+        }
+
         Ok(())
     }
 

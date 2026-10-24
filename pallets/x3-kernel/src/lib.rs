@@ -1459,9 +1459,7 @@ pub mod pallet {
             match constraints {
                 Some(constraints) => {
                     ensure!(
-                        constraints.min_net_profit > 0
-                            || constraints.max_execution_cost < u128::MAX
-                            || constraints.deadline_blocks != 0,
+                        constraints.enables_any_check(),
                         Error::<T>::InvalidTradeConstraints
                     );
                     TradeConstraintsOf::<T>::put(constraints);
