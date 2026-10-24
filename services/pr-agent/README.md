@@ -34,7 +34,7 @@ Two things this measured that changed the wrapper:
   instruction is worth having, and a clean verdict from an 8B on a large PR is still not
   evidence of anything.
 
-So `config.model` is `deepseek/deepseek-chat`, and `qwen3:8b` is both the `--local` model and the
+So `config.model` is `deepseek/deepseek-v4-pro`, and `qwen3:8b` is both the `--local` model and the
 last fallback. `qwen2.5-coder:7b` is no longer used: it cannot produce the review schema at all.
 `--local` is worth using for `--diff`/`--stdin` work where the answer is short and structured;
 treat its `review` verdicts as a first pass that found nothing, not as a gate.
@@ -54,7 +54,7 @@ and lives outside the repository, so nothing has to be added to `.gitignore`.
 
 ```bash
 services/pr-agent/review.sh 672                          # review PR 672 with DeepSeek, posts a comment
-services/pr-agent/review.sh 672 --dry-run                # same, prints instead of publishing
+services/pr-agent/review.sh --dry-run 672                # same, prints instead of publishing
 services/pr-agent/review.sh --local 672                  # same, on the local GPUs
 services/pr-agent/review.sh 672 describe                 # any PR-Agent command
 services/pr-agent/review.sh --local --diff x.patch improve
@@ -64,6 +64,11 @@ services/pr-agent/review.sh --diff change.patch review
 services/pr-agent/review.sh --via-router --model x3-code 672 review
 services/pr-agent/usage.sh                                # what that router run cost
 ```
+
+Wrapper flags (`--dry-run`, `--local`, `--model`, …) go before the PR or diff; after it they are
+rejected. `--dry-run` on a PR prints what would have been posted: with publishing off PR-Agent keeps
+the result in memory and prints nothing, so [dry_run.py](dry_run.py) runs the CLI and prints it.
+`review`, `describe`, `improve` and `ask` are covered.
 
 `review` is the default command. A bare number is expanded to
 `https://github.com/Cyptopimpinainteazy/xxxstar/pull/<n>`. The GitHub token comes from
@@ -76,9 +81,10 @@ GitHub Action. `PR_AGENT_NO_EXTRA_CONFIG=1` turns it off.
 
 ## Model names
 
-`check.sh` prints the model ids the DeepSeek key returns. The shipped default is
-`deepseek/deepseek-chat` with `deepseek/deepseek-flash`, `deepseek/deepseek-v4-pro` and the local
-model as fallbacks. If none of those names is accepted, set `config.model` to an id from that list.
+`check.sh` prints the model ids the DeepSeek key returns. On 2026-10-24 the key served
+`deepseek-flash` and `deepseek-v4-pro` (not `deepseek-chat`), so the shipped default is
+`deepseek/deepseek-v4-pro` with `deepseek/deepseek-flash` and the local model as fallbacks. If the
+list changes, set `config.model` to an id from it.
 
 ## What the review enforces
 

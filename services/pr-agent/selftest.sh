@@ -94,6 +94,16 @@ printf '%s\n' "$@" > "$PR_AGENT_ARGV_LOG"
 printf '%s' "${CONFIG__FALLBACK_MODELS:-unset}" > "$PR_AGENT_ARGV_LOG.fallback"
 SHIM
 chmod +x "$fake_venv/bin/pr-agent"
+# A PR dry run goes through dry_run.py on the venv python; record the script and
+# the pr-agent argv after it, so the same argv assertions cover both entry points.
+cat > "$fake_venv/bin/python" <<'SHIM'
+#!/usr/bin/env bash
+printf '%s' "$1" > "$PR_AGENT_ARGV_LOG.entry"
+shift
+printf '%s\n' "$@" > "$PR_AGENT_ARGV_LOG"
+printf '%s' "${CONFIG__FALLBACK_MODELS:-unset}" > "$PR_AGENT_ARGV_LOG.fallback"
+SHIM
+chmod +x "$fake_venv/bin/python"
 
 run_wrapper() {
   : > "$argv_log"
@@ -161,12 +171,29 @@ expect_argv "--dry-run suppresses publishing" \
 expect_argv "overrides land after the command name" \
   "--pr_url=https://github.com/$repo_slug/pull/672 --extra_config_url=$CONFIG improve --config.publish_output=false --pr_code_suggestions.num_code_suggestions_per_chunk=5" \
   --dry-run 672 improve --pr_code_suggestions.num_code_suggestions_per_chunk=5
+expect_entry() { # <label> <expected entry: dry_run.py|pr-agent> [wrapper args...]
+  local label="$1" expected="$2"; shift 2
+  rm -f "$argv_log.entry"
+  if run_wrapper "$@"; then :; fi
+  local actual="pr-agent"
+  [ -s "$argv_log.entry" ] && actual="$(basename "$(cat "$argv_log.entry")")"
+  if [ "$actual" = "$expected" ]; then
+    pass "$label"
+  else
+    fail "$label (expected $expected, got $actual)"
+  fi
+}
+
+expect_entry "a PR dry run prints the unpublished result via dry_run.py" dry_run.py --dry-run 672 review
+expect_entry "a plain-diff dry run calls pr-agent directly (it already prints)" pr-agent --dry-run --diff /tmp/x.diff
+expect_entry "a publishing run calls pr-agent directly" pr-agent 672
 expect_argv "--model overrides the configured model" \
   "--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=deepseek/deepseek-flash" \
   --model deepseek/deepseek-flash --diff /tmp/x.diff
 expect_dies "an unreachable router fails loudly" --via-router --diff /tmp/x.diff
 expect_dies "--local and --via-router are rejected together" --local --via-router 672
 expect_dies "a non-numeric target is rejected" not-a-pr
+expect_dies "a wrapper flag after the target is rejected, not run as a command" 672 --dry-run
 
 # ── --via-router overrides and router authentication ──────────────────────
 # A one-shot HTTP server stands in for x3-ai-router: it answers /health and

@@ -9,11 +9,10 @@
 # Point --local at review.sh to use the GPUs as the primary instead.
 
 [config]
-model = "deepseek/deepseek-chat"
-# Names the account may serve instead: this repo's router config uses
-# deepseek-flash / deepseek-v4-pro. `services/pr-agent/check.sh` prints the ids
-# the key actually returns; set model to the one listed there if none match.
-fallback_models = ["deepseek/deepseek-flash", "deepseek/deepseek-v4-pro", "ollama/qwen3:8b"]
+model = "deepseek/deepseek-v4-pro"
+# The ids the key serves, per `services/pr-agent/check.sh` (2026-10-24):
+# deepseek-flash, deepseek-v4-pro. deepseek-chat is not among them.
+fallback_models = ["deepseek/deepseek-flash", "ollama/qwen3:8b"]
 # DeepSeek advertises 128k; cap at 64k so a runaway diff fails loudly instead of
 # costing a full-window call per retry.
 max_model_tokens = 65536

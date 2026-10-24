@@ -88,6 +88,11 @@ if [ -z "$target_kind" ]; then
 fi
 
 command_name="${1:-review}"
+# Wrapper flags are only parsed before the target; after it, `672 --dry-run`
+# would make "--dry-run" the command and publish anyway.
+case "$command_name" in
+  -*) die "'$command_name' is not a command; put wrapper flags before the PR or diff (review.sh --dry-run 672 review)" ;;
+esac
 [ $# -gt 0 ] && shift
 
 # The secrets file is a fallback, never an override. install.sh writes empty
@@ -190,4 +195,11 @@ if [ "$via_router" = 1 ]; then
 fi
 
 # pr-agent only accepts settings overrides after the command name.
+if [ "$dry_run" = 1 ] && [ "$target_kind" = pr ]; then
+  # With publishing off, pr-agent keeps the result in memory and prints nothing,
+  # so a bare dry run paid for a review and threw it away. dry_run.py prints it.
+  # Plain-diff modes already print to stdout and never publish.
+  exec "$VENV_DIR/bin/python" "$ROOT_DIR/services/pr-agent/dry_run.py" \
+    "${args[@]}" "$command_name" "${overrides[@]}" "$@"
+fi
 exec "$VENV_DIR/bin/pr-agent" "${args[@]}" "$command_name" "${overrides[@]}" "$@"
