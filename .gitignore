@@ -97,6 +97,9 @@ apps/explorer/.next/
 .env.local
 .env.*.local
 
+# PR-Agent secrets file (services/pr-agent keeps real values in ~/.config/pr-agent/env)
+.secrets.toml
+
 # Deployment key templates (FILL_IN placeholders only; real keys injected at deploy)
 deployment/keys/*.json
 deployment/keys/*-key

@@ -19,6 +19,7 @@
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
 #   scripts/local-ci.sh --rotation      # + the validator key rotation drill
 #   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
+#   scripts/local-ci.sh --pr-agent      # + the PR-Agent wiring self-test (offline, no LLM call)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
@@ -130,6 +131,7 @@ RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
 RUN_ROTATION=0
+RUN_PR_AGENT=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -153,8 +155,9 @@ while [ "$#" -gt 0 ]; do
     --testnet) RUN_TESTNET=1 ;;
     --soak) RUN_SOAK=1 ;;
     --rotation) RUN_ROTATION=1 ;;
+    --pr-agent) RUN_PR_AGENT=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1; RUN_PR_AGENT=1 ;;
     --loom) RUN_LOOM=1 ;;
     --fuzz) RUN_FUZZ=1 ;;
     --mutants) RUN_MUTANTS=1 ;;
@@ -1145,6 +1148,16 @@ GATES_ROTATION=(
   "validator rotation drill:bash scripts/testnet/validator-rotation-drill.sh"
 )
 
+# The PR-Agent review wrapper is used on real PRs, so its argv contract, the
+# repo config that feeds it, and the cost reporter need a check that does not
+# depend on a model, a network call or a key. This runs offline: it parses
+# .pr_agent.toml, checks the scripts, drives review.sh against a recording shim,
+# and feeds a saved router snapshot through usage.sh. What it cannot cover —
+# review quality and provider auth — is what check.sh reports.
+GATES_PR_AGENT=(
+  "pr-agent wiring:bash services/pr-agent/selftest.sh"
+)
+
 # The broadest automated signal the repository has: every test target in every
 # workspace member. SLOW (thousands of tests), so it is opt-in rather than part
 # of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
@@ -1230,6 +1243,8 @@ describe_all() {
   echo
   echo "validator key rotation (--rotation, also implied by --all):"
   printf '  - %s\n' "${GATES_ROTATION[@]%%:*}"
+  echo "PR-Agent wiring (--pr-agent, also implied by --all; offline, no model call):"
+  printf '  - %s\n' "${GATES_PR_AGENT[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast --publish-status"
@@ -1295,6 +1310,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_TESTNET" = 1 ] && for spec in "${GATES_TESTNET[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_SOAK" = 1 ] && for spec in "${GATES_SOAK[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_PR_AGENT" = 1 ] && for spec in "${GATES_PR_AGENT[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_FUZZ" = 1 ] && for spec in "${GATES_FUZZ[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_MUTANTS" = 1 ] && for spec in "${GATES_MUTANTS[@]}"; do SELECTED+=("$spec"); done
