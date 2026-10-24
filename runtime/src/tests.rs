@@ -412,7 +412,6 @@ fn settlement_verification_uses_only_finalized_external_headers() {
             H256::repeat_byte(0x71),
             H256::repeat_byte(0x72),
         ));
-
         // A later finalized header must not erase the evidence for an older
         // transfer. The maps retain every finalized header; only the latest
         // pointers advance.
