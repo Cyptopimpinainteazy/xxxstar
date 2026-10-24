@@ -26,6 +26,7 @@ import hmac
 import json
 import logging
 import os
+import secrets
 import signal
 import sys
 import time
@@ -50,10 +51,12 @@ if not os.path.exists(VENV_PYTHON):
     VENV_PYTHON = sys.executable
 
 # ── Configuration ──────────────────────────────────────────
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "inferstructor-admin")
-ADMIN_JWT_SECRET = os.environ.get(
-    "ADMIN_JWT_SECRET", "inferstructor-admin-jwt-secret-2024"
-)
+# No defaults: a published fallback password, or a published JWT secret that
+# lets anyone mint admin tokens, would make every unconfigured deployment open.
+# Without ADMIN_PASSWORD admin login is refused; without ADMIN_JWT_SECRET each
+# process signs with its own random secret, so tokens end with the process.
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
+ADMIN_JWT_SECRET = os.environ.get("ADMIN_JWT_SECRET") or secrets.token_urlsafe(48)
 ADMIN_JWT_EXPIRY = 8 * 3600  # 8 hours
 
 GPU_POWER_WATTS = 150  # Per GTX 1070
@@ -73,6 +76,8 @@ class AdminAuth:
         self.audit_log: deque = deque(maxlen=500)
 
     def verify_password(self, password: str) -> bool:
+        if not ADMIN_PASSWORD:
+            return False
         return hmac.compare_digest(password.encode(), ADMIN_PASSWORD.encode())
 
     def create_token(self) -> str:
@@ -1388,7 +1393,10 @@ def main():
     logger.info("=" * 60)
     logger.info("  Inferstructor Admin API")
     logger.info(f"  Port: 7777")
-    logger.info(f"  Admin Password: {'*' * len(ADMIN_PASSWORD)}")
+    if ADMIN_PASSWORD:
+        logger.info("  Admin Password: set")
+    else:
+        logger.warning("  ADMIN_PASSWORD is not set: admin login is disabled")
     logger.info(f"  JWT Expiry: {ADMIN_JWT_EXPIRY // 3600}h")
     logger.info(f"  Metrics Interval: 5s")
     logger.info("=" * 60)
