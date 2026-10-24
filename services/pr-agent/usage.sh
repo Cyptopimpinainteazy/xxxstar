@@ -22,9 +22,12 @@ if [ -n "${PR_AGENT_USAGE_FILE:-}" ]; then
   [ -r "$PR_AGENT_USAGE_FILE" ] || { echo "error: cannot read $PR_AGENT_USAGE_FILE" >&2; exit 1; }
   source_command=(cat "$PR_AGENT_USAGE_FILE")
 else
-  curl -sf -m 5 "${ROUTER_BASE%/v1}/health" >/dev/null \
-    || { echo "error: x3-ai-router is not answering at $ROUTER_BASE" >&2; exit 1; }
-  source_command=(curl -sf -m 10 "${ROUTER_BASE%/v1}/v1/usage")
+  # The router authenticates every GET, /health and /v1/usage included.
+  auth=()
+  [ -n "${X3_ROUTER_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $X3_ROUTER_TOKEN")
+  curl -sf -m 5 "${auth[@]}" "${ROUTER_BASE%/v1}/health" >/dev/null \
+    || { echo "error: x3-ai-router is not answering at $ROUTER_BASE (or X3_ROUTER_TOKEN is wrong)" >&2; exit 1; }
+  source_command=(curl -sf -m 10 "${auth[@]}" "${ROUTER_BASE%/v1}/v1/usage")
 fi
 
 "${source_command[@]}" | python3 -c '

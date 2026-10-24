@@ -76,12 +76,17 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          X3_ROUTER_TOKEN: ${{ secrets.X3_ROUTER_TOKEN }}
+          PR_AGENT_MODE: ${{ inputs.use_local && 'local' || (inputs.via_router && 'router' || 'cloud') }}
+        # Required providers are mode-scoped: a rejected cloud key must not stop a
+        # --local run, and a missing local model must not stop a cloud review.
         run: services/pr-agent/check.sh
 
       - name: Run the command
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          X3_ROUTER_TOKEN: ${{ secrets.X3_ROUTER_TOKEN }}
           PR_AGENT_LOCAL_MODEL: ${{ vars.PR_AGENT_LOCAL_MODEL }}
           INPUT_PR: ${{ inputs.pr_number }}
           INPUT_COMMAND: ${{ inputs.command }}
