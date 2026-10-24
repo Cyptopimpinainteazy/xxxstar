@@ -993,6 +993,23 @@ pub mod pallet {
                     Error::<T>::NonInternalRouteNotSupported
                 );
 
+                // Runtime scope gate for an external leg. `external-gateway`
+                // compiles the capability in; this is the switch that opens it, and
+                // it is the same one that gates `register_external_root` and
+                // `emergency_pause_bridge`. Without this, a build could initiate a
+                // transfer it had no switch to pause, and `ExternalBridgeAuditGate`
+                // — documented as "set to true only after documented bridge audit
+                // completion" — would gate nothing a user can reach.
+                //
+                // Unreachable with `external-gateway` off: the ensure above has
+                // already rejected the non-internal leg.
+                if !(source.is_x3_internal() && destination.is_x3_internal()) {
+                    ensure!(
+                        ExternalBridgesEnabled::<T>::get(),
+                        Error::<T>::ExternalBridgesDisabled
+                    );
+                }
+
                 // Recipient/sender typing.
                 ensure!(
                     recipient.is_compatible_with(destination),
