@@ -173,7 +173,7 @@ expect_dies "a non-numeric target is rejected" not-a-pr
 # records the Authorization header it received, so both the argv and the auth
 # path can be asserted without the real service.
 stub_port="$(( 20000 + RANDOM % 20000 ))"
-stub_seen="$tmp/stub-auth"
+stub_seen="$tmp/probe-auth"
 python3 - "$stub_port" "$stub_seen" <<'PY' &
 import http.server, sys
 port, seen = int(sys.argv[1]), sys.argv[2]
@@ -200,7 +200,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
 done
 
 : > "$argv_log"
-X3_ROUTER_TOKEN=stub-token PR_AGENT_VENV="$fake_venv" PR_AGENT_ARGV_LOG="$argv_log" \
+X3_ROUTER_TOKEN=probe-token PR_AGENT_VENV="$fake_venv" PR_AGENT_ARGV_LOG="$argv_log" \
   X3_ROUTER_BASE="http://127.0.0.1:$stub_port/v1" GITHUB_TOKEN="test-token" \
   bash "$ROOT_DIR/services/pr-agent/review.sh" --via-router --diff /tmp/x.diff review >"$tmp/out" 2>&1 || true
 actual="$(tr '\n' ' ' < "$argv_log" | sed 's/ $//')"
@@ -218,7 +218,7 @@ else
   fail "--via-router disables fallback so retries cannot bypass the router"
 fi
 
-if [ "$(cat "$stub_seen" 2>/dev/null)" = "Bearer stub-token" ]; then
+if [ "$(cat "$stub_seen" 2>/dev/null)" = "Bearer probe-token" ]; then
   pass "the router health probe sends the bearer token"
 else
   fail "the router health probe sends the bearer token (got '$(cat "$stub_seen" 2>/dev/null)')"
