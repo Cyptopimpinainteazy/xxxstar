@@ -31,17 +31,17 @@
     {
       "gate": "stub / marker ratchet",
       "status": "pass",
-      "detail": "critical-marker=441, explicit-stub=74, marker=1185"
+      "detail": "critical-marker=443, explicit-stub=72, marker=1076"
     },
     {
       "gate": "fake-code scan",
       "status": "pass",
-      "detail": "constant-assert=17, noop-test=2, skip=139"
+      "detail": "constant-assert=14, noop-test=2, skip=142"
     },
     {
       "gate": "panic / unwrap ratchet",
       "status": "pass",
-      "detail": "pallet-call=0, production=438, runtime-hook=0"
+      "detail": "pallet-call=0, production=440, runtime-hook=0"
     }
   ],
   "findings": [
