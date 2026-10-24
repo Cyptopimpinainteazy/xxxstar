@@ -967,7 +967,7 @@
       "repo_evidence": [
         "scripts/mainnet/rc5_chaos_harness.sh",
         "infra-structure/validator/tests/adversarial/test_network_chaos.py",
-        "tools/cross-chain-gpu-validator/tests/inferstructor/failover_triggers.py",
+        "infra-structure/validator/tests/inferstructor/failover_triggers.py",
         "benchmarks/zombienet/x3-benchmark-network.toml"
       ],
       "ci_evidence": [
@@ -1361,7 +1361,6 @@
         "monitoring/local3/prometheus-local3.yml",
         "infra/rpc/prometheus/prometheus.yml",
         "infra-structure/validator/prometheus.yml",
-        "tools/cross-chain-gpu-validator/prometheus.yml",
         "infra/rpc/router/src/metrics.rs (router exposes Prometheus metrics)"
       ],
       "ci_evidence": [],
