@@ -158,10 +158,23 @@ def _run_dashboard() -> None:
     settings = load_settings()
     configure_logging(settings.log_level)
     metrics = MetricsStore()
-    static_dir = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", "dashboard")
+    # The package root is two levels up from src/cross_chain_gpu_validator.
+    # Three levels resolved to infra-structure/dashboard, a different app.
+    package_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    static_dir = os.getenv(
+        "CCGV_DASHBOARD_DIR", os.path.join(package_root, "dashboard")
     )
-    run_dashboard(settings.dashboard_host, settings.dashboard_port, metrics, static_dir)
+    benchmark_path = os.getenv(
+        "CCGV_BENCHMARK_PATH",
+        os.path.join(package_root, "benchmarks", "all_chains_tps.json"),
+    )
+    run_dashboard(
+        settings.dashboard_host,
+        settings.dashboard_port,
+        metrics,
+        static_dir,
+        benchmark_path=benchmark_path,
+    )
 
 
 def _run_benchmark(output: str) -> None:
