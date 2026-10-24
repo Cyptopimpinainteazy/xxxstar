@@ -113,6 +113,29 @@ pub mod pallet {
 
     const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
+    pub(crate) fn evm_address_bytes(value: &[u8]) -> Option<[u8; 20]> {
+        let value = value.strip_prefix(b"0x").unwrap_or(value);
+        if value.len() != 40 {
+            return None;
+        }
+        let mut address = [0u8; 20];
+        for (index, byte) in address.iter_mut().enumerate() {
+            let high = hex_nibble(value[index * 2])?;
+            let low = hex_nibble(value[index * 2 + 1])?;
+            *byte = (high << 4) | low;
+        }
+        Some(address)
+    }
+
+    fn hex_nibble(value: u8) -> Option<u8> {
+        match value {
+            b'0'..=b'9' => Some(value - b'0'),
+            b'a'..=b'f' => Some(value - b'a' + 10),
+            b'A'..=b'F' => Some(value - b'A' + 10),
+            _ => None,
+        }
+    }
+
     // ── Chain / asset types (self-contained, Substrate-codec friendly) ──
 
     /// Substrate-friendly external chain identifier. The set is closed
@@ -148,10 +171,12 @@ pub mod pallet {
     impl ExternalChainId {
         pub fn to_chain_kind(self) -> ChainKind {
             match self {
-                ExternalChainId::EthereumMainnet
-                | ExternalChainId::EthereumSepolia
-                | ExternalChainId::BaseMainnet
-                | ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 1 },
+                ExternalChainId::EthereumMainnet => ChainKind::Evm { chain_id: 1 },
+                ExternalChainId::EthereumSepolia => ChainKind::Evm {
+                    chain_id: 11_155_111,
+                },
+                ExternalChainId::BaseMainnet => ChainKind::Evm { chain_id: 8_453 },
+                ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 84_532 },
                 ExternalChainId::Custom(chain_id) => ChainKind::Evm { chain_id },
                 ExternalChainId::SolanaMainnet | ExternalChainId::SolanaDevnet => ChainKind::Solana,
                 ExternalChainId::BitcoinMainnet | ExternalChainId::BitcoinTestnet => {
@@ -1035,7 +1060,7 @@ pub mod pallet {
             // pallet's own router is constructed per-call (the router
             // is stateless w.r.t. the route's verifier, so this is OK
             // and keeps storage simple).
-            let router = Self::build_router(&route);
+            let router = Self::build_router(&route, Some(proof.nonce));
             let envelope = Self::envelope_from_deposit(&proof, &route);
             let outcome = router
                 .route(&envelope)
@@ -1500,7 +1525,7 @@ pub mod pallet {
         /// configured verification level. The router is created
         /// per-call because the verifier set is small and the pallet
         /// does not need to keep the router's state across calls.
-        fn build_router(route: &RouteConfig) -> VerificationRouter {
+        fn build_router(route: &RouteConfig, expected_nonce: Option<u64>) -> VerificationRouter {
             let mut router = VerificationRouter::new();
             match route.verification_level {
                 RouteVerificationLevel::ValidatorQuorum { threshold, total } => {
@@ -1509,10 +1534,19 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::EvmReceiptProof => {
-                    let v: Arc<dyn Verifier> =
-                        Arc::new(ProductionEvmReceiptVerifier::anchored_by::<
-                            T::EvmHeaderAnchor,
-                        >(route.finality_requirement));
+                    let Some(source_asset) =
+                        evm_address_bytes(&route.external_asset.token_address_or_mint)
+                    else {
+                        return router;
+                    };
+                    let mut verifier = ProductionEvmReceiptVerifier::anchored_by::<
+                        T::EvmHeaderAnchor,
+                    >(route.finality_requirement)
+                    .with_source_asset(source_asset);
+                    if let Some(nonce) = expected_nonce {
+                        verifier = verifier.with_expected_nonce(nonce);
+                    }
+                    let v: Arc<dyn Verifier> = Arc::new(verifier);
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
@@ -1573,15 +1607,21 @@ pub mod pallet {
             let mut router = VerificationRouter::new();
             match route.verification_level {
                 RouteVerificationLevel::EvmReceiptProof => {
+                    let Some(source_asset) =
+                        evm_address_bytes(&route.external_asset.token_address_or_mint)
+                    else {
+                        return router;
+                    };
                     let v: Arc<dyn Verifier> = Arc::new(
                         ProductionEvmReceiptVerifier::anchored_by::<T::EvmHeaderAnchor>(
                             route.finality_requirement,
                         )
+                        .with_source_asset(source_asset)
                         .with_selector(withdrawal_released_selector()),
                     );
                     router.register_verifier(v);
                 }
-                _ => return Self::build_router(route),
+                _ => return Self::build_router(route, None),
             }
             router
         }

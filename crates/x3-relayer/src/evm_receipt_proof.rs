@@ -143,32 +143,44 @@ impl ReceiptInclusion {
         ))
     }
 
-    /// Bind this inclusion to a specific X3 deposit and relayer nonce.
-    pub fn evm_proof(
-        &self,
-        source_domain: u32,
-        expected_recipient: Vec<u8>,
-        expected_amount: u128,
-        proof_nonce: u32,
-        min_confirmations: u64,
-    ) -> Result<EvmProof, ProducerError> {
-        if expected_recipient.len() != 20 {
+    /// Bind this inclusion to the exact `DepositLocked` event the proof claims.
+    pub fn evm_proof(&self, binding: EvmProofBinding) -> Result<EvmProof, ProducerError> {
+        if binding.expected_beneficiary.is_empty() || binding.expected_beneficiary.len() > 128 {
             return Err(ProducerError::Malformed(format!(
-                "X3 EVM recipient is {} bytes, expected 20",
-                expected_recipient.len()
+                "X3 EVM beneficiary is {} bytes, expected 1..=128",
+                binding.expected_beneficiary.len()
             )));
         }
         Ok(EvmProof {
-            source_domain,
+            source_domain: binding.source_domain,
+            proof_id: binding.proof_id,
             block_hash: self.block_hash,
             state_root: self.state_root,
             finalized_block: self.block_number,
-            proof_nonce,
-            proof_payload: self.verification_payload(min_confirmations)?,
-            expected_recipient,
-            expected_amount,
+            proof_nonce: binding.proof_nonce,
+            proof_payload: self.verification_payload(binding.min_confirmations)?,
+            source_asset: binding.source_asset,
+            expected_sender: binding.expected_sender,
+            expected_contract: binding.expected_contract,
+            expected_beneficiary: binding.expected_beneficiary,
+            expected_nonce: binding.expected_nonce,
+            expected_amount: binding.expected_amount,
         })
     }
+}
+
+/// All event and transfer fields a receipt inclusion must match.
+pub struct EvmProofBinding {
+    pub source_domain: u32,
+    pub proof_id: [u8; 32],
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
+    pub proof_nonce: u32,
+    pub expected_amount: u128,
+    pub min_confirmations: u64,
 }
 
 use pallet_x3_settlement_engine::{
@@ -674,11 +686,24 @@ mod tests {
             .expect("router payload")
             .is_empty());
         let proof = inclusion
-            .evm_proof(100, vec![0x42; 20], 1_000, 7, 12)
+            .evm_proof(EvmProofBinding {
+                source_domain: 100,
+                proof_id: [0x41; 32],
+                source_asset: [0x42; 20],
+                expected_sender: [0x43; 20],
+                expected_contract: [0x44; 20],
+                expected_beneficiary: vec![0x45; 32],
+                expected_nonce: 9,
+                proof_nonce: 7,
+                expected_amount: 1_000,
+                min_confirmations: 12,
+            })
             .expect("event-bound EVM proof");
         assert_eq!(proof.finalized_block, inclusion.block_number);
         assert_eq!(proof.proof_nonce, 7);
-        assert_eq!(proof.expected_recipient, vec![0x42; 20]);
+        assert_eq!(proof.proof_id, [0x41; 32]);
+        assert_eq!(proof.expected_contract, [0x44; 20]);
+        assert_eq!(proof.expected_beneficiary, vec![0x45; 32]);
         assert!(!proof.proof_payload.is_empty());
         // The producer already checks both of these internally; asserting them
         // here keeps the test honest about what it is relying on.

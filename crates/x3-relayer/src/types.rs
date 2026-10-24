@@ -136,14 +136,25 @@ pub struct HeaderInfo {
 #[derive(Clone, Debug)]
 pub struct EvmProof {
     pub source_domain: u32,
+    /// The gateway's `messageId`; this is the proof's replay identity, not the
+    /// containing block hash.
+    pub proof_id: [u8; 32],
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
     pub finalized_block: u64,
     pub proof_nonce: u32,
     /// Canonical payload for `ProductionEvmReceiptVerifier`.
     pub proof_payload: Vec<u8>,
-    /// Exact X3 recipient encoded in the deposit log.
-    pub expected_recipient: Vec<u8>,
+    /// ERC-20 contract named by the gateway event.
+    pub source_asset: [u8; 20],
+    /// Depositor named by the gateway event.
+    pub expected_sender: [u8; 20],
+    /// Exact gateway contract that emitted the event.
+    pub expected_contract: [u8; 20],
+    /// Exact X3 recipient encoded in the deposit event.
+    pub expected_beneficiary: Vec<u8>,
+    /// Gateway event nonce.
+    pub expected_nonce: u64,
     /// Exact deposit amount encoded in the deposit log.
     pub expected_amount: u128,
 }
@@ -152,11 +163,16 @@ pub struct EvmProof {
 #[derive(Clone, Debug)]
 pub struct EvmProofRequest {
     pub source_domain: u32,
+    pub proof_id: [u8; 32],
     pub finalized_block: u64,
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
     pub proof_payload: Vec<u8>,
-    pub expected_recipient: Vec<u8>,
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
     pub expected_amount: u128,
 }
 

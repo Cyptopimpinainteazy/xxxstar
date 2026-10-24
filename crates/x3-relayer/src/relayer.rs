@@ -77,8 +77,29 @@ struct PendingEvmReceipt {
     finalized_block: u64,
     verified_header: VerifiedEthereumExecutionHeader,
     proof_payload: Vec<u8>,
-    expected_recipient: Vec<u8>,
+    proof_id: [u8; 32],
+    source_asset: [u8; 20],
+    expected_sender: [u8; 20],
+    expected_contract: [u8; 20],
+    expected_beneficiary: Vec<u8>,
+    expected_nonce: u64,
     expected_amount: u128,
+}
+
+/// A finalized EVM receipt and the exact `DepositLocked` fields it must prove.
+#[derive(Clone)]
+pub struct EvmReceiptProofRequest {
+    pub domain_id: u32,
+    pub finalized_block: u64,
+    pub verified_header: VerifiedEthereumExecutionHeader,
+    pub proof_payload: Vec<u8>,
+    pub proof_id: [u8; 32],
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
+    pub expected_amount: u128,
 }
 
 fn configured_solana_cluster(clusters: &[SvmClusterConfig]) -> Result<SolanaCluster, String> {
@@ -215,36 +236,36 @@ impl RelayerService {
 
     /// Attach the event-specific receipt proof that finality polling alone cannot
     /// derive. The proof is consumed only after the matching block is finalized.
-    pub async fn queue_evm_receipt_proof(
-        &self,
-        domain_id: u32,
-        finalized_block: u64,
-        verified_header: VerifiedEthereumExecutionHeader,
-        proof_payload: Vec<u8>,
-        expected_recipient: Vec<u8>,
-        expected_amount: u128,
-    ) -> Result<()> {
-        if proof_payload.is_empty() {
+    pub async fn queue_evm_receipt_proof(&self, request: EvmReceiptProofRequest) -> Result<()> {
+        if request.proof_payload.is_empty() {
             anyhow::bail!("EVM receipt proof payload must not be empty");
         }
-        if expected_recipient.len() != 20 {
-            anyhow::bail!("EVM deposit recipient must be 20 bytes");
+        if request.proof_id == [0u8; 32] {
+            anyhow::bail!("EVM gateway message id must not be zero");
         }
-        if verified_header.block_number != finalized_block {
+        if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
+            anyhow::bail!("EVM deposit beneficiary must be between 1 and 128 bytes");
+        }
+        if request.verified_header.block_number != request.finalized_block {
             anyhow::bail!("verified beacon header does not match the finalized block");
         }
         self.state
             .write()
             .await
             .pending_evm_receipts
-            .entry(domain_id)
+            .entry(request.domain_id)
             .or_default()
             .push(PendingEvmReceipt {
-                finalized_block,
-                verified_header,
-                proof_payload,
-                expected_recipient,
-                expected_amount,
+                finalized_block: request.finalized_block,
+                verified_header: request.verified_header,
+                proof_payload: request.proof_payload,
+                proof_id: request.proof_id,
+                source_asset: request.source_asset,
+                expected_sender: request.expected_sender,
+                expected_contract: request.expected_contract,
+                expected_beneficiary: request.expected_beneficiary,
+                expected_nonce: request.expected_nonce,
+                expected_amount: request.expected_amount,
             });
         Ok(())
     }
@@ -535,11 +556,16 @@ impl RelayerService {
                     .submitter
                     .acquire_evm_proof(EvmProofRequest {
                         source_domain: domain_id,
+                        proof_id: pending.proof_id,
                         finalized_block: block_number,
                         block_hash,
                         state_root,
                         proof_payload: pending.proof_payload,
-                        expected_recipient: pending.expected_recipient,
+                        source_asset: pending.source_asset,
+                        expected_sender: pending.expected_sender,
+                        expected_contract: pending.expected_contract,
+                        expected_beneficiary: pending.expected_beneficiary,
+                        expected_nonce: pending.expected_nonce,
                         expected_amount: pending.expected_amount,
                     })
                     .await
@@ -709,14 +735,19 @@ impl RelayerService {
         use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
-        hasher.update(b"x3-relayer-evm-proof-v2");
+        hasher.update(b"x3-relayer-evm-proof-v3");
         hasher.update(proof.source_domain.to_le_bytes());
+        hasher.update(proof.proof_id);
         hasher.update(proof.finalized_block.to_le_bytes());
         hasher.update(proof.block_hash);
         hasher.update(proof.state_root);
         hasher.update(proof.proof_nonce.to_le_bytes());
-        hasher.update((proof.expected_recipient.len() as u64).to_le_bytes());
-        hasher.update(&proof.expected_recipient);
+        hasher.update(proof.source_asset);
+        hasher.update(proof.expected_sender);
+        hasher.update(proof.expected_contract);
+        hasher.update(proof.expected_nonce.to_le_bytes());
+        hasher.update((proof.expected_beneficiary.len() as u64).to_le_bytes());
+        hasher.update(&proof.expected_beneficiary);
         hasher.update(proof.expected_amount.to_le_bytes());
         hasher.update((proof.proof_payload.len() as u64).to_le_bytes());
         hasher.update(&proof.proof_payload);
@@ -880,7 +911,7 @@ impl RelayerSafetyPipeline {
 
     #[cfg(test)]
     fn evaluate_evm_proof(&self, proof: &EvmProof, recent_failures: u32) -> Result<(), String> {
-        let proof_id = proof.block_hash;
+        let proof_id = proof.proof_id;
         let required_confirmations = self
             .evm_finality_thresholds
             .get(&proof.source_domain)
@@ -899,7 +930,7 @@ impl RelayerSafetyPipeline {
             VerificationStrategy::EvmReceiptProof,
             proof.proof_payload.clone(),
             proof.source_domain,
-            proof.expected_recipient.clone(),
+            proof.expected_contract.to_vec(),
             proof.expected_amount,
         ) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
@@ -927,7 +958,7 @@ impl RelayerSafetyPipeline {
         attested_head: u64,
         recent_failures: u32,
     ) -> Result<(), String> {
-        let proof_id = proof.block_hash;
+        let proof_id = proof.proof_id;
         let required_confirmations = self
             .evm_finality_thresholds
             .get(&proof.source_domain)
@@ -958,7 +989,9 @@ impl RelayerSafetyPipeline {
                 header: anchor,
                 head: attested_head,
             },
-        );
+        )
+        .with_source_asset(proof.source_asset)
+        .with_expected_nonce(proof.expected_nonce);
         let envelope = ProofEnvelope {
             proof_id,
             strategy: VerificationStrategy::EvmReceiptProof,
@@ -969,9 +1002,9 @@ impl RelayerSafetyPipeline {
             payload: proof.proof_payload.clone(),
             expected_asset_id: [0u8; 32],
             expected_amount: proof.expected_amount,
-            expected_sender: Vec::new(),
-            expected_recipient: proof.expected_recipient.clone(),
-            expected_beneficiary: Vec::new(),
+            expected_sender: proof.expected_sender.to_vec(),
+            expected_recipient: proof.expected_contract.to_vec(),
+            expected_beneficiary: proof.expected_beneficiary.clone(),
         };
         if let Err(reason) = verifier.verify(&envelope) {
             return self.raise_dispute(
@@ -1502,12 +1535,17 @@ mod tests {
         let pipeline = RelayerSafetyPipeline::for_test(&config, router, Vec::new());
         let proof = EvmProof {
             source_domain: 100,
+            proof_id: [0x70u8; 32],
             block_hash: [1u8; 32],
             state_root: [2u8; 32],
             finalized_block: 1_000,
             proof_nonce: 1,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 1,
             expected_amount: 1_000,
         };
 
@@ -1520,12 +1558,17 @@ mod tests {
         let pipeline = RelayerSafetyPipeline::new(&config);
         let proof = EvmProof {
             source_domain: 999,
+            proof_id: [0x70u8; 32],
             block_hash: [3u8; 32],
             state_root: [4u8; 32],
             finalized_block: 55,
             proof_nonce: 9,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 9,
             expected_amount: 1_000,
         };
 
@@ -1542,12 +1585,17 @@ mod tests {
         let pipeline = RelayerSafetyPipeline::new(&config);
         let proof = EvmProof {
             source_domain: 100,
+            proof_id: [0x70u8; 32],
             block_hash: [3u8; 32],
             state_root: [4u8; 32],
             finalized_block: 55,
             proof_nonce: 9,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 9,
             expected_amount: 1_000,
         };
         let error = pipeline

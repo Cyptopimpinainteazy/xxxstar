@@ -21,7 +21,7 @@ pub mod watchers;
 #[cfg(feature = "std")]
 pub use quorum::{AuthorizedValidatorSet, ValidatorSetError};
 #[cfg(feature = "std")]
-pub use relayer::RelayerService;
+pub use relayer::{EvmReceiptProofRequest, RelayerService};
 #[cfg(feature = "std")]
 pub use submitter::RpcSubmitter;
 pub use types::*;

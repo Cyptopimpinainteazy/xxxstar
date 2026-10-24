@@ -22,11 +22,16 @@
 
 use x3_verification_router::evm_receipt::{
     deposit_locked_selector, encode_proof_payload, receipts_trie_proof, receipts_trie_root,
-    DecodedProof,
+    DecodedProof, EvmReceiptExpectations,
 };
 
 const AMOUNT: u128 = 42;
 const RECIPIENT: [u8; 20] = [0x11; 20];
+const TOKEN: [u8; 20] = [0x22; 20];
+const SENDER: [u8; 20] = [0x33; 20];
+const BENEFICIARY: [u8; 32] = [0x44; 32];
+const PROOF_ID: [u8; 32] = [0x55; 32];
+const NONCE: u64 = 7;
 const MIN_CONFIRMATIONS: u64 = 3;
 const HEAD_NUMBER: u64 = 10;
 const CHAIN_ID: u64 = 31337;
@@ -50,11 +55,25 @@ fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
 
 /// The receipt the proof is about: one `DepositLocked`-shaped log carrying the amount.
 fn receipt_rlp() -> Vec<u8> {
-    let mut data = [0u8; 32];
-    data[16..].copy_from_slice(&AMOUNT.to_be_bytes());
+    let mut data = vec![0u8; 192];
+    data[31] = 128;
+    data[48..64].copy_from_slice(&AMOUNT.to_be_bytes());
+    data[88..96].copy_from_slice(&NONCE.to_be_bytes());
+    data[120..128].copy_from_slice(&CHAIN_ID.to_be_bytes());
+    data[159] = BENEFICIARY.len() as u8;
+    data[160..].copy_from_slice(&BENEFICIARY);
+    let mut token_topic = [0u8; 32];
+    token_topic[12..].copy_from_slice(&TOKEN);
+    let mut sender_topic = [0u8; 32];
+    sender_topic[12..].copy_from_slice(&SENDER);
     let log = rlp_list(&[
         rlp_bytes(&RECIPIENT),
-        rlp_list(&[rlp_bytes(&deposit_locked_selector())]),
+        rlp_list(&[
+            rlp_bytes(&deposit_locked_selector()),
+            rlp_bytes(&PROOF_ID),
+            rlp_bytes(&token_topic),
+            rlp_bytes(&sender_topic),
+        ]),
         rlp_bytes(&data),
     ]);
     // status = 1, cumulative gas = 0, logs = [log]
@@ -120,12 +139,19 @@ fn decode(
 ) -> Result<DecodedProof, x3_verification_router::evm_receipt::EvmReceiptError> {
     DecodedProof::decode(
         body,
-        AMOUNT,
-        RECIPIENT,
-        deposit_locked_selector(),
-        MIN_CONFIRMATIONS,
-        HEAD_NUMBER,
-        CHAIN_ID,
+        EvmReceiptExpectations {
+            amount: AMOUNT,
+            contract: RECIPIENT,
+            sender: SENDER.to_vec(),
+            beneficiary: BENEFICIARY.to_vec(),
+            source_asset: Some(TOKEN),
+            nonce: Some(NONCE),
+            proof_id: PROOF_ID,
+            selector: deposit_locked_selector(),
+            min_confirmations: MIN_CONFIRMATIONS,
+            current_block_number: HEAD_NUMBER,
+            chain_id: CHAIN_ID,
+        },
     )
 }
 

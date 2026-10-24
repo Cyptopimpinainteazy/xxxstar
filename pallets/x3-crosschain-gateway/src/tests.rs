@@ -141,7 +141,7 @@ fn register_and_enable() {
     assert_ok!(X3CrosschainGateway::register_asset(
         RuntimeOrigin::root(),
         ExternalChainId::BaseSepolia,
-        bounded("0xTOKEN"),
+        bounded(TOKEN_ADDRESS),
         [9u8; 32],
     ));
     assert_ok!(X3CrosschainGateway::enable_route(
@@ -200,9 +200,52 @@ fn register_asset_works() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
+    });
+}
+
+#[test]
+fn external_chain_kinds_keep_their_eip155_ids() {
+    use x3_verification_router::ChainKind;
+
+    assert_eq!(
+        ExternalChainId::EthereumMainnet.to_chain_kind(),
+        ChainKind::Evm { chain_id: 1 }
+    );
+    assert_eq!(
+        ExternalChainId::EthereumSepolia.to_chain_kind(),
+        ChainKind::Evm {
+            chain_id: 11_155_111
+        }
+    );
+    assert_eq!(
+        ExternalChainId::BaseMainnet.to_chain_kind(),
+        ChainKind::Evm { chain_id: 8_453 }
+    );
+    assert_eq!(
+        ExternalChainId::BaseSepolia.to_chain_kind(),
+        ChainKind::Evm { chain_id: 84_532 }
+    );
+}
+
+#[test]
+fn an_evm_route_with_an_invalid_asset_address_fails_closed() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        let mut malformed_route = evm_route();
+        malformed_route.external_asset.token_address_or_mint = bounded("0xTOKEN");
+        enable_route_for(malformed_route);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
+        attest_header(receipts_root, number, head);
+        let mut proof = evm_deposit_proof([1u8; 32], 100, payload);
+        proof.external_asset.token_address_or_mint = bounded("0xTOKEN");
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(RuntimeOrigin::signed(1), [5u8; 32], proof,),
+            Error::<Test>::VerificationFailed
+        );
     });
 }
 
@@ -284,7 +327,7 @@ fn submit_deposit_proof_rejects_disabled_route() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
         // Don't enable; route lookup itself will fail first.
@@ -305,7 +348,7 @@ fn submit_deposit_proof_rejects_dry_run_mode() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
         let mut r = route();
@@ -654,7 +697,7 @@ fn submit_release_proof_disabled_route_fails() {
 #[test]
 fn deposit_proof_validator_quorum_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(validator_route());
 
         assert_ok!(X3CrosschainGateway::submit_deposit_proof(
@@ -740,7 +783,7 @@ fn deposit_proof_different_chain_asset_works() {
 #[test]
 fn deposit_proof_evm_verifier_fails_on_malformed_proof() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
 
         // ProductionEvmReceiptVerifier will fail on a short random payload
@@ -767,7 +810,7 @@ fn release_proof_validator_quorum_works() {
     new_test_ext().execute_with(|| {
         // Two routes: one for deposit (X3Internal), one for release
         // (ValidatorQuorum) with matching chain + asset ids.
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let deposit_route = route();
         enable_route_for(deposit_route.clone());
         let mut release_route = validator_route();
@@ -828,7 +871,7 @@ fn enable_then_disable_then_re_enable_route() {
 #[test]
 fn enable_route_min_gt_max_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.min_amount = 200;
         r.max_amount = 100;
@@ -842,7 +885,7 @@ fn enable_route_min_gt_max_fails() {
 #[test]
 fn enable_route_zero_daily_limit_for_live_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.daily_limit = 0;
         // TestnetLive mode requires daily_limit > 0
@@ -928,13 +971,13 @@ fn submit_deposit_proof_wrong_chain_fails() {
         register_and_enable();
         // Register a second asset on EthereumSepolia so AssetNotRegistered doesn't
         // fire before WrongChain.
-        register_asset(ExternalChainId::EthereumSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::EthereumSepolia, TOKEN_ADDRESS, [9u8; 32]);
         // Proof has EthereumSepolia, route is BaseSepolia
         let mut p = deposit_proof([1u8; 32], 100);
         p.source_chain = ExternalChainId::EthereumSepolia;
         p.external_asset = ExternalAssetRef {
             chain_id: ExternalChainId::EthereumSepolia,
-            token_address_or_mint: bounded("0xTOKEN"),
+            token_address_or_mint: bounded(TOKEN_ADDRESS),
         };
         assert_noop!(
             X3CrosschainGateway::submit_deposit_proof(RuntimeOrigin::signed(1), [1u8; 32], p),
@@ -1110,7 +1153,7 @@ fn finalize_external_release_not_found_fails() {
 #[test]
 fn route_mode_guarded_live_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::GuardedLive;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1126,7 +1169,7 @@ fn route_mode_guarded_live_works() {
 #[test]
 fn route_mode_full_live_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::FullLive;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1142,7 +1185,7 @@ fn route_mode_full_live_works() {
 #[test]
 fn route_mode_disabled_blocks_deposit() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::Disabled;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1164,7 +1207,7 @@ fn route_mode_disabled_blocks_deposit() {
 #[test]
 fn credit_with_dispute_window_after_window() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.require_dispute_window = true;
         r.dispute_window_blocks = 10;
@@ -1190,7 +1233,7 @@ fn credit_with_dispute_window_after_window() {
 #[test]
 fn credit_with_dispute_window_before_close_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.require_dispute_window = true;
         r.dispute_window_blocks = 10;
@@ -1245,7 +1288,7 @@ fn register_asset_non_governance_fails() {
             X3CrosschainGateway::register_asset(
                 RuntimeOrigin::signed(1),
                 ExternalChainId::BaseSepolia,
-                bounded("0xTOKEN"),
+                bounded(TOKEN_ADDRESS),
                 [9u8; 32],
             ),
             sp_runtime::DispatchError::BadOrigin
@@ -1641,22 +1684,15 @@ fn stake_weighted_solana_finality_rejects_less_than_two_thirds_stake() {
 fn an_evm_route_refuses_a_proof_when_no_header_is_attested() {
     new_test_ext().execute_with(|| {
         forget_attested_header();
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, _, _, _) = evm_deposit_payload(100);
+        let (payload, _, _, _) = evm_deposit_payload([1u8; 32], 100);
 
         assert_noop!(
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );
@@ -1667,9 +1703,9 @@ fn an_evm_route_refuses_a_proof_when_no_header_is_attested() {
 #[test]
 fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
 
         // A different root attested at the same height: the receipt is real, the
         // trie is real, the walk is real — and it is not the chain's block.
@@ -1681,14 +1717,7 @@ fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );
@@ -1699,22 +1728,15 @@ fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
 #[test]
 fn an_evm_route_verifies_a_proof_anchored_to_the_attested_header() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
         attest_header(receipts_root, number, head);
 
         assert_ok!(X3CrosschainGateway::submit_deposit_proof(
             RuntimeOrigin::signed(1),
             [5u8; 32],
-            deposit_proof_with(
-                [1u8; 32],
-                100,
-                ExternalChainId::BaseSepolia,
-                asset(),
-                1,
-                payload,
-            ),
+            evm_deposit_proof([1u8; 32], 100, payload),
         ));
         assert_eq!(Pallet::<Test>::external_locked([9u8; 32]), 100);
     });
@@ -1723,9 +1745,9 @@ fn an_evm_route_verifies_a_proof_anchored_to_the_attested_header() {
 #[test]
 fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route()); // finality_requirement = 12
-        let (payload, receipts_root, number, _head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, _head) = evm_deposit_payload([1u8; 32], 100);
 
         // The payload claims a head 12 blocks past the header. The chain has
         // attested a head only 4 blocks past it, so the deposit is too shallow
@@ -1736,14 +1758,7 @@ fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );

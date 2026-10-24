@@ -213,9 +213,9 @@ impl RpcSubmitter {
                 "refusing to acquire an EVM proof without receipt-inclusion evidence"
             ));
         }
-        if request.expected_recipient.len() != 20 {
+        if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
             return Err(anyhow!(
-                "refusing to acquire an EVM proof with a non-20-byte recipient"
+                "refusing to acquire an EVM proof without a bounded X3 beneficiary"
             ));
         }
         debug!(
@@ -230,12 +230,17 @@ impl RpcSubmitter {
 
         Ok(EvmProof {
             source_domain: request.source_domain,
+            proof_id: request.proof_id,
             finalized_block: request.finalized_block,
             block_hash: request.block_hash,
             state_root: request.state_root,
             proof_nonce: nonce,
             proof_payload: request.proof_payload,
-            expected_recipient: request.expected_recipient,
+            source_asset: request.source_asset,
+            expected_sender: request.expected_sender,
+            expected_contract: request.expected_contract,
+            expected_beneficiary: request.expected_beneficiary,
+            expected_nonce: request.expected_nonce,
             expected_amount: request.expected_amount,
         })
     }
@@ -404,12 +409,17 @@ mod tests {
 
         let proof = EvmProof {
             source_domain: 11155111,
+            proof_id: [0x56u8; 32],
             finalized_block: 100,
             block_hash,
             state_root,
             proof_nonce: 0,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x57u8; 20],
+            expected_sender: [0x58u8; 20],
+            expected_contract: [0x59u8; 20],
+            expected_beneficiary: vec![0x60u8; 32],
+            expected_nonce: 5,
             expected_amount: 1_000,
         };
 
@@ -478,12 +488,17 @@ mod tests {
         };
         let proof = EvmProof {
             source_domain: 200,
+            proof_id: [0x56u8; 32],
             block_hash: [1u8; 32],
             state_root: [2u8; 32],
             finalized_block: 123,
             proof_nonce: 7,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x57u8; 20],
+            expected_sender: [0x58u8; 20],
+            expected_contract: [0x59u8; 20],
+            expected_beneficiary: vec![0x60u8; 32],
+            expected_nonce: 5,
             expected_amount: 1_000,
         };
 

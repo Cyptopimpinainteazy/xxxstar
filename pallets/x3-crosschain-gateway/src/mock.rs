@@ -147,10 +147,17 @@ pub fn bounded_payload(s: &str) -> BoundedVec<u8, ConstU32<4096>> {
     BoundedVec::try_from(s.as_bytes().to_vec()).unwrap()
 }
 
+pub const TOKEN_ADDRESS: &str = "0x1111111111111111111111111111111111111111";
+pub const EVM_GATEWAY: [u8; 20] = [0xaa; 20];
+pub const EVM_SENDER: [u8; 20] = [0xbb; 20];
+pub const EVM_BENEFICIARY: [u8; 32] = [0xcc; 32];
+pub const EVM_NONCE: u64 = 1;
+pub const BASE_SEPOLIA_CHAIN_ID: u64 = 84_532;
+
 pub fn asset() -> ExternalAssetRef {
     ExternalAssetRef {
         chain_id: ExternalChainId::BaseSepolia,
-        token_address_or_mint: bounded("0xTOKEN"),
+        token_address_or_mint: bounded(TOKEN_ADDRESS),
     }
 }
 
@@ -169,12 +176,15 @@ pub fn route() -> RouteConfig {
         daily_reset_at_block: 0,
         pending_limit: 10,
         finality_requirement: 12,
-        verification_level: RouteVerificationLevel::X3Internal,
+        verification_level: RouteVerificationLevel::ValidatorQuorum {
+            threshold: 2,
+            total: 3,
+        },
         fee_bps: 10,
         mode: GatewayMode::TestnetLive,
         require_dispute_window: false,
         dispute_window_blocks: 0,
-        contract_address: bounded("0xGATEWAY"),
+        contract_address: bounded20(EVM_GATEWAY),
     }
 }
 
@@ -276,7 +286,7 @@ pub fn evm_route() -> RouteConfig {
         route_id: [5u8; 32],
         x3_asset_id: [9u8; 32],
         verification_level: RouteVerificationLevel::EvmReceiptProof,
-        contract_address: bounded20([0xaa; 20]),
+        contract_address: bounded20(EVM_GATEWAY),
         ..route()
     }
 }
@@ -293,17 +303,35 @@ pub fn valid_proof_payload() -> BoundedVec<u8, ConstU32<4096>> {
 ///
 /// Returns `(payload, receipts_root, block_number, head)` — the caller attests
 /// that root at that height (or does not, to prove the route refuses).
-pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
+pub fn evm_deposit_payload(
+    proof_id: [u8; 32],
+    amount: u128,
+) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
     use x3_verification_router::evm_receipt::{
         deposit_locked_selector, encode_proof_payload, receipt_trie_key,
     };
 
-    let contract = [0xaa; 20]; // `evm_route().contract_address`
-    let mut log_data = [0u8; 32];
-    log_data[16..].copy_from_slice(&amount.to_be_bytes());
+    let mut log_data = vec![0u8; 192];
+    log_data[31] = 128;
+    log_data[48..64].copy_from_slice(&amount.to_be_bytes());
+    log_data[88..96].copy_from_slice(&EVM_NONCE.to_be_bytes());
+    log_data[120..128].copy_from_slice(&BASE_SEPOLIA_CHAIN_ID.to_be_bytes());
+    log_data[159] = EVM_BENEFICIARY.len() as u8;
+    log_data[160..].copy_from_slice(&EVM_BENEFICIARY);
+    let token =
+        crate::pallet::evm_address_bytes(TOKEN_ADDRESS.as_bytes()).expect("test token address");
+    let mut token_topic = [0u8; 32];
+    token_topic[12..].copy_from_slice(&token);
+    let mut sender_topic = [0u8; 32];
+    sender_topic[12..].copy_from_slice(&EVM_SENDER);
     let log = rlp_list(&[
-        rlp_bytes(&contract),
-        rlp_list(&[rlp_bytes(&deposit_locked_selector())]),
+        rlp_bytes(&EVM_GATEWAY),
+        rlp_list(&[
+            rlp_bytes(&deposit_locked_selector()),
+            rlp_bytes(&proof_id),
+            rlp_bytes(&token_topic),
+            rlp_bytes(&sender_topic),
+        ]),
         rlp_bytes(&log_data),
     ]);
     // Post-Byzantium receipt: [status, cumulative_gas_used, logs].
@@ -324,6 +352,24 @@ pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8
         block_number,
         head,
     )
+}
+
+pub fn evm_deposit_proof(
+    proof_id: [u8; 32],
+    amount: u128,
+    payload: BoundedVec<u8, ConstU32<4096>>,
+) -> DepositProof {
+    let mut proof = deposit_proof_with(
+        proof_id,
+        amount,
+        ExternalChainId::BaseSepolia,
+        asset(),
+        EVM_NONCE,
+        payload,
+    );
+    proof.sender = bounded20(EVM_SENDER);
+    proof.recipient = BoundedVec::try_from(EVM_BENEFICIARY.to_vec()).expect("beneficiary fits");
+    proof
 }
 
 fn rlp_bytes(bytes: &[u8]) -> Vec<u8> {

@@ -102,10 +102,14 @@ pub struct ProofEnvelope {
     pub payload: alloc::vec::Vec<u8>,
     pub expected_asset_id: [u8; 32],
     pub expected_amount: u128,
+    /// Party that initiated the external transfer (for EVM this is the
+    /// indexed depositor/recipient; for Solana it is the source account).
     pub expected_sender: alloc::vec::Vec<u8>,
+    /// External contract or vault whose event/funding must prove the transfer
+    /// (for EVM this is the gateway contract, not the X3 beneficiary).
     pub expected_recipient: alloc::vec::Vec<u8>,
-    /// The X3 account the deposit credits. A Bitcoin proof must show the transaction committed to
-    /// it (see [`bitcoin_spv`]); other strategies do not read it.
+    /// The X3 account the deposit credits. EVM `DepositLocked` and Bitcoin
+    /// proofs must bind it to the external event/transaction.
     pub expected_beneficiary: alloc::vec::Vec<u8>,
 }
 

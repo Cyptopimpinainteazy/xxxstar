@@ -405,12 +405,17 @@ pub enum RelayerProofRequest {
     },
     Evm {
         source_domain: u32,
+        proof_id: [u8; 32],
         block_hash: [u8; 32],
         state_root: [u8; 32],
         finalized_block: u64,
         proof_nonce: u32,
         proof_payload: Vec<u8>,
-        expected_recipient: Vec<u8>,
+        source_asset: Vec<u8>,
+        expected_sender: Vec<u8>,
+        expected_contract: Vec<u8>,
+        expected_beneficiary: Vec<u8>,
+        expected_nonce: u64,
         expected_amount: String,
     },
 }
@@ -465,35 +470,59 @@ async fn post_relayer_proof_summary(
         }
         RelayerProofRequest::Evm {
             source_domain,
+            proof_id,
             block_hash,
             state_root,
             finalized_block,
             proof_nonce,
             proof_payload,
-            expected_recipient,
+            source_asset,
+            expected_sender,
+            expected_contract,
+            expected_beneficiary,
+            expected_nonce,
             expected_amount,
         } => {
             let expected_amount = expected_amount.parse::<u128>().map_err(|error| {
                 GatewayError::BadRequest(format!("invalid EVM proof amount: {error}"))
             })?;
+            let source_asset: [u8; 20] = source_asset.try_into().map_err(|_| {
+                GatewayError::BadRequest("EVM source asset must be 20 bytes".into())
+            })?;
+            let expected_sender: [u8; 20] = expected_sender
+                .try_into()
+                .map_err(|_| GatewayError::BadRequest("EVM depositor must be 20 bytes".into()))?;
+            let expected_contract: [u8; 20] = expected_contract.try_into().map_err(|_| {
+                GatewayError::BadRequest("EVM gateway contract must be 20 bytes".into())
+            })?;
+            if expected_beneficiary.is_empty() || expected_beneficiary.len() > 128 {
+                return Err(GatewayError::BadRequest(
+                    "EVM beneficiary must be between 1 and 128 bytes".into(),
+                ));
+            }
             let _proof = EvmProof {
                 source_domain,
+                proof_id,
                 block_hash,
                 state_root,
                 finalized_block,
                 proof_nonce,
                 proof_payload: proof_payload.clone(),
-                expected_recipient: expected_recipient.clone(),
+                source_asset,
+                expected_sender,
+                expected_contract,
+                expected_beneficiary,
+                expected_nonce,
                 expected_amount,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "evm",
-                proof_id_hex: hex::encode(block_hash),
+                proof_id_hex: hex::encode(proof_id),
                 validator_attestations: 0,
                 required_signatures: 0,
-                meets_quorum: block_hash != [0u8; 32]
-                    && !proof_payload.is_empty()
-                    && expected_recipient.len() == 20,
+                meets_quorum: proof_id != [0u8; 32]
+                    && block_hash != [0u8; 32]
+                    && !proof_payload.is_empty(),
                 chain_kind: "evm",
             }))
         }
@@ -2105,12 +2134,17 @@ mod tests {
         let evm_proof = json!({
             "kind": "evm",
             "source_domain": 1,
+            "proof_id": vec![9u8; 32],
             "block_hash": vec![1u8; 32],
             "state_root": vec![0u8; 32],
             "finalized_block": 42,
             "proof_nonce": 0u32,
             "proof_payload": vec![1u8; 96],
-            "expected_recipient": vec![2u8; 20],
+            "source_asset": vec![2u8; 20],
+            "expected_sender": vec![3u8; 20],
+            "expected_contract": vec![4u8; 20],
+            "expected_beneficiary": vec![5u8; 32],
+            "expected_nonce": 1u64,
             "expected_amount": "1000",
         });
         serde_json::from_value::<RelayerProofRequest>(evm_proof.clone())
