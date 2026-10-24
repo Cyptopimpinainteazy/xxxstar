@@ -371,6 +371,10 @@ GATES_FAST=(
   "npm audit scope:python3 -m unittest discover -s tests -p test_npm_audit_scope.py"
   "npm audit:python3 scripts/check-npm-audit.py"
   "feature matrix check:python3 scripts/feature_matrix.py check"
+  # The expensive release gate runs too late to be the first place a P0 score,
+  # stale matrix artifact, dirty candidate, bad launch record or missing audit
+  # is discovered. Keep the release contract itself in the fast gate.
+  "mainnet release contract tests:python3 -m pytest -q tests/test_mainnet_release_gate.py tests/test_feature_matrix.py tests/test_launch_record.py"
   # `docs/audit/X3_FEATURE_COMPLETION_MATRIX.md`, `docs/audit/X3_AGENT_QUEUE.md` and
   # `audit-artifacts/current/feature-status.json` are *derived* from FEATURE_REGISTRY.toml and
   # FEATURE_MATRIX.toml by `scripts/x3_audit_matrix.py`. A derived readiness table that a human

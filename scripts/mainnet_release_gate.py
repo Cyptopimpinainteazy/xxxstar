@@ -24,8 +24,13 @@ import shutil
 import subprocess
 import sys
 import fcntl
+import datetime as dt
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+import feature_matrix  # noqa: E402
+
 FAILURES: list[str] = []
 
 
@@ -67,6 +72,635 @@ def path_exists(rel: str) -> pathlib.Path:
     else:
         ok(f"found {rel}")
     return p
+
+
+# ── 0. P0 release scope and candidate identity ───────────────────────────────
+
+P0_RELEASE_FLOOR = 95
+P0_BASELINE_COUNT = 82
+CLAIM_HYGIENE_SUBSYSTEM = "claims_hygiene"
+LAUNCH_RECORD_PATH = ROOT / "reports" / "launch" / "promotion.json"
+LAUNCH_RECORD_SCHEMA = 2
+AUDIT_SCOPES_A = {"runtime", "consensus", "atomic"}
+AUDIT_SCOPES_B = {"bridges", "contracts", "operations"}
+APPROVAL_ROLES = {"release", "security", "operations"}
+BRIDGE_ROUTES = {
+    "ethereum-mainnet",
+    "solana-mainnet-beta",
+    "bitcoin-mainnet",
+}
+BRIDGE_LIMITS = {
+    "per_transfer_limit_usd": 1_000,
+    "daily_per_route_limit_usd": 10_000,
+    "total_exposure_limit_usd": 50_000,
+}
+BOUNTY_MIN_POOL_USD = 100_000
+BOUNTY_MIN_AGE = dt.timedelta(days=28)
+PUBLIC_TESTNET_MIN_DURATION = dt.timedelta(weeks=8)
+PUBLIC_TESTNET_MAX_AGE = dt.timedelta(days=90)
+PUBLIC_TESTNET_MIN_VALIDATORS = 50
+PUBLIC_TESTNET_MIN_CONTINENTS = 5
+NON_REPOSITORY_EVIDENCE_PREFIXES = (
+    "claim:",
+    "commit:",
+    "note:",
+    "pr #",
+    "pr:",
+    "registry:",
+    "workflow:",
+)
+
+
+def load_matrix(path: pathlib.Path | str) -> dict:
+    return feature_matrix.load_matrix(pathlib.Path(path))
+
+
+def _local_evidence_path(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.lower().startswith(("http://", "https://")):
+        return None
+    if text.lower().startswith(NON_REPOSITORY_EVIDENCE_PREFIXES):
+        return None
+    return text.split("#", 1)[0].strip()
+
+
+def _current_evidence_errors(
+    feature: dict, root: pathlib.Path
+) -> list[str]:
+    label = str(feature.get("id") or feature.get("name") or "<unknown P0 feature>")
+    evidence = feature.get("evidence", [])
+    test_evidence = feature.get("test_evidence", [])
+    if not isinstance(evidence, list) or not isinstance(test_evidence, list):
+        return [f"{label}: evidence and test_evidence must be arrays"]
+
+    local_evidence: list[str] = []
+    errors: list[str] = []
+    for item in evidence + test_evidence:
+        local = _local_evidence_path(item)
+        if local is None:
+            continue
+        path = root / local
+        if not path.is_file():
+            errors.append(f"{label}: evidence artifact is missing: {local}")
+            continue
+        try:
+            if path.stat().st_size == 0:
+                errors.append(f"{label}: evidence artifact is empty: {local}")
+                continue
+        except OSError as exc:
+            errors.append(f"{label}: evidence artifact cannot be read: {local}: {exc}")
+            continue
+        local_evidence.append(local)
+
+    if not local_evidence:
+        errors.append(
+            f"{label}: no current repository evidence artifact is recorded; "
+            "URLs, PR references, commits and notes are claims, not launch evidence"
+        )
+    return errors
+
+
+def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
+    """Return every reason the matrix fails the public-launch contract."""
+    root = pathlib.Path(repo_root)
+    features = matrix.get("feature", [])
+    p0 = [
+        feature
+        for feature in features
+        if isinstance(feature, dict) and feature.get("priority") == "P0"
+    ]
+    if not p0:
+        return ["P0 release scope is empty"]
+
+    errors: list[str] = []
+    if len(p0) != P0_BASELINE_COUNT:
+        errors.append(
+            f"P0 release scope has {len(p0)} rows; the approved baseline is "
+            f"{P0_BASELINE_COUNT}"
+        )
+
+    capability_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") != CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    hygiene_rows = [
+        feature
+        for feature in p0
+        if feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+
+    for feature in hygiene_rows:
+        label = str(feature.get("id") or feature.get("name") or "<unknown claim row>")
+        if feature.get("claim_risk") is not True:
+            errors.append(f"{label}: claim-hygiene row must set claim_risk = true")
+        if feature.get("launch_scope") != "research":
+            errors.append(f"{label}: claim-hygiene row must remain research scope")
+
+    for feature in capability_rows:
+        label = str(feature.get("id") or feature.get("name") or "<unknown P0 feature>")
+        for field in ("implemented", "tested", "mainnet_ready"):
+            score = feature.get(field)
+            if not isinstance(score, int) or isinstance(score, bool):
+                errors.append(f"{label}: {field} is not an integer")
+            elif score < P0_RELEASE_FLOOR:
+                errors.append(
+                    f"{label}: {field} is {score}; P0 release requires at least "
+                    f"{P0_RELEASE_FLOOR}"
+                )
+
+        blockers = feature.get("blockers", [])
+        if not isinstance(blockers, list):
+            errors.append(f"{label}: blockers is not an array")
+        elif blockers:
+            errors.append(
+                f"{label}: P0 release has {len(blockers)} open blocker"
+                f"{'s' if len(blockers) != 1 else ''}: {'; '.join(map(str, blockers))}"
+            )
+
+        required_tests = feature.get("required_tests", [])
+        if not isinstance(required_tests, list):
+            errors.append(f"{label}: required_tests is not an array")
+        else:
+            if not required_tests and not feature.get("test_evidence"):
+                errors.append(f"{label}: no required test evidence is recorded")
+            for test_name in required_tests:
+                if not isinstance(test_name, str) or not feature_matrix._test_exists(
+                    root,
+                    feature.get("paths", []),
+                    feature.get("test_paths", []),
+                    test_name,
+                ):
+                    errors.append(f"{label}: required test does not resolve: {test_name}")
+        errors.extend(_current_evidence_errors(feature, root))
+    return errors
+
+
+def claims_hygiene_errors(repo_root: pathlib.Path | str) -> list[str]:
+    """Claim-risk rows are scanner gates, never launch capabilities."""
+    root = pathlib.Path(repo_root)
+    script = root / "scripts" / "ci" / "check-claims-hygiene.py"
+    if not script.is_file():
+        return ["claims hygiene scanner is missing: scripts/ci/check-claims-hygiene.py"]
+    result = run([sys.executable, str(script)], cwd=root)
+    if result.returncode == 0:
+        return []
+    output = (result.stderr or result.stdout).strip()
+    detail = output.splitlines()[-1] if output else f"exit {result.returncode}"
+    return [f"claims hygiene scanner failed: {detail}"]
+
+
+def audit_artifact_errors(repo_root: pathlib.Path | str) -> list[str]:
+    """Reject generated matrix artifacts that no longer describe their sources."""
+    root = pathlib.Path(repo_root)
+    script = root / "scripts" / "x3_audit_matrix.py"
+    if not script.is_file():
+        return [
+            "generated matrix artifacts cannot be verified: "
+            "scripts/x3_audit_matrix.py is missing"
+        ]
+    result = run([sys.executable, str(script), "--check"], cwd=root)
+    if result.returncode == 0:
+        return []
+    stale = [
+        line.split("missing/stale:", 1)[1].strip()
+        for line in result.stderr.splitlines()
+        if "missing/stale:" in line
+    ]
+    if stale:
+        return [
+            "generated matrix artifacts are missing or stale: "
+            + ", ".join(sorted(stale))
+        ]
+    detail = next(
+        (line.strip() for line in result.stderr.splitlines() if line.strip()),
+        f"x3_audit_matrix.py --check exited {result.returncode}",
+    )
+    return [f"generated matrix artifacts cannot be verified: {detail}"]
+
+
+def check_p0_scope(
+    matrix_path: pathlib.Path | str | None = None,
+    repo_root: pathlib.Path | str | None = None,
+) -> list[str]:
+    """Load and validate the complete P0 release scope."""
+    root = pathlib.Path(repo_root) if repo_root is not None else ROOT
+    matrix_file = (
+        pathlib.Path(matrix_path)
+        if matrix_path is not None
+        else root / "FEATURE_MATRIX.toml"
+    )
+    try:
+        matrix = load_matrix(matrix_file)
+    except (OSError, ValueError) as exc:
+        return [f"P0 release scope cannot be loaded from {matrix_file}: {exc}"]
+    errors = evaluate_p0_scope(matrix, root)
+    p0_hygiene = [
+        feature
+        for feature in matrix.get("feature", [])
+        if isinstance(feature, dict)
+        and feature.get("priority") == "P0"
+        and feature.get("subsystem") == CLAIM_HYGIENE_SUBSYSTEM
+    ]
+    if p0_hygiene:
+        errors += claims_hygiene_errors(root)
+    return errors + audit_artifact_errors(root)
+
+
+def working_tree_changes(root: pathlib.Path | str = ROOT) -> list[str]:
+    """Return porcelain status lines; a candidate release must name committed bytes."""
+    result = run(
+        ["git", "status", "--porcelain", "--untracked-files=normal"],
+        cwd=pathlib.Path(root),
+    )
+    if result.returncode != 0:
+        return ["cannot determine working-tree state for a release candidate"]
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def check_candidate_identity() -> None:
+    print("\n── 0b. Candidate identity ──")
+    changes = working_tree_changes()
+    if changes:
+        fail(
+            "release candidate working tree is dirty; commit or remove every staged, "
+            f"modified and untracked change first ({len(changes)} path(s))"
+        )
+        for line in changes[:20]:
+            print(f"    {line}")
+        if len(changes) > 20:
+            print(f"    … {len(changes) - 20} more")
+    else:
+        ok("release candidate working tree is clean")
+
+
+def _sha256(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(
+        value, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+
+
+def _record_digest(record: dict) -> str:
+    body = {key: value for key, value in record.items() if key != "record_sha256"}
+    return hashlib.sha256(_canonical_json(body)).hexdigest()
+
+
+def _parse_timestamp(value: object, label: str) -> dt.datetime | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def _record_artifact_error(
+    artifact: object, root: pathlib.Path, label: str
+) -> str | None:
+    if not isinstance(artifact, dict):
+        return f"{label}: artifact record is missing"
+    raw_path = (
+        artifact.get("path")
+        or artifact.get("report")
+        or artifact.get("evidence")
+    )
+    expected = artifact.get("sha256")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        return f"{label}: artifact path is missing"
+    path = root / raw_path
+    if not path.is_file():
+        return f"{label}: artifact is missing: {raw_path}"
+    actual = _sha256(path)
+    if not isinstance(expected, str) or actual != expected:
+        return f"{label}: artifact digest does not match: {raw_path}"
+    return None
+
+
+def _record_matrix_errors(
+    record: dict, root: pathlib.Path, matrix: dict
+) -> list[str]:
+    feature_record = record.get("feature_matrix")
+    if not isinstance(feature_record, dict):
+        return ["launch record: feature_matrix evidence is missing"]
+    sources = feature_record.get("sources")
+    if not isinstance(sources, dict) or not sources:
+        return ["launch record: feature_matrix sources are missing"]
+
+    errors: list[str] = []
+    for raw_path, expected in sorted(sources.items()):
+        if not isinstance(raw_path, str) or not isinstance(expected, str):
+            errors.append("launch record: malformed feature_matrix source entry")
+            continue
+        path = root / raw_path
+        if not path.is_file() or _sha256(path) != expected:
+            errors.append(
+                f"launch record: feature_matrix source does not match: {raw_path}"
+            )
+
+    current_rows = sorted(
+        (
+            {
+                "id": str(feature.get("id") or feature.get("name")),
+                "implemented": feature.get("implemented"),
+                "tested": feature.get("tested"),
+                "mainnet_ready": feature.get("mainnet_ready"),
+            }
+            for feature in matrix.get("feature", [])
+            if isinstance(feature, dict) and feature.get("priority") == "P0"
+        ),
+        key=lambda row: row["id"],
+    )
+    snapshot = record.get("p0_snapshot")
+    expected_rows = snapshot.get("rows") if isinstance(snapshot, dict) else None
+    if expected_rows != current_rows:
+        errors.append("launch record: P0 snapshot does not match FEATURE_MATRIX.toml")
+    return errors
+
+
+def evaluate_launch_record(
+    record: object,
+    repo_root: pathlib.Path | str,
+    head_commit: str,
+    matrix: dict,
+    now: dt.datetime | None = None,
+) -> list[str]:
+    """Re-read every launch claim that is not a code or build result."""
+    if not isinstance(record, dict):
+        return ["launch record: root must be a JSON object"]
+    root = pathlib.Path(repo_root)
+    errors: list[str] = []
+    if record.get("schema") != LAUNCH_RECORD_SCHEMA:
+        errors.append(
+            f"launch record: schema {record.get('schema')!r}; expected "
+            f"{LAUNCH_RECORD_SCHEMA}"
+        )
+    if not isinstance(record.get("approved_by"), str) or not record["approved_by"].strip():
+        errors.append("launch record: approved_by is missing")
+    if record.get("commit") != head_commit:
+        errors.append(
+            f"launch record: commit {record.get('commit')!r} does not match "
+            f"candidate {head_commit}"
+        )
+    if record.get("record_sha256") != _record_digest(record):
+        errors.append("launch record: record_sha256 does not match its contents")
+
+    recorded_at = _parse_timestamp(record.get("recorded_at"), "recorded_at")
+    if recorded_at is None:
+        errors.append("launch record: recorded_at is not a timezone-aware timestamp")
+        recorded_at = now or dt.datetime.now(dt.timezone.utc)
+
+    artifacts = record.get("artifacts")
+    if not isinstance(artifacts, list):
+        errors.append("launch record: genesis artifacts are missing")
+    else:
+        roles = {
+            artifact.get("role")
+            for artifact in artifacts
+            if isinstance(artifact, dict)
+        }
+        for role in ("mainnet-plain", "mainnet-raw"):
+            matching = [
+                artifact
+                for artifact in artifacts
+                if isinstance(artifact, dict) and artifact.get("role") == role
+            ]
+            if len(matching) != 1:
+                errors.append(f"launch record: exactly one {role} genesis is required")
+                continue
+            artifact = matching[0]
+            problem = _record_artifact_error(artifact, root, f"launch record: {role}")
+            if problem:
+                errors.append(problem)
+            if artifact.get("aura_authorities") != 7:
+                errors.append(f"launch record: {role} does not have 7 Aura authorities")
+            if artifact.get("grandpa_authorities") != 7:
+                errors.append(
+                    f"launch record: {role} does not have 7 GRANDPA authorities"
+                )
+        if roles != {"mainnet-plain", "mainnet-raw"}:
+            errors.append("launch record: unexpected genesis artifact roles")
+
+    errors.extend(_record_matrix_errors(record, root, matrix))
+
+    audits = record.get("audits")
+    if not isinstance(audits, list) or len(audits) < 2:
+        errors.append("launch record: two independent audit reports are required")
+    else:
+        providers: set[str] = set()
+        scopes: list[set[str]] = []
+        for index, audit in enumerate(audits):
+            if not isinstance(audit, dict):
+                errors.append(f"launch record: audits[{index}] is malformed")
+                continue
+            provider = audit.get("provider")
+            if not isinstance(provider, str) or not provider.strip():
+                errors.append(f"launch record: audits[{index}] has no provider")
+            elif provider in providers:
+                errors.append(f"launch record: duplicate audit provider {provider}")
+            else:
+                providers.add(provider)
+            scope = audit.get("scope")
+            if isinstance(scope, str):
+                scope = [scope]
+            normalized = (
+                {item.strip().lower() for item in scope if isinstance(item, str)}
+                if isinstance(scope, list)
+                else set()
+            )
+            scopes.append(normalized)
+            if not normalized:
+                errors.append(
+                    f"launch record: audit {provider or index} has no scope"
+                )
+            elif not normalized.issubset(AUDIT_SCOPES_A | AUDIT_SCOPES_B):
+                errors.append(
+                    f"launch record: audit {provider or index} has an unknown scope"
+                )
+            if audit.get("critical_open") != 0 or audit.get("high_open") != 0:
+                errors.append(
+                    f"launch record: audit {provider or index} has open critical/high findings"
+                )
+            problem = _record_artifact_error(
+                audit, root, f"launch record: audit {provider or index}"
+            )
+            if problem:
+                errors.append(problem)
+        if len(providers) < 2:
+            errors.append("launch record: audit providers are not independent")
+        if not any(scope.intersection(AUDIT_SCOPES_A) for scope in scopes):
+            errors.append("launch record: runtime/consensus audit scope is missing")
+        if not any(scope.intersection(AUDIT_SCOPES_B) for scope in scopes):
+            errors.append("launch record: bridges/contracts/operations audit scope is missing")
+
+    bounty = record.get("bounty_window")
+    if not isinstance(bounty, dict):
+        errors.append("launch record: bounty window is missing")
+    else:
+        pool = bounty.get("pool_usd")
+        if (
+            not isinstance(pool, int)
+            or isinstance(pool, bool)
+            or pool < BOUNTY_MIN_POOL_USD
+        ):
+            errors.append(
+                f"launch record: bounty pool is below ${BOUNTY_MIN_POOL_USD:,}"
+            )
+        starts = _parse_timestamp(bounty.get("starts_at"), "bounty starts_at")
+        ends = _parse_timestamp(bounty.get("ends_at"), "bounty ends_at")
+        if starts is None or ends is None or ends - starts < BOUNTY_MIN_AGE:
+            errors.append("launch record: bounty window is shorter than 28 days")
+        elif not (starts <= recorded_at <= ends):
+            errors.append("launch record: bounty was not active when launch was recorded")
+        problem = _record_artifact_error(bounty, root, "launch record: bounty")
+        if problem:
+            errors.append(problem)
+
+    testnet = record.get("public_testnet_window")
+    if not isinstance(testnet, dict):
+        errors.append("launch record: public testnet window is missing")
+    else:
+        starts = _parse_timestamp(testnet.get("started_at"), "testnet started_at")
+        ends = _parse_timestamp(testnet.get("ended_at"), "testnet ended_at")
+        if starts is None or ends is None:
+            errors.append("launch record: public testnet timestamps are invalid")
+        else:
+            duration = ends - starts
+            if duration < PUBLIC_TESTNET_MIN_DURATION:
+                errors.append("launch record: public testnet is shorter than 8 weeks")
+            if ends > recorded_at:
+                errors.append("launch record: public testnet had not completed at approval")
+            if recorded_at - ends > PUBLIC_TESTNET_MAX_AGE:
+                errors.append("launch record: public testnet evidence has expired")
+        if testnet.get("validator_count", 0) < PUBLIC_TESTNET_MIN_VALIDATORS:
+            errors.append("launch record: public testnet has fewer than 50 validators")
+        if testnet.get("continents", 0) < PUBLIC_TESTNET_MIN_CONTINENTS:
+            errors.append("launch record: public testnet spans fewer than 5 continents")
+        problem = _record_artifact_error(testnet, root, "launch record: public testnet")
+        if problem:
+            errors.append(problem)
+
+    bridge = record.get("bridge_configuration")
+    if not isinstance(bridge, dict):
+        errors.append("launch record: bridge configuration is missing")
+    else:
+        raw_path = bridge.get("path")
+        path = root / raw_path if isinstance(raw_path, str) else None
+        if path is None or not path.is_file():
+            errors.append("launch record: bridge configuration file is missing")
+        else:
+            try:
+                config = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                errors.append("launch record: bridge configuration is not valid JSON")
+            else:
+                if set(config.get("active_routes", [])) != BRIDGE_ROUTES:
+                    errors.append(
+                        "launch record: external routes must be exactly Ethereum, "
+                        "Solana and Bitcoin mainnet"
+                    )
+                for field, cap in BRIDGE_LIMITS.items():
+                    value = config.get(field)
+                    if not isinstance(value, int) or isinstance(value, bool) or value > cap:
+                        errors.append(
+                            f"launch record: bridge {field} exceeds ${cap:,}"
+                        )
+                if config.get("kill_switch") is not True:
+                    errors.append("launch record: bridge kill switch is not enabled")
+        problem = _record_artifact_error(
+            bridge, root, "launch record: bridge configuration"
+        )
+        if problem:
+            errors.append(problem)
+
+    validators = record.get("validators")
+    entries = validators.get("entries") if isinstance(validators, dict) else None
+    if not isinstance(entries, list) or len(entries) != 7:
+        errors.append("launch record: exactly seven genesis validators are required")
+    else:
+        for field, minimum in (("host", 7), ("operator", 7), ("identity", 7), ("provider", 5), ("jurisdiction", 3)):
+            values = [entry.get(field) for entry in entries if isinstance(entry, dict)]
+            if (
+                len(values) != 7
+                or any(not isinstance(value, str) or not value.strip() for value in values)
+                or len(set(values)) < minimum
+            ):
+                errors.append(
+                    f"launch record: fewer than {minimum} distinct validator {field} values"
+                )
+        if any(entry.get("loopback") is not False for entry in entries):
+            errors.append("launch record: validator hosts must be non-loopback")
+    if isinstance(validators, dict):
+        problem = _record_artifact_error(validators, root, "launch record: validators")
+        if problem:
+            errors.append(problem)
+
+    approvals = record.get("approvals")
+    roles: dict[str, list[dict]] = {}
+    if not isinstance(approvals, list):
+        errors.append("launch record: release approvals are missing")
+    else:
+        for approval in approvals:
+            if not isinstance(approval, dict):
+                continue
+            role = approval.get("role")
+            if role in APPROVAL_ROLES:
+                roles.setdefault(role, []).append(approval)
+            if approval.get("approved_commit") != head_commit:
+                errors.append(
+                    f"launch record: approval {approval.get('approver', role)!r} "
+                    "is not bound to the candidate commit"
+                )
+            evidence = approval.get("evidence")
+            problem = _record_artifact_error(
+                {**approval, "path": evidence}
+                if isinstance(evidence, str)
+                else approval,
+                root,
+                f"launch record: approval {role!r}",
+            )
+            if problem:
+                errors.append(problem)
+        if set(roles) != APPROVAL_ROLES or any(len(rows) != 1 for rows in roles.values()):
+            errors.append(
+                "launch record: one release, security and operations approval each is required"
+            )
+    return errors
+
+
+def check_launch_record(
+    record_path: pathlib.Path | str | None = None,
+    repo_root: pathlib.Path | str | None = None,
+) -> list[str]:
+    root = pathlib.Path(repo_root) if repo_root is not None else ROOT
+    path = (
+        pathlib.Path(record_path)
+        if record_path is not None
+        else root / LAUNCH_RECORD_PATH.relative_to(ROOT)
+    )
+    if not path.is_file():
+        return [f"launch record is missing: {path}"]
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+        matrix = load_matrix(root / "FEATURE_MATRIX.toml")
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [f"launch record cannot be loaded: {exc}"]
+    commit = run(["git", "rev-parse", "HEAD"], cwd=root)
+    if commit.returncode != 0:
+        return ["launch record: cannot resolve candidate commit"]
+    return evaluate_launch_record(record, root, commit.stdout.strip(), matrix)
 
 
 # ── 1. Required documentation ────────────────────────────────────────────────
@@ -807,6 +1441,34 @@ def main() -> int:
     print("═" * 60)
     print("  Mainnet Release Gate")
     print("═" * 60)
+
+    check_candidate_identity()
+    if FAILURES:
+        print(f"\n  ❌ GATE FAILED — {len(FAILURES)} candidate-identity failure(s)")
+        print(f"{'═' * 60}")
+        return 1
+
+    print("\n── 0. P0 release scope ──")
+    p0_errors = check_p0_scope()
+    if p0_errors:
+        for message in p0_errors:
+            fail(message)
+        print(f"\n  ❌ GATE FAILED — {len(p0_errors)} P0 release-contract failure(s)")
+        print(f"{'═' * 60}")
+        return 1
+    ok("all P0 rows meet the 95-point launch contract with current evidence")
+
+    print("\n── 0c. Launch evidence ──")
+    launch_errors = check_launch_record()
+    if launch_errors:
+        for message in launch_errors:
+            fail(message)
+        print(
+            f"\n  ❌ GATE FAILED — {len(launch_errors)} launch-evidence failure(s)"
+        )
+        print(f"{'═' * 60}")
+        return 1
+    ok("launch record re-reads current evidence and matches the candidate")
 
     # This gate builds the runtime in `runtime/target/srtool` and boots nodes on fixed ports. Two
     # concurrent runs therefore share both, and the second one corrupts the first one's evidence
