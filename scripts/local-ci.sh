@@ -733,6 +733,8 @@ GATES_FAST=(
   # the gate calls it and the drill still writes the fields it reads.
   # Cheap: 20 checks, no build, no network.
   "public testnet gate 7 verdict:python3 tests/test_restart_proof_verdict.py"
+  # Finality monitoring must reject divergent finalized chains and malformed RPC evidence.
+  "testnet finality monitor:python3 tests/test_testnet_finality_status.py"
   # The promotion record: what ties a passing RC run to the genesis it promotes.
   # `build` refuses a wrong validator count, a non-Live spec, an RC log without the
   # gate's own PASSED marker, a missing operator, a missing artifact and a dirty tree;
