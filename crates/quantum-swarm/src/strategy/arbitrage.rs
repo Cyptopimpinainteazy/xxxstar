@@ -6,7 +6,7 @@
 //! - Flash loan arbitrage paths
 
 use super::{ArbitrageConfig, MarketData, Signal, Strategy, StrategyMetrics, StrategyType};
-use crate::error::SwarmResult;
+use crate::error::{SwarmError, SwarmResult};
 use crate::evolution::Genome;
 use crate::types::{RiskProfile, StrategyId, TradeRoute};
 use serde::{Deserialize, Serialize};
@@ -130,25 +130,44 @@ impl ArbitrageStrategy {
     }
 
     /// Scan for arbitrage opportunities
-    pub fn scan(&mut self, market_data: &MarketData) -> Vec<ArbitrageOpportunity> {
+    pub fn scan(&mut self, market_data: &MarketData) -> SwarmResult<Vec<ArbitrageOpportunity>> {
+        let opportunities = self.detect_opportunities(market_data)?;
+        self.opportunities = opportunities.clone();
+        Ok(opportunities)
+    }
+
+    fn detect_opportunities(
+        &self,
+        market_data: &MarketData,
+    ) -> SwarmResult<Vec<ArbitrageOpportunity>> {
         let mut opportunities = Vec::new();
 
         // Get prices for each venue
         let venues = &self.config.venues;
         if venues.len() < 2 {
-            return opportunities;
+            return Ok(opportunities);
         }
 
         for asset in market_data.prices.keys() {
-            // Get prices from different venues
             let mut venue_prices: Vec<(&str, f64)> = Vec::new();
 
             for venue in venues {
-                // In real implementation, would have per-venue prices
-                // For now, simulate small price differences
-                let base_price = market_data.prices.get(asset).copied().unwrap_or(0.0);
-                let variance = (rand::random::<f64>() - 0.5) * 0.02 * base_price;
-                venue_prices.push((venue.as_str(), base_price + variance));
+                let price = market_data
+                    .venue_prices
+                    .get(venue)
+                    .and_then(|assets| assets.get(asset))
+                    .copied()
+                    .ok_or_else(|| {
+                        SwarmError::Strategy(format!(
+                            "arbitrage requires a {venue} execution price for {asset}"
+                        ))
+                    })?;
+                if !price.is_finite() || price <= 0.0 {
+                    return Err(SwarmError::Strategy(format!(
+                        "arbitrage price for {asset} at {venue} must be finite and positive"
+                    )));
+                }
+                venue_prices.push((venue.as_str(), price));
             }
 
             // Find best buy and sell
@@ -164,8 +183,20 @@ impl ArbitrageStrategy {
                     let profit_bps = ((*sell_price - *buy_price) / *buy_price * 10000.0) as u32;
 
                     if profit_bps >= self.config.min_profit_bps {
+                        let mut hasher = blake3::Hasher::new();
+                        hasher.update(b"x3-arbitrage-opportunity-v1");
+                        hasher.update(asset.as_bytes());
+                        hasher.update(buy_venue.as_bytes());
+                        hasher.update(sell_venue.as_bytes());
+                        hasher.update(&buy_price.to_bits().to_le_bytes());
+                        hasher.update(&sell_price.to_bits().to_le_bytes());
+                        hasher.update(&market_data.timestamp.to_le_bytes());
+                        let digest = hasher.finalize();
+                        let mut id = [0u8; 16];
+                        id.copy_from_slice(&digest.as_bytes()[..16]);
+
                         opportunities.push(ArbitrageOpportunity {
-                            id: uuid::Uuid::new_v4(),
+                            id: uuid::Uuid::from_bytes(id),
                             asset: asset.clone(),
                             buy_venue: buy_venue.to_string(),
                             sell_venue: sell_venue.to_string(),
@@ -173,7 +204,7 @@ impl ArbitrageStrategy {
                             sell_price: *sell_price,
                             profit_bps,
                             max_size: self.config.max_position as f64,
-                            expires_at: market_data.timestamp + 5000, // 5 second window
+                            expires_at: market_data.timestamp.saturating_add(5000),
                             route: ArbitrageRoute {
                                 steps: vec![
                                     ArbitrageStep {
@@ -202,10 +233,15 @@ impl ArbitrageStrategy {
         }
 
         // Sort by profit
-        opportunities.sort_by(|a, b| b.profit_bps.cmp(&a.profit_bps));
+        opportunities.sort_by(|a, b| {
+            b.profit_bps
+                .cmp(&a.profit_bps)
+                .then_with(|| a.asset.cmp(&b.asset))
+                .then_with(|| a.buy_venue.cmp(&b.buy_venue))
+                .then_with(|| a.sell_venue.cmp(&b.sell_venue))
+        });
 
-        self.opportunities = opportunities.clone();
-        opportunities
+        Ok(opportunities)
     }
 
     /// Get best opportunity
@@ -249,12 +285,12 @@ impl Strategy for ArbitrageStrategy {
     fn evaluate(&self, market_data: &MarketData) -> SwarmResult<Vec<Signal>> {
         let mut signals = Vec::new();
 
-        // Generate signals from opportunities
-        for opp in &self.opportunities {
+        // Generate signals from the current market snapshot, never stale scans.
+        for opp in self.detect_opportunities(market_data)? {
             if opp.profit_bps >= self.config.min_profit_bps {
                 // Buy signal
                 signals.push(
-                    Signal::buy(&opp.asset, opp.profit_bps as f64 / 1000.0)
+                    Signal::buy(&opp.asset, (opp.profit_bps as f64 / 1000.0).min(1.0))
                         .with_urgency((opp.profit_bps as f64 / 100.0).min(1.0)),
                 );
             }
@@ -333,10 +369,42 @@ mod tests {
 
         let mut market_data = MarketData::default();
         market_data.prices.insert("ETH".to_string(), 2000.0);
+        market_data.venue_prices.insert(
+            "Uniswap".into(),
+            [("ETH".to_string(), 2_000.0)].into_iter().collect(),
+        );
+        market_data.venue_prices.insert(
+            "Sushiswap".into(),
+            [("ETH".to_string(), 2_010.0)].into_iter().collect(),
+        );
         market_data.timestamp = 1000;
 
-        let opps = strategy.scan(&market_data);
-        // May or may not find opportunities depending on random variance
+        let opps = strategy.scan(&market_data).expect("real venue prices");
+        assert_eq!(opps.len(), 1);
+        assert_eq!(opps[0].profit_bps, 50);
         assert!(strategy.metrics.total_trades == 0);
+    }
+
+    #[test]
+    fn arbitrage_refuses_to_invent_missing_venue_prices() {
+        let genome = Genome::new_float(5, 0.0, 1.0);
+        let config = ArbitrageConfig {
+            min_profit_bps: 10,
+            max_position: 100_000,
+            venues: vec!["Uniswap".into(), "Sushiswap".into()],
+            cross_chain: false,
+        };
+        let mut strategy = ArbitrageStrategy::new(genome, config);
+        let mut market_data = MarketData::default();
+        market_data.prices.insert("ETH".into(), 2_000.0);
+        market_data.venue_prices.insert(
+            "Uniswap".into(),
+            [("ETH".to_string(), 2_000.0)].into_iter().collect(),
+        );
+
+        let error = strategy
+            .scan(&market_data)
+            .expect_err("missing venue prices must fail closed");
+        assert!(error.to_string().contains("Sushiswap"), "{error}");
     }
 }

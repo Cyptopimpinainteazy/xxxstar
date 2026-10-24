@@ -177,14 +177,6 @@ impl QuantumSwarmExecutor {
         result.tournament_result = Some(tournament_result.clone());
         self.stats.tournaments += 1;
 
-        // 4. Quantum optimization for top performers
-        if self.should_quantum_optimize() {
-            self.state = ExecutorState::QuantumOptimizing;
-            let quantum_results = self.quantum_optimize_top(5)?;
-            result.quantum_optimizations = quantum_results.len();
-            self.stats.quantum_jobs += quantum_results.len() as u64;
-        }
-
         // Update stats
         self.stats.best_fitness = self.stats.best_fitness.max(self.evolution.best_fitness());
         self.stats.strategies_evaluated += result.strategies_evaluated as u64;
@@ -199,31 +191,51 @@ impl QuantumSwarmExecutor {
         &mut self,
         market_data: &MarketData,
     ) -> SwarmResult<HashMap<StrategyId, f64>> {
+        if market_data.prices.is_empty() {
+            return Err(SwarmError::Strategy(
+                "market data contains no prices".into(),
+            ));
+        }
+        for (asset, price) in &market_data.prices {
+            if !price.is_finite() || *price <= 0.0 {
+                return Err(SwarmError::Strategy(format!(
+                    "market price for {asset} must be finite and positive, got {price}"
+                )));
+            }
+        }
+
         let mut scores = HashMap::new();
 
-        // For strategies in arena
         for combatant in self.arena.active_combatants() {
-            // Simple fitness based on genome parameters
-            let fitness = combatant.genome.fitness;
-
-            // Add some noise based on market conditions
-            let market_factor = market_data.prices.values().map(|p| p.log10()).sum::<f64>()
-                / market_data.prices.len().max(1) as f64;
-
-            let score = fitness + market_factor * 0.01;
-            scores.insert(combatant.id, score);
-        }
-
-        // For registered strategies
-        for (id, strategy) in &self.strategies {
+            let id = combatant.id;
+            let strategy = self.strategies.get(&id).ok_or_else(|| {
+                SwarmError::Strategy(format!(
+                    "active combatant {id} has no registered strategy evaluator"
+                ))
+            })?;
             let signals = strategy.evaluate(market_data)?;
-            let score = signals
-                .iter()
-                .map(|s| s.confidence * s.direction.abs())
-                .sum::<f64>();
-            scores.insert(*id, score);
+            let mut score = 0.0;
+            for signal in signals {
+                if !signal.direction.is_finite()
+                    || !signal.confidence.is_finite()
+                    || !(0.0..=1.0).contains(&signal.confidence)
+                {
+                    return Err(SwarmError::Strategy(format!(
+                        "strategy {id} emitted an invalid signal: direction={}, confidence={}",
+                        signal.direction, signal.confidence
+                    )));
+                }
+                score += signal.confidence * signal.direction.abs();
+            }
+            if !score.is_finite() {
+                return Err(SwarmError::Strategy(format!(
+                    "strategy {id} produced a non-finite fitness score"
+                )));
+            }
+            scores.insert(id, score);
         }
 
+        self.arena.apply_fitness(&scores)?;
         Ok(scores)
     }
 
@@ -235,69 +247,6 @@ impl QuantumSwarmExecutor {
             ExecutorMode::Hybrid => self.stats.generations % 10 == 0,
             ExecutorMode::Yolo => true, // Always optimize in YOLO mode
         }
-    }
-
-    /// Quantum optimize top N strategies
-    fn quantum_optimize_top(&mut self, n: usize) -> SwarmResult<Vec<QuantumResult>> {
-        let mut results = Vec::new();
-
-        let top_genomes: Vec<_> = self
-            .evolution
-            .population()
-            .top_n(n)
-            .into_iter()
-            .cloned()
-            .collect();
-
-        for genome in top_genomes {
-            // Convert genome to QUBO problem
-            let params = genome.to_float_vec();
-            if params.is_empty() {
-                continue;
-            }
-
-            // Create portfolio optimization QUBO
-            let n_assets = params.len().min(8); // Max 8 qubits for simulation
-            let returns: Vec<f64> = params.iter().take(n_assets).cloned().collect();
-
-            // Create dummy covariance matrix (identity * 0.1 for simplicity)
-            let covariance: Vec<Vec<f64>> = (0..n_assets)
-                .map(|i| {
-                    (0..n_assets)
-                        .map(|j| if i == j { 0.1 } else { 0.01 })
-                        .collect()
-                })
-                .collect();
-
-            let risk_aversion = 0.5;
-            let budget = n_assets / 2; // Select half the assets
-            let penalty = 1.0;
-
-            let qubo = crate::quantum::QuboMatrix::portfolio_selection(
-                &returns,
-                &covariance,
-                risk_aversion,
-                budget,
-                penalty,
-            );
-
-            // Solve with simulated annealing
-            let annealing_result = self.qubo.solve(&qubo)?;
-
-            results.push(QuantumResult {
-                optimal_params: annealing_result
-                    .solution
-                    .iter()
-                    .map(|&b| if b { 1.0 } else { 0.0 })
-                    .collect(),
-                optimal_value: annealing_result.energy,
-                counts: std::collections::HashMap::new(),
-                statevector: None,
-                history: annealing_result.history,
-            });
-        }
-
-        Ok(results)
     }
 
     /// Register a strategy
@@ -411,6 +360,7 @@ impl AsyncQuantumSwarmExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::strategy::{ArbitrageConfig, ArbitrageStrategy};
 
     #[test]
     fn test_executor_creation() {
@@ -440,15 +390,61 @@ mod tests {
 
         let template = Genome::new_float(5, 0.0, 1.0);
         executor.initialize(&template).unwrap();
+        let genomes: Vec<_> = executor.evolution.population().iter().cloned().collect();
+        for genome in genomes {
+            executor
+                .register_strategy(Box::new(ArbitrageStrategy::new(
+                    genome,
+                    ArbitrageConfig {
+                        min_profit_bps: 10,
+                        max_position: 100_000,
+                        venues: vec!["Uniswap".into(), "Sushiswap".into()],
+                        cross_chain: false,
+                    },
+                )))
+                .unwrap();
+        }
 
         let mut market_data = MarketData::default();
         market_data.prices.insert("ETH".to_string(), 2000.0);
         market_data.prices.insert("BTC".to_string(), 50000.0);
+        market_data.venue_prices.insert(
+            "Uniswap".into(),
+            [("ETH".to_string(), 2_000.0), ("BTC".to_string(), 50_000.0)]
+                .into_iter()
+                .collect(),
+        );
+        market_data.venue_prices.insert(
+            "Sushiswap".into(),
+            [("ETH".to_string(), 2_010.0), ("BTC".to_string(), 50_100.0)]
+                .into_iter()
+                .collect(),
+        );
 
         let result = executor.step(&market_data).unwrap();
 
         assert!(result.strategies_evaluated > 0);
         assert!(result.evolution_stats.is_some());
+        assert!(executor.stats.best_fitness > 0.0);
+    }
+
+    #[test]
+    fn executor_refuses_to_score_combatants_without_strategy_evaluators() {
+        let mut executor = QuantumSwarmExecutor::new(QuantumSwarmConfig::default());
+        let template = Genome::new_float(5, 0.0, 1.0);
+        executor.initialize(&template).unwrap();
+        let mut market_data = MarketData::default();
+        market_data.prices.insert("ETH".into(), 2_000.0);
+
+        let error = executor
+            .step(&market_data)
+            .expect_err("missing evaluators must fail closed");
+        assert!(
+            error
+                .to_string()
+                .contains("no registered strategy evaluator"),
+            "{error}"
+        );
     }
 
     #[test]
