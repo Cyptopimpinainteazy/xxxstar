@@ -806,6 +806,60 @@ fn test_cannot_cancel_before_expiry() {
     });
 }
 
+/// `external-gateway` compiles external legs in; this switch is what opens them.
+///
+/// Before the runtime scope gate existed, an `external-gateway` build initiated a
+/// route to a real external chain (Ethereum/Base/Arbitrum/Bsc/Solana/Bitcoin) while
+/// `ExternalBridgesEnabled` stayed false, so `emergency_pause_bridge` — which
+/// requires the same flag — could not pause what the router had just started, and
+/// `ExternalBridgeAuditGate` gated nothing a user could reach. This pins the fix:
+/// the refusal moves from the switch to the route table once the switch is open.
+#[cfg(feature = "external-gateway")]
+#[test]
+fn external_leg_requires_the_runtime_bridge_switch() {
+    new_test_ext().execute_with(|| {
+        let asset_id = bootstrap_x3_asset(10_000);
+
+        // Feature compiled in, switch closed: the runtime scope gate refuses.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset_id,
+                DomainId::Ethereum,
+                AccountBytes::Evm([9u8; 20]),
+                10,
+                60,
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::ExternalBridgesDisabled
+        );
+
+        // Governance path: audit gate first, then the switch.
+        assert_ok!(Router::set_external_bridge_audit_gate(
+            RuntimeOrigin::root(),
+            true
+        ));
+        assert_ok!(Router::set_external_bridges_enabled(
+            RuntimeOrigin::root(),
+            true
+        ));
+
+        // Past the gate now; this mock configures no external route, so the next
+        // refusal is the route table's. If the gate were still firing the error
+        // would be ExternalBridgesDisabled again.
+        assert_noop!(
+            Router::xvm_transfer(
+                RuntimeOrigin::signed(1),
+                asset_id,
+                DomainId::Ethereum,
+                AccountBytes::Evm([9u8; 20]),
+                10,
+                60,
+            ),
+            pallet_x3_cross_vm_router::Error::<Test>::RouteClosed
+        );
+    });
+}
+
 #[test]
 fn test_external_route_rejected_in_mvp() {
     new_test_ext().execute_with(|| {
