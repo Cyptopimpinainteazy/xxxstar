@@ -430,6 +430,49 @@ def _record_matrix_errors(
     return errors
 
 
+def _record_test_gate_errors(record: dict, root: pathlib.Path) -> list[str]:
+    gates = record.get("test_gates")
+    if not isinstance(gates, list) or not gates:
+        return ["launch record: at least one passing test gate is required"]
+    errors: list[str] = []
+    names: set[str] = set()
+    for index, test_gate in enumerate(gates):
+        if not isinstance(test_gate, dict):
+            errors.append(f"launch record: test_gates[{index}] is malformed")
+            continue
+        name = test_gate.get("name")
+        if not isinstance(name, str) or not name.strip():
+            errors.append(f"launch record: test_gates[{index}] has no name")
+            continue
+        name = name.strip()
+        if name in names:
+            errors.append(f"launch record: duplicate test gate {name}")
+        names.add(name)
+        if (
+            test_gate.get("status") != "PASS"
+            or test_gate.get("exit_code") != 0
+            or isinstance(test_gate.get("exit_code"), bool)
+        ):
+            errors.append(f"launch record: test gate {name} did not pass")
+        if not isinstance(test_gate.get("command"), str) or not test_gate[
+            "command"
+        ].strip():
+            errors.append(f"launch record: test gate {name} has no command")
+        log = test_gate.get("log")
+        problem = _record_artifact_error(
+            {"path": log, "sha256": test_gate.get("sha256")},
+            root,
+            f"launch record: test gate {name}",
+        )
+        if problem:
+            errors.append(problem)
+            continue
+        text = (root / log).read_text(encoding="utf-8", errors="replace")
+        if "PASS" not in text:
+            errors.append(f"launch record: test gate {name} log has no PASS marker")
+    return errors
+
+
 def evaluate_launch_record(
     record: object,
     repo_root: pathlib.Path | str,
@@ -494,6 +537,12 @@ def evaluate_launch_record(
             errors.append("launch record: unexpected genesis artifact roles")
 
     errors.extend(_record_matrix_errors(record, root, matrix))
+    evidence_pack_error = _record_artifact_error(
+        record.get("evidence_pack"), root, "launch record: evidence pack"
+    )
+    if evidence_pack_error:
+        errors.append(evidence_pack_error)
+    errors.extend(_record_test_gate_errors(record, root))
 
     audits = record.get("audits")
     if not isinstance(audits, list) or len(audits) < 2:

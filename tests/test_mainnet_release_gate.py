@@ -377,6 +377,8 @@ def launch_record_fixture(tmp_path: Path, matrix_path: Path, commit: str):
             }
         )
 
+    evidence_pack = write("evidence-pack.json", '{"fixture":true}\n')
+    gate_log = write("evidence/gates.log", "release gate PASS\n")
     matrix = gate.load_matrix(matrix_path)
     rows = sorted(
         (
@@ -402,6 +404,17 @@ def launch_record_fixture(tmp_path: Path, matrix_path: Path, commit: str):
             "sources": {matrix_path.name: gate._sha256(matrix_path)},
         },
         "p0_snapshot": {"rows": rows},
+        "evidence_pack": evidence_pack,
+        "test_gates": [
+            {
+                "name": "release",
+                "command": "make mainnet-check",
+                "status": "PASS",
+                "exit_code": 0,
+                "log": gate_log["path"],
+                "sha256": gate_log["sha256"],
+            }
+        ],
         "audits": [audit_a, audit_b],
         "bounty_window": {**bounty, "evidence": bounty.pop("path")},
         "public_testnet_window": {**testnet, "evidence": testnet.pop("path")},
@@ -518,4 +531,47 @@ def test_record_from_a_different_candidate_commit_is_rejected(tmp_path):
 
     assert (
         "launch record: commit 'abc123' does not match candidate def456"
+    ) in errors
+
+
+def test_missing_test_gate_evidence_is_rejected(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    record = launch_record_fixture(tmp_path, matrix, "abc123")
+    record["test_gates"] = []
+    record["record_sha256"] = gate._record_digest(record)
+
+    errors = gate.evaluate_launch_record(
+        record, tmp_path, "abc123", gate.load_matrix(matrix)
+    )
+
+    assert "launch record: at least one passing test gate is required" in errors
+
+
+def test_changed_test_gate_log_is_rejected(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    record = launch_record_fixture(tmp_path, matrix, "abc123")
+    (tmp_path / "evidence/gates.log").write_text("release gate FAIL\n")
+
+    errors = gate.evaluate_launch_record(
+        record, tmp_path, "abc123", gate.load_matrix(matrix)
+    )
+
+    assert (
+        "launch record: test gate release: artifact digest does not match: "
+        "evidence/gates.log"
+    ) in errors
+
+
+def test_changed_evidence_pack_is_rejected(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    record = launch_record_fixture(tmp_path, matrix, "abc123")
+    (tmp_path / "evidence-pack.json").write_text('{"fixture":false}\n')
+
+    errors = gate.evaluate_launch_record(
+        record, tmp_path, "abc123", gate.load_matrix(matrix)
+    )
+
+    assert (
+        "launch record: evidence pack: artifact digest does not match: "
+        "evidence-pack.json"
     ) in errors
