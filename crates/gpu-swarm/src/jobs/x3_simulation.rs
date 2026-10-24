@@ -77,6 +77,8 @@ pub struct StrategyCandidate {
     pub parents: Vec<[u8; 32]>,
     /// Fitness score
     pub fitness: Option<FitnessMetrics>,
+    /// Canonical portfolio state hash from the strategy simulation.
+    pub state_hash: [u8; 32],
 }
 
 /// Fitness metrics for strategy evaluation
@@ -297,6 +299,7 @@ impl X3SimulationJob {
                         fitness,
                         self.config.initial_capital,
                     )),
+                    state_hash: fitness.simulation_state_hash,
                 })
             })
             .collect();
@@ -367,6 +370,7 @@ fn simulation_result_hash(result: &SimulationResult) -> [u8; 32] {
         for parent in &strategy.parents {
             hasher.update(parent);
         }
+        hasher.update(&strategy.state_hash);
         if let Some(fitness) = &strategy.fitness {
             for value in [
                 fitness.pnl_pct,
@@ -555,15 +559,22 @@ mod tests {
             .with_seeds(vec![strategy_module(1)])
             .with_market_data(market_data());
 
-        let output = job.execute().expect("simulation");
+        let mut output = job.execute().expect("simulation");
         let JobOutput::X3Simulation(result) = &output else {
             panic!("wrong job output");
         };
         assert_eq!(result.generation_stats.len(), 1);
         assert!(!result.top_strategies.is_empty());
+        assert_ne!(result.top_strategies[0].state_hash, [0u8; 32]);
         assert!(result.compute_units > 0);
         assert!(!job.requires_gpu());
         assert!(job.verify(&output).expect("verification"));
+
+        let JobOutput::X3Simulation(result) = &mut output else {
+            unreachable!();
+        };
+        result.top_strategies[0].state_hash[0] ^= 0xff;
+        assert!(!job.verify(&output).expect("hash recomputation"));
     }
 
     #[test]

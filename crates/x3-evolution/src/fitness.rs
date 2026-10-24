@@ -37,6 +37,8 @@ pub struct FitnessScore {
     pub execution_instructions: u64,
     /// Wall-clock time spent evaluating the strategy, in milliseconds.
     pub execution_latency_ms: f64,
+    /// Canonical accounting-state hash produced by a simulation evaluator.
+    pub simulation_state_hash: [u8; 32],
 }
 
 impl FitnessScore {
@@ -88,6 +90,7 @@ impl FitnessScore {
             execution_gas: 0,
             execution_instructions: 0,
             execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
         }
     }
 
@@ -281,6 +284,7 @@ impl PnLFitness {
             execution_gas: 0,
             execution_instructions: 0,
             execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
         }
     }
 }
@@ -433,6 +437,7 @@ impl FitnessEvaluator for MockFitness {
             execution_gas: 0,
             execution_instructions: 0,
             execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
         })
     }
 
@@ -463,6 +468,7 @@ mod tests {
             execution_gas: 0,
             execution_instructions: 0,
             execution_latency_ms: 0.0,
+            simulation_state_hash: [0u8; 32],
         };
 
         let total = score.total_score();

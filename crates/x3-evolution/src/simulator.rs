@@ -18,6 +18,67 @@ pub const STRATEGY_PARAM_COUNT: u16 = 8;
 /// Scale for every monetary and quantity argument in strategy ABI v1.
 pub const STRATEGY_VALUE_SCALE: u64 = 100_000_000;
 
+type Fixed = i64;
+
+const FIXED_SCALE: Fixed = STRATEGY_VALUE_SCALE as Fixed;
+
+fn checked_ratio(value: Fixed, ratio: Fixed) -> Result<Fixed> {
+    let scaled = (value as i128).checked_mul(ratio as i128).ok_or_else(|| {
+        EvolutionError::SimulationFailed("fixed-point multiplication overflow".into())
+    })? / FIXED_SCALE as i128;
+    Fixed::try_from(scaled)
+        .map_err(|_| EvolutionError::SimulationFailed("fixed-point result out of range".into()))
+}
+
+fn checked_div(value: Fixed, divisor: Fixed) -> Result<Fixed> {
+    if divisor <= 0 {
+        return Err(EvolutionError::SimulationFailed(
+            "fixed-point divisor must be positive".into(),
+        ));
+    }
+    let scaled = (value as i128)
+        .checked_mul(FIXED_SCALE as i128)
+        .ok_or_else(|| EvolutionError::SimulationFailed("fixed-point division overflow".into()))?
+        / divisor as i128;
+    Fixed::try_from(scaled)
+        .map_err(|_| EvolutionError::SimulationFailed("fixed-point result out of range".into()))
+}
+
+fn checked_mul(left: Fixed, right: Fixed) -> Result<Fixed> {
+    checked_ratio(left, right)
+}
+
+fn checked_add(left: Fixed, right: Fixed) -> Result<Fixed> {
+    left.checked_add(right)
+        .ok_or_else(|| EvolutionError::SimulationFailed("fixed-point addition overflow".into()))
+}
+
+fn checked_sub(left: Fixed, right: Fixed) -> Result<Fixed> {
+    left.checked_sub(right)
+        .ok_or_else(|| EvolutionError::SimulationFailed("fixed-point subtraction overflow".into()))
+}
+
+/// Convert a finite decimal value into the simulator's canonical 1e-8 fixed-point unit.
+pub fn decimal_to_fixed(value: f64, name: &str) -> Result<Fixed> {
+    if !value.is_finite() {
+        return Err(EvolutionError::SimulationFailed(format!(
+            "{name} must be finite, got {value}"
+        )));
+    }
+    let scaled = (value * FIXED_SCALE as f64).round();
+    if scaled < Fixed::MIN as f64 || scaled > Fixed::MAX as f64 {
+        return Err(EvolutionError::SimulationFailed(format!(
+            "{name} exceeds the fixed-point range"
+        )));
+    }
+    Ok(scaled as Fixed)
+}
+
+/// Convert canonical fixed-point units back to decimal for reporting only.
+pub fn fixed_to_decimal(value: Fixed) -> f64 {
+    value as f64 / FIXED_SCALE as f64
+}
+
 /// Market data point for simulation
 #[derive(Debug, Clone)]
 pub struct MarketTick {
@@ -86,18 +147,22 @@ impl TradeAction {
 pub struct Trade {
     pub timestamp: u64,
     pub action: TradeAction,
-    pub price: f64,
-    pub quantity: f64,
-    pub fees: f64,
-    pub slippage: f64,
+    pub price: Fixed,
+    pub quantity: Fixed,
+    pub fees: Fixed,
+    pub slippage: Fixed,
+    pub realized_pnl: Fixed,
 }
 
 impl Trade {
-    pub fn total_cost(&self) -> f64 {
+    pub fn total_cost(&self) -> Result<Fixed> {
         match self.action {
-            TradeAction::Buy => self.price * self.quantity + self.fees + self.slippage,
-            TradeAction::Sell => -(self.price * self.quantity - self.fees - self.slippage),
-            TradeAction::Hold => 0.0,
+            TradeAction::Buy => checked_add(checked_mul(self.price, self.quantity)?, self.fees),
+            TradeAction::Sell => {
+                let proceeds = checked_sub(checked_mul(self.price, self.quantity)?, self.fees)?;
+                Ok(-proceeds)
+            }
+            TradeAction::Hold => Ok(0),
         }
     }
 }
@@ -105,36 +170,49 @@ impl Trade {
 /// Portfolio state during simulation
 #[derive(Debug, Clone)]
 pub struct PortfolioState {
-    /// Cash balance
-    pub cash: f64,
-    /// Asset positions (symbol -> quantity)
-    pub positions: HashMap<String, f64>,
-    /// Total value (cash + positions at current prices)
-    pub total_value: f64,
-    /// Peak value (for drawdown calculation)
-    pub peak_value: f64,
+    /// Cash balance in canonical 1e-8 fixed-point units.
+    pub cash: Fixed,
+    /// Asset positions in canonical 1e-8 fixed-point units.
+    pub positions: HashMap<String, Fixed>,
+    /// Cost basis for each open position in canonical 1e-8 fixed-point units.
+    pub cost_basis: HashMap<String, Fixed>,
+    /// Latest mark price for each held asset in canonical 1e-8 fixed-point units.
+    pub last_prices: HashMap<String, Fixed>,
+    /// Total value in canonical 1e-8 fixed-point units.
+    pub total_value: Fixed,
+    /// Peak value in canonical 1e-8 fixed-point units.
+    pub peak_value: Fixed,
     /// Trade history
     pub trades: Vec<Trade>,
-    /// Daily returns
-    pub daily_returns: Vec<f64>,
+    /// Realized PnL from closed positions in canonical 1e-8 fixed-point units.
+    pub realized_pnl: Fixed,
+    /// Daily returns as canonical 1e-8 fixed-point fractions.
+    pub daily_returns: Vec<Fixed>,
+    /// Mark-to-market equity after each tick in canonical 1e-8 fixed-point units.
+    pub equity_curve: Vec<Fixed>,
 }
 
 impl PortfolioState {
-    pub fn new(initial_capital: f64) -> Self {
+    pub fn new(initial_capital: Fixed) -> Self {
         Self {
             cash: initial_capital,
             positions: HashMap::new(),
+            cost_basis: HashMap::new(),
+            last_prices: HashMap::new(),
             total_value: initial_capital,
             peak_value: initial_capital,
             trades: Vec::new(),
+            realized_pnl: 0,
             daily_returns: Vec::new(),
+            equity_curve: vec![initial_capital],
         }
     }
 
     /// Calculate current drawdown percentage
     pub fn current_drawdown(&self) -> f64 {
-        if self.peak_value > 0.0 {
-            (self.peak_value - self.total_value) / self.peak_value * 100.0
+        if self.peak_value > 0 {
+            (self.peak_value.saturating_sub(self.total_value) as f64 / self.peak_value as f64)
+                * 100.0
         } else {
             0.0
         }
@@ -148,42 +226,122 @@ impl PortfolioState {
     }
 
     /// Get position value
-    pub fn position_value(&self, symbol: &str, price: f64) -> f64 {
-        self.positions.get(symbol).copied().unwrap_or(0.0) * price
+    pub fn position_value(&self, symbol: &str) -> Result<Fixed> {
+        let quantity = self.positions.get(symbol).copied().unwrap_or(0);
+        let price = self.last_prices.get(symbol).copied().ok_or_else(|| {
+            EvolutionError::SimulationFailed(format!("position {symbol} has no mark price"))
+        })?;
+        checked_mul(quantity, price)
     }
 
-    /// Update total value with current prices
-    pub fn update_value(&mut self, prices: &HashMap<String, f64>) {
-        let position_value: f64 = self
-            .positions
-            .iter()
-            .map(|(sym, qty)| qty * prices.get(sym).copied().unwrap_or(0.0))
-            .sum();
+    /// Update the mark for one asset.
+    pub fn mark_price(&mut self, symbol: &str, price: Fixed) -> Result<()> {
+        if price <= 0 {
+            return Err(EvolutionError::SimulationFailed(format!(
+                "mark price for {symbol} must be positive"
+            )));
+        }
+        self.last_prices.insert(symbol.to_string(), price);
+        Ok(())
+    }
 
-        self.total_value = self.cash + position_value;
+    /// Mark the complete portfolio to the latest prices.
+    pub fn update_value(&mut self) -> Result<()> {
+        let mut position_value = 0;
+        for symbol in self.positions.keys() {
+            position_value = checked_add(position_value, self.position_value(symbol)?)?;
+        }
+        self.total_value = checked_add(self.cash, position_value)?;
         self.update_peak();
+        Ok(())
     }
 
     /// Record daily return
-    pub fn record_daily_return(&mut self, previous_value: f64) {
-        if previous_value > 0.0 {
-            let ret = (self.total_value - previous_value) / previous_value;
+    pub fn record_daily_return(&mut self, previous_value: Fixed) -> Result<()> {
+        if previous_value > 0 {
+            let ret = checked_div(
+                checked_sub(self.total_value, previous_value)?,
+                previous_value,
+            )?;
             self.daily_returns.push(ret);
         }
+        Ok(())
     }
 
     /// Get PnL
-    pub fn pnl(&self, initial_capital: f64) -> f64 {
-        self.total_value - initial_capital
+    pub fn pnl(&self, initial_capital: Fixed) -> Result<Fixed> {
+        checked_sub(self.total_value, initial_capital)
     }
 
     /// Get return percentage
-    pub fn return_pct(&self, initial_capital: f64) -> f64 {
-        if initial_capital > 0.0 {
-            (self.total_value - initial_capital) / initial_capital * 100.0
+    pub fn return_pct(&self, initial_capital: Fixed) -> Result<f64> {
+        if initial_capital > 0 {
+            Ok(self.pnl(initial_capital)? as f64 / initial_capital as f64 * 100.0)
         } else {
-            0.0
+            Err(EvolutionError::SimulationFailed(
+                "initial capital must be positive".into(),
+            ))
         }
+    }
+
+    /// Canonical hash of accounting state, independent of hash-map iteration order.
+    pub fn state_hash(&self) -> [u8; 32] {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"x3-portfolio-state-v1");
+        hasher.update(&self.cash.to_le_bytes());
+        hasher.update(&self.total_value.to_le_bytes());
+        hasher.update(&self.peak_value.to_le_bytes());
+        hasher.update(&self.realized_pnl.to_le_bytes());
+
+        let mut positions: Vec<_> = self.positions.iter().collect();
+        positions.sort_by(|(left, _), (right, _)| left.cmp(right));
+        hasher.update(&(positions.len() as u64).to_le_bytes());
+        for (symbol, quantity) in positions {
+            hasher.update(&(symbol.len() as u64).to_le_bytes());
+            hasher.update(symbol.as_bytes());
+            hasher.update(&quantity.to_le_bytes());
+        }
+
+        let mut marks: Vec<_> = self.last_prices.iter().collect();
+        marks.sort_by(|(left, _), (right, _)| left.cmp(right));
+        hasher.update(&(marks.len() as u64).to_le_bytes());
+        for (symbol, price) in marks {
+            hasher.update(&(symbol.len() as u64).to_le_bytes());
+            hasher.update(symbol.as_bytes());
+            hasher.update(&price.to_le_bytes());
+        }
+
+        let mut costs: Vec<_> = self.cost_basis.iter().collect();
+        costs.sort_by(|(left, _), (right, _)| left.cmp(right));
+        hasher.update(&(costs.len() as u64).to_le_bytes());
+        for (symbol, cost) in costs {
+            hasher.update(&(symbol.len() as u64).to_le_bytes());
+            hasher.update(symbol.as_bytes());
+            hasher.update(&cost.to_le_bytes());
+        }
+        hasher.update(&(self.trades.len() as u64).to_le_bytes());
+        for trade in &self.trades {
+            hasher.update(&trade.timestamp.to_le_bytes());
+            hasher.update(&[match trade.action {
+                TradeAction::Buy => 1,
+                TradeAction::Sell => 2,
+                TradeAction::Hold => 0,
+            }]);
+            hasher.update(&trade.price.to_le_bytes());
+            hasher.update(&trade.quantity.to_le_bytes());
+            hasher.update(&trade.fees.to_le_bytes());
+            hasher.update(&trade.slippage.to_le_bytes());
+            hasher.update(&trade.realized_pnl.to_le_bytes());
+        }
+        hasher.update(&(self.daily_returns.len() as u64).to_le_bytes());
+        for value in &self.daily_returns {
+            hasher.update(&value.to_le_bytes());
+        }
+        hasher.update(&(self.equity_curve.len() as u64).to_le_bytes());
+        for value in &self.equity_curve {
+            hasher.update(&value.to_le_bytes());
+        }
+        hasher.finalize().into()
     }
 }
 
@@ -236,6 +394,8 @@ pub struct SimulationResult {
     pub gas_used: u64,
     /// Total VM instructions executed across strategy decisions.
     pub instructions_executed: u64,
+    /// Canonical hash of the final portfolio accounting state.
+    pub state_hash: [u8; 32],
     /// Simulation duration
     pub duration: Duration,
     /// Errors encountered
@@ -245,6 +405,42 @@ pub struct SimulationResult {
 /// Strategy simulator
 pub struct Simulator {
     config: SimulationConfig,
+}
+
+struct FixedSimulationConfig {
+    initial_capital: Fixed,
+    fee_rate: Fixed,
+    slippage_rate: Fixed,
+    max_position_size: Fixed,
+}
+
+struct PreparedTick {
+    timestamp: u64,
+    symbol: String,
+    price: Fixed,
+    volume: Fixed,
+    bid: Fixed,
+    ask: Fixed,
+}
+
+fn prepare_tick(tick: &MarketTick) -> Result<PreparedTick> {
+    let price = decimal_to_fixed(tick.price, "price")?;
+    let bid = decimal_to_fixed(tick.bid, "bid")?;
+    let ask = decimal_to_fixed(tick.ask, "ask")?;
+    if price <= 0 || bid <= 0 || ask <= 0 || bid > ask {
+        return Err(EvolutionError::SimulationFailed(format!(
+            "invalid market tick for {}: price={price}, bid={bid}, ask={ask}",
+            tick.symbol
+        )));
+    }
+    Ok(PreparedTick {
+        timestamp: tick.timestamp,
+        symbol: tick.symbol.clone(),
+        price,
+        volume: decimal_to_fixed(tick.volume, "volume")?,
+        bid,
+        ask,
+    })
 }
 
 /// A verified strategy module bound to simulator ABI v1.
@@ -274,7 +470,7 @@ impl StrategyProgram {
 
     fn decide(
         &self,
-        tick: &MarketTick,
+        tick: &PreparedTick,
         portfolio: &PortfolioState,
         gas_limit: u64,
     ) -> Result<(TradeAction, u64, u64)> {
@@ -305,45 +501,54 @@ impl StrategyProgram {
     }
 }
 
-fn fixed_value(value: f64, name: &str) -> Result<i64> {
-    if !value.is_finite() || value < 0.0 {
-        return Err(EvolutionError::SimulationFailed(format!(
-            "strategy input {name} must be finite and non-negative, got {value}"
-        )));
-    }
-    let scaled = (value * STRATEGY_VALUE_SCALE as f64).round();
-    if scaled > i64::MAX as f64 {
-        return Err(EvolutionError::SimulationFailed(format!(
-            "strategy input {name} exceeds the ABI range"
-        )));
-    }
-    Ok(scaled as i64)
-}
-
-fn strategy_args(tick: &MarketTick, portfolio: &PortfolioState) -> Result<Vec<Value>> {
+fn strategy_args(tick: &PreparedTick, portfolio: &PortfolioState) -> Result<Vec<Value>> {
     let timestamp = i64::try_from(tick.timestamp).map_err(|_| {
         EvolutionError::SimulationFailed("strategy timestamp exceeds the ABI range".into())
     })?;
-    let position = portfolio
-        .positions
-        .get(&tick.symbol)
-        .copied()
-        .unwrap_or(0.0);
+    let position = portfolio.positions.get(&tick.symbol).copied().unwrap_or(0);
     Ok(vec![
         Value::I64(timestamp),
-        Value::I64(fixed_value(tick.price, "price")?),
-        Value::I64(fixed_value(tick.volume, "volume")?),
-        Value::I64(fixed_value(tick.bid, "bid")?),
-        Value::I64(fixed_value(tick.ask, "ask")?),
-        Value::I64(fixed_value(portfolio.cash, "cash")?),
-        Value::I64(fixed_value(position, "position")?),
-        Value::I64(fixed_value(portfolio.total_value, "total_value")?),
+        Value::I64(tick.price),
+        Value::I64(tick.volume),
+        Value::I64(tick.bid),
+        Value::I64(tick.ask),
+        Value::I64(portfolio.cash),
+        Value::I64(position),
+        Value::I64(portfolio.total_value),
     ])
 }
 
 impl Simulator {
     pub fn new(config: SimulationConfig) -> Self {
         Self { config }
+    }
+
+    fn fixed_config(&self) -> Result<FixedSimulationConfig> {
+        if self.config.initial_capital <= 0.0 {
+            return Err(EvolutionError::SimulationFailed(
+                "initial capital must be positive".into(),
+            ));
+        }
+        for (name, rate) in [
+            ("fee_rate", self.config.fee_rate),
+            ("slippage_rate", self.config.slippage_rate),
+            ("max_position_size", self.config.max_position_size),
+        ] {
+            if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
+                return Err(EvolutionError::SimulationFailed(format!(
+                    "{name} must be finite and between 0 and 1"
+                )));
+            }
+        }
+        Ok(FixedSimulationConfig {
+            initial_capital: decimal_to_fixed(self.config.initial_capital, "initial_capital")?,
+            fee_rate: decimal_to_fixed(self.config.fee_rate, "fee_rate")?,
+            slippage_rate: decimal_to_fixed(self.config.slippage_rate, "slippage_rate")?,
+            max_position_size: decimal_to_fixed(
+                self.config.max_position_size,
+                "max_position_size",
+            )?,
+        })
     }
 
     /// Run simulation with chromosome against market data
@@ -353,17 +558,22 @@ impl Simulator {
         market_data: &[MarketTick],
     ) -> Result<SimulationResult> {
         let start = Instant::now();
+        let config = self.fixed_config()?;
         let strategy = StrategyProgram::verify(&chromosome.to_bytecode())?;
-        let mut portfolio = PortfolioState::new(self.config.initial_capital);
+        let prepared: Vec<PreparedTick> = market_data
+            .iter()
+            .map(prepare_tick)
+            .collect::<Result<_>>()?;
+        let mut portfolio = PortfolioState::new(config.initial_capital);
         let mut errors = Vec::new();
         let mut ticks_processed = 0;
         let mut gas_used = 0u64;
         let mut instructions_executed = 0u64;
-        let mut previous_value = self.config.initial_capital;
+        let mut previous_value = config.initial_capital;
         let mut last_day: Option<u64> = None;
 
         // Execute strategy for each tick
-        for tick in market_data {
+        for tick in &prepared {
             // Check timeout
             if start.elapsed() > self.config.timeout {
                 errors.push(format!(
@@ -373,10 +583,12 @@ impl Simulator {
                 break;
             }
 
-            // Record daily returns (simplified: every 1000 ticks = 1 day)
+            portfolio.mark_price(&tick.symbol, tick.price)?;
+            portfolio.update_value()?;
+
             let current_day = tick.timestamp / (24 * 60 * 60 * 1000);
             if last_day.is_some() && last_day != Some(current_day) {
-                portfolio.record_daily_return(previous_value);
+                portfolio.record_daily_return(previous_value)?;
                 previous_value = portfolio.total_value;
             }
             last_day = Some(current_day);
@@ -388,21 +600,27 @@ impl Simulator {
             instructions_executed = instructions_executed.saturating_add(tick_instructions);
 
             // Apply action
-            if let Some(trade) = self.execute_trade(action, tick, &mut portfolio)? {
+            if let Some(trade) = self.execute_trade(action, tick, &config, &mut portfolio)? {
                 portfolio.trades.push(trade);
             }
 
-            // Update portfolio value
-            let mut prices = HashMap::new();
-            prices.insert(tick.symbol.clone(), tick.price);
-            portfolio.update_value(&prices);
+            portfolio.update_value()?;
+            portfolio.equity_curve.push(portfolio.total_value);
 
             ticks_processed += 1;
         }
 
         // Calculate final fitness
         let duration = start.elapsed();
-        let fitness = self.calculate_fitness(&portfolio, gas_used, instructions_executed, duration);
+        let state_hash = portfolio.state_hash();
+        let mut fitness = self.calculate_fitness(
+            &portfolio,
+            config.initial_capital,
+            gas_used,
+            instructions_executed,
+            duration,
+        )?;
+        fitness.simulation_state_hash = state_hash;
 
         Ok(SimulationResult {
             portfolio,
@@ -410,6 +628,7 @@ impl Simulator {
             ticks_processed,
             gas_used,
             instructions_executed,
+            state_hash,
             duration,
             errors,
         })
@@ -419,36 +638,44 @@ impl Simulator {
     fn execute_trade(
         &self,
         action: TradeAction,
-        tick: &MarketTick,
+        tick: &PreparedTick,
+        config: &FixedSimulationConfig,
         portfolio: &mut PortfolioState,
     ) -> Result<Option<Trade>> {
         match action {
             TradeAction::Hold => Ok(None),
 
             TradeAction::Buy => {
-                // Calculate position size (max 25% of portfolio)
-                let max_value = portfolio.cash * self.config.max_position_size;
-                let price_with_slippage = tick.ask * (1.0 + self.config.slippage_rate);
-                let quantity = max_value / price_with_slippage;
+                let max_value = checked_ratio(portfolio.cash, config.max_position_size)?;
+                let price_multiplier = checked_add(FIXED_SCALE, config.slippage_rate)?;
+                let price_with_slippage = checked_ratio(tick.ask, price_multiplier)?;
+                let quantity = checked_div(max_value, price_with_slippage)?;
 
-                if quantity <= 0.0 || max_value < 100.0 {
+                if quantity <= 0 || max_value < 100 * FIXED_SCALE {
                     return Ok(None);
                 }
 
-                let fees = max_value * self.config.fee_rate;
-                let slippage = max_value * self.config.slippage_rate;
-                let total_cost = max_value + fees;
+                let notional = checked_mul(quantity, price_with_slippage)?;
+                let fees = checked_ratio(notional, config.fee_rate)?;
+                let total_cost = checked_add(notional, fees)?;
+                let unslipped_notional = checked_mul(quantity, tick.ask)?;
+                let slippage = checked_sub(max_value, unslipped_notional)?;
 
                 if total_cost > portfolio.cash {
                     return Ok(None);
                 }
 
-                // Execute
-                portfolio.cash -= total_cost;
-                *portfolio
-                    .positions
-                    .entry(tick.symbol.clone())
-                    .or_insert(0.0) += quantity;
+                portfolio.cash = checked_sub(portfolio.cash, total_cost)?;
+                let previous_quantity = portfolio.positions.get(&tick.symbol).copied().unwrap_or(0);
+                portfolio.positions.insert(
+                    tick.symbol.clone(),
+                    checked_add(previous_quantity, quantity)?,
+                );
+                let previous_basis = portfolio.cost_basis.get(&tick.symbol).copied().unwrap_or(0);
+                portfolio.cost_basis.insert(
+                    tick.symbol.clone(),
+                    checked_add(previous_basis, total_cost)?,
+                );
 
                 Ok(Some(Trade {
                     timestamp: tick.timestamp,
@@ -457,28 +684,40 @@ impl Simulator {
                     quantity,
                     fees,
                     slippage,
+                    realized_pnl: 0,
                 }))
             }
 
             TradeAction::Sell => {
-                let quantity = portfolio
-                    .positions
-                    .get(&tick.symbol)
-                    .copied()
-                    .unwrap_or(0.0);
+                let quantity = portfolio.positions.get(&tick.symbol).copied().unwrap_or(0);
 
-                if quantity <= 0.0 {
+                if quantity <= 0 {
                     return Ok(None);
                 }
 
-                let price_with_slippage = tick.bid * (1.0 - self.config.slippage_rate);
-                let proceeds = quantity * price_with_slippage;
-                let fees = proceeds * self.config.fee_rate;
-                let slippage = quantity * tick.bid * self.config.slippage_rate;
+                let price_multiplier = checked_sub(FIXED_SCALE, config.slippage_rate)?;
+                let price_with_slippage = checked_ratio(tick.bid, price_multiplier)?;
+                let gross_proceeds = checked_mul(quantity, price_with_slippage)?;
+                let fees = checked_ratio(gross_proceeds, config.fee_rate)?;
+                let net_proceeds = checked_sub(gross_proceeds, fees)?;
+                let basis = portfolio
+                    .cost_basis
+                    .get(&tick.symbol)
+                    .copied()
+                    .ok_or_else(|| {
+                        EvolutionError::SimulationFailed(format!(
+                            "position {} has no cost basis",
+                            tick.symbol
+                        ))
+                    })?;
+                let realized_pnl = checked_sub(net_proceeds, basis)?;
+                let unslipped_proceeds = checked_mul(quantity, tick.bid)?;
+                let slippage = checked_sub(unslipped_proceeds, gross_proceeds)?;
 
-                // Execute
-                portfolio.cash += proceeds - fees;
+                portfolio.cash = checked_add(portfolio.cash, net_proceeds)?;
+                portfolio.realized_pnl = checked_add(portfolio.realized_pnl, realized_pnl)?;
                 portfolio.positions.remove(&tick.symbol);
+                portfolio.cost_basis.remove(&tick.symbol);
 
                 Ok(Some(Trade {
                     timestamp: tick.timestamp,
@@ -487,6 +726,7 @@ impl Simulator {
                     quantity,
                     fees,
                     slippage,
+                    realized_pnl,
                 }))
             }
         }
@@ -496,12 +736,14 @@ impl Simulator {
     fn calculate_fitness(
         &self,
         portfolio: &PortfolioState,
+        initial_capital: Fixed,
         gas_used: u64,
         instructions_executed: u64,
         duration: Duration,
-    ) -> FitnessScore {
-        let pnl = portfolio.pnl(self.config.initial_capital);
-        let return_pct = portfolio.return_pct(self.config.initial_capital);
+    ) -> Result<FitnessScore> {
+        let pnl_fixed = portfolio.pnl(initial_capital)?;
+        let pnl = fixed_to_decimal(pnl_fixed);
+        let return_pct = portfolio.return_pct(initial_capital)?;
 
         // Calculate Sharpe ratio
         let sharpe = self.calculate_sharpe(&portfolio.daily_returns);
@@ -510,28 +752,34 @@ impl Simulator {
         let sortino = self.calculate_sortino(&portfolio.daily_returns);
 
         // Calculate max drawdown
-        let max_drawdown = self.calculate_max_drawdown(&portfolio.daily_returns);
+        let max_drawdown = self.calculate_max_drawdown(&portfolio.equity_curve);
 
         // Win rate
         let win_rate = self.calculate_win_rate(&portfolio.trades);
+        let profit_factor = self.calculate_profit_factor(&portfolio.trades);
 
         // Average trade
-        let avg_trade = if !portfolio.trades.is_empty() {
-            pnl / portfolio.trades.len() as f64
+        let closed = portfolio
+            .trades
+            .iter()
+            .filter(|trade| trade.action == TradeAction::Sell)
+            .count();
+        let avg_trade = if closed > 0 {
+            fixed_to_decimal(portfolio.realized_pnl) / closed as f64
         } else {
             0.0
         };
 
-        FitnessScore {
+        Ok(FitnessScore {
             pnl,
             sharpe_ratio: sharpe,
             sortino_ratio: sortino,
             max_drawdown,
             win_rate,
-            profit_factor: if pnl > 0.0 { 1.5 } else { 0.5 }, // Simplified
+            profit_factor,
             avg_trade,
             avg_duration: 0.0,
-            trade_count: portfolio.trades.len(),
+            trade_count: closed,
             calmar_ratio: if max_drawdown > 0.01 {
                 return_pct / max_drawdown
             } else {
@@ -542,22 +790,24 @@ impl Simulator {
             execution_gas: gas_used,
             execution_instructions: instructions_executed,
             execution_latency_ms: duration.as_secs_f64() * 1_000.0,
-        }
+            simulation_state_hash: [0u8; 32],
+        })
     }
 
-    fn calculate_sharpe(&self, daily_returns: &[f64]) -> f64 {
+    fn calculate_sharpe(&self, daily_returns: &[Fixed]) -> f64 {
         if daily_returns.len() < 2 {
             return 0.0;
         }
 
-        let mean: f64 = daily_returns.iter().sum::<f64>() / daily_returns.len() as f64;
+        let returns: Vec<f64> = daily_returns
+            .iter()
+            .map(|value| fixed_to_decimal(*value))
+            .collect();
+        let mean: f64 = returns.iter().sum::<f64>() / returns.len() as f64;
         let annualized_mean = mean * 252.0;
 
-        let variance: f64 = daily_returns
-            .iter()
-            .map(|r| (r - mean).powi(2))
-            .sum::<f64>()
-            / (daily_returns.len() - 1) as f64;
+        let variance: f64 =
+            returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / (returns.len() - 1) as f64;
         let std_dev = variance.sqrt() * (252.0_f64).sqrt();
 
         if std_dev > 0.0 {
@@ -567,20 +817,24 @@ impl Simulator {
         }
     }
 
-    fn calculate_sortino(&self, daily_returns: &[f64]) -> f64 {
+    fn calculate_sortino(&self, daily_returns: &[Fixed]) -> f64 {
         if daily_returns.len() < 2 {
             return 0.0;
         }
 
-        let mean: f64 = daily_returns.iter().sum::<f64>() / daily_returns.len() as f64;
+        let returns: Vec<f64> = daily_returns
+            .iter()
+            .map(|value| fixed_to_decimal(*value))
+            .collect();
+        let mean: f64 = returns.iter().sum::<f64>() / returns.len() as f64;
         let annualized_mean = mean * 252.0;
 
-        let downside_variance: f64 = daily_returns
+        let downside_variance: f64 = returns
             .iter()
             .filter(|&&r| r < 0.0)
             .map(|r| r.powi(2))
             .sum::<f64>()
-            / daily_returns.len() as f64;
+            / returns.len() as f64;
         let downside_dev = downside_variance.sqrt() * (252.0_f64).sqrt();
 
         if downside_dev > 0.0 {
@@ -590,78 +844,67 @@ impl Simulator {
         }
     }
 
-    fn calculate_max_drawdown(&self, daily_returns: &[f64]) -> f64 {
-        if daily_returns.is_empty() {
+    fn calculate_max_drawdown(&self, equity_curve: &[Fixed]) -> f64 {
+        let Some(&first) = equity_curve.first() else {
             return 0.0;
-        }
-
-        let mut cumulative = 1.0;
-        let mut peak = 1.0;
-        let mut max_dd = 0.0;
-
-        for &ret in daily_returns {
-            cumulative *= 1.0 + ret;
-            if cumulative > peak {
-                peak = cumulative;
+        };
+        let mut peak = first;
+        let mut max_drawdown = 0.0f64;
+        for &equity in equity_curve {
+            if equity > peak {
+                peak = equity;
             }
-            let dd = (peak - cumulative) / peak;
-            if dd > max_dd {
-                max_dd = dd;
+            if peak > 0 {
+                let drawdown = (peak.saturating_sub(equity) as f64 / peak as f64) * 100.0;
+                max_drawdown = max_drawdown.max(drawdown);
             }
         }
-
-        max_dd * 100.0 // As percentage
+        max_drawdown
     }
 
     fn calculate_win_rate(&self, trades: &[Trade]) -> f64 {
-        if trades.is_empty() {
+        let closed: Vec<&Trade> = trades
+            .iter()
+            .filter(|trade| trade.action == TradeAction::Sell)
+            .collect();
+        if closed.is_empty() {
             return 0.0;
         }
+        closed.iter().filter(|trade| trade.realized_pnl > 0).count() as f64 / closed.len() as f64
+    }
 
-        let mut wins = 0;
-        let mut prev_sell_price: Option<f64> = None;
-
-        for trade in trades {
-            match trade.action {
-                TradeAction::Buy => {
-                    prev_sell_price = None;
-                }
-                TradeAction::Sell => {
-                    if let Some(buy_price) = prev_sell_price {
-                        if trade.price > buy_price {
-                            wins += 1;
-                        }
-                    }
-                    prev_sell_price = Some(trade.price);
-                }
-                _ => {}
-            }
-        }
-
-        // Simplified: assume 50% of closed trades are wins
-        let closed_trades = trades
+    fn calculate_profit_factor(&self, trades: &[Trade]) -> f64 {
+        let gross_profit: i128 = trades
             .iter()
-            .filter(|t| matches!(t.action, TradeAction::Sell))
-            .count();
-
-        if closed_trades > 0 {
-            (closed_trades / 2) as f64 / closed_trades as f64
+            .filter(|trade| trade.realized_pnl > 0)
+            .map(|trade| trade.realized_pnl as i128)
+            .sum();
+        let gross_loss: i128 = trades
+            .iter()
+            .filter(|trade| trade.realized_pnl < 0)
+            .map(|trade| -(trade.realized_pnl as i128))
+            .sum();
+        if gross_loss > 0 {
+            gross_profit as f64 / gross_loss as f64
+        } else if gross_profit > 0 {
+            10.0
         } else {
             0.0
         }
     }
 
-    fn calculate_volatility(&self, daily_returns: &[f64]) -> f64 {
+    fn calculate_volatility(&self, daily_returns: &[Fixed]) -> f64 {
         if daily_returns.len() < 2 {
             return 0.0;
         }
 
-        let mean: f64 = daily_returns.iter().sum::<f64>() / daily_returns.len() as f64;
-        let variance: f64 = daily_returns
+        let returns: Vec<f64> = daily_returns
             .iter()
-            .map(|r| (r - mean).powi(2))
-            .sum::<f64>()
-            / (daily_returns.len() - 1) as f64;
+            .map(|value| fixed_to_decimal(*value))
+            .collect();
+        let mean: f64 = returns.iter().sum::<f64>() / returns.len() as f64;
+        let variance: f64 =
+            returns.iter().map(|r| (r - mean).powi(2)).sum::<f64>() / (returns.len() - 1) as f64;
 
         variance.sqrt() * (252.0_f64).sqrt() * 100.0 // Annualized percentage
     }
@@ -765,6 +1008,10 @@ mod tests {
     use x3_backend::bc_format::FunctionEntry;
     use x3_backend::opcode::Opcode;
 
+    fn fixed(value: f64) -> Fixed {
+        decimal_to_fixed(value, "test value").expect("fixed value")
+    }
+
     fn strategy_module(name: &str, decision: i64) -> Vec<u8> {
         let mut module = BytecodeModule::new();
         let constant = module.const_pool.add_integer(decision).expect("constant");
@@ -790,18 +1037,41 @@ mod tests {
 
     #[test]
     fn test_portfolio_state() {
-        let mut portfolio = PortfolioState::new(100_000.0);
-        assert_eq!(portfolio.cash, 100_000.0);
-        assert_eq!(portfolio.total_value, 100_000.0);
+        let mut portfolio = PortfolioState::new(fixed(100_000.0));
+        assert_eq!(portfolio.cash, fixed(100_000.0));
+        assert_eq!(portfolio.total_value, fixed(100_000.0));
 
-        portfolio.cash -= 10_000.0;
-        portfolio.positions.insert("BTC".to_string(), 1.0);
+        portfolio.cash -= fixed(10_000.0);
+        portfolio.positions.insert("BTC".to_string(), fixed(1.0));
+        portfolio
+            .mark_price("BTC", fixed(50_000.0))
+            .expect("mark price");
 
-        let mut prices = HashMap::new();
-        prices.insert("BTC".to_string(), 50_000.0);
-        portfolio.update_value(&prices);
+        portfolio.update_value().expect("portfolio value");
 
-        assert_eq!(portfolio.total_value, 140_000.0);
+        assert_eq!(portfolio.total_value, fixed(140_000.0));
+    }
+
+    #[test]
+    fn mark_to_market_values_every_held_asset() {
+        let mut portfolio = PortfolioState::new(fixed(90_000.0));
+        portfolio.positions.insert("ETH".into(), fixed(1.0));
+        portfolio.positions.insert("BTC".into(), fixed(0.1));
+        portfolio.mark_price("ETH", fixed(2_000.0)).unwrap();
+        portfolio.mark_price("BTC", fixed(50_000.0)).unwrap();
+        portfolio.update_value().unwrap();
+
+        assert_eq!(portfolio.total_value, fixed(97_000.0));
+    }
+
+    #[test]
+    fn missing_mark_price_fails_instead_of_valuing_an_asset_at_zero() {
+        let mut portfolio = PortfolioState::new(fixed(10_000.0));
+        portfolio.positions.insert("ETH".into(), fixed(1.0));
+        let error = portfolio
+            .update_value()
+            .expect_err("unmarked positions must fail closed");
+        assert!(error.to_string().contains("no mark price"), "{error}");
     }
 
     #[test]
@@ -832,7 +1102,7 @@ mod tests {
         assert_eq!(result.ticks_processed, 1);
         assert_eq!(result.portfolio.trades.len(), 1);
         assert_eq!(result.portfolio.trades[0].action, TradeAction::Buy);
-        assert!(result.portfolio.cash < 100_000.0);
+        assert!(result.portfolio.cash < fixed(100_000.0));
         assert!(result.portfolio.positions.contains_key("ETH"));
     }
 
@@ -897,34 +1167,103 @@ mod tests {
     }
 
     #[test]
+    fn repeated_simulations_have_identical_canonical_state_hash() {
+        let simulator = Simulator::new(SimulationConfig::default());
+        let chromosome =
+            Chromosome::from_bytecode(strategy_module(STRATEGY_ENTRYPOINT, 1)).unwrap();
+        let market = vec![
+            MarketTick::new(1_000, "ETH", 2_000.0),
+            MarketTick::new(2_000, "ETH", 2_100.0),
+        ];
+
+        let first = simulator.simulate(&chromosome, &market).unwrap();
+        let second = simulator.simulate(&chromosome, &market).unwrap();
+
+        assert_eq!(first.state_hash, second.state_hash);
+        assert_eq!(first.portfolio.equity_curve, second.portfolio.equity_curve);
+        assert_eq!(first.portfolio.cash, second.portfolio.cash);
+        assert_eq!(first.portfolio.positions, second.portfolio.positions);
+    }
+
+    #[test]
     fn test_trade_execution() {
         let config = SimulationConfig::default();
         let simulator = Simulator::new(config);
+        let fixed_config = simulator.fixed_config().expect("fixed config");
 
-        let mut portfolio = PortfolioState::new(100_000.0);
+        let mut portfolio = PortfolioState::new(fixed(100_000.0));
         let tick = MarketTick::new(0, "ETH", 2000.0);
+        let tick = prepare_tick(&tick).expect("prepared tick");
 
         // Execute buy
         let trade = simulator
-            .execute_trade(TradeAction::Buy, &tick, &mut portfolio)
+            .execute_trade(TradeAction::Buy, &tick, &fixed_config, &mut portfolio)
             .unwrap()
             .unwrap();
 
         assert_eq!(trade.action, TradeAction::Buy);
-        assert!(portfolio.cash < 100_000.0);
+        assert!(portfolio.cash < fixed(100_000.0));
         assert!(portfolio.positions.contains_key("ETH"));
     }
 
     #[test]
+    fn round_trip_profit_is_realized_from_fixed_point_cost_basis() {
+        let simulator = Simulator::new(SimulationConfig {
+            fee_rate: 0.0,
+            slippage_rate: 0.0,
+            ..Default::default()
+        });
+        let config = simulator.fixed_config().unwrap();
+        let mut portfolio = PortfolioState::new(fixed(100_000.0));
+        let buy = prepare_tick(&MarketTick::new(1, "ETH", 100.0)).unwrap();
+        let sell = prepare_tick(&MarketTick::new(2, "ETH", 120.0)).unwrap();
+
+        let buy_trade = simulator
+            .execute_trade(TradeAction::Buy, &buy, &config, &mut portfolio)
+            .unwrap()
+            .expect("buy");
+        portfolio.trades.push(buy_trade);
+        portfolio.mark_price("ETH", sell.price).unwrap();
+        portfolio.update_value().unwrap();
+        let sell_trade = simulator
+            .execute_trade(TradeAction::Sell, &sell, &config, &mut portfolio)
+            .unwrap()
+            .expect("sell");
+        portfolio.trades.push(sell_trade.clone());
+        portfolio.update_value().unwrap();
+
+        assert_eq!(portfolio.positions.len(), 0);
+        assert_eq!(portfolio.cash, fixed(105_000.0));
+        assert_eq!(portfolio.realized_pnl, fixed(5_000.0));
+        assert_eq!(sell_trade.realized_pnl, fixed(5_000.0));
+        assert_eq!(simulator.calculate_win_rate(&portfolio.trades), 1.0);
+    }
+
+    #[test]
     fn test_fitness_calculation() {
-        let daily_returns = vec![0.01, -0.005, 0.02, 0.015, -0.01, 0.005];
+        let daily_returns = vec![
+            fixed(0.01),
+            fixed(-0.005),
+            fixed(0.02),
+            fixed(0.015),
+            fixed(-0.01),
+            fixed(0.005),
+        ];
+        let equity_curve = vec![
+            fixed(100.0),
+            fixed(101.0),
+            fixed(100.5),
+            fixed(102.5),
+            fixed(101.5),
+            fixed(102.0),
+        ];
 
         let config = SimulationConfig::default();
         let simulator = Simulator::new(config);
 
         let sharpe = simulator.calculate_sharpe(&daily_returns);
         let sortino = simulator.calculate_sortino(&daily_returns);
-        let max_dd = simulator.calculate_max_drawdown(&daily_returns);
+        let max_dd = simulator.calculate_max_drawdown(&equity_curve);
         let volatility = simulator.calculate_volatility(&daily_returns);
 
         // Just verify they compute without panicking
