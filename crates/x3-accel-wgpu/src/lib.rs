@@ -1214,4 +1214,60 @@ mod tests {
             );
         }
     }
+
+    /// Verify real ECDSA signatures on every hardware adapter and require the
+    /// reference library's verdicts exactly: the genuine signature is valid,
+    /// while the same signature over another digest is not.
+    #[test]
+    fn every_hardware_adapter_verifies_ecdsa_with_reference_verdicts() {
+        use ::secp256k1::{Message, Secp256k1, SecretKey};
+
+        let adapters = WgpuBackend::hardware_adapters();
+        if adapters.is_empty() {
+            assert!(
+                std::env::var("X3_REQUIRE_GPU").as_deref() != Ok("1"),
+                "X3_REQUIRE_GPU=1 but no hardware adapter was enumerated"
+            );
+            eprintln!(
+                "every_hardware_adapter_verifies_ecdsa_with_reference_verdicts: SKIPPED, no hardware adapter"
+            );
+            return;
+        }
+
+        let secp = Secp256k1::new();
+        let secret = SecretKey::from_slice(&[7u8; 32]).unwrap();
+        let public_key =
+            ::secp256k1::PublicKey::from_secret_key(&secp, &secret).serialize_uncompressed();
+        let signed_digest = [9u8; 32];
+        let message = Message::from_digest_slice(&signed_digest).unwrap();
+        let signature = secp.sign_ecdsa(&message, &secret).serialize_compact();
+        let prepared = |z| Secp256k1Prepared {
+            r: signature[..32].try_into().unwrap(),
+            s: signature[32..].try_into().unwrap(),
+            z,
+            qx: public_key[1..33].try_into().unwrap(),
+            qy: public_key[33..65].try_into().unwrap(),
+        };
+        let jobs = [prepared(signed_digest), prepared([10u8; 32])];
+
+        for (index, adapter) in adapters.iter().enumerate() {
+            let backend = WgpuBackend::initialize_adapter(index).unwrap_or_else(|error| {
+                panic!(
+                    "adapter {index} ({:?}, {:?}) did not initialize: {error}",
+                    adapter.name, adapter.backend
+                )
+            });
+            eprintln!(
+                "every_hardware_adapter_verifies_ecdsa_with_reference_verdicts: adapter {} = {} ({:?})",
+                index,
+                backend.adapter_name(),
+                backend.adapter_info().backend
+            );
+            assert_eq!(
+                backend.secp256k1_verify_prepared(&jobs).unwrap(),
+                vec![true, false],
+                "ECDSA verdict parity failed on adapter {index}"
+            );
+        }
+    }
 }
