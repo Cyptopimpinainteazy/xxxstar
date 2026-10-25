@@ -338,6 +338,16 @@ const WITHDRAWAL_RELEASED_SIGNATURE: &str = "WithdrawalReleased(bytes32,address,
 
 const SIGNED_DEPOSIT_RELAY_MAGIC: &[u8] = b"X3DP1";
 
+fn required_proof_signer() -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let signer = std::env::var("X3_RELAY_PROOF_SIGNER").map_err(|_| {
+        "X3_RELAY_PROOF_SIGNER is required; refusing the development //Alice fallback"
+    })?;
+    if signer.trim().is_empty() {
+        return Err("X3_RELAY_PROOF_SIGNER must not be empty".into());
+    }
+    Ok(signer)
+}
+
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SignedDepositRelayEnvelope {
@@ -1122,61 +1132,12 @@ impl Relayer {
         &self,
         event: &SvmDepositEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!(
-            "[relayer] Submitting SVM deposit proof: cluster='{}', amount={}",
-            event.cluster_name, event.amount,
-        );
-
-        let proof_signer =
-            std::env::var("X3_RELAY_PROOF_SIGNER").unwrap_or_else(|_| "//Alice".to_string());
-
-        // Build the CrossVmOperation for SVM deposit — source is 32-byte SVM address
-        let operation = CrossVmOperation::TransferToSvm {
-            source: [0u8; 20], // placeholder — X3 chain expects 20-byte EVM compat source
-            destination: event.destination_address.to_vec(),
-            amount: event.amount,
-        };
-        let lock_proof = build_lock_proof(&operation, &proof_signer)?;
-
-        // Build deposit payload using SVM event fields
-        let mut deposit_payload = Vec::new();
-        deposit_payload.extend_from_slice(&event.source_address);
-        deposit_payload.extend_from_slice(&event.destination_address);
-        deposit_payload.extend_from_slice(&event.amount.to_le_bytes());
-        deposit_payload.extend_from_slice(&event.asset_id);
-        deposit_payload.extend_from_slice(&event.slot.to_le_bytes());
-        deposit_payload.extend_from_slice(event.cluster_name.as_bytes());
-
-        let proof_len: u32 = lock_proof
-            .len()
-            .try_into()
-            .map_err(|_| "lock proof too large for SVM deposit relay envelope")?;
-        let mut envelope = Vec::with_capacity(
-            SIGNED_DEPOSIT_RELAY_MAGIC.len() + 4 + lock_proof.len() + deposit_payload.len(),
-        );
-        envelope.extend_from_slice(SIGNED_DEPOSIT_RELAY_MAGIC);
-        envelope.extend_from_slice(&proof_len.to_le_bytes());
-        envelope.extend_from_slice(&lock_proof);
-        envelope.extend_from_slice(&deposit_payload);
-
-        let proof_hex = format!("0x{}", hex::encode(&envelope));
-
-        let resp = rpc_call_blocking(
-            &self.config.x3_rpc,
-            "x3_submitCrossVmTransaction",
-            serde_json::json!([proof_hex]),
-            30000,
-        )?;
-
-        if let Some(err) = resp.error {
-            return Err(format!("X3 RPC error: {:?}", err).into());
-        }
-
-        println!(
-            "[relayer] SVM deposit proof submitted successfully — cluster='{}'",
-            event.cluster_name
-        );
-        Ok(())
+        let _ = event;
+        Err(
+            "legacy SVM deposit relay is disabled: production requires the V2 \
+             stake-weighted evidence path; refusing to synthesize a compatibility source"
+                .into(),
+        )
     }
 
     /// Submit a deposit proof to X3 via the gateway pallet.
@@ -1195,8 +1156,7 @@ impl Relayer {
             hex::encode(event.message_id)
         );
 
-        let proof_signer =
-            std::env::var("X3_RELAY_PROOF_SIGNER").unwrap_or_else(|_| "//Alice".to_string());
+        let proof_signer = required_proof_signer()?;
         let proof_envelope = build_signed_deposit_relay_envelope(event, &proof_signer)?;
         let proof_hex = format!("0x{}", hex::encode(&proof_envelope));
 
