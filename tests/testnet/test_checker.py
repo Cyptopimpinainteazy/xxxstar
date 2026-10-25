@@ -49,9 +49,9 @@ class ConsensusInvariantTests(unittest.TestCase):
     def records(self):
         before = [
             {"url": "node0", "genesis_hash": "0xgenesis", "peers": 1, "isSyncing": False,
-             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold0"},
+             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold"},
             {"url": "node1", "genesis_hash": "0xgenesis", "peers": 1, "isSyncing": False,
-             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold1"},
+             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold"},
         ]
         after = [{**n, "best_number": 16, "finalized_number": 11,
                   "finalized_hash": "0xnew"} for n in before]
@@ -59,12 +59,21 @@ class ConsensusInvariantTests(unittest.TestCase):
 
     def query(self, url, method, timeout, params):
         # Historical finalized hashes remain immutable, despite newer finality.
-        return {"node0": "0xold0", "node1": "0xold1"}[url] if params == [10] else "0xnew"
+        return "0xold" if params == [10] else "0xnew"
 
     def test_progressing_consensus_accepts_stable_finality(self):
         before, after = self.records()
         self.assertEqual(checker.validate_consensus(
             before, after, ["node0", "node1"], 1, 1, self.query), [])
+
+    def test_prior_finality_divergence_is_rejected(self):
+        before, after = self.records()
+        def split_history(url, method, timeout, params):
+            if url == "node1" and params == [10]:
+                return "0xsplit"
+            return self.query(url, method, timeout, params)
+        self.assertTrue(any("prior finalized divergence" in e for e in checker.validate_consensus(
+            before, after, ["node0", "node1"], 1, 1, split_history)))
 
     def test_individual_finality_regression_is_rejected(self):
         before, after = self.records()
