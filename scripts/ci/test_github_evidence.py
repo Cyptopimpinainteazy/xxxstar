@@ -65,5 +65,38 @@ class EvidenceTests(unittest.TestCase):
             module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", full, max_pages=1)
 
 
+    def test_head_moving_during_collection_is_rejected(self):
+        calls = [0]
+        def moved(path, token):
+            if "/pulls/" in path:
+                calls[0] += 1
+                packet = fake(path, token)
+                packet["head"]["sha"] = SHA if calls[0] == 1 else "b" * 40
+                return packet
+            return fake(path, token)
+        with self.assertRaisesRegex(ValueError, "changed during collection"):
+            module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", moved)
+
+    def test_job_from_other_commit_is_rejected(self):
+        def mismatched(path, token):
+            result = fake(path, token)
+            if "/jobs?" in path:
+                result["jobs"][0]["head_sha"] = "b" * 40
+            return result
+        with self.assertRaisesRegex(ValueError, "job head"):
+            module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", mismatched)
+
+    def test_missing_base_repository_is_rejected(self):
+        def no_base(path, token):
+            if "/pulls/" in path:
+                packet = fake(path, token)
+                packet["base"]["repo"] = {}
+                return packet
+            return fake(path, token)
+        with self.assertRaisesRegex(ValueError, "target requested repository"):
+            module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", no_base)
+
+
+
 if __name__ == "__main__":
     unittest.main()
