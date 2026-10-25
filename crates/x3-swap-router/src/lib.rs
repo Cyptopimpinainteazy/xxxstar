@@ -28,7 +28,9 @@ pub use mev_protection::{
     ProtectionStrategy, SandwichAttack, SandwichProtection,
 };
 pub use optimization::{OptimizationParams, RouteOptimizer, RouteScore};
-pub use quote_engine::{PriceOracle, PriceSource, QuoteEngine, QuoteResult};
+pub use quote_engine::{
+    LiquiditySource, NativePool, QuoteEngine, QuoteError, QuoteResult, SourceQuote,
+};
 pub use routing::{HopInfo, RouteConstraints, RouteFinder, SwapRoute};
 pub use slippage_control::{
     ProtectionLevel, SlippageConfig, SlippageController, SlippageProtectedParams,

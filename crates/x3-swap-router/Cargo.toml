@@ -12,6 +12,9 @@ sp-core = { workspace = true, default-features = false, features = ["std"] }
 # same algorithm; this crate re-exports it rather than keeping a second copy.
 x3-order-window = { path = "../x3-order-window", default-features = false, features = ["std"] }
 sp-std = { workspace = true, default-features = false, features = ["std"] }
+# The canonical constant-product venue math. A quote must be priced by the same
+# arithmetic the chain settles with, not by a second implementation here.
+x3bc-core = { path = "../x3bc-core", default-features = false, features = ["std"] }
 serde = { workspace = true }
 # Note: Would depend on oracle interface when available
 
