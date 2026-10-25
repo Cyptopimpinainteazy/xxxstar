@@ -149,19 +149,17 @@ def test_missing_input_is_an_error_not_a_pass(tmp_path: Path, missing: str) -> N
 
 
 def test_the_actual_2026_10_23_regression_is_caught(tmp_path: Path) -> None:
-    """The stale document this guard exists for, replayed against today's registry."""
-    stale = subprocess.run(
-        ["git", "show", "50029cf14^:CURRENT_MAINNET_STATUS.md"],
-        cwd=str(REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if stale.returncode != 0:
-        pytest.skip("the pre-fix status document is not reachable from this clone")
+    """The stale claims this guard exists for, replayed against today's registry."""
+    stale_document = """# X3 Atomic Star - Mainnet Status
+
+Atomic Kernel (pallets/x3-atomic-kernel)  ███░░░░░░░  35%  LIVE_TESTNET
+Tauri OS (apps/tauri-os)                  █░░░░░░░░░  15%  GUARDED_TESTNET
+
+**Average readiness: ~55%**
+"""
 
     doc = tmp_path / "CURRENT_MAINNET_STATUS.md"
-    doc.write_text(stale.stdout, encoding="utf-8")
+    doc.write_text(stale_document, encoding="utf-8")
 
     result = run_check(REGISTRY, doc)
     assert result.returncode == 1, result.stdout + result.stderr

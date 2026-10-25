@@ -105,10 +105,7 @@ def test_resolve_detail_refuses_symlink_out(tmp_path, capsys):
     (tmp_path / "secret.txt").write_text("SECRET", encoding="utf-8")
     catalog = tmp_path / "catalog"
     catalog.mkdir()
-    try:
-        (catalog / "link.md").symlink_to(tmp_path / "secret.txt")
-    except OSError:
-        pytest.skip("symlinks not permitted here")
+    (catalog / "link.md").symlink_to(tmp_path / "secret.txt")
     assert brain.resolve_detail({"technique_name": "T", "detail": "link.md"}, catalog) is None
     assert "refused for T: link.md" in capsys.readouterr().err
 

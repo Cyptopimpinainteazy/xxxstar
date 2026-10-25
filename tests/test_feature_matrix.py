@@ -187,8 +187,7 @@ def test_generation_is_deterministic(tmp_path):
 
 def test_real_repository_matrix_validates():
     matrix_path = ROOT / "FEATURE_MATRIX.toml"
-    if not matrix_path.exists():
-        pytest.skip("matrix seed is added in task 2")
+    assert matrix_path.is_file(), f"release matrix is missing: {matrix_path}"
     matrix = fm.load_matrix(matrix_path)
     reg = fm.load_registry(ROOT / "FEATURE_REGISTRY.toml")
     errors, _ = fm.validate_matrix(matrix, ROOT, reg)
