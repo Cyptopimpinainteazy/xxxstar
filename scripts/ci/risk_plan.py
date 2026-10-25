@@ -86,7 +86,7 @@ def main():
     try:
         paths = changed_paths(args.base)
         mode, gates = choose_profile(paths)
-    except (OSError, ValueError, UnicodeError, subprocess.CalledProcessError) as exc:
+    except (OSError, ValueError, UnicodeError, subprocess.CalledProcessError):
         print("risk-plan: git inspection unavailable; full verification required", file=sys.stderr)
         mode, gates = "full", ()
     if mode == "focused":
