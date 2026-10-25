@@ -27,6 +27,8 @@ use x3_lang_execution::{
     trading::*,
 };
 
+type NativeVenueRoute<T> = (<T as frame_system::Config>::AccountId, <T as Config>::AssetId, <T as Config>::AssetId);
+
 fn error(message: &str) -> HostError {
     HostError {
         code: "X3_NATIVE_TRADING_REJECTED".into(),
@@ -283,7 +285,7 @@ impl<T: Config> NativeHost<T> {
         venue: &str,
         from: &AssetKey,
         to: &AssetKey,
-    ) -> Result<(T::AccountId, T::AssetId, T::AssetId), HostError> {
+    ) -> Result<NativeVenueRoute<T>, HostError> {
         let name =
             capability_name(venue.as_bytes().to_vec()).map_err(|_| error("invalid venue name"))?;
         let (account, a, b) =
@@ -296,9 +298,7 @@ impl<T: Config> NativeHost<T> {
         Ok((account, from, to))
     }
     fn balance(account: &T::AccountId, asset: T::AssetId) -> Result<u128, HostError> {
-        CanonicalLedger::<T>::get(account, asset)
-            .try_into()
-            .map_err(|_| error("balance does not fit u128"))
+        Ok(CanonicalLedger::<T>::get(account, asset).into())
     }
     fn transfer(
         &mut self,
