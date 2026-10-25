@@ -1,0 +1,108 @@
+{
+  "scope": "Integer suffix recognition, preservation and range checking; exact numeric compatibility of function parameters and local bindings",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/compiler/src/numeric.rs",
+      "x3-lang/compiler/src/parser.rs",
+      "x3-lang/compiler/src/formatter.rs",
+      "x3-lang/compiler/tests/test_numeric_policy.rs",
+      "x3-lang/crates/x3-common/src/token.rs",
+      "x3-lang/crates/x3-lexer/src/lexer.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/compiler/src/numeric.rs": "e8ea71bcd79cc113ef1612eb2e28e30b4fedf60227b8ff657cfa13fc4c393765",
+      "x3-lang/compiler/src/parser.rs": "267891b2c534b1c37ebc3a6ad5fc31eaca90d3f825a7724d4564226b95160755",
+      "x3-lang/compiler/src/formatter.rs": "e1a9b15e9ed956e1d890441fef11543547903a8aff92ef321227d2f14249ce02",
+      "x3-lang/compiler/tests/test_numeric_policy.rs": "f58d298ae4f89a7a71ee5723e743f258fc95406fb59c0fa479957b04c4145b8d",
+      "x3-lang/crates/x3-common/src/token.rs": "e4700c03a543c75bbe94fd584d8d0575409f349e41e3411dfefd39c34c105eed",
+      "x3-lang/crates/x3-lexer/src/lexer.rs": "b9daf0d1ee9c5f308181f793af2438845581b32249aa131b5dcb80e9b16189ea"
+    }
+  },
+  "environment": {
+    "rustc": "rustc 1.90.0 (1159e78c4 2025-09-14)",
+    "cargo": "cargo 1.90.0 (840b83a10 2025-07-30)",
+    "python": "3.12.3",
+    "platform": "Linux-6.8.0-146-generic-x86_64-with-glibc2.39"
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang",
+      "exit_code": 0
+    }
+  ],
+  "results": {
+    "rust_suites": 98,
+    "rust_passed": 1378,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "numeric_policy_passed": 22,
+    "python_passed": 23
+  },
+  "regressions": [
+    "Suffix words such as 256u8 were identifiers; lexer now emits typed integer tokens",
+    "Parser and formatter preserve explicit suffix and base",
+    "Suffixed literals and annotated initializers refuse out-of-range values and incompatible numeric types",
+    "Typed parameters and named local arguments retain width and signedness across lexical scopes",
+    "Callee expressions are traversed; repeated negations cannot hide intermediate overflow",
+    "Malformed or unrepresentable suffixed integers cannot fall back to identifiers"
+  ],
+  "cli_smoke": [
+    {
+      "source": "fn main() { let value = 256u8; }",
+      "command": "x3c build <source> --out <artifact>",
+      "expected_diagnostic": "X3E0301",
+      "exit_code": 2,
+      "artifact_written": false
+    },
+    {
+      "source": "fn takes(x: u64) { } fn main(value: u32) { takes(value); }",
+      "command": "x3c build <source> --out <artifact>",
+      "expected_diagnostic": "X3E0202",
+      "exit_code": 2,
+      "artifact_written": false
+    },
+    {
+      "command": "x3c fmt <source>",
+      "exit_code": 0,
+      "suffix_preserved": "u32"
+    }
+  ],
+  "language_scan": {
+    "match_count": 71,
+    "clean_claim": false,
+    "note": "Test-only mocks, explicit simulation and historical comments remain; no production completeness claim from keyword count"
+  },
+  "limitations": [
+    "This pass checks numeric compatibility; it does not add source-level local binding/arithmetic execution to the production lowering backend",
+    "Literal magnitudes remain limited to u128; wider typed literals fail closed",
+    "Closure scoping regression is tested on AST nodes; typed-closure source parsing is outside this pass",
+    "No live venue, cross-chain or whole-blockchain readiness certification"
+  ]
+}

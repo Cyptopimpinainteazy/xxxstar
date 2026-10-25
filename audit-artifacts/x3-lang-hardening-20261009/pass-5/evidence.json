@@ -1,0 +1,74 @@
+{
+  "scope": "Unsigned compile-time bitwise amount expressions and checked shifts, with source parsing and real VM execution",
+  "git": {
+    "branch": "feat/x3gpu1-dual-gpu-accel",
+    "head": "3f4a3a0bac91c03150445a55b14d0b7a9a1d290f",
+    "dirty": true,
+    "files_changed_this_pass": [
+      "x3-lang/crates/x3-lexer/src/lexer.rs",
+      "x3-lang/compiler/src/parser.rs",
+      "x3-lang/compiler/src/lowering.rs",
+      "x3-lang/compiler/tests/test_constant_bindings.rs",
+      "x3-lang/compiler/src/formatter.rs"
+    ],
+    "source_sha256": {
+      "x3-lang/crates/x3-lexer/src/lexer.rs": "3ac30db03017a2a1f949d066b725b9754243bc2b4942ff23ce98e1791ce40148",
+      "x3-lang/compiler/src/parser.rs": "d151634869af73a138052cb1ce31978a8428386f858112a8ec14459cc573108b",
+      "x3-lang/compiler/src/lowering.rs": "85560bf2b9c28cd24da7995b4ed1eedf7548d6fa4c7b0677422a27a70560ea52",
+      "x3-lang/compiler/tests/test_constant_bindings.rs": "96a58403530f84eddc4c218d14663236c79d7cd5de77184d52b5038bc277ecbe",
+      "x3-lang/compiler/src/formatter.rs": "9d1af26806085754741249ed3fa26be3bdffc89f87d3835fe15d3e30855942a3"
+    }
+  },
+  "status": "PASS for bitwise compile-time amounts, checked shifts and formatter grouping",
+  "boundaries": [
+    "No runtime locals or new bytecode instructions",
+    "Amount bindings remain limited to untyped or explicit u128 values",
+    "VM asset-operation evidence does not certify external-chain transfer"
+  ],
+  "related_fix": "Preserve grouping of nested binary and unary expressions during formatting; formatter previously changed the value and could introduce overflow.",
+  "rust_tests": {
+    "passed": 1386,
+    "failed": 0,
+    "ignored": 0,
+    "suites": 99
+  },
+  "python_tests": {
+    "passed": 23,
+    "failed": 0
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --manifest-path x3-lang/Cargo.toml --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "git diff --check -- x3-lang",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m pytest -q x3-lang/tests",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m compileall -q x3-lang/tests",
+      "exit_code": 0
+    }
+  ],
+  "scan": {
+    "scope": "x3-lang excluding build and dependency directories",
+    "matches": 71,
+    "result": "Historical comments, test mocks and simulation paths remain; no repository-wide clean-code certification."
+  }
+}
