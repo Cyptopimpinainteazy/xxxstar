@@ -60,6 +60,14 @@ jobs:
           python3 scripts/ci/integration_e2e.py --output "$RUNNER_TEMP/x3-integration-synthetic.json"
       - name: Verify GitHub metadata adapter (fake API; no token)
         run: python3 -m unittest discover -s scripts/ci -p test_github_evidence.py -v
+      - name: Verify live exact-head PR evidence (same-repository PR only)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --expected-head "$EVENT_HEAD_SHA" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
       - name: Collect live PR evidence (manual dispatch only)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
         env:
