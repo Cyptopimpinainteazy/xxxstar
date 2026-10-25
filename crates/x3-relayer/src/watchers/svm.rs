@@ -24,6 +24,7 @@ pub struct SvmHeaderWatcher {
 
 impl SvmHeaderWatcher {
     pub async fn new(config: SvmClusterConfig) -> Result<Self> {
+        Self::validate_rpc_sources(&config)?;
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
             .build()?;
@@ -85,6 +86,21 @@ impl SvmHeaderWatcher {
 
     pub fn domain_id(&self) -> u32 {
         self.config.x3_domain_id
+    }
+
+    /// Validate the configured JSON-RPC sources before the relayer starts.
+    ///
+    /// A mainnet watcher cannot run with fewer than three distinct endpoints:
+    /// doing so would let one provider manufacture transaction evidence that the
+    /// rest of the proof path treats as independently observed.
+    pub fn validate_rpc_sources(config: &SvmClusterConfig) -> Result<()> {
+        let endpoints = Self::rpc_endpoints(config)?;
+        if config.cluster_name.to_ascii_lowercase().contains("mainnet") && endpoints.len() < 3 {
+            return Err(anyhow!(
+                "mainnet Solana transaction evidence requires at least three distinct RPC endpoints"
+            ));
+        }
+        Ok(())
     }
 
     pub async fn finalized_floor(&self) -> u64 {
@@ -183,25 +199,8 @@ impl SvmHeaderWatcher {
         slot: u64,
         expected_blockhash: [u8; 32],
     ) -> Result<SolanaTransactionEvidence> {
-        let mut endpoints = Vec::new();
-        for endpoint in std::iter::once(&self.config.rpc_endpoint)
-            .chain(self.config.rpc_quorum_endpoints.iter())
-        {
-            if !endpoint.trim().is_empty() && !endpoints.contains(endpoint) {
-                endpoints.push(endpoint.clone());
-            }
-        }
-        if self
-            .config
-            .cluster_name
-            .to_ascii_lowercase()
-            .contains("mainnet")
-            && endpoints.len() < 3
-        {
-            return Err(anyhow!(
-                "mainnet Solana transaction evidence requires at least three distinct RPC endpoints"
-            ));
-        }
+        Self::validate_rpc_sources(&self.config)?;
+        let endpoints = Self::rpc_endpoints(&self.config)?;
 
         let mut observations = Vec::new();
         for endpoint in &endpoints {
@@ -289,6 +288,22 @@ impl SvmHeaderWatcher {
     // ============================================================================
     // JSON-RPC Methods
     // ============================================================================
+
+    fn rpc_endpoints(config: &SvmClusterConfig) -> Result<Vec<String>> {
+        let mut endpoints = Vec::new();
+        for endpoint in
+            std::iter::once(&config.rpc_endpoint).chain(config.rpc_quorum_endpoints.iter())
+        {
+            let endpoint = endpoint.trim();
+            if endpoint.is_empty() {
+                return Err(anyhow!("Solana RPC endpoint must not be empty"));
+            }
+            if !endpoints.iter().any(|known| known == endpoint) {
+                endpoints.push(endpoint.to_string());
+            }
+        }
+        Ok(endpoints)
+    }
 
     async fn get_finalized_slot(client: &reqwest::Client, rpc_url: &str) -> Result<u64> {
         let response = client
@@ -709,6 +724,36 @@ mod tests {
             .await
             .expect_err("mainnet cannot use a single RPC provider");
         assert!(error.to_string().contains("three distinct RPC endpoints"));
+    }
+
+    #[test]
+    fn mainnet_rpc_sources_are_validated_before_startup() {
+        let mut config = SvmClusterConfig {
+            name: "mainnet".into(),
+            cluster_name: "mainnet-beta".into(),
+            x3_domain_id: 200,
+            rpc_endpoint: "https://rpc-a.example".into(),
+            rpc_quorum_endpoints: vec![
+                "https://rpc-a.example".into(),
+                "https://rpc-b.example".into(),
+            ],
+            finality_threshold: 1,
+            slot_poll_interval_ms: 1,
+            max_concurrent_requests: 1,
+        };
+        let error = SvmHeaderWatcher::validate_rpc_sources(&config)
+            .expect_err("a repeated endpoint is not an independent provider");
+        assert!(error.to_string().contains("three distinct RPC endpoints"));
+
+        config
+            .rpc_quorum_endpoints
+            .push("https://rpc-c.example".into());
+        SvmHeaderWatcher::validate_rpc_sources(&config).expect("three distinct endpoints");
+
+        config.rpc_quorum_endpoints.push(" ".into());
+        let error = SvmHeaderWatcher::validate_rpc_sources(&config)
+            .expect_err("an empty endpoint is a configuration error");
+        assert!(error.to_string().contains("must not be empty"));
     }
 
     #[tokio::test]

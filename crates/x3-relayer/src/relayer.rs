@@ -174,6 +174,9 @@ impl RelayerService {
         }
 
         // Initialize SVM watchers
+        for svm_config in &config.svm_clusters {
+            SvmHeaderWatcher::validate_rpc_sources(svm_config).map_err(anyhow::Error::msg)?;
+        }
         let mut svm_watchers = Vec::new();
         for svm_config in &config.svm_clusters {
             match SvmHeaderWatcher::new(svm_config.clone()).await {
