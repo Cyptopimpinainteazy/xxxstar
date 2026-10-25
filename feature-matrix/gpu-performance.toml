@@ -235,18 +235,18 @@ confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "Real two-GPU hardware parity now covers SHA-256 and Keccak-256 batch outputs, including empty, rate-boundary, and multi-block inputs, on both installed NVIDIA adapters. Hardware Ed25519 verification and full hardware secp256k1 signature-batch parity still need device execution before this row can reach mainnet readiness.",
+  "Real two-GPU hardware parity now covers SHA-256 and Keccak-256 batch outputs, including empty, rate-boundary, and multi-block inputs, plus real secp256k1 ECDSA verdicts on both installed NVIDIA adapters. Hardware Ed25519 verification still needs device execution before this row can reach mainnet readiness.",
 ]
 evidence = [
   "crates/x3-accel/src/lib.rs",
   "crates/x3-accel-wgpu/src/lib.rs",
-  "audit-artifacts/evidence/2026-10-24-two-gpu-hash-parity.json",
-  "note: commit f9f6e3c9f adds a test that enumerates every hardware adapter and compares each adapter's SHA-256 and Keccak-256 results byte-for-byte with CPU truth; the recorded run exercised the GTX 1070 and RTX 2060 SUPER separately.",
+  "audit-artifacts/evidence/2026-10-24-two-gpu-parity.json",
+  "note: commits f9f6e3c9f and ce73c8d10 add tests that enumerate every hardware adapter, compare SHA-256 and Keccak-256 results byte-for-byte with CPU truth, and require the reference ECDSA verdicts for a genuine signature and the same signature over another digest; the recorded runs exercised the GTX 1070 and RTX 2060 SUPER separately.",
 ]
 test_evidence = [
   "crates/x3-accel-wgpu/src/lib.rs",
-  "audit-artifacts/evidence/2026-10-24-two-gpu-hash-parity.json",
-  "note: `WGPU_BACKEND=vulkan X3_REQUIRE_GPU=1 cargo test -p x3-accel-wgpu --lib` -> 7 passed, 0 failed; the per-adapter run passed on NVIDIA GeForce GTX 1070 and NVIDIA GeForce RTX 2060 SUPER over Vulkan.",
+  "audit-artifacts/evidence/2026-10-24-two-gpu-parity.json",
+  "note: `WGPU_BACKEND=vulkan X3_REQUIRE_GPU=1 cargo test -p x3-accel-wgpu --lib` -> 8 passed, 0 failed at ce73c8d10; the per-adapter hash and ECDSA runs passed on NVIDIA GeForce GTX 1070 and NVIDIA GeForce RTX 2060 SUPER over Vulkan.",
   "note: `cargo clippy -p x3-accel-wgpu --all-targets --no-deps -- -D warnings` -> PASS.",
 ]
 

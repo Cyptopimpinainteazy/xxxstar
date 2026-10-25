@@ -2429,8 +2429,8 @@
       "evidence": [
         "crates/x3-accel/src/lib.rs",
         "crates/x3-accel-wgpu/src/lib.rs",
-        "audit-artifacts/evidence/2026-10-24-two-gpu-hash-parity.json",
-        "note: commit f9f6e3c9f adds a test that enumerates every hardware adapter and compares each adapter's SHA-256 and Keccak-256 results byte-for-byte with CPU truth; the recorded run exercised the GTX 1070 and RTX 2060 SUPER separately."
+        "audit-artifacts/evidence/2026-10-24-two-gpu-parity.json",
+        "note: commits f9f6e3c9f and ce73c8d10 add tests that enumerate every hardware adapter, compare SHA-256 and Keccak-256 results byte-for-byte with CPU truth, and require the reference ECDSA verdicts for a genuine signature and the same signature over another digest; the recorded runs exercised the GTX 1070 and RTX 2060 SUPER separately."
       ],
       "id": "X3-GPU-004",
       "implemented": 80,
@@ -2438,7 +2438,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 55,
       "missing_work": [
-        "Real two-GPU hardware parity now covers SHA-256 and Keccak-256 batch outputs, including empty, rate-boundary, and multi-block inputs, on both installed NVIDIA adapters. Hardware Ed25519 verification and full hardware secp256k1 signature-batch parity still need device execution before this row can reach mainnet readiness."
+        "Real two-GPU hardware parity now covers SHA-256 and Keccak-256 batch outputs, including empty, rate-boundary, and multi-block inputs, plus real secp256k1 ECDSA verdicts on both installed NVIDIA adapters. Hardware Ed25519 verification still needs device execution before this row can reach mainnet readiness."
       ],
       "name": "GPU/CPU parity checking",
       "paths": [
@@ -4961,7 +4961,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "9b88e91ac0f2f81b1c559321ae003434a911d62b7656710cbb0c7e9fd6758247",
+    "source_digest": "766641b4492245a7df27765bca0a29061a172cc8e6b64874fe257d5ca832c9bd",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4971,7 +4971,7 @@
       "feature-matrix/cross-chain.toml": "68175079bd951af50366b95138a292c9955c537909a5ed11a05020f16e7ed2da",
       "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "e11aa87df5d6f8ee130d7943936e67ef85b3cf15076cb5e272c915d33d777adf",
+      "feature-matrix/gpu-performance.toml": "d70ef708859961f9017baf0aaf95e740ba71144e1a45c3b6475e4383d04329cd",
       "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "09d1bd89a8066adf336cfef1632f28add490ea5b087e6fe6c3f1eab85b9090f8",
