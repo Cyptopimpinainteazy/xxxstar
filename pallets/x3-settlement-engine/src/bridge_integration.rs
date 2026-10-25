@@ -15,6 +15,7 @@
 //! 5. Update settlement state to track proof verification
 
 use sp_core::H256;
+use x3_verification_router::{SolanaCluster, SolanaStakeWeightedVerifier};
 
 /// Cross-chain validator provider for settlement proof verification
 ///
@@ -80,6 +81,18 @@ pub trait CrossChainValidatorProvider {
     fn get_latest_svm_header_hash() -> Option<H256>
     where
         Self: Sized;
+
+    /// Construct the governance-configured stake-weighted Solana V4 verifier,
+    /// including the runtime's persisted finalized-slot floor.
+    fn solana_v4_verifier(_cluster: SolanaCluster) -> Option<SolanaStakeWeightedVerifier> {
+        None
+    }
+
+    /// Persist the accepted V4 finalized slot. The dispatch transaction rolls
+    /// this write back if any later `submit_proof` check fails.
+    fn record_solana_v4_finalized_slot(_cluster: SolanaCluster, _slot: u64) -> bool {
+        false
+    }
 }
 
 /// Accept-all validator for tests and local development.
@@ -114,6 +127,14 @@ impl CrossChainValidatorProvider for NoOpCrossChainValidator {
 
     fn get_latest_svm_header_hash() -> Option<H256> {
         None
+    }
+
+    fn solana_v4_verifier(_cluster: SolanaCluster) -> Option<SolanaStakeWeightedVerifier> {
+        None
+    }
+
+    fn record_solana_v4_finalized_slot(_cluster: SolanaCluster, _slot: u64) -> bool {
+        false
     }
 }
 

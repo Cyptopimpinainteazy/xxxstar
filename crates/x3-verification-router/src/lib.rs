@@ -36,12 +36,15 @@ pub use gateway_types::{
     ExternalAssetRef, ExternalChainId, VerificationRequest, VerificationResult,
 };
 pub use solana_finality::{
-    encode_solana_finality_v3, encode_solana_finality_v4, solana_finality_message_v3,
-    solana_finality_message_v4, solana_stake_table_digest, solana_transaction_commitment,
-    SolanaCluster, SolanaStakeWeightedVerifier, SolanaTransactionEvidence, SolanaValidatorStake,
-    SolanaVerifierConfigError, MAX_SOLANA_FINALITY_VOTES, MAX_SOLANA_TRANSACTION_BYTES,
-    SOLANA_FINALITY_V3_HEADER_LEN, SOLANA_FINALITY_V4_FIXED_LEN, SOLANA_FINALITY_V4_HEADER_LEN,
-    SOLANA_FINALITY_VOTE_LEN, SOLANA_FINALIZED_FORMAT_V3, SOLANA_FINALIZED_FORMAT_V4,
+    decode_solana_settlement_evidence, encode_solana_finality_v3, encode_solana_finality_v4,
+    encode_solana_settlement_evidence, solana_finality_message_v3, solana_finality_message_v4,
+    solana_stake_table_digest, solana_transaction_commitment, solana_v4_finality_binding,
+    solana_v4_transaction_commitment, SolanaCluster, SolanaSettlementEvidence,
+    SolanaStakeWeightedVerifier, SolanaTransactionEvidence, SolanaV4FinalityBinding,
+    SolanaValidatorStake, SolanaVerifierConfigError, MAX_SOLANA_FINALITY_VOTES,
+    MAX_SOLANA_SETTLEMENT_FIELD_BYTES, MAX_SOLANA_TRANSACTION_BYTES, SOLANA_FINALITY_V3_HEADER_LEN,
+    SOLANA_FINALITY_V4_FIXED_LEN, SOLANA_FINALITY_V4_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
+    SOLANA_FINALIZED_FORMAT_V3, SOLANA_FINALIZED_FORMAT_V4, SOLANA_SETTLEMENT_EVIDENCE_MAGIC,
 };
 
 use alloc::collections::btree_map::BTreeMap;

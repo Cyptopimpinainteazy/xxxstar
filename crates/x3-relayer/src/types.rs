@@ -10,7 +10,8 @@ use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 use x3_verification_router::{
-    encode_solana_finality_v4, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
+    encode_solana_finality_v4, encode_solana_settlement_evidence, ChainKind, ProofEnvelope,
+    VerificationError, VerificationStrategy,
 };
 pub use x3_verification_router::{SolanaCluster, SolanaTransactionEvidence};
 
@@ -294,6 +295,13 @@ impl SvmProof {
         let mut envelope = self.envelope();
         envelope.payload = self.encode_payload()?;
         Ok(envelope)
+    }
+
+    /// Encode the portable evidence accepted by the settlement engine.
+    pub fn settlement_evidence(&self) -> Result<Vec<u8>, VerificationError> {
+        let envelope = self.envelope();
+        let payload = self.encode_payload()?;
+        encode_solana_settlement_evidence(&envelope, &payload)
     }
 }
 

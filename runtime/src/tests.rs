@@ -9,6 +9,7 @@
 
 use super::*;
 use frame_support::{assert_err, assert_noop, assert_ok};
+use pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider;
 use pallet_x3_settlement_engine::types::{AssetSpec, ExternalChainId, TokenId};
 use sp_runtime::DispatchError;
 
@@ -37,6 +38,62 @@ fn runtime_genesis_config_builds() {
         !storage.top.is_empty(),
         "genesis produced an empty top-level trie"
     );
+}
+
+#[test]
+fn runtime_solana_v4_verifier_uses_the_gateway_committee() {
+    use sp_core::Pair;
+
+    sp_io::TestExternalities::default().execute_with(|| {
+        let chain = pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet;
+        assert!(
+            RuntimeCrossChainValidator::solana_v4_verifier(
+                x3_verification_router::SolanaCluster::Devnet
+            )
+            .is_none(),
+            "no governance committee must fail closed"
+        );
+
+        let mut validators = vec![
+            sp_core::ed25519::Pair::from_seed(&[1u8; 32]),
+            sp_core::ed25519::Pair::from_seed(&[2u8; 32]),
+        ]
+        .into_iter()
+        .map(|pair| pallet_x3_crosschain_gateway::SolanaStakeEntry {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+        validators.sort_by_key(|entry| entry.pubkey);
+        pallet_x3_crosschain_gateway::SolanaStakeCommittees::<Runtime>::insert(
+            chain,
+            pallet_x3_crosschain_gateway::SolanaStakeCommittee {
+                threshold_numerator: 2,
+                threshold_denominator: 3,
+                validators: validators.try_into().expect("two validators fit"),
+            },
+        );
+        pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::insert(chain, 400);
+
+        let verifier = RuntimeCrossChainValidator::solana_v4_verifier(
+            x3_verification_router::SolanaCluster::Devnet,
+        )
+        .expect("configured verifier");
+        assert_eq!(
+            verifier.cluster(),
+            x3_verification_router::SolanaCluster::Devnet
+        );
+        assert_eq!(verifier.total_stake(), 200);
+        assert_eq!(verifier.required_stake(), 134);
+        assert!(RuntimeCrossChainValidator::record_solana_v4_finalized_slot(
+            x3_verification_router::SolanaCluster::Devnet,
+            500,
+        ));
+        assert_eq!(
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain),
+            500
+        );
+    });
 }
 
 /// The settlement engine must be reachable through the real runtime with a

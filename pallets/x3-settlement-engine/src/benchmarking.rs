@@ -11,7 +11,7 @@
 
 use super::*;
 use frame_benchmarking::{benchmarks, BenchmarkError};
-use frame_support::traits::{Currency, ReservableCurrency};
+use frame_support::traits::{Currency, Get, ReservableCurrency};
 use frame_system::RawOrigin;
 use sp_core::H256;
 use sp_runtime::SaturatedConversion;
@@ -293,26 +293,47 @@ benchmarks! {
         // being weighed is the merkle walk and the UTXO write, and the header has to
         // be admitted by `submit_btc_header` *before* a proof naming it can be
         // submitted at all. What is not being measured is header admission.
-        let block_header = BtcBlockHeader {
-            version: 1,
-            prev_block_hash: H256::from_low_u64_be(0),
-            merkle_root: btc_txid,
-            timestamp: 1234567890u32,
-            bits: 0x207fffff,
-            nonce: 0,
-            height: 0u64,
-        };
-        let block_hash = Pallet::<T>::compute_btc_block_hash(&block_header);
-        BtcCheckpoints::<T>::insert(0u64, block_hash);
-        BtcHeaders::<T>::insert(block_hash, block_header.clone());
-        BtcHeaderMetaStore::<T>::insert(
-            block_hash,
-            crate::types::BtcHeaderMeta {
-                height: 0,
-                anchored: true,
-            },
-        );
-        BtcBestHeight::<T>::put(0u64);
+        let confirmation_requirement = T::MinBtcConfirmations::get() as u64;
+        let proof_height = 1u64;
+        let best_height = proof_height + confirmation_requirement - 1;
+        let mut previous = H256::from_low_u64_be(0);
+        let mut proof_header = None;
+        let mut genesis_hash = H256::from_low_u64_be(0);
+        for height in 0..=best_height {
+            let header = BtcBlockHeader {
+                version: 1,
+                prev_block_hash: previous,
+                merkle_root: if height == proof_height {
+                    btc_txid
+                } else {
+                    H256::from_low_u64_be(1_000 + height)
+                },
+                timestamp: 1_234_567_890u32.saturating_add(height as u32),
+                bits: 0x207fffff,
+                nonce: 0,
+                height,
+            };
+            let hash = Pallet::<T>::compute_btc_block_hash(&header);
+            if height == 0 {
+                genesis_hash = hash;
+            }
+            if height == proof_height {
+                proof_header = Some(header.clone());
+            }
+            BtcHeaders::<T>::insert(hash, header);
+            BtcHeaderMetaStore::<T>::insert(
+                hash,
+                crate::types::BtcHeaderMeta {
+                    height,
+                    anchored: true,
+                },
+            );
+            BtcBestChain::<T>::insert(height, hash);
+            previous = hash;
+        }
+        BtcCheckpoints::<T>::insert(0u64, genesis_hash);
+        BtcBestHeight::<T>::put(best_height);
+        let block_header = proof_header.ok_or(BenchmarkError::Weightless)?;
 
         let origin = RawOrigin::Signed(maker.clone());
     }: _(origin, intent_id, btc_txid, 0u32, 0u32, 0u64, merkle_proof, block_header)

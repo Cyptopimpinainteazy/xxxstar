@@ -48,14 +48,6 @@ pub enum SubmitterError {
     #[error("failed to submit the {leg} proof: {reason}")]
     SubmissionFailed { leg: &'static str, reason: String },
 
-    /// The SVM settlement adapter is intentionally withheld until the runtime
-    /// consumes the V4 transaction-and-bank evidence.
-    #[error(
-        "refusing to submit the SVM settlement proof: V4 transaction-and-bank evidence is \
-         verified, but the settlement runtime adapter has not been enabled"
-    )]
-    UnsupportedSvmSettlementProof,
-
     /// The configured validator set demands more distinct signatures than this
     /// pipeline can supply.
     #[error(
@@ -352,11 +344,75 @@ impl RpcSubmitter {
         Ok(tx_hash)
     }
 
-    /// The SVM V4 evidence is verified, but the settlement-engine adapter is not
-    /// enabled yet. Refuse rather than sending evidence the chain will reject.
-    pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String, SubmitterError> {
-        let _ = proof;
-        Err(SubmitterError::UnsupportedSvmSettlementProof)
+    /// Convert and sign one verified Solana V4 proof for the settlement engine.
+    pub async fn submit_svm_proof(
+        &self,
+        runtime_intent_id: sp_core::H256,
+        proof: SvmProof,
+    ) -> Result<String, SubmitterError> {
+        if runtime_intent_id == sp_core::H256::zero() {
+            return Err(SubmitterError::InvalidRuntimeProof {
+                leg: "svm",
+                reason: "runtime intent id must not be zero".to_string(),
+            });
+        }
+        let chain = match proof.cluster {
+            SolanaCluster::MainnetBeta => ExternalChainId::Solana,
+            SolanaCluster::Devnet => ExternalChainId::SolanaDevnet,
+            SolanaCluster::Testnet => {
+                return Err(SubmitterError::InvalidRuntimeProof {
+                    leg: "svm",
+                    reason: "settlement engine has no Solana testnet chain id".to_string(),
+                })
+            }
+        };
+        let receipt_data = proof
+            .settlement_evidence()
+            .map_err(|error| SubmitterError::InvalidRuntimeProof {
+                leg: "svm",
+                reason: error.to_string(),
+            })?
+            .try_into()
+            .map_err(|_| SubmitterError::InvalidRuntimeProof {
+                leg: "svm",
+                reason: "Solana settlement evidence exceeds the runtime proof bound".to_string(),
+            })?;
+        let settlement = pallet_x3_settlement_engine::SettlementProof {
+            proof_type: pallet_x3_settlement_engine::ProofType::SolanaProof,
+            tx_hash: sp_core::H256::from(proof.transaction.commitment),
+            block_hash: sp_core::H256::from(proof.blockhash),
+            chain_height: Some(proof.slot),
+            confirmations: 1,
+            merkle_proof: Default::default(),
+            receipt_data,
+            receipt_index: Some(proof.transaction.index),
+            trie_proof: None,
+        };
+
+        let _submission_guard = self.submission_lock.lock().await;
+        let signer = self.runtime_signer.clone().ok_or_else(|| {
+            SubmitterError::RuntimeSignerUnavailable {
+                leg: "svm",
+                authority: self.authority_label(),
+            }
+        })?;
+        let signed = tokio::task::spawn_blocking(move || {
+            signer.sign_submit_proof(runtime_intent_id, chain, settlement)
+        })
+        .await
+        .map_err(|error| SubmitterError::SubmissionFailed {
+            leg: "svm",
+            reason: format!("runtime signer task failed: {error}"),
+        })?
+        .map_err(|error| SubmitterError::SubmissionFailed {
+            leg: "svm",
+            reason: format!("runtime signer refused the extrinsic: {error}"),
+        })?;
+
+        let tx_hash = self.submit_signed_extrinsic("svm", &signed).await?;
+        let mut nonce = self.nonce.write().await;
+        *nonce = nonce.saturating_add(1);
+        Ok(tx_hash)
     }
 
     async fn submit_signed_extrinsic(
@@ -901,6 +957,39 @@ mod tests {
         assert_eq!(proof.slot, 42);
         assert_eq!(proof.blockhash, [0x32u8; 32]);
         assert_eq!(proof.validator_signatures.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn svm_settlement_refuses_missing_intent_and_runtime_signer() {
+        let key = RpcSubmitter::key_from_seed("SVM settlement test seed");
+        let pubkeys = vec![key.verifying_key().to_bytes()];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
+        let proof = submitter
+            .acquire_svm_proof(test_request(&stakes))
+            .await
+            .expect("proof");
+
+        let error = submitter
+            .submit_svm_proof(sp_core::H256::zero(), proof.clone())
+            .await
+            .expect_err("zero intent is refused first");
+        assert!(matches!(
+            error,
+            SubmitterError::InvalidRuntimeProof { leg: "svm", .. }
+        ));
+
+        let error = submitter
+            .submit_svm_proof(sp_core::H256::repeat_byte(0x11), proof)
+            .await
+            .expect_err("no runtime signer");
+        assert_eq!(
+            error,
+            SubmitterError::RuntimeSignerUnavailable {
+                leg: "svm",
+                authority: "seed-derived".to_string(),
+            }
+        );
     }
 
     #[test]

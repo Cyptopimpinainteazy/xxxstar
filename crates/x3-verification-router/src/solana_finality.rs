@@ -54,6 +54,10 @@ pub const MAX_SOLANA_FINALITY_VOTES: usize = 1_024;
 /// Maximum serialized Solana transaction size accepted in V4 evidence.
 pub const MAX_SOLANA_TRANSACTION_BYTES: usize = 1_232;
 
+/// Maximum length of each transfer-intent byte field in portable settlement
+/// evidence.
+pub const MAX_SOLANA_SETTLEMENT_FIELD_BYTES: usize = 128;
+
 /// Fixed length of a V2 vote record: Ed25519 public key plus signature.
 pub const SOLANA_FINALITY_VOTE_LEN: usize = 96;
 
@@ -87,6 +91,8 @@ const STAKE_TABLE_DOMAIN: &[u8] = b"X3/SOLANA_STAKE_TABLE/V2";
 const FINALITY_DOMAIN: &[u8] = b"X3/SOLANA_FINALITY/V3";
 const FINALITY_DOMAIN_V4: &[u8] = b"X3/SOLANA_FINALITY/V4";
 const TRANSFER_DOMAIN: &[u8] = b"X3/SOLANA_TRANSFER/V3";
+/// Magic prefix for portable Solana settlement evidence.
+pub const SOLANA_SETTLEMENT_EVIDENCE_MAGIC: [u8; 8] = *b"X3SV4S01";
 
 /// Solana cluster bound by a finality proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -151,6 +157,186 @@ impl SolanaTransactionEvidence {
             raw_transaction,
         })
     }
+}
+
+/// Portable Solana V4 evidence consumed by the settlement engine.
+///
+/// The finality payload is self-contained; the surrounding envelope binds it to
+/// the exact transfer fields validators signed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolanaSettlementEvidence {
+    pub proof: ProofEnvelope,
+    pub finality_payload: Vec<u8>,
+}
+
+/// Encode the transfer envelope and its V4 finality payload for a settlement
+/// extrinsic.
+pub fn encode_solana_settlement_evidence(
+    proof: &ProofEnvelope,
+    finality_payload: &[u8],
+) -> Result<Vec<u8>, VerificationError> {
+    if proof.strategy != VerificationStrategy::SolanaFinalizedProof
+        || proof.source_chain != ChainKind::Solana
+        || proof.destination_chain != ChainKind::X3
+    {
+        return Err(VerificationError::InvalidStrategy);
+    }
+    if finality_payload.is_empty()
+        || proof.expected_sender.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+        || proof.expected_recipient.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+        || proof.expected_beneficiary.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+    {
+        return Err(VerificationError::MalformedProof);
+    }
+    let finality_len =
+        u16::try_from(finality_payload.len()).map_err(|_| VerificationError::MalformedProof)?;
+    let mut encoded = Vec::with_capacity(
+        8 + 32
+            + 32
+            + 16
+            + 3
+            + proof.expected_sender.len()
+            + proof.expected_recipient.len()
+            + proof.expected_beneficiary.len()
+            + 2
+            + finality_payload.len(),
+    );
+    encoded.extend_from_slice(&SOLANA_SETTLEMENT_EVIDENCE_MAGIC);
+    encoded.extend_from_slice(&proof.proof_id);
+    encoded.extend_from_slice(&proof.expected_asset_id);
+    encoded.extend_from_slice(&proof.expected_amount.to_le_bytes());
+    for field in [
+        &proof.expected_sender,
+        &proof.expected_recipient,
+        &proof.expected_beneficiary,
+    ] {
+        encoded.push(field.len() as u8);
+        encoded.extend_from_slice(field);
+    }
+    encoded.extend_from_slice(&finality_len.to_le_bytes());
+    encoded.extend_from_slice(finality_payload);
+    Ok(encoded)
+}
+
+/// Decode portable V4 settlement evidence without accepting trailing or
+/// truncated bytes.
+pub fn decode_solana_settlement_evidence(
+    encoded: &[u8],
+) -> Result<SolanaSettlementEvidence, VerificationError> {
+    const PREFIX_LEN: usize = 8 + 32 + 32 + 16 + 3 + 2;
+    if encoded.len() < PREFIX_LEN || encoded[..8] != SOLANA_SETTLEMENT_EVIDENCE_MAGIC {
+        return Err(VerificationError::MalformedProof);
+    }
+    let mut proof_id = [0u8; 32];
+    proof_id.copy_from_slice(&encoded[8..40]);
+    let mut expected_asset_id = [0u8; 32];
+    expected_asset_id.copy_from_slice(&encoded[40..72]);
+    let expected_amount = u128::from_le_bytes(
+        encoded[72..88]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let mut cursor = 88usize;
+    let mut fields = Vec::with_capacity(3);
+    for _ in 0..3 {
+        let len = *encoded
+            .get(cursor)
+            .ok_or(VerificationError::MalformedProof)? as usize;
+        cursor += 1;
+        if len > MAX_SOLANA_SETTLEMENT_FIELD_BYTES {
+            return Err(VerificationError::MalformedProof);
+        }
+        let end = cursor
+            .checked_add(len)
+            .ok_or(VerificationError::MalformedProof)?;
+        fields.push(
+            encoded
+                .get(cursor..end)
+                .ok_or(VerificationError::MalformedProof)?
+                .to_vec(),
+        );
+        cursor = end;
+    }
+    let finality_len = u16::from_le_bytes(
+        encoded
+            .get(cursor..cursor + 2)
+            .ok_or(VerificationError::MalformedProof)?
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    ) as usize;
+    cursor += 2;
+    let finality_end = cursor
+        .checked_add(finality_len)
+        .ok_or(VerificationError::MalformedProof)?;
+    if finality_len == 0 || finality_end != encoded.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+    Ok(SolanaSettlementEvidence {
+        proof: ProofEnvelope {
+            proof_id,
+            strategy: VerificationStrategy::SolanaFinalizedProof,
+            source_chain: ChainKind::Solana,
+            destination_chain: ChainKind::X3,
+            payload: Vec::new(),
+            expected_asset_id,
+            expected_amount,
+            expected_sender: fields[0].clone(),
+            expected_recipient: fields[1].clone(),
+            expected_beneficiary: fields[2].clone(),
+        },
+        finality_payload: encoded[cursor..finality_end].to_vec(),
+    })
+}
+
+/// Finality identifiers that a settlement caller must compare with the
+/// surrounding [`SettlementProof`] fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolanaV4FinalityBinding {
+    pub cluster: SolanaCluster,
+    pub finalized_slot: u64,
+    pub transaction_index: u32,
+    pub finalized_blockhash: [u8; 32],
+    pub transaction_commitment: [u8; 32],
+}
+
+/// Extract the non-vote finality identifiers from a V4 payload.
+pub fn solana_v4_finality_binding(
+    finality_payload: &[u8],
+) -> Result<SolanaV4FinalityBinding, VerificationError> {
+    if finality_payload.len() < SOLANA_FINALITY_V4_FIXED_LEN
+        || finality_payload[0] != SOLANA_FINALIZED_FORMAT_V4
+    {
+        return Err(VerificationError::UnsupportedProofFormat);
+    }
+    let cluster = SolanaCluster::decode(finality_payload[1])?;
+    let finalized_slot = u64::from_le_bytes(
+        finality_payload[2..10]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let transaction_index = u32::from_le_bytes(
+        finality_payload[26..30]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let mut finalized_blockhash = [0u8; 32];
+    finalized_blockhash.copy_from_slice(&finality_payload[31..63]);
+    let mut transaction_commitment = [0u8; 32];
+    transaction_commitment.copy_from_slice(&finality_payload[223..255]);
+    Ok(SolanaV4FinalityBinding {
+        cluster,
+        finalized_slot,
+        transaction_index,
+        finalized_blockhash,
+        transaction_commitment,
+    })
+}
+
+/// Read the transaction commitment from a V4 finality payload.
+pub fn solana_v4_transaction_commitment(
+    finality_payload: &[u8],
+) -> Result<[u8; 32], VerificationError> {
+    Ok(solana_v4_finality_binding(finality_payload)?.transaction_commitment)
 }
 
 /// Why a stake-weighted verifier could not be constructed.
@@ -1388,6 +1574,63 @@ mod tests {
         commitment_tampered.payload[223] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&commitment_tampered, 0),
+            Err(VerificationError::MalformedProof)
+        );
+    }
+
+    #[test]
+    fn portable_settlement_evidence_round_trips_without_trailing_bytes() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let envelope = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+        let finality_payload = envelope.payload.clone();
+        let encoded =
+            encode_solana_settlement_evidence(&envelope, &finality_payload).expect("encode");
+        let decoded = decode_solana_settlement_evidence(&encoded).expect("decode");
+        assert_eq!(decoded.proof.proof_id, envelope.proof_id);
+        assert_eq!(decoded.proof.expected_asset_id, envelope.expected_asset_id);
+        assert_eq!(decoded.proof.expected_amount, envelope.expected_amount);
+        assert_eq!(decoded.proof.expected_sender, envelope.expected_sender);
+        assert_eq!(
+            decoded.proof.expected_recipient,
+            envelope.expected_recipient
+        );
+        assert_eq!(
+            decoded.proof.expected_beneficiary,
+            envelope.expected_beneficiary
+        );
+        assert_eq!(decoded.finality_payload, finality_payload);
+        assert_eq!(
+            solana_v4_transaction_commitment(&decoded.finality_payload).expect("V4 commitment"),
+            transaction(400).commitment
+        );
+
+        let mut trailing = encoded.clone();
+        trailing.push(0);
+        assert_eq!(
+            decode_solana_settlement_evidence(&trailing),
+            Err(VerificationError::MalformedProof)
+        );
+        assert_eq!(
+            decode_solana_settlement_evidence(&encoded[..encoded.len() - 1]),
             Err(VerificationError::MalformedProof)
         );
     }

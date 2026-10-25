@@ -1586,7 +1586,7 @@ pub mod pallet {
             );
 
             // Verify proof based on chain type
-            let is_valid = Self::verify_proof(&chain, &proof)?;
+            let is_valid = Self::verify_proof_for_intent(&chain, &proof, &intent)?;
             ensure!(is_valid, Error::<T>::InvalidProof);
 
             // Emit proof verification event for bridge integration tracking
@@ -2672,6 +2672,29 @@ pub mod pallet {
             }
         }
 
+        fn verify_proof_for_intent(
+            chain: &ExternalChainId,
+            proof: &SettlementProof,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<bool, DispatchError> {
+            if matches!(chain, ExternalChainId::Solana) {
+                return Self::verify_svm_proof_for_intent(chain, proof, intent);
+            }
+            Self::verify_proof(chain, proof)
+        }
+
+        fn external_asset_id(token: &TokenId) -> [u8; 32] {
+            match token {
+                TokenId::Native => [0u8; 32],
+                TokenId::Contract(bytes) => *bytes,
+                TokenId::X3Asset(id) => {
+                    let mut encoded = [0u8; 32];
+                    encoded[..4].copy_from_slice(&id.to_be_bytes());
+                    encoded
+                }
+            }
+        }
+
         /// The two roots a cross-chain proof is verified against, or `None` when
         /// the proof does not carry both.
         ///
@@ -2868,6 +2891,83 @@ pub mod pallet {
                 }
                 _ => false,
             }
+        }
+
+        /// Verify the runtime-facing Solana settlement proof.
+        ///
+        /// V4 evidence is decoded from the exact portable envelope and checked
+        /// against the governance stake committee before accepting it. The
+        /// legacy transaction-only path remains available only behind the
+        /// existing unbound-proof switch used by local tests.
+        pub(crate) fn verify_svm_proof_for_intent(
+            chain: &ExternalChainId,
+            proof: &SettlementProof,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<bool, DispatchError> {
+            if proof.proof_type != ProofType::SolanaProof || proof.confirmations < 1 {
+                return Ok(false);
+            }
+            if !proof
+                .receipt_data
+                .starts_with(&x3_verification_router::SOLANA_SETTLEMENT_EVIDENCE_MAGIC)
+            {
+                return Self::verify_svm_proof(proof);
+            }
+
+            let evidence =
+                x3_verification_router::decode_solana_settlement_evidence(&proof.receipt_data)
+                    .map_err(|_| Error::<T>::InvalidProof)?;
+            let binding =
+                x3_verification_router::solana_v4_finality_binding(&evidence.finality_payload)
+                    .map_err(|_| Error::<T>::InvalidProof)?;
+            let expected_cluster = match chain {
+                ExternalChainId::Solana => x3_verification_router::SolanaCluster::MainnetBeta,
+                ExternalChainId::SolanaDevnet => x3_verification_router::SolanaCluster::Devnet,
+                _ => return Ok(false),
+            };
+            if binding.cluster != expected_cluster
+                || proof.chain_height != Some(binding.finalized_slot)
+                || proof.receipt_index != Some(binding.transaction_index)
+                || proof.block_hash != H256::from(binding.finalized_blockhash)
+                || proof.tx_hash != H256::from(binding.transaction_commitment)
+            {
+                return Ok(false);
+            }
+
+            if !Self::intent_matches_external_asset(
+                intent,
+                &ExternalChainId::Solana,
+                evidence.proof.expected_amount,
+                evidence.proof.expected_asset_id,
+            ) {
+                return Ok(false);
+            }
+
+            let Some(verifier) = T::CrossChainValidator::solana_v4_verifier(binding.cluster) else {
+                return Ok(false);
+            };
+            let mut envelope = evidence.proof;
+            envelope.payload = evidence.finality_payload;
+            if x3_verification_router::Verifier::verify(&verifier, &envelope).is_err() {
+                return Ok(false);
+            }
+            Ok(T::CrossChainValidator::record_solana_v4_finalized_slot(
+                binding.cluster,
+                binding.finalized_slot,
+            ))
+        }
+
+        fn intent_matches_external_asset(
+            intent: &SettlementIntent<AccountIdOf<T>>,
+            chain: &ExternalChainId,
+            amount: u128,
+            asset_id: [u8; 32],
+        ) -> bool {
+            [&intent.asset_a, &intent.asset_b].into_iter().any(|asset| {
+                asset.chain == *chain
+                    && asset.amount == amount
+                    && Self::external_asset_id(&asset.token) == asset_id
+            })
         }
 
         /// Verify Solana transaction proof

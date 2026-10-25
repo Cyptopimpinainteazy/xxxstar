@@ -12780,6 +12780,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "hex",
  "log",
  "pallet-atomic-trade-engine",
  "pallet-balances",

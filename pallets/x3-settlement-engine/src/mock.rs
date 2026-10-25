@@ -5,12 +5,13 @@ use frame_support::{
     derive_impl, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, Get},
 };
-use sp_core::{H160, H256};
+use sp_core::{ed25519, Pair, H160, H256};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 use x3_asset_kernel_types::traits::NoEconomicHalt;
+use x3_verification_router::{SolanaCluster, SolanaStakeWeightedVerifier, SolanaValidatorStake};
 
 pub type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = frame_system::mocking::MockBlock<Test>;
@@ -51,6 +52,11 @@ impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for MockSettlementProofO
             Ok(other) => Err(other.into()),
             Err(origin) => Err(origin),
         }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(SETTLEMENT_RELAYER))
     }
 }
 
@@ -266,6 +272,25 @@ thread_local! {
 /// keep passing through the same path) while making the height observable.
 pub struct RecordingCrossChainValidator;
 
+pub fn solana_v4_test_pairs() -> Vec<ed25519::Pair> {
+    vec![
+        ed25519::Pair::from_seed(&[1u8; 32]),
+        ed25519::Pair::from_seed(&[2u8; 32]),
+    ]
+}
+
+pub fn solana_v4_test_verifier(cluster: SolanaCluster) -> SolanaStakeWeightedVerifier {
+    let mut stakes = solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| SolanaValidatorStake {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+    stakes.sort_by_key(|entry| entry.pubkey);
+    SolanaStakeWeightedVerifier::new(cluster, stakes, 2, 3, 0).expect("test Solana stake table")
+}
+
 impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
     for RecordingCrossChainValidator
 {
@@ -285,6 +310,14 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
 
     fn get_latest_svm_header_hash() -> Option<H256> {
         None
+    }
+
+    fn solana_v4_verifier(cluster: SolanaCluster) -> Option<SolanaStakeWeightedVerifier> {
+        Some(solana_v4_test_verifier(cluster))
+    }
+
+    fn record_solana_v4_finalized_slot(_cluster: SolanaCluster, _slot: u64) -> bool {
+        true
     }
 }
 

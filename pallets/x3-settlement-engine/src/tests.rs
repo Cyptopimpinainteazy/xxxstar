@@ -534,9 +534,166 @@ fn create_solana_proof() -> SettlementProof {
     }
 }
 
+fn create_solana_v4_settlement_proof(
+    expected_asset_id: [u8; 32],
+    expected_amount: u128,
+) -> SettlementProof {
+    let transaction = x3_verification_router::SolanaTransactionEvidence::from_raw(
+        42,
+        0,
+        true,
+        hex::decode(concat!(
+            "010ca9bbc1fd52fb8a2d08c512ccdb720fc3100804cb2fb8cba4bbc9ce4df7a7d0",
+            "567d96e7a21e7356e6f2b2b6d9efd725c6dd40bf4ad25dac00a27cb2dde3f509",
+            "01000001d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+            "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c00"
+        ))
+        .expect("signed transaction fixture"),
+    )
+    .expect("valid Solana transaction");
+    let envelope = x3_verification_router::ProofEnvelope {
+        proof_id: [4u8; 32],
+        strategy: x3_verification_router::VerificationStrategy::SolanaFinalizedProof,
+        source_chain: x3_verification_router::ChainKind::Solana,
+        destination_chain: x3_verification_router::ChainKind::X3,
+        payload: Vec::new(),
+        expected_asset_id,
+        expected_amount,
+        expected_sender: vec![3u8; 32],
+        expected_recipient: vec![2u8; 32],
+        expected_beneficiary: vec![1u8; 32],
+    };
+    let mut stakes = crate::mock::solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| x3_verification_router::SolanaValidatorStake {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+    stakes.sort_by_key(|entry| entry.pubkey);
+    let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
+    let message = x3_verification_router::solana_finality_message_v4(
+        x3_verification_router::SolanaCluster::Devnet,
+        42,
+        41,
+        &[7u8; 32],
+        &[6u8; 32],
+        &[5u8; 32],
+        &stake_digest,
+        &transaction,
+        &envelope,
+    )
+    .expect("V4 message");
+    let votes = crate::mock::solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| (pair.public().0, pair.sign(&message).0))
+        .collect::<Vec<_>>();
+    let finality_payload = x3_verification_router::encode_solana_finality_v4(
+        x3_verification_router::SolanaCluster::Devnet,
+        42,
+        41,
+        [7u8; 32],
+        [6u8; 32],
+        [5u8; 32],
+        stake_digest,
+        transaction.clone(),
+        &votes,
+    )
+    .expect("V4 payload");
+    let receipt_data =
+        x3_verification_router::encode_solana_settlement_evidence(&envelope, &finality_payload)
+            .expect("portable settlement evidence");
+
+    SettlementProof {
+        proof_type: ProofType::SolanaProof,
+        tx_hash: H256::from(transaction.commitment),
+        block_hash: H256::from([7u8; 32]),
+        chain_height: Some(42),
+        confirmations: 1,
+        merkle_proof: BoundedVec::default(),
+        receipt_data: receipt_data.try_into().expect("proof fits"),
+        receipt_index: Some(transaction.index),
+        trie_proof: None,
+    }
+}
+
 // ============================================================================
 // SETTLEMENT INTEGRATION TESTS
 // ============================================================================
+
+#[test]
+fn solana_v4_settlement_verifies_transaction_and_intent_economics() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(ALICE),
+            BOB,
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: 5_000,
+            },
+            AssetSpec {
+                chain: ExternalChainId::Solana,
+                token: TokenId::Native,
+                amount: 2_000,
+            },
+            H256::from([42u8; 32]),
+            Some(7_200),
+        ));
+        let intent = SettlementIntents::<Test>::iter()
+            .map(|(_, intent)| intent)
+            .find(|intent| intent.maker == ALICE)
+            .expect("intent");
+        let proof = create_solana_v4_settlement_proof([0u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &proof,
+                &intent
+            ),
+            Ok(true)
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(&ExternalChainId::Solana, &proof, &intent),
+            Ok(false),
+            "a devnet proof cannot claim the mainnet chain id"
+        );
+
+        let mut wrong_amount = proof.clone();
+        wrong_amount.receipt_data =
+            create_solana_v4_settlement_proof([0u8; 32], 1_999).receipt_data;
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_amount,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let wrong_asset = create_solana_v4_settlement_proof([1u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_asset,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let mut wrong_transaction = proof;
+        wrong_transaction.tx_hash = H256::from([99u8; 32]);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_transaction,
+                &intent
+            ),
+            Ok(false)
+        );
+    });
+}
 
 #[test]
 fn settlement_lifecycle_evm_to_evm() {

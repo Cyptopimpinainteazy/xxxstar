@@ -59,6 +59,7 @@ x3-atomic-swap = { path = "../../crates/x3-atomic-swap", default-features = fals
 # The test fixtures build a real receipts-trie proof (a leaf node and its RLP
 # envelope); the pallet itself walks them with `x3-verification-router`.
 rlp = "0.5"
+hex = "0.4"
 
 pallet-timestamp = { workspace = true }
 pallet-balances = { workspace = true }

@@ -777,6 +777,7 @@ impl RelayerService {
                         continue;
                     }
                 };
+                let runtime_intent_id = request.runtime_intent_id;
 
                 if let Ok(proof) = self.submitter.acquire_svm_proof(request).await {
                     state.pending_svm_requests.remove(&domain_id);
@@ -815,7 +816,11 @@ impl RelayerService {
                     }
 
                     // Submit proof with retries
-                    match self.submitter.submit_svm_proof(proof).await {
+                    match self
+                        .submitter
+                        .submit_svm_proof(sp_core::H256(runtime_intent_id), proof)
+                        .await
+                    {
                         Ok(tx_hash) => {
                             debug!("Submitted SVM proof: {}", tx_hash);
                             state.pending_submissions = state.pending_submissions.saturating_sub(1);

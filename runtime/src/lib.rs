@@ -3212,6 +3212,57 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
         )
     }
 
+    fn solana_v4_verifier(
+        cluster: x3_verification_router::SolanaCluster,
+    ) -> Option<x3_verification_router::SolanaStakeWeightedVerifier> {
+        let chain = match cluster {
+            x3_verification_router::SolanaCluster::MainnetBeta => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaMainnet
+            }
+            x3_verification_router::SolanaCluster::Devnet => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet
+            }
+            x3_verification_router::SolanaCluster::Testnet => return None,
+        };
+        let committee = pallet_x3_crosschain_gateway::SolanaStakeCommittees::<Runtime>::get(chain)?;
+        let stakes = committee
+            .validators
+            .iter()
+            .map(|entry| x3_verification_router::SolanaValidatorStake {
+                pubkey: entry.pubkey,
+                stake: entry.stake,
+            })
+            .collect();
+        x3_verification_router::SolanaStakeWeightedVerifier::new(
+            cluster,
+            stakes,
+            committee.threshold_numerator,
+            committee.threshold_denominator,
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain),
+        )
+        .ok()
+    }
+
+    fn record_solana_v4_finalized_slot(
+        cluster: x3_verification_router::SolanaCluster,
+        slot: u64,
+    ) -> bool {
+        let chain = match cluster {
+            x3_verification_router::SolanaCluster::MainnetBeta => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaMainnet
+            }
+            x3_verification_router::SolanaCluster::Devnet => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet
+            }
+            x3_verification_router::SolanaCluster::Testnet => return false,
+        };
+        let previous = pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain);
+        if slot > previous {
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::insert(chain, slot);
+        }
+        true
+    }
+
     fn get_latest_evm_header_hash() -> Option<H256> {
         pallet_cross_chain_validator::Pallet::<Runtime>::get_latest_evm_header_hash()
     }
@@ -3253,19 +3304,18 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
-    /// `false`: the chain refuses an SVM settlement proof, because nothing binds
-    /// its transaction to the slot header it is checked against.
+    /// `false`: the chain refuses the legacy transaction-only SVM proof shape.
     ///
     /// The EVM path no longer needs this. It walks the receipt's Merkle-Patricia
     /// path to the header's receipts root — the one implementation of that check in
     /// the workspace, in `x3-verification-router`, shared with the relayer — and
     /// refuses a proof that does not carry one, so an EVM settlement stands on an
     /// inclusion proof rather than on a copy of the header's public fields
-    /// (TICKET-063). The SVM path verifies the transaction's signature and that it
-    /// names the attested blockhash, but nothing proves the transaction is *in* that
-    /// slot, so `RuntimeCrossChainValidator` cannot bind it and the chain says so
-    /// rather than settling it. Flip this to `true` only together with a validator
-    /// that binds the SVM evidence itself.
+    /// (TICKET-063). The stake-weighted V4 settlement path is independent of this
+    /// switch: it decodes the portable evidence, verifies the raw transaction and
+    /// finalized bank under the governance committee, binds intent economics, and
+    /// advances the persisted finalized-slot floor. This flag now controls only
+    /// the legacy slot-header path, which remains refused on the live runtime.
     type AllowUnboundSvmProofs = ConstBool<false>;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type SettlementFeeBps = SettlementProtocolFeeBps;
@@ -5939,17 +5989,17 @@ mod settlement_proof_posture_tests {
     /// The EVM path binds the receipt itself now: it walks the receipt's
     /// Merkle-Patricia path to the header's receipts root (TICKET-063), so a proof
     /// without that path is refused as `Ok(false)` — a proof that is not evidence.
-    /// The SVM path has no such binding yet, so the runtime states that it cannot
-    /// verify one at all and the refusal says why; that is the flag's remaining
-    /// scope, and this test is the runtime's half of it.
+    /// The new SVM V4 path is bound by the stake-weighted transaction/bank
+    /// verifier. This test covers the legacy slot-header shape instead: the live
+    /// runtime must still refuse it unless an operator explicitly enables an
+    /// unbound validator that is not part of the mainnet posture.
     #[test]
-    fn the_chain_refuses_external_settlement_proofs_until_they_are_bound() {
+    fn the_chain_refuses_legacy_unbound_svm_settlement_proofs() {
         let svm_allowed: bool = <<Runtime as pallet_x3_settlement_engine::Config>::AllowUnboundSvmProofs
             as frame_support::traits::Get<bool>>::get();
         assert!(
             !svm_allowed,
-            "the chain runtime must state the safe value: setting it true is a claim that the \
-             configured validator binds the SVM evidence itself, and nothing in this workspace does"
+            "the live chain must keep the legacy unbound SVM path disabled"
         );
 
         // The SVM refusal happens before the proof is inspected, so a minimal
