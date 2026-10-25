@@ -6419,7 +6419,19 @@ dependencies = [
  "tracing",
  "x3-atomic-swap",
  "x3-cross-vm-bridge",
+ "x3-release-beacon",
  "zeroize",
+]
+
+[[package]]
+name = "x3-release-beacon"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -98,9 +98,15 @@ the floor check with the record append atomically, so concurrent submissions
 also cannot install an older validly signed beacon or interchangeable hashes at
 one height.
 
-Still open: the seven authority validators must publish these attestations
-through a production node/service path, and the policy keys and threshold must
-be deployed and rotated through governance.
+The authority boundary is implemented in `crates/x3-release-beacon`: a dedicated
+validator signer reads X3's finalized head and publishes an Ed25519 attestation;
+the exchange verifies configured keys, persists only valid evidence, and removes
+a validator's prior vote on same-height equivocation. The exchange does not
+assert threshold; the coordinator policy remains the final authority.
+
+Still open: deploy that path to the seven independent validators, prove it
+against the live finalized network, and perform a governance-approved key
+rotation with recorded evidence.
 
 ### S5 — Withholding — **OPEN, and unavoidable at this layer**
 

@@ -486,6 +486,12 @@ GATES_FAST=(
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
   # `test_verify_too_short_merkle_proof`); a warm run is seconds, a cold one about a minute.
   "test x3-cross-vm-bridge:cargo test -p x3-cross-vm-bridge"
+  # The coordinator verifies release beacons, but verification is only useful
+  # when the authority path can actually sign and exchange them. This gate
+  # covers the shared statement primitive, durable exchange, equivocation
+  # refusal, real HTTP round trip, finalized-head parser and signer.
+  "clippy x3-release-beacon:cargo clippy --locked -p x3-release-beacon --all-targets -- -D warnings"
+  "test x3-release-beacon:cargo test --locked -p x3-release-beacon"
   # `x3-gpu-validator-swarm` decides whether a GPU validator's attestation is acceptable, and
   # nothing ran its tests: no gate named it, and it is not a crate `FEATURE_REGISTRY.toml` cites, so
   # `registry tests are gated` did not reach it either. Its `UnifiedProof::validate()` accepted any

@@ -155,6 +155,7 @@ members = [
     "crates/x3-gateway-risk-engine",
     "crates/x3-gpu-validator-swarm",
     "crates/x3-readiness",
+    "crates/x3-release-beacon",
     "crates/x3-integration",
     "crates/x3-integration/fuzz",       # libFuzzer targets for the X3 language path (cargo fuzz, nightly)
     "crates/x3-ixl",

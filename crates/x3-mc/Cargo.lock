@@ -5267,6 +5267,7 @@ dependencies = [
  "tokio",
  "tracing",
  "x3-cross-vm-bridge",
+ "x3-release-beacon",
  "zeroize",
 ]
 
@@ -5281,6 +5282,17 @@ dependencies = [
  "serde",
  "serde_json",
  "x3-sim",
+]
+
+[[package]]
+name = "x3-release-beacon"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror",
 ]
 
 [[package]]
