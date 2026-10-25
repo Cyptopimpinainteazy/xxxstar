@@ -1116,20 +1116,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/state_machine.rs",
         "note: PR #166 returns IdempotencyConflict for mismatched evidence",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"
       ],
       "id": "X3-XCHAIN-016",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending production-gate proof"
+        "A live multi-process/network retry drill remains: the current proof is the complete coordinator crate suite, not independently operated coordinators racing against restarted production storage and RPC."
       ],
       "name": "Conflicting retry rejection",
       "paths": [
@@ -1137,29 +1137,29 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/persistence.rs",
         "note: secret hash -> owning session id",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"
       ],
       "id": "X3-XCHAIN-017",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending production-gate proof"
+        "The global ownership registry is proven in-memory and through the suite; it has not yet been exercised across independently operated production nodes with storage failover."
       ],
       "name": "Cross-session secret ownership",
       "paths": [
@@ -1167,11 +1167,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -1206,20 +1206,21 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
-        "crates/x3-atomic-swap",
-        "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains",
-        "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "crates/cross-vm-coordinator/src/lease.rs",
+        "crates/x3-atomic-swap/src/secret_release.rs",
+        "note: PR #162 prevents one proof from satisfying multiple required domains",
+        "note: 2026-10-25 coordinator suite (119 library + 41 security regressions) and x3-atomic-swap suite (719 std library tests) passed with 0 failures"
       ],
       "id": "X3-XCHAIN-019",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending merge/exact-head proof"
+        "No live multi-node release attempt has exercised fencing-epoch reuse and proof replay against production storage; the current evidence is the merged coordinator and firewall suites."
       ],
       "name": "Secret-release proof reuse rejection",
       "paths": [
@@ -1227,11 +1228,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4981,14 +4982,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "5fec5f9d60121064858dd5336e94bb20f8230fd4b0e69dae3e42c4c28407f1e4",
+    "source_digest": "f70b57f3c9cbc8d39ea5b2a1ef13c439f94dd508e4c2ff75156593eb9659aaac",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "e8c98686088768dcfc20ca998109088460b20cddd3eeea26e5e17c73a44df2a2",
+      "feature-matrix/cross-chain.toml": "dd85dea2334ca04666d38c9d954809960b8354d275c494b8e2f4e59d81a2360e",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",
@@ -5550,8 +5551,8 @@
   "summary": {
     "by_state": {
       "BROKEN": 0,
-      "COMPLETE": 10,
-      "FUNCTIONAL BUT UNHARDENED": 63,
+      "COMPLETE": 13,
+      "FUNCTIONAL BUT UNHARDENED": 60,
       "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
       "PARTIAL": 70,

@@ -6353,6 +6353,7 @@ name = "x3-atomic-swap"
 version = "0.1.0"
 dependencies = [
  "blake2",
+ "ed25519-dalek",
  "hex",
  "parity-scale-codec",
  "scale-info",

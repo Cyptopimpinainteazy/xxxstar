@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `5fec5f9d60121064…` — the artifacts move when
+Source digest: `f70b57f3c9cbc8d3…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -102,10 +102,7 @@ fails when they do not match.
 | MTX-X3-XCHAIN-013 | cross_chain | Secret-release firewall: **CLOSED 2026-10-25 — provider identities and the quorum bar are authenticated policy inputs.** `SecretReleaseRequirement` now owns both `min_providers` and the authorized Ed25519 provider keys. Each `RpcProviderObservation` carries its key… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 95% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-014 | cross_chain | Coordinator restart recovery: Needs real process/network restart drill | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 88% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-015 | cross_chain | Split-write crash recovery: Needs merge plus long-running persistence fault injection | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
-| MTX-X3-XCHAIN-016 | cross_chain | Conflicting retry rejection: Pending production-gate proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 88% (no named test list on this row) | open |
-| MTX-X3-XCHAIN-017 | cross_chain | Cross-session secret ownership: Pending production-gate proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 88% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-018 | cross_chain | Secret-release domain binding: No live external-chain proof of the binding (TICKET-095): the chain-id and VM checks are exercised against constructed evidence only | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
-| MTX-X3-XCHAIN-019 | cross_chain | Secret-release proof reuse rejection: Pending merge/exact-head proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 88% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-020 | cross_chain | Secret-release refund rejection: Pending merge/exact-head proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-021 | cross_chain | Secret-release tx/block binding: No live external-chain proof of the binding (TICKET-095): the tx/block checks are exercised against constructed evidence only | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-022 | cross_chain | Atomic swap proof ledger: Needs durable multi-validator proof retention and replay audit | unassigned | — | — | P1/high | `bash scripts/local-ci.sh` | PARTIAL · tested score 50% (no named test list on this row) | open |
@@ -213,6 +210,6 @@ fails when they do not match.
 | MTX-X3-SWARM-001 | swarm_compute | Northern Swarm on-chain pallet (stake/task/quorum/reward): Closed 2026-09-27 — a `Disputed` task no longer strands funds. `resolve_disputed_task` (call_index 8) refunds the submitter's exact reserved reward and moves the task to the new terminal `TaskStatus::Refunded`; it is permissionless because… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · tested score 78% (no named test list on this row) | open |
 | MTX-X3-SWARM-002 | swarm_compute | Northern Swarm executor: signed metadata-driven chain contract and compute backends: No live-node integration test. The watcher/encoder/signer contract is proven at its own boundary - the storage prefix is derived and stable, the map key decodes to the task id, the HTTP polling URL conversion is pinned, the signature parser… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P1/medium | `bash scripts/local-ci.sh` | PARTIAL · 13 named tests in FEATURE_REGISTRY | open |
 
-**201 open rows** (12 blocker lines on registry rows are marked CLOSED and are not
+**198 open rows** (12 blocker lines on registry rows are marked CLOSED and are not
 listed). A row disappears only when the underlying record changes - a fixed blocker removed
 from `FEATURE_REGISTRY.toml`, or a matrix row that reached `COMPLETE`.

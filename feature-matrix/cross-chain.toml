@@ -438,16 +438,26 @@ name = "Conflicting retry rejection"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
-implemented = 90
-tested = 88
-mainnet_ready = 72
+implemented = 94
+tested = 95
+mainnet_ready = 82
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): conflicting_concurrent_lock_observations_yield_one_winner_one_conflict (concurrent.rs), terminal_phase_conflicting_with_canonical_evidence_halts (recovery.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
+blockers = ["A live multi-process/network retry drill remains: the current proof is the complete coordinator crate suite, not independently operated coordinators racing against restarted production storage and RPC."]
+required_tests = [
+  "conflicting_concurrent_lock_observations_yield_one_winner_one_conflict",
+  "terminal_phase_conflicting_with_canonical_evidence_halts",
+  "identical_fast_lock_replay_is_successful_noop_but_conflict_fails",
+]
+test_paths = [
+  "crates/cross-vm-coordinator/src/concurrent.rs",
+  "crates/cross-vm-coordinator/src/recovery.rs",
+  "crates/cross-vm-coordinator/src/state_machine.rs",
+]
+evidence = ["crates/cross-vm-coordinator/src/state_machine.rs", "note: PR #166 returns IdempotencyConflict for mismatched evidence", "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"]
+test_evidence = ["note: exact tests run on 2026-10-25: conflicting_concurrent_lock_observations_yield_one_winner_one_conflict (concurrent.rs), terminal_phase_conflicting_with_canonical_evidence_halts (recovery.rs), identical_fast_lock_replay_is_successful_noop_but_conflict_fails (state_machine.rs)"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -456,16 +466,25 @@ name = "Cross-session secret ownership"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
-implemented = 90
-tested = 88
-mainnet_ready = 72
+implemented = 94
+tested = 95
+mainnet_ready = 82
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending production-gate proof"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): distributed_secret_registry_allows_same_session_retry_only (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
+blockers = ["The global ownership registry is proven in-memory and through the suite; it has not yet been exercised across independently operated production nodes with storage failover."]
+required_tests = [
+  "distributed_secret_registry_allows_same_session_retry_only",
+  "distributed_secret_replay_is_rejected_across_sessions",
+  "concurrent_distributed_secret_claim_has_single_owner",
+]
+test_paths = [
+  "crates/cross-vm-coordinator/src/lease.rs",
+  "crates/cross-vm-coordinator/src/concurrent.rs",
+]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: secret hash -> owning session id", "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"]
+test_evidence = ["note: exact tests run on 2026-10-25: distributed_secret_registry_allows_same_session_retry_only (lease.rs), distributed_secret_replay_is_rejected_across_sessions (concurrent.rs), and concurrent_distributed_secret_claim_has_single_owner (lease.rs)"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22
@@ -498,16 +517,24 @@ name = "Secret-release proof reuse rejection"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
-implemented = 90
-tested = 88
-mainnet_ready = 72
+implemented = 94
+tested = 95
+mainnet_ready = 82
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Pending merge/exact-head proof"]
-evidence = ["crates/x3-atomic-swap", "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains", "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: exact tests named on master 2026-09-22 (TICKET-101): release_does_not_reuse_fencing_epoch (lease.rs); crates/cross-vm-coordinator has 133 #[test] functions"]
+blockers = ["No live multi-node release attempt has exercised fencing-epoch reuse and proof replay against production storage; the current evidence is the merged coordinator and firewall suites."]
+required_tests = [
+  "release_does_not_reuse_fencing_epoch",
+  "rejects_reused_proof_across_required_domains",
+]
+test_paths = [
+  "crates/cross-vm-coordinator/src/lease.rs",
+  "crates/x3-atomic-swap/src/secret_release.rs",
+]
+evidence = ["crates/cross-vm-coordinator/src/lease.rs", "crates/x3-atomic-swap/src/secret_release.rs", "note: PR #162 prevents one proof from satisfying multiple required domains", "note: 2026-10-25 coordinator suite (119 library + 41 security regressions) and x3-atomic-swap suite (719 std library tests) passed with 0 failures"]
+test_evidence = ["note: exact tests run on 2026-10-25: release_does_not_reuse_fencing_epoch (coordinator lease.rs) and rejects_reused_proof_across_required_domains (x3-atomic-swap secret_release.rs)"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22

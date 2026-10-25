@@ -951,13 +951,15 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
     ) -> Result<crate::OperationAttempt, CoordinatorError> {
         self.validate(lease, now_unix)?;
         crate::OperationAttemptLedger::new(self.attempts.clone()).record_started(
-            &lease.session_id,
-            operation,
-            attempt_id,
-            &lease.owner_id,
-            lease.fence,
-            domain,
-            now_unix,
+            crate::OperationAttemptStart {
+                session_id: &lease.session_id,
+                operation,
+                attempt_id,
+                owner_id: &lease.owner_id,
+                fence: lease.fence,
+                domain,
+                started_at: now_unix,
+            },
         )
     }
 

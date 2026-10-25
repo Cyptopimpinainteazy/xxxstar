@@ -273,7 +273,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             || latest
                 .signed_extrinsic
                 .as_ref()
-                .map_or(true, Vec::is_empty)
+                .is_none_or(Vec::is_empty)
         {
             return Err(CoordinatorError::Internal(
                 "signed settlement record is missing tx id or extrinsic bytes".into(),

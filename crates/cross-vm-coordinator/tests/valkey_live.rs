@@ -1,8 +1,9 @@
 #![cfg(feature = "valkey")]
 
 use x3_cross_vm_coordinator::{
-    CoordinatorOperation, OperationAttemptLedger, OperationAttemptStatus, DistributedLeaseStore,
-    ValkeyAttemptStore, ValkeyCasStore, ValkeyLeaseAuthority, ValkeySecretRegistry,
+    CoordinatorOperation, DistributedLeaseStore, OperationAttemptLedger, OperationAttemptStart,
+    OperationAttemptStatus, ValkeyAttemptStore, ValkeyCasStore, ValkeyLeaseAuthority,
+    ValkeySecretRegistry,
 };
 
 #[cfg(feature = "canonical-proofs")]
@@ -96,15 +97,15 @@ fn live_valkey_attempt_history_survives_store_restart() {
             ValkeyAttemptStore::with_namespace(&url, &ns).unwrap(),
         );
         let started = ledger
-            .record_started(
-                "swap-ledger",
-                CoordinatorOperation::FastClaim,
-                "attempt-1",
-                "relayer-a",
-                7,
-                "ethereum",
-                100,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-ledger",
+                operation: CoordinatorOperation::FastClaim,
+                attempt_id: "attempt-1",
+                owner_id: "relayer-a",
+                fence: 7,
+                domain: "ethereum",
+                started_at: 100,
+            })
             .unwrap();
         ledger.record_broadcast(&started, "0xabc", 101).unwrap()
     };
@@ -135,29 +136,29 @@ fn live_valkey_canonical_proof_hash_cannot_be_replaced() {
     );
 
     let first = ledger
-        .record_started(
-            "swap-ledger",
-            CoordinatorOperation::SlowClaim,
-            "attempt-a",
-            "relayer-a",
-            8,
-            "solana",
-            100,
-        )
+        .record_started(OperationAttemptStart {
+            session_id: "swap-ledger",
+            operation: CoordinatorOperation::SlowClaim,
+            attempt_id: "attempt-a",
+            owner_id: "relayer-a",
+            fence: 8,
+            domain: "solana",
+            started_at: 100,
+        })
         .unwrap();
     let first = ledger.record_broadcast(&first, "sig-a", 101).unwrap();
     ledger.record_finalized(&first, [0x72; 32], 102).unwrap();
 
     let second = ledger
-        .record_started(
-            "swap-ledger",
-            CoordinatorOperation::SlowClaim,
-            "attempt-b",
-            "relayer-b",
-            9,
-            "solana",
-            103,
-        )
+        .record_started(OperationAttemptStart {
+            session_id: "swap-ledger",
+            operation: CoordinatorOperation::SlowClaim,
+            attempt_id: "attempt-b",
+            owner_id: "relayer-b",
+            fence: 9,
+            domain: "solana",
+            started_at: 103,
+        })
         .unwrap();
     let second = ledger.record_broadcast(&second, "sig-b", 104).unwrap();
     assert!(ledger.record_finalized(&second, [0x73; 32], 105).is_err());
