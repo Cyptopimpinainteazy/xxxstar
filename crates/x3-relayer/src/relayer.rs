@@ -1414,6 +1414,24 @@ mod tests {
     }
 
     #[test]
+    fn shipped_mainnet_config_parses_with_a_solana_rpc_quorum() {
+        let config: RelayerConfig =
+            serde_yaml::from_str(include_str!("../relayer-config-mainnet.yaml"))
+                .expect("mainnet relayer template parses");
+        let solana = config
+            .svm_clusters
+            .iter()
+            .find(|cluster| cluster.cluster_name == "mainnet-beta")
+            .expect("mainnet Solana cluster");
+        SvmHeaderWatcher::validate_rpc_sources(solana).expect("three distinct RPC endpoints");
+        assert!(
+            config.validator_set.svm_validator_pubkeys.is_empty()
+                && config.validator_set.svm_validator_stakes.is_empty(),
+            "the template must stay fail-closed until governance supplies the real committee"
+        );
+    }
+
+    #[test]
     fn solana_v2_stake_configuration_must_match_authorized_keys() {
         let mut config = test_config();
         config.svm_clusters[0].cluster_name = "mainnet-beta".into();

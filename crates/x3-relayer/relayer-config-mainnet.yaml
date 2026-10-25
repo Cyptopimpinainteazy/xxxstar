@@ -70,6 +70,12 @@ svm_clusters:
     # Maximum concurrent requests (higher for Solana's fast finality)
     max_concurrent_requests: 50
 
+validator_set:
+  # Mainnet must be populated from the governance-approved Solana validator
+  # committee before this template can produce a proof. Empty means fail closed.
+  svm_validator_pubkeys: []
+  svm_validator_stakes: []
+
 submission:
   # Batch size (group multiple proofs per submission)
   # Production: 5 (balance between throughput and latency)
