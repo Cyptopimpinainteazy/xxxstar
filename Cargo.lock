@@ -25837,6 +25837,7 @@ dependencies = [
  "bytemuck",
  "keccak-hash",
  "pollster",
+ "secp256k1 0.28.2",
  "sha2 0.10.9",
  "thiserror 1.0.69",
  "wgpu 0.20.1",
