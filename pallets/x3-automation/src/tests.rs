@@ -705,7 +705,6 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
     });
 }
 
-
 #[test]
 fn event_trigger_registration_is_refused_without_a_bounded_event_index() {
     new_test_ext().execute_with(|| {
