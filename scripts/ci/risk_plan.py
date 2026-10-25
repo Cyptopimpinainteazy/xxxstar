@@ -70,8 +70,8 @@ def changed_paths(base):
     _git_output("rev-parse", "--verify", "--quiet", base + "^{commit}")
     results = set()
     for args in (
-        ("diff", "--no-ext-diff", "--name-only", "-z", base + "...HEAD"),
-        ("diff", "--no-ext-diff", "--name-only", "-z", "HEAD"),
+        ("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", base + "...HEAD"),
+        ("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD"),
         ("ls-files", "--others", "--exclude-standard", "-z"),
     ):
         raw = _git_output(*args)
