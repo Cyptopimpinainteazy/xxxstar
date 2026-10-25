@@ -1,0 +1,4 @@
+{"label":"PHYSICAL","host":"x3gpu1","commit":"fc18d6bb08c9d2f9649406b5b55b01a03472f3eb","dirty":false,"collected":"2026-10-25T20:07:48Z",
+ "driver":"580.178.04",
+ "steps":[{"step":"clean_tree","pass":true},{"step":"gpu_enumeration","pass":true},{"step":"crate_gpu_tests","pass":true},{"step":"hash_parity_all_gpus","pass":true},{"step":"secp256k1_parity_vs_cpu","pass":true},{"step":"secp256k1_bench_all_gpus","pass":true}],"pass":true,
+ "not_covered":["ed25519 GPU verification (no kernel)","CUDA backend (no nvcc)"]}

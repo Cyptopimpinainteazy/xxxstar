@@ -2331,7 +2331,8 @@
       "confidence": "high",
       "evidence": [
         "GPU_VALIDATOR_HONEST_AUDIT.md",
-        "note: Honest audit explicitly forbids GPU acceleration claim without real device"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "note: physical kernels now pass CPU parity and throughput measurement, but the honest audit still forbids presenting kernel operations per second as finalized-chain TPS"
       ],
       "id": "X3-GPU-001",
       "implemented": 10,
@@ -2339,7 +2340,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 5,
       "missing_work": [
-        "No physical GPU benchmark showing finalized-TPS improvement"
+        "No benchmark crosses consensus and finality: physical hash and signature kernels are measured, but accelerator task/hash throughput is not finalized-chain TPS."
       ],
       "name": "GPU finalized-TPS proof",
       "paths": [
@@ -2445,21 +2446,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 68,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
         "crates/x3-accel-wgpu/src/lib.rs",
-        "audit-artifacts/evidence/2026-10-24-two-gpu-parity.json",
-        "note: commits f9f6e3c9f and ce73c8d10 add tests that enumerate every hardware adapter, compare SHA-256 and Keccak-256 results byte-for-byte with CPU truth, and require the reference ECDSA verdicts for a genuine signature and the same signature over another digest; the recorded runs exercised the GTX 1070 and RTX 2060 SUPER separately."
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+        "note: 2026-10-25 physical gate passed on GTX 1070 and RTX 2060 SUPER: SHA-256 and Keccak-256 matched CPU over 4,354,871 vectors per card, both results were deterministic, ordered multi-GPU merge matched CPU, and secp256k1 verdicts matched the CPU reference."
       ],
       "id": "X3-GPU-004",
-      "implemented": 80,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 55,
+      "mainnet_ready": 70,
       "missing_work": [
-        "Real two-GPU hardware parity now covers SHA-256 and Keccak-256 batch outputs, including empty, rate-boundary, and multi-block inputs, plus real secp256k1 ECDSA verdicts on both installed NVIDIA adapters. Hardware Ed25519 verification still needs device execution before this row can reach mainnet readiness."
+        "Hardware Ed25519 verification still needs a device kernel. Launch-target parity has not been repeated on the eventual validator hardware."
       ],
       "name": "GPU/CPU parity checking",
       "paths": [
@@ -2467,11 +2470,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2534,19 +2537,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 38,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable; the CPU reference and the parity contract are real as of 241e9d033"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "note: physical WGPU Keccak batch kernel executed on both installed GPUs"
       ],
       "id": "X3-GPU-007",
-      "implemented": 50,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 15,
+      "mainnet_ready": 55,
       "missing_work": [
-        "A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it returned. What is still missing is the accelerator itself \u2014 this host has no compute device, the WGPU backend reports `KernelUnavailable`, and no GPU kernel has been run for this primitive. No GPU batching throughput has been measured anywhere in this repository."
+        "The accelerator is real, but small batches are slower than CPU and no consensus caller or launch-target benchmark yet proves a net production benefit."
       ],
       "name": "GPU Keccak256 batching",
       "paths": [
@@ -2557,8 +2561,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2592,19 +2596,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 37,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: Honest audit says no production GPU secp256k1 kernel; the CPU reference and parity contract are real as of 241e9d033, the kernel is not"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+        "note: physical secp256k1 WGPU kernel and CPU reference execute on both installed GPUs"
       ],
       "id": "X3-GPU-009",
-      "implemented": 45,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 15,
+      "mainnet_ready": 60,
       "missing_work": [
-        "A `secp256k1_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with a divergent answer refused. What is still missing is the accelerator \u2014 the WGPU backend reports `KernelUnavailable`, this host has no compute device, and no GPU kernel has run for this primitive. Nothing on a chain calls this path yet either, so the parity contract currently protects a caller that does not exist."
+        "Physical secp256k1 verification now runs and matches CPU, but no chain-critical caller uses it yet and the launch target has not been re-benchmarked."
       ],
       "name": "GPU secp256k1 verification",
       "paths": [
@@ -2612,11 +2617,11 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2650,19 +2655,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 54,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel-wgpu",
-        "note: Honest audit confirms real WGSL/wgpu device code compiles"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "note: both installed GPUs executed the Vulkan/WGPU backend on 2026-10-25"
       ],
       "id": "X3-GPU-011",
-      "implemented": 70,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 40,
+      "mainnet_ready": 70,
       "missing_work": [
-        "Needs real physical GPU CI/run evidence"
+        "Physical execution is proven on this workstation, but there is no automated physical-GPU CI runner for launch hardware."
       ],
       "name": "WGPU accelerator backend",
       "paths": [
@@ -2670,28 +2676,29 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 55,
-      "tests": "tested score 55% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel-wgpu",
-        "note: Real SHA-256 compute path called out by honest audit"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "note: SHA-256 matched CPU over 4,354,871 vectors per GPU; 65,536 x 32-byte hashes measured 12.89M/s on GTX 1070 and 18.60M/s on RTX 2060 SUPER"
       ],
       "id": "X3-GPU-012",
-      "implemented": 75,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 42,
+      "mainnet_ready": 70,
       "missing_work": [
-        "No production validator GPU benchmark yet"
+        "The SHA-256 kernel is physically benchmarked, but no validator on the launch target has run this path under consensus load."
       ],
       "name": "WGPU SHA-256 compute kernel",
       "paths": [
@@ -2699,11 +2706,11 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 55,
-      "tests": "tested score 55% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4982,7 +4989,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "fcf69b85d312dc2bfcb24b20354999cd531b264e46b3a0fff761e6b4bde33596",
+    "source_digest": "d8f2bc46ffc32d5f687235ba46e5edb370b2f1bdaca0de968d9fac9365f0d9c2",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
@@ -4992,7 +4999,7 @@
       "feature-matrix/cross-chain.toml": "880ae98763f6d5e91b3914a8f261df40e9619cedca2db037c86e1b2aa5aebc43",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",
+      "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",
       "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "09d1bd89a8066adf336cfef1632f28add490ea5b087e6fe6c3f1eab85b9090f8",
@@ -5552,11 +5559,11 @@
     "by_state": {
       "BROKEN": 0,
       "COMPLETE": 13,
-      "FUNCTIONAL BUT UNHARDENED": 60,
+      "FUNCTIONAL BUT UNHARDENED": 64,
       "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
-      "PARTIAL": 70,
-      "STUB": 1
+      "PARTIAL": 67,
+      "STUB": 0
     },
     "matrix_features": 153,
     "registry_features": 23,
