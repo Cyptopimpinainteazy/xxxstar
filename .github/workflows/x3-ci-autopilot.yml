@@ -85,7 +85,12 @@ jobs:
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
           python3 -m json.tool "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
       - name: Preserve diagnostic evidence
+        id: diagnostic_upload
         if: always()
+        # This is a non-signoff diagnostic workflow, and the account has
+        # exhausted Actions artifact storage. Preserve the loss as an explicit
+        # warning instead of misclassifying successful diagnostic tests.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: x3-ci-autopilot-${{ github.run_id }}-${{ github.run_attempt }}
@@ -96,3 +101,13 @@ jobs:
             ${{ runner.temp }}/x3-github-evidence.json
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Report missing diagnostic evidence
+        if: always() && steps.diagnostic_upload.outcome != 'success'
+        run: |
+          echo "::warning title=Autopilot evidence not exported::GitHub Actions artifact storage is unavailable. Review runner-local evidence. This workflow never certifies production."
+          {
+            echo "### CI Autopilot diagnostic evidence"
+            echo "Artifact export failed or was skipped; no uploaded evidence is available for this run."
+            echo "This diagnostic workflow is not a required full CI, testnet, or mainnet certification."
+          } >> "$GITHUB_STEP_SUMMARY"
