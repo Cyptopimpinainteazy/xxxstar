@@ -2,6 +2,11 @@ name: X3 CI Autopilot Foundation
 
 on:
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Optional PR to collect read-only GitHub Actions metadata from'
+        required: false
+        type: string
   pull_request:
     branches: [master]
     paths:
@@ -15,6 +20,8 @@ on:
       - 'scripts/ci/test_integration_audit.py'
       - 'scripts/ci/integration_e2e.py'
       - 'scripts/ci/test_integration_e2e.py'
+      - 'scripts/ci/github_evidence.py'
+      - 'scripts/ci/test_github_evidence.py'
       - '.github/workflows/pr-agent.yml'
       - '.github/workflows/pr-agent-auto.yml'
       - '.pr_agent.toml'
@@ -24,6 +31,8 @@ on:
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
   autopilot-tests:
@@ -45,6 +54,16 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/ci -p test_integration_e2e.py -v
           python3 scripts/ci/integration_e2e.py --output "$RUNNER_TEMP/x3-integration-synthetic.json"
+      - name: Verify GitHub metadata adapter (fake API; no token)
+        run: python3 -m unittest discover -s scripts/ci -p test_github_evidence.py -v
+      - name: Collect live PR evidence (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'PR number must be numeric' >&2; exit 2; }
+          python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
@@ -58,5 +77,6 @@ jobs:
             ${{ runner.temp }}/x3-ci-autopilot.json
             ${{ runner.temp }}/x3-integration-audit.json
             ${{ runner.temp }}/x3-integration-synthetic.json
+            ${{ runner.temp }}/x3-github-evidence.json
           if-no-files-found: warn
           retention-days: 14
