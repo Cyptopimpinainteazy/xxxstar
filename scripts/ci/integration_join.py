@@ -46,7 +46,8 @@ def join(github, review):
            not isinstance(c.get("run_attempt"), int) or
            c["run_attempt"] < 1 for c in checks):
         problems.append("job metadata incomplete")
-    result = assess({"pr": {"head_sha": head}, "checks": checks, "findings": findings})
+    safe_checks = [c for c in checks if isinstance(c, dict)]
+    result = assess({"pr": {"head_sha": head}, "checks": safe_checks, "findings": findings})
     problems.extend(result["reasons"])
     return {
         "schema_version": 1, "head_sha": head,
