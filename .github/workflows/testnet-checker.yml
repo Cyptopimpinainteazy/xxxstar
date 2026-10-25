@@ -1,0 +1,19 @@
+name: X3 Testnet Checker Unit Tests
+on:
+  pull_request:
+    paths:
+      - 'tests/testnet/**'
+      - '.github/workflows/testnet-checker.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checker-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax validation
+        run: python3 -m py_compile tests/testnet/check_seven_validators.py tests/testnet/test_checker.py
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests/testnet -p 'test_*.py' -v
