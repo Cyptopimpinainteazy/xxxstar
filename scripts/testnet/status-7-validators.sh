@@ -92,7 +92,7 @@ for i in $(seq 0 $((COUNT - 1))); do
     -d '{"jsonrpc":"2.0","id":1,"method":"chain_getBlockHash","params":[]}' \
     "$url" || true)
 
-  NODE="$node" PORT="$port" HEALTH="$health" HEADER="$header" HASH="$hash" python - <<'PY'
+  NODE="$node" PORT="$port" HEALTH="$health" HEADER="$header" HASH="$hash" python3 - <<'PY'
 import json
 import os
 import sys
@@ -174,7 +174,7 @@ peer_check() {
         ok=0
         continue
       fi
-      MIN_PEERS="$MIN_PEERS" HEALTH="$health" python - <<'PY'
+      MIN_PEERS="$MIN_PEERS" HEALTH="$health" python3 - <<'PY'
 import json
 import os
 import sys
@@ -230,7 +230,7 @@ finality_check() {
     sample2+=("${finalized_hash}|||${header}")
   done
 
-  SAMPLE1="${sample1[*]}" SAMPLE2="${sample2[*]}" MAX_LAG="$max_lag_blocks" BASE_RPC_PORT="$BASE_RPC_PORT" python - <<'PY'
+  SAMPLE1="${sample1[*]}" SAMPLE2="${sample2[*]}" MAX_LAG="$max_lag_blocks" BASE_RPC_PORT="$BASE_RPC_PORT" python3 - <<'PY'
 import json
 import os
 import sys
