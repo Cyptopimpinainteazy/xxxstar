@@ -37,7 +37,7 @@ def gather(repo, number, token, fetch=get_json, max_pages=5):
     sha = (pr.get("head") or {}).get("sha")
     if not isinstance(sha, str) or not SHA.fullmatch(sha):
         raise ValueError("PR head is not a full commit SHA")
-    if (pr.get("base") or {}).get("repo", {}).get("full_name") not in (None, repo):
+    if (pr.get("base") or {}).get("repo", {}).get("full_name") != repo:
         raise ValueError("PR does not target requested repository")
     runs = []
     for page in range(1, max_pages + 1):
@@ -71,10 +71,17 @@ def gather(repo, number, token, fetch=get_json, max_pages=5):
                            "run_attempt": run["run_attempt"], "status": "unknown",
                            "conclusion": None, "evidence_state": "NO_JOBS"})
         for job in jobs:
+            if job.get("head_sha") not in (None, sha):
+                raise ValueError("job head differs from captured PR head")
             checks.append({"head_sha": sha, "name": job.get("name"),
                            "workflow_run_id": run["id"], "run_attempt": run["run_attempt"],
                            "job_id": job.get("id"), "status": job.get("status"),
                            "conclusion": job.get("conclusion"), "evidence_state": "OBSERVED"})
+    # Head identity is mutable during pagination; a second read is mandatory.
+    # A report captured during a force push cannot be used as exact-head evidence.
+    latest = fetch(f"repos/{repo}/pulls/{number}", token)
+    if (latest.get("head") or {}).get("sha") != sha:
+        raise ValueError("PR head changed during collection")
     return {
         "schema_version": 1, "source": "GITHUB_ACTIONS_METADATA",
         "pr": {"number": number, "head_sha": sha},
