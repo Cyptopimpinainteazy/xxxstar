@@ -1456,7 +1456,7 @@ mod tests {
     }
 
     #[test]
-    fn pending_withdrawals_reserve_vault_utxos() {
+    fn pending_withdrawals_reserve_spendable_capacity() {
         let (mut vault, _) = vault_with_spendable_utxo();
         vault
             .submit_withdrawal([1u8; 32], vec![0x03], 6_000_000, vec![1], 0)

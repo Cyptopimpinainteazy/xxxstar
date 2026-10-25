@@ -18,7 +18,7 @@ blockers = [
   "A chain can be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) — and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
   "The sender runs unattended (`push-headers.mjs --loop --cursor …`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
   "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks — which alternate `nBits` mid-epoch after a twenty-minute gap — are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
-  "The vault now verifies an injected X3 proof authority, reserves UTXOs, enforces cumulative daily limits, and requires a threshold of distinct secp256k1 signer approvals bound to the exact withdrawal payload. The runtime/pallet path still has no withdrawal-request or release dispatchables, so the live bridge cannot yet exercise this vault flow.",
+  "The vault now verifies an injected X3 proof authority, reserves aggregate spendable capacity, enforces cumulative daily limits, and requires a threshold of distinct secp256k1 signer approvals bound to the exact withdrawal payload. Transaction-level outpoint locking and the runtime/pallet withdrawal-release path remain open, so the live bridge cannot yet exercise this vault flow.",
   "BTC mainnet disabled by feature flag; no external audit",
 ]
 # `crates/x3-gateway` used to be this row's only path. It is the REST/GraphQL API
@@ -34,7 +34,7 @@ required_tests = [
   "withdrawal_x3_proof_must_verify_before_signer_approval",
   "withdrawal_requires_distinct_verified_signer_threshold",
   "withdrawal_approval_is_bound_to_the_exact_payload",
-  "pending_withdrawals_reserve_vault_utxos",
+  "pending_withdrawals_reserve_spendable_capacity",
   "daily_withdrawal_limit_accumulates_and_resets_only_forward",
 ]
 registry_feature = "btc_fortress_gateway"
