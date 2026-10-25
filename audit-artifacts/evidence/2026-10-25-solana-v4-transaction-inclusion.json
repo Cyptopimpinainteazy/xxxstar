@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "c45a9d7e4",
+  "candidate_commit": "e98dcec3c",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "Solana finalized transaction inclusion and bank-state evidence",
@@ -28,7 +28,7 @@
     {
       "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --no-fail-fast",
       "result": "PASS",
-      "tests_passed": 80,
+      "tests_passed": 81,
       "tests_failed": 0
     },
     {
@@ -73,6 +73,7 @@
     "An RPC transaction whose slot, blockhash, signature index, execution status, or serialized signature disagrees with the claim is refused.",
     "A mainnet configuration with fewer than three distinct RPC endpoints is refused before any proof can be produced.",
     "Duplicate or empty RPC endpoints cannot inflate the configured mainnet provider count.",
+    "The shipped mainnet YAML parses into RelayerConfig with three distinct RPC endpoints and empty validator authorities until governance supplies them.",
     "Finality uses the RPC finalized commitment; changing the configured age threshold cannot turn an unfinalized slot into a finalized one.",
     "Provider observations that do not reach the two-thirds agreement threshold are refused."
   ],
