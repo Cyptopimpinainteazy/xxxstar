@@ -1,0 +1,57 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "4e320e9b9",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "scope": "settlement-engine external proof submission authority",
+  "issue_fixed": "The settlement engine accepted external proofs only from an intent's maker or taker, so the governance-managed Settlement gateway could verify and finalize external state but could not submit the proof that advances the intent.",
+  "implementation": [
+    "Add SettlementProofOrigin to the settlement-engine Config.",
+    "Wire the runtime to the existing storage-backed EnsureSettlementGateway origin.",
+    "Accept an intent party or the authorized proof origin for submit_proof, submit_cross_domain_proof_set, and submit_btc_proof.",
+    "Keep claim_settlement and refund_settlement restricted to the intent parties.",
+    "Charge one additional database read for proof-origin authorization."
+  ],
+  "verification": [
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p pallet-x3-settlement-engine --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 237,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-chain-runtime --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 94,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p pallet-x3-settlement-engine -p x3-chain-runtime --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/feature_matrix.py validate",
+      "result": "PASS",
+      "features": 153,
+      "warnings": 41
+    },
+    {
+      "command": "python3 scripts/x3_audit_matrix.py --check",
+      "result": "PASS"
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "An ordinary signed third party cannot submit an EVM proof.",
+    "An ordinary signed third party cannot submit a BTC proof.",
+    "The authorized settlement relayer can submit an EVM proof and cross-domain proof set.",
+    "The authorized settlement relayer cannot claim an intent leg.",
+    "The authorized settlement relayer cannot refund an intent.",
+    "An authorized relayer reaches BTC proof verification and is refused for the unanchored header, rather than being refused for origin."
+  ],
+  "limitations": [
+    "This establishes the chain-side authority and custody boundary. The relayer executable still does not bind a runtime intent id into queued evidence or submit the typed runtime extrinsic.",
+    "No live Sepolia, Solana devnet, or Bitcoin testnet transaction was submitted.",
+    "The governance-managed Settlement gateway remains a chain-configured trust boundary and has not yet completed external audit."
+  ]
+}
