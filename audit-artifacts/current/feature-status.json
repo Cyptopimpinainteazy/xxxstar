@@ -4980,7 +4980,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cc6e1b36b672a1e116de14cbccaf8d8adf959a9f708f493809f2695d3edf47ec",
+    "source_digest": "b044bb9149cdbb65fc9e864603a397f2bb3175946716a5a3c2bfc9d8f0d09f49",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
