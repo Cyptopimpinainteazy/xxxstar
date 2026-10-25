@@ -13,7 +13,7 @@ def rpc(url, method, timeout, params=None):
     with urllib.request.urlopen(req, timeout=timeout) as response:
         result = json.load(response)
     if not isinstance(result, dict) or result.get("error") is not None or result.get("result") is None:
-        raise RuntimeError(f"{method}: {result.get('error', 'missing result')}")
+        raise RuntimeError(f"{method}: {result.get('error', 'missing result') if isinstance(result, dict) else 'invalid response'}")
     return result["result"]
 
 def snapshot(url, timeout):
@@ -25,7 +25,7 @@ def snapshot(url, timeout):
     req = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "chain_getHeader", "params": [finalized_hash]}).encode()
     with urllib.request.urlopen(urllib.request.Request(url, data=req, headers={"Content-Type": "application/json"}), timeout=timeout) as response:
         body = json.load(response)
-    if "error" in body or not isinstance(body.get("result"), dict):
+    if not isinstance(body, dict) or body.get("error") is not None or not isinstance(body.get("result"), dict):
         raise RuntimeError("finalized header unavailable")
     genesis_hash = rpc(url, "chain_getBlockHash", timeout, [0])
     return {
