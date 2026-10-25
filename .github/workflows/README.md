@@ -12,9 +12,9 @@ The gate of record for this repository is **local CI**, not GitHub-hosted Action
 
 ## Automatic GitHub Actions policy
 
-Automatic `pull_request` / `push` hosted CI is intentionally disabled. GitHub-hosted jobs on this account terminate before executing any steps, so they produce red checks without verification and drown out real failures.
+Automatic GitHub-**hosted** CI is disabled because these jobs terminate before executing test steps. The trusted `local-ci.yml` workflow instead runs on self-hosted runners for master pushes and same-repository PRs; forks are excluded explicitly.
 
-Do **not** move untrusted pull-request code onto a self-hosted runner. PR-time verification happens on the author's machine through the pre-push hook before the branch is pushed.
+Draft PRs run a lightweight, non-signoff preflight. When a PR is marked ready for review, the exact-head full local CI suite runs and publishes the required `x3/local-ci` status. Pre-push focused checks on low-risk files cannot satisfy that requirement. Do **not** run untrusted fork code on self-hosted runners.
 
 ## Local gate modes
 
