@@ -1,0 +1,81 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "5fca08b3d",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "scope": "Solana finalized transaction inclusion and bank-state evidence",
+  "issue_fixed": "The V3 proof signed a finalized blockhash and bank hash but did not carry a transaction. The verifier therefore could not establish that the value transfer existed in the finalized bank.",
+  "implementation": [
+    "Define SOLANA_FINALIZED_FORMAT_V4 and bind finalized slot, parent slot, blockhash, bank hash, parent bank hash, stake-table digest, transaction slot, index, success status, exact serialized transaction, and transfer intent into one validator-signed message.",
+    "Parse the serialized Solana transaction, enforce packet and shortvec bounds, verify its Ed25519 fee-payer signature, and derive its signature, recent blockhash, and domain-separated raw-transaction commitment.",
+    "Reject V3 bank-only proof payloads and any V4 payload whose derived transaction fields disagree with the bytes.",
+    "Require an RPC-derived transaction on the proof queue path rather than accepting caller-supplied conclusions.",
+    "Query getTransaction and getBlock with finalized commitment and require the transaction signature, slot, blockhash, index, and successful execution status to agree.",
+    "Require at least three distinct Solana RPC endpoints for mainnet and a two-thirds provider quorum reporting identical evidence.",
+    "Carry the signed transaction evidence through relayer proof hashing, validator quorum verification, settlement verification, and gateway benchmarks."
+  ],
+  "verification": [
+    {
+      "command": "cargo test -p x3-verification-router --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 70,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 78,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo test -p pallet-x3-crosschain-gateway --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 66,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo test -p pallet-x3-crosschain-gateway --features runtime-benchmarks --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 79,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo clippy -p x3-verification-router --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-relayer --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "cargo clippy -p pallet-x3-crosschain-gateway --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check -p x3-relayer --no-default-features",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check -p x3-chain-runtime",
+      "result": "PASS"
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "A V3 bank-only payload is refused even when its version byte and length are otherwise plausible.",
+    "A failed transaction is refused before its votes are counted.",
+    "Transaction evidence from a slot other than the finalized slot is refused.",
+    "Zero transaction signature, commitment, or recent blockhash identities are refused.",
+    "A changed serialized-transaction signature or commitment is refused.",
+    "An RPC transaction whose slot, blockhash, signature index, execution status, or serialized signature disagrees with the claim is refused.",
+    "A mainnet configuration with fewer than three distinct RPC endpoints is refused before any proof can be produced.",
+    "Provider observations that do not reach the two-thirds agreement threshold are refused."
+  ],
+  "limitations": [
+    "No live request was made to Solana devnet or mainnet-beta in this evidence run; the HTTP path is exercised against a local JSON-RPC fixture.",
+    "The configured endpoints are required to be distinct URLs, but provider ownership diversity remains an operator attestation.",
+    "There is still no production vote-exchange transport for collecting independent validator signatures.",
+    "The standalone relayer executable has not yet been replaced by RelayerService.",
+    "The settlement-engine SVM submission adapter remains disabled."
+  ]
+}
