@@ -535,6 +535,7 @@ fn create_solana_proof() -> SettlementProof {
 }
 
 fn create_solana_v4_settlement_proof(
+    proof_id: [u8; 32],
     expected_asset_id: [u8; 32],
     expected_amount: u128,
 ) -> SettlementProof {
@@ -552,7 +553,7 @@ fn create_solana_v4_settlement_proof(
     )
     .expect("valid Solana transaction");
     let envelope = x3_verification_router::ProofEnvelope {
-        proof_id: [4u8; 32],
+        proof_id,
         strategy: x3_verification_router::VerificationStrategy::SolanaFinalizedProof,
         source_chain: x3_verification_router::ChainKind::Solana,
         destination_chain: x3_verification_router::ChainKind::X3,
@@ -641,11 +642,10 @@ fn solana_v4_settlement_verifies_transaction_and_intent_economics() {
             H256::from([42u8; 32]),
             Some(7_200),
         ));
-        let intent = SettlementIntents::<Test>::iter()
-            .map(|(_, intent)| intent)
-            .find(|intent| intent.maker == ALICE)
+        let (intent_id, intent) = SettlementIntents::<Test>::iter()
+            .find(|(_, intent)| intent.maker == ALICE)
             .expect("intent");
-        let proof = create_solana_v4_settlement_proof([0u8; 32], 2_000);
+        let proof = create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [0u8; 32], 2_000);
         assert_eq!(
             Pallet::<Test>::verify_svm_proof_for_intent(
                 &ExternalChainId::SolanaDevnet,
@@ -662,7 +662,8 @@ fn solana_v4_settlement_verifies_transaction_and_intent_economics() {
 
         let mut wrong_amount = proof.clone();
         wrong_amount.receipt_data =
-            create_solana_v4_settlement_proof([0u8; 32], 1_999).receipt_data;
+            create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [0u8; 32], 1_999)
+                .receipt_data;
         assert_eq!(
             Pallet::<Test>::verify_svm_proof_for_intent(
                 &ExternalChainId::SolanaDevnet,
@@ -672,11 +673,22 @@ fn solana_v4_settlement_verifies_transaction_and_intent_economics() {
             Ok(false)
         );
 
-        let wrong_asset = create_solana_v4_settlement_proof([1u8; 32], 2_000);
+        let wrong_asset =
+            create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [1u8; 32], 2_000);
         assert_eq!(
             Pallet::<Test>::verify_svm_proof_for_intent(
                 &ExternalChainId::SolanaDevnet,
                 &wrong_asset,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let wrong_intent = create_solana_v4_settlement_proof([0x55u8; 32], [0u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_intent,
                 &intent
             ),
             Ok(false)

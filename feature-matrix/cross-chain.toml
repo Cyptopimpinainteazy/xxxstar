@@ -65,10 +65,10 @@ id = "X3-XCHAIN-003"
 name = "Relayer framework"
 subsystem = "cross_chain"
 source = "master"
-paths = ["crates/x3-relayer/src/main.rs", "crates/x3-relayer/src/types.rs", "crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/quorum.rs", "crates/x3-relayer/src/watchers", "crates/x3-verification-router/src/solana_finality.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "crates/x3-gateway/src/rest.rs", "pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-settlement-engine/src/lib.rs", "pallets/x3-settlement-engine/src/tests.rs", "runtime/src/tests.rs"]
-implemented = 85
-tested = 80
-mainnet_ready = 25
+paths = ["crates/x3-relayer/src/main.rs", "crates/x3-relayer/src/types.rs", "crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/relayer.rs", "crates/x3-relayer/src/quorum.rs", "crates/x3-relayer/src/vote_exchange.rs", "crates/x3-relayer/src/watchers", "crates/x3-verification-router/src/solana_finality.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "crates/x3-gateway/src/rest.rs", "pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-settlement-engine/src/lib.rs", "pallets/x3-settlement-engine/src/tests.rs", "runtime/src/tests.rs"]
+implemented = 90
+tested = 85
+mainnet_ready = 30
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -78,7 +78,7 @@ blockers = [
   "**CLOSED 2026-10-25 — Solana V4 proves transaction inclusion and bank state together.** V4 carries the raw serialized transaction, transaction slot/index, success status, recent blockhash, raw-transaction commitment, final blockhash, bank hash, parent bank hash, stake-table digest, and transfer intent under the same stake-weighted validator signatures. The verifier parses the transaction, enforces raw packet/shortvec bounds, verifies the fee-payer Ed25519 signature, derives the signature and commitment from the bytes, and rejects V3 bank-only payloads. The watcher now polls finalized commitment rather than inferring finality from slot age. The proof queue independently calls finalized `getTransaction` and `getBlock`; mainnet startup requires at least three distinct non-empty RPC endpoints and proof production requires a two-thirds provider quorum reporting identical evidence. The shipped mainnet YAML is parsed by a regression test and keeps its validator committee empty until governance supplies it. The gateway proof-summary wire contract requires and parses the raw transaction before summarizing a proof. Measured with 70 verification-router tests, 75 relayer library tests plus 6 executable tests, 66 gateway-pallet tests, 79 gateway-pallet benchmark-feature tests, and real HTTP plus malformed-transaction tests in `x3-gateway`; strict clippy passes across all affected crates.",
   "**CLOSED 2026-10-25 — the EVM and Solana typed submission paths exist.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` carries the runtime intent id, converts a receipt proof into the exact settlement type, signs the runtime-monomorphized extrinsic, and submits it through `author_submitExtrinsic`. `RpcSubmitter::submit_svm_proof` now does the same for portable Solana V4 evidence. The settlement engine decodes the V4 transaction/bank package, compares its slot, blockhash, transaction index, and commitment with the enclosing proof, binds its chain, asset, and amount to an intent leg, obtains the governance-configured stake verifier through the runtime, and persists the accepted finalized-slot floor. The signer account must match the configured relayer account. The legacy executable still refuses EVM deposit/release and its old SVM route.",
   "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
-  "No production vote-exchange transport: the library accepts and verifies independently signed V4 votes, but there is no deployed relayer/validator message bus that collects them from separate operators.",
+  "The durable Solana vote exchange is implemented and exercised over real HTTP, including persistence, reload verification, equivocation, independent aggregation, and runtime-intent binding, but it has not been deployed as separately operated validator and aggregator services and no public-chain quorum has used it.",
   "All nine `pallet-cross-chain-validator` dispatchables now have executable `runtime-benchmarks` cases, including the beacon checkpoint, sync-committee update, and execution proof over the repository's real Ethereum fixtures; the benchmark test suite passes 36/36. The cross-chain-gateway deposit/release benchmarks use a real two-validator Solana V4 transaction-and-bank proof, and the gateway benchmark suite passes 79/79. The settlement benchmark suite now passes 247/247 after its BTC setup was corrected to populate a contiguous best chain at the configured confirmation depth. Weight regeneration is still blocked on this host by insufficient release-benchmark build capacity.",
   "`crates/x3-relayer/src/main.rs` is still a separate monolith with its own config and does not use the V2 `RelayerService`. Its legacy EVM deposit/release and old SVM settlement paths fail closed, while the library now has real typed EVM and Solana submission paths; the executable still needs to be replaced by the library service before mainnet.",
 ]
@@ -86,9 +86,10 @@ blockers = [
 # implementation used by the node-side swap tests. The production relayer is the
 # `x3-relayer` crate; this points at it now, and at the crates that actually verify
 # attestation quorum.
-evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/types.rs", "crates/x3-relayer/src/watchers/evm.rs", "crates/x3-relayer/src/watchers/svm.rs", "crates/x3-verification-router/src/solana_finality.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "audit-artifacts/evidence/2026-10-25-solana-v3-blockhash-bank-hash.json", "audit-artifacts/evidence/2026-10-25-solana-v4-transaction-inclusion.json", "audit-artifacts/evidence/2026-10-25-solana-v4-settlement-submission.json", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "audit-artifacts/evidence/2026-10-25-evm-settlement-submission.json", "note: watchers produce receipt or V4 evidence from chain data; the library converts and signs the exact settlement proof, and the settlement engine rebinds transaction/finality identifiers to the intent economics before execution"]
+evidence = ["crates/x3-relayer/src/submitter.rs", "crates/x3-relayer/src/types.rs", "crates/x3-relayer/src/vote_exchange.rs", "crates/x3-relayer/src/watchers/evm.rs", "crates/x3-relayer/src/watchers/svm.rs", "crates/x3-verification-router/src/solana_finality.rs", "crates/x3-validator-attestation/src/lib.rs", "crates/x3-bridge/src/cross_chain_proofs.rs", "audit-artifacts/evidence/2026-10-25-solana-v3-blockhash-bank-hash.json", "audit-artifacts/evidence/2026-10-25-solana-v4-transaction-inclusion.json", "audit-artifacts/evidence/2026-10-25-solana-v4-settlement-submission.json", "audit-artifacts/evidence/2026-10-25-solana-durable-vote-exchange.json", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "audit-artifacts/evidence/2026-10-25-evm-settlement-submission.json", "note: watchers produce receipt or V4 evidence from chain data; the library converts and signs the exact settlement proof, the vote exchange collects independent validator signatures, and the settlement engine rebinds transaction/finality identifiers and the signed proof id to the intent economics before execution"]
 test_evidence = [
   "crates/x3-relayer/src/submitter.rs",
+  "crates/x3-relayer/src/vote_exchange.rs",
   "crates/x3-relayer/src/quorum.rs",
   "crates/x3-relayer/src/main.rs",
   "crates/x3-relayer/src/watchers/svm.rs",
@@ -98,6 +99,7 @@ test_evidence = [
   "audit-artifacts/evidence/2026-10-25-solana-v3-blockhash-bank-hash.json",
   "audit-artifacts/evidence/2026-10-25-solana-v4-transaction-inclusion.json",
   "audit-artifacts/evidence/2026-10-25-solana-v4-settlement-submission.json",
+  "audit-artifacts/evidence/2026-10-25-solana-durable-vote-exchange.json",
   "note: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed, 0 failed (re-run by the primary agent on the pushed commit); `cargo clippy -p x3-relayer -p x3-validator-attestation --all-targets -- -D warnings` clean; the crate still builds `--no-default-features`",
   "note: 2026-10-25 EVM settlement submission measured with `SKIP_WASM_BUILD=1 cargo test -p x3-relayer --lib` -> 69 passed, including portable-proof-to-runtime conversion, zero-intent refusal, signer-account binding, chain-domain mapping, and a real HTTP `author_submitExtrinsic` round trip; strict clippy passes",
   "note: 2026-10-25 legacy event-only relay refusal measured with `SKIP_WASM_BUILD=1 cargo test -p x3-relayer --bin x3-relayer` -> 6 passed; both deposit and release errors name receipt-inclusion evidence and the typed RelayerService path",
@@ -105,6 +107,7 @@ test_evidence = [
   "note: 2026-10-25 Solana V4 measured with `cargo test -p x3-verification-router --lib` -> 70 passed, `SKIP_WASM_BUILD=1 cargo test -p x3-relayer` -> 75 library and 6 executable tests passed, gateway default -> 66 and benchmark-feature -> 79 passed, and strict clippy passed for all affected crates; the JSON-RPC fixture proves finalized slot, blockhash, signature-index, success, raw transaction, recent-blockhash, and fee-payer-signature binding",
   "note: 2026-10-25 gateway boundary measured with `cargo check -p x3-gateway --all-targets --locked` -> PASS, the real HTTP proof-summary test -> PASS, the malformed transaction evidence test -> PASS, and strict `cargo clippy -p x3-gateway --all-targets -- -D warnings` -> PASS",
   "note: 2026-10-25 Solana settlement submission measured with 238 default settlement-engine tests and 247 runtime-benchmark-feature tests, 76 relayer library plus 6 executable tests, 95 runtime tests, and 71 verification-router tests; strict clippy passed for all four affected packages and the relayer still checks with no default features",
+  "note: 2026-10-25 durable vote exchange measured with 81 relayer library tests and 6 executable tests, 238 default and 247 benchmark-feature settlement tests, and 95 runtime tests; the HTTP aggregation test assembles a three-signature Solana proof from two independent published votes plus the submitter's own vote, persistence is file-and-directory synced, a reopened store rejects duplicate proofs and inconsistent digest history, and strict clippy, formatting, and the relayer no-default-features check pass",
   "note: measured load-bearing - removing the policy check makes `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` accept a one-of-three proof; restoring it returns 9/9. Proof runs under `.ai/runlogs/round8-relayer-quorum-20260926T202731Z/`",
 ]
 required_tests = [
@@ -135,6 +138,12 @@ required_tests = [
   "svm_settlement_refuses_missing_intent_and_runtime_signer",
   "solana_v4_settlement_verifies_transaction_and_intent_economics",
   "runtime_solana_v4_verifier_uses_the_gateway_committee",
+  "durable_quorum_rejects_equivocation_and_reloads",
+  "real_http_client_publishes_and_queries_votes",
+  "http_vote_exchange_assembles_a_real_svm_quorum",
+  "unauthorized_and_bad_signatures_are_refused",
+  "store_refuses_duplicate_proofs_and_unrecorded_equivocation",
+  "svm_settlement_refuses_missing_intent_and_runtime_signer",
 ]
 
 [[feature]]

@@ -2917,6 +2917,9 @@ pub mod pallet {
             let evidence =
                 x3_verification_router::decode_solana_settlement_evidence(&proof.receipt_data)
                     .map_err(|_| Error::<T>::InvalidProof)?;
+            if evidence.proof.proof_id != intent.intent_id.to_fixed_bytes() {
+                return Ok(false);
+            }
             let binding =
                 x3_verification_router::solana_v4_finality_binding(&evidence.finality_payload)
                     .map_err(|_| Error::<T>::InvalidProof)?;

@@ -356,6 +356,12 @@ impl RpcSubmitter {
                 reason: "runtime intent id must not be zero".to_string(),
             });
         }
+        if proof.proof_id != runtime_intent_id.0 {
+            return Err(SubmitterError::InvalidRuntimeProof {
+                leg: "svm",
+                reason: "signed proof id must equal the runtime intent id".to_string(),
+            });
+        }
         let chain = match proof.cluster {
             SolanaCluster::MainnetBeta => ExternalChainId::Solana,
             SolanaCluster::Devnet => ExternalChainId::SolanaDevnet,
@@ -824,7 +830,7 @@ mod tests {
         SvmProofRequest {
             runtime_intent_id: [0x30u8; 32],
             source_domain: 200,
-            proof_id: [0x31u8; 32],
+            proof_id: [0x30u8; 32],
             cluster: TEST_CLUSTER,
             slot: 42,
             parent_slot: 41,
@@ -979,6 +985,19 @@ mod tests {
             SubmitterError::InvalidRuntimeProof { leg: "svm", .. }
         ));
 
+        let mut mismatched = proof.clone();
+        mismatched.proof_id = [0x12u8; 32];
+        let error = submitter
+            .submit_svm_proof(sp_core::H256::repeat_byte(0x11), mismatched)
+            .await
+            .expect_err("proof id must match the runtime intent");
+        assert!(matches!(
+            error,
+            SubmitterError::InvalidRuntimeProof { leg: "svm", .. }
+        ));
+
+        let mut proof = proof;
+        proof.proof_id = [0x11u8; 32];
         let error = submitter
             .submit_svm_proof(sp_core::H256::repeat_byte(0x11), proof)
             .await
@@ -1261,6 +1280,67 @@ mod tests {
             .expect("two independent votes meet a two-thirds stake threshold");
         assert_eq!(proof.validator_signatures.len(), 2);
         assert!(proof.encoded_envelope().is_ok());
+    }
+
+    #[tokio::test]
+    async fn http_vote_exchange_assembles_a_real_svm_quorum() {
+        use crate::vote_exchange::{
+            serve_vote_exchange, sign_vote, SolanaVoteEvidence, VoteExchange, VoteExchangeClient,
+        };
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static NEXT_FILE: AtomicU64 = AtomicU64::new(1);
+
+        let validators = [
+            RpcSubmitter::key_from_seed("http vote exchange validator one"),
+            RpcSubmitter::key_from_seed("http vote exchange validator two"),
+            RpcSubmitter::key_from_seed("http vote exchange validator three"),
+        ];
+        let pubkeys = validators
+            .iter()
+            .map(|key| key.verifying_key().to_bytes())
+            .collect::<Vec<_>>();
+        let stakes = test_stakes(&pubkeys);
+        let request = test_request(&stakes);
+        let evidence = SolanaVoteEvidence::from_request(&request).expect("vote evidence");
+        let path = std::env::temp_dir().join(format!(
+            "x3-relayer-http-vote-quorum-{}-{}.json",
+            std::process::id(),
+            NEXT_FILE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let exchange =
+            VoteExchange::open(&path, AuthorizedValidatorSet::from_keys(pubkeys.clone()))
+                .await
+                .expect("vote exchange");
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("listener");
+        let address = listener.local_addr().expect("listener address");
+        let server = tokio::spawn(serve_vote_exchange(listener, exchange));
+        let client = VoteExchangeClient::new(format!("http://{address}"));
+
+        for validator in &validators[..2] {
+            client
+                .publish(&sign_vote(&evidence, validator).expect("signed vote"))
+                .await
+                .expect("published vote");
+        }
+        let exchanged_votes = client.votes_for(&evidence).await.expect("exchanged votes");
+        assert_eq!(exchanged_votes.len(), 2);
+
+        let submitter = test_submitter(validators[2].clone(), pubkeys, stakes);
+        let mut request = request;
+        request.existing_signatures = exchanged_votes;
+        let proof = submitter
+            .acquire_svm_proof(request)
+            .await
+            .expect("three independently signed votes assemble a quorum");
+        assert_eq!(proof.required_signatures, 3);
+        assert_eq!(proof.validator_signatures.len(), 3);
+        assert!(proof.encoded_envelope().is_ok());
+
+        server.abort();
+        let _ = tokio::fs::remove_file(path).await;
     }
 
     #[test]
