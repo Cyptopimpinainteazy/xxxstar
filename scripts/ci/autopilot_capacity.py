@@ -2,6 +2,7 @@
 """X3 CI Autopilot resource placement planner. Pure decisions; never launches jobs."""
 import argparse
 import json
+import math
 from pathlib import Path
 
 # Conservative defaults; intended to preserve resources for each host's main role.
@@ -38,7 +39,7 @@ def assess_worker(worker, job_class, policy=None):
         reasons.append("primary workload availability not verified")
     for key in ("cpu_threads", "load_1m", "disk_free_gb"):
         v = worker.get(key)
-        if isinstance(v, bool) or not isinstance(v, (int, float)) or v < 0:
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0:
             reasons.append(f"missing or invalid {key}")
     if reasons:
         return False, reasons
