@@ -31,6 +31,8 @@ def join(github, review):
         problems.append("review belongs to another head")
     if review.get("review_completed") is not True:
         problems.append("review execution not verified")
+    if review.get("review_coverage_complete") is not True:
+        problems.append("review coverage not established")
     if review.get("pr_number") != pr.get("number"):
         problems.append("review belongs to another PR")
     findings = review.get("findings")
