@@ -1811,7 +1811,7 @@
       "live_tested": "LIVE_TESTNET",
       "mainnet_ready": 90,
       "missing_work": [
-        "**CLOSED 2026-09-26 \u2014 the root-registration path asks a verifier, not a byte count.** `register_external_root` did `ensure!(!proof.is_empty())` under a comment saying a production version \"would verify SPV proofs, Merkle roots, etc.\", and then wrote the caller's `root_hash` into `BridgeRoots`, where the bridge surface reads it as the state of a foreign chain \u2014 a well-formed byte string treated as a proof, the same class as the settlement verifier's fabricated acceptance and worse in consequence. It now calls `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so no root can be established at all until a per-chain light client exists; the refusal is its own error (`ExternalRootVerificationUnavailable`), distinct from the scope-freeze (`ExternalBridgesDisabled`, checked earlier) and from the data-shape `InvalidProof` it replaced. Pinned by `an_external_root_cannot_be_registered_without_a_verifier` (an enabled bridge surface, a 64-byte proof, `BridgeRoots` still untouched) and by `register_external_root_works_only_after_governance_enables`, whose second half now asserts the verifier's refusal where it used to assert a raw `vec![1u8; 8]` was accepted. Load-bearing, measured: restoring the byte-count check turns the first test red on the error variant, then the file was restored byte-identically.",
+        "**CLOSED 2026-10-25 \u2014 the root-registration path is bound to stored finalized headers.** `register_external_root` no longer treats proof bytes as evidence. `RuntimeExternalRootVerifier` requires the requested EVM root to be bound to a beacon-finalized header, the Solana root to a stored finalized SVM header, and the Bitcoin root to an admitted header on the best chain; the proof envelope must name the same chain, block, and root kind. The refusal for an unavailable native EVM anchor is distinct from the governance scope freeze and from malformed proof data. Runtime tests pin EVM, SVM, and Bitcoin bindings plus wrong-root rejection. The call now charges two verifier storage reads alongside its declared compute; its generic pallet benchmark remains an explicit exception because fabricated runtime-finalized headers would bypass the production verifier.",
         "Operational governance activation process still required"
       ],
       "name": "External bridge pause-at-genesis",
@@ -2407,7 +2407,7 @@
       "missing_work": [
         "**CLOSED 2026-09-28 \u2014 every pallet that charged a typed weight is measured, and the count is 4, all `low`.** The burndown started at 25 `pallet-call-without-weights` sites. Twenty-one pallets are measured by this repository's own CLI now, and the four findings that remain are the documented `T::DbWeight::get().reads_writes` estimate \u2014 a stated storage-access count, not an invented cost \u2014 in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance. There is no `high` finding left. The last pass also fixed the defect that had made the whole burndown impossible: `pallet-x3-settlement-engine` enabled its optional `rlp` with default features, so the runtime's `runtime-benchmarks` build dragged `bytes/std` and `rustc-hex/std` into the `wasm32v1-none` blob and died with E0463 before any weights could be regenerated",
         "**CLOSED 2026-09-28 \u2014 a gate now says when a weight file has gone stale.** `scripts/check-weights-freshness.py` runs in the default gate set and answers the two questions the tree can answer without a per-pallet node build: an entry no call charges (a renamed call, or a call that went back to a literal) is drift and fails, and a `weights.rs` with no benchmark CLI record line was never produced by a run, so it is unmeasured \u2014 ratcheted shrink-only by `docs/reports/weights-unmeasured-baseline.json` (22 files on 2026-09-28, down from every file being one). What it deliberately does *not* do is re-run a benchmark on change, so a number can still be stale while the file agrees with the pallet; that needs a CI runner with a benchmark-featured node build",
-        "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root` (this runtime's `RefuseExternalRoots` verifier refuses every root by policy). Measuring either would report a cost *below* the real one for the calls that gate the atomic kernel"
+        "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root`, whose production verifier reads runtime-specific finalized EVM/SVM/Bitcoin state that a generic pallet benchmark cannot fabricate without bypassing verification. The root-registration call now charges two verifier storage reads and 200,000 ps of declared compute; it remains an explicit exception until a runtime benchmark can install real finalized evidence"
       ],
       "name": "FRAME benchmarking",
       "paths": [
@@ -4966,7 +4966,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "80d827d24edcdfce30fe587dbe5f800536926a3d6e5a9a68e9661413d06227b2",
+    "source_digest": "4d199aee3ef2f3f2fde404db7d308bcd25c08440e175b8c93159436e5fb6346e",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
@@ -4974,9 +4974,9 @@
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
       "feature-matrix/cross-chain.toml": "9ee1dc9ed92df1ed146b478247d56e9e84c4b4939874acdefa49fec38f61ca35",
-      "feature-matrix/cross-vm-atomic.toml": "c2d6d3f1e3e2e4ef3970fb9adc5418e33d298a0767c1ae2aa3d71e9c50e2dd99",
+      "feature-matrix/cross-vm-atomic.toml": "252d3892bea366ec7e7a4ee2caabe431760a3b125e455cf68cae20196b3d49c9",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "d70ef708859961f9017baf0aaf95e740ba71144e1a45c3b6475e4383d04329cd",
+      "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",
       "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "09d1bd89a8066adf336cfef1632f28add490ea5b087e6fe6c3f1eab85b9090f8",

@@ -763,7 +763,9 @@ pub mod pallet {
         /// FROZEN under v1-alpha API (2026-04-24, commit d99252ca42)
         /// Only verifier/executor authority can call this
         #[pallet::call_index(4)]
-        #[pallet::weight(Weight::from_parts(50_000, 0))]
+        #[pallet::weight(
+            Weight::from_parts(200_000, 0).saturating_add(T::DbWeight::get().reads(2))
+        )]
         pub fn register_external_root(
             origin: OriginFor<T>,
             chain_id: u32,
