@@ -625,7 +625,7 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => frame_system::Events::<T>::get()
+                Condition::Event { topic } => frame_system::Pallet::<T>::events()
                     .iter()
                     .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
                 Condition::Manual => true,

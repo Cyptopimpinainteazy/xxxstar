@@ -2713,8 +2713,7 @@ pub mod pallet {
                         artifact.gas_used,
                         T::Balance::default(),
                     )?;
-                    let fee_units: u128 =
-                        required.try_into().map_err(|_| Error::<T>::FeeOverflow)?;
+                    let fee_units: u128 = required.into();
                     Some(crate::native_trading::execute::<T>(
                         &who,
                         tx,
