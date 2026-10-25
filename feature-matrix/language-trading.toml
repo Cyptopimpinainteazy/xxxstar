@@ -38,14 +38,21 @@ paths = ["crates/x3-integration", "crates/x3-backend", "crates/x3-vm", "crates/x
 # state and the other intrinsics are still not expressible), tested 85 -> 92 (7 tests across both
 # engines and the on-chain path, three mutations).
 # 0.35*88 + 0.25*92 + 0.40*30 = 30.8 + 23 + 12 = 65.8 -> 66 (was 61)
-implemented = 88
-tested = 92
-mainnet_ready = 30
+# 2026-10-25: the exact candidate now has the three-validator consensus receipt proof and
+# cross-block storage proof, so implemented=94, tested=95, mainnet_ready=65. Public-testnet
+# deployment and the explicitly deferred cross-VM dispatch remain open.
+implemented = 94
+tested = 95
+mainnet_ready = 65
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). **Scope decided 2026-09-29 (owner): cross-VM calls from `.x3` are a documented non-goal for now.** Measured: the production (WASM) runtime runs the kernel EVM as `mini_evm` and its SVM as the payload own program, and the SVM executes the payload program without deployed-account persistence. The kernel EVM now retains trie-backed state across authenticated executions (`the_chains_evm_keeps_state_between_executions`); deployed-target cross-VM calls remain refused until their dispatch interface is implemented. `pallet_evm` is wired in only for a native build with the non-default `frontier` feature, so `test runtime frontier` is evidence about that build, not about the chain; the adapter selection in runtime/src/lib.rs and that gate now say so. The compiler refuses a cross-VM intrinsic by name with that reason (`UnavailableCrossVmCall`, `a_cross_vm_call_is_refused_with_the_reason_it_cannot_run`; removing the check reverts it to an unknown-identifier error, red). Making these calls real still requires deployed-target dispatch and compiler integration; persistent EVM state alone does not prove cross-VM calls. Mutable module state other than storage slots is not expressible by design: `evm_sload`/`evm_sstore` are the persistent state."]
+blockers = [
+  "The local three-validator path is now proven end to end, but it has not run on the public testnet or the launch validator set.",
+  "Cross-VM calls from `.x3` remain a documented non-goal for this row and are refused at compile time until deployed-target dispatch and compiler integration exist.",
+  "Mutable module state other than `evm_sload`/`evm_sstore` storage slots is not expressible by design.",
+]
 required_tests = [
   "compile_encode_decode_execute_receipt_end_to_end",
   "every_operand_kind_compiles_verifies_and_executes",
@@ -68,13 +75,17 @@ required_tests = [
   "emit_without_an_event_is_refused",
   "a_cross_vm_call_is_refused_with_the_reason_it_cannot_run",
   "the_chains_evm_keeps_state_between_executions",
+  "a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it",
 ]
+test_paths = ["node/tests/x3lang_network_receipt.rs"]
 test_evidence = [
   "crates/x3-integration/tests/events.rs",
   "crates/x3-integration/tests/source_language.rs",
   "crates/x3-compiler/tests/optimizer_order.rs",
   "crates/x3-integration/tests/compiler_bridge.rs",
+  "node/tests/x3lang_network_receipt.rs",
   "note: six tests, green; the sweep drives eight program shapes through compile → both readers → on-chain executor → receipt and asserts the receipt reports the value the source states, and the float test asserts both the simulation result and the on-chain refusal",
+  "note: 2026-10-25 — the ignored three-validator test passed: Alice alone received the 63-byte compiled artifact; all three finalized block 180:0x92be07c774f77b195ff9061486e707953db777c313adc528ca8b451dbe34ee4c; Charlie verified ExtrinsicSuccess and the byte-identical receipt (return_data=42, gas_used=3, version=2); later state read back slot 0 written by an earlier comit.",
 ]
 evidence = ["crates/x3-integration/tests/compiler_bridge.rs", "crates/x3-backend/src/emit.rs", "note: Trading Core v1 gap #10"]
 

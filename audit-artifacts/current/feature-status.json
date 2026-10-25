@@ -2864,7 +2864,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 66,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2872,12 +2872,14 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 88,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 65,
       "missing_work": [
-        "Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). **Scope decided 2026-09-29 (owner): cross-VM calls from `.x3` are a documented non-goal for now.** Measured: the production (WASM) runtime runs the kernel EVM as `mini_evm` and its SVM as the payload own program, and the SVM executes the payload program without deployed-account persistence. The kernel EVM now retains trie-backed state across authenticated executions (`the_chains_evm_keeps_state_between_executions`); deployed-target cross-VM calls remain refused until their dispatch interface is implemented. `pallet_evm` is wired in only for a native build with the non-default `frontier` feature, so `test runtime frontier` is evidence about that build, not about the chain; the adapter selection in runtime/src/lib.rs and that gate now say so. The compiler refuses a cross-VM intrinsic by name with that reason (`UnavailableCrossVmCall`, `a_cross_vm_call_is_refused_with_the_reason_it_cannot_run`; removing the check reverts it to an unknown-identifier error, red). Making these calls real still requires deployed-target dispatch and compiler integration; persistent EVM state alone does not prove cross-VM calls. Mutable module state other than storage slots is not expressible by design: `evm_sload`/`evm_sstore` are the persistent state."
+        "The local three-validator path is now proven end to end, but it has not run on the public testnet or the launch validator set.",
+        "Cross-VM calls from `.x3` remain a documented non-goal for this row and are refused at compile time until deployed-target dispatch and compiler integration exist.",
+        "Mutable module state other than `evm_sload`/`evm_sstore` storage slots is not expressible by design."
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2892,11 +2894,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "language_trading",
-      "tested": 92,
-      "tests": "tested score 92% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4989,7 +4991,7 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "d8f2bc46ffc32d5f687235ba46e5edb370b2f1bdaca0de968d9fac9365f0d9c2",
+    "source_digest": "dff32d596314731bb1c60f748447fdf9be1c0a82031c5ed5705cb98890906166",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
@@ -5000,7 +5002,7 @@
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",
-      "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",
+      "feature-matrix/language-trading.toml": "d25316c78fc6c434744246aa5ba94289782d09f7e353e62e6583c40ab4d4530b",
       "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
       "feature-matrix/operations-user-tools.toml": "09d1bd89a8066adf336cfef1632f28add490ea5b087e6fe6c3f1eab85b9090f8",
       "feature-matrix/runtime-core.toml": "4b03c2edb17eebf343714786fcc695c58f0fb8ece4e39f187fdf668f06cbbdae",
@@ -5559,10 +5561,10 @@
     "by_state": {
       "BROKEN": 0,
       "COMPLETE": 13,
-      "FUNCTIONAL BUT UNHARDENED": 64,
+      "FUNCTIONAL BUT UNHARDENED": 65,
       "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
-      "PARTIAL": 67,
+      "PARTIAL": 66,
       "STUB": 0
     },
     "matrix_features": 153,
