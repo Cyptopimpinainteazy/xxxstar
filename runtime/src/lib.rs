@@ -3239,6 +3239,9 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
     #[cfg(not(feature = "dev"))]
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x1d00_ffff>;
+    /// The governance-managed settlement gateway may submit verified external
+    /// proofs for any intent. Claims and refunds remain party-only.
+    type SettlementProofOrigin = EnsureSettlementGateway;
     /// Who may push Bitcoin headers in bulk (`x3SettlementEngine.submitBtcHeaders`).
     ///
     /// Root: this chain has no header relayer, and naming an account that does not exist yet

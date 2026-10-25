@@ -1,6 +1,8 @@
 use crate::atomic_lock::{LockPhase, ReleaseReason};
 use crate::btc_gateway::{BtcAdaptorSignature, BtcHtlcParams, BtcSignature65, BtcSpvProof};
-use crate::mock::{new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB};
+use crate::mock::{
+    new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB, SETTLEMENT_RELAYER,
+};
 use crate::mock::{RuntimeEvent, RuntimeOrigin};
 use crate::proof_fixtures::{receipt_trie, PROOF_HEIGHT, RECEIPT_INDEX};
 
@@ -3431,6 +3433,14 @@ fn submit_canonical_claim_proof_set(intent_id: H256) {
 /// `intent_id` with bundles for `operation` (a terminal `Finalized` needs Claim bundles, a
 /// terminal `Refunded` needs Refund bundles).
 fn submit_canonical_proof_set(intent_id: H256, operation: x3_atomic_swap::CrossDomainOperation) {
+    submit_canonical_proof_set_from(intent_id, operation, RuntimeOrigin::signed(ALICE));
+}
+
+fn submit_canonical_proof_set_from(
+    intent_id: H256,
+    operation: x3_atomic_swap::CrossDomainOperation,
+    origin: RuntimeOrigin,
+) {
     use x3_atomic_swap::{CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType};
 
     let runtime_intent_id = intent_id.to_fixed_bytes();
@@ -3492,9 +3502,7 @@ fn submit_canonical_proof_set(intent_id: H256, operation: x3_atomic_swap::CrossD
         bundles,
     };
     assert_ok!(Pallet::<Test>::submit_cross_domain_proof_set(
-        RuntimeOrigin::signed(ALICE),
-        intent_id,
-        proof_set,
+        origin, intent_id, proof_set,
     ));
 }
 
@@ -4197,6 +4205,101 @@ fn submit_btc_proof_refuses_a_header_that_was_never_admitted() {
                 0u32,
                 0u32,
                 1_000u64,
+                vec![],
+                forged,
+            ),
+            Error::<Test>::BtcHeaderNotAnchored
+        );
+    });
+}
+
+#[test]
+fn a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([0x5Au8; 32]);
+        let intent_id = native_for_ethereum_intent(secret);
+
+        assert_noop!(
+            Pallet::<Test>::submit_proof(
+                RuntimeOrigin::signed(99),
+                intent_id,
+                ExternalChainId::Ethereum,
+                create_evm_receipt_proof(),
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        assert_ok!(Pallet::<Test>::submit_proof(
+            RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+            intent_id,
+            ExternalChainId::Ethereum,
+            create_evm_receipt_proof(),
+        ));
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::ExecutingExternal
+        ));
+
+        submit_canonical_proof_set_from(
+            intent_id,
+            CrossDomainOperation::Claim,
+            RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+        );
+
+        // Submitting evidence is not a custody right. The relayer cannot claim
+        // either party's escrow or trigger a refund.
+        assert_noop!(
+            Pallet::<Test>::claim_settlement(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+                secret,
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        past_timeout();
+        assert_noop!(
+            Pallet::<Test>::refund_settlement(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+            ),
+            Error::<Test>::NotAuthorized
+        );
+
+        // The BTC proof entry point uses the same authority rule. With the
+        // authorized relayer, authorization passes and the unanchored-header
+        // check is the first refusal; an ordinary third party is refused before
+        // proof verification.
+        let tx_bytes = b"not admitted to any bitcoin block".to_vec();
+        let txid = H256::from(double_sha256(&tx_bytes));
+        let forged = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::repeat_byte(0xEE),
+            merkle_root: txid,
+            timestamp: 1_700_000_000,
+            bits: 0x207f_ffff,
+            nonce: 0,
+            height: 700_000,
+        });
+        assert_noop!(
+            Pallet::<Test>::submit_btc_proof(
+                RuntimeOrigin::signed(99),
+                intent_id,
+                txid,
+                0,
+                0,
+                1_000,
+                vec![],
+                forged.clone(),
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        assert_noop!(
+            Pallet::<Test>::submit_btc_proof(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+                txid,
+                0,
+                0,
+                1_000,
                 vec![],
                 forged,
             ),

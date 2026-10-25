@@ -37,6 +37,23 @@ impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {}
 }
 
+pub const SETTLEMENT_RELAYER: u64 = 77;
+
+pub struct MockSettlementProofOrigin;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for MockSettlementProofOrigin {
+    type Success = u64;
+
+    fn try_origin(origin: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        let raw: Result<frame_system::RawOrigin<u64>, RuntimeOrigin> = origin.into();
+        match raw {
+            Ok(frame_system::RawOrigin::Signed(who)) if who == SETTLEMENT_RELAYER => Ok(who),
+            Ok(other) => Err(other.into()),
+            Err(origin) => Err(origin),
+        }
+    }
+}
+
 frame_support::construct_runtime!(
     pub enum Test {
         System: frame_system,
@@ -211,6 +228,7 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MaxPendingIntents = frame_support::traits::ConstU32<10>;
     type DefaultSettlementTimeout = frame_support::traits::ConstU64<60>;
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
+    type SettlementProofOrigin = MockSettlementProofOrigin;
     // Bitcoin's regtest `powLimit`. A test cannot mine a mainnet-difficulty header,
     // and the regtest limit is Bitcoin's own answer to "which limit may a chain that
     // mines its own headers use"; production runtimes carry `0x1d00ffff`.

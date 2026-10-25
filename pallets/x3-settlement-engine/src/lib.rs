@@ -221,6 +221,18 @@ pub mod pallet {
         /// Unix time provider for timeout enforcement.
         type UnixTime: UnixTime;
 
+        /// Origin allowed to submit already-verified external proofs on behalf
+        /// of any settlement intent.
+        ///
+        /// The chain runtime points this at its governance-managed settlement
+        /// gateway. A maker or taker is also accepted directly, so normal user
+        /// flows do not require the gateway. This origin may submit proofs only;
+        /// claims and refunds remain restricted to the intent parties.
+        type SettlementProofOrigin: EnsureOrigin<
+            <Self as frame_system::Config>::RuntimeOrigin,
+            Success = <Self as frame_system::Config>::AccountId,
+        >;
+
         /// Maximum legs per settlement intent.
         #[pallet::constant]
         type MaxSettlementLegs: Get<u32>;
@@ -1538,24 +1550,19 @@ pub mod pallet {
 
         /// Submit external execution proof to X3
         #[pallet::call_index(2)]
-        #[pallet::weight(T::SettlementWeightInfo::submit_external_proof())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::submit_external_proof()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         pub fn submit_proof(
             origin: OriginFor<T>,
             intent_id: H256,
             chain: ExternalChainId,
             proof: SettlementProof,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // Verify intent exists and caller is party to the intent.
-            // Only the maker or taker may advance proof state to prevent third-party
-            // actors from triggering state transitions for intents they are not party to.
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let _who = Self::ensure_proof_submitter(origin, &intent)?;
 
             let state = IntentStates::<T>::get(intent_id);
             ensure!(
@@ -1656,6 +1663,10 @@ pub mod pallet {
             // Verify intent exists
             let mut intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
+            ensure!(
+                who == intent.maker || who == intent.taker,
+                Error::<T>::NotAuthorized
+            );
 
             let state = IntentStates::<T>::get(intent_id);
             ensure!(
@@ -1779,19 +1790,18 @@ pub mod pallet {
         /// Full bundles are verified against the canonical H256 runtime intent,
         /// then compact proof hashes are committed into consensus storage.
         #[pallet::call_index(33)]
-        #[pallet::weight(T::SettlementWeightInfo::claim_settlement())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::claim_settlement()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         pub fn submit_cross_domain_proof_set(
             origin: OriginFor<T>,
             intent_id: H256,
             proof_set: CrossDomainProofSet,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let who = Self::ensure_proof_submitter(origin, &intent)?;
 
             proof_set
                 .verify_runtime_binding(intent_id.to_fixed_bytes())
@@ -1923,7 +1933,10 @@ pub mod pallet {
         /// `submit_btc_header` after `anchor_btc_checkpoint`); this call no longer
         /// admits headers of its own.
         #[pallet::call_index(10)]
-        #[pallet::weight(T::SettlementWeightInfo::verify_btc_proof())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::verify_btc_proof()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         #[allow(clippy::too_many_arguments)]
         pub fn submit_btc_proof(
             origin: OriginFor<T>,
@@ -1935,17 +1948,9 @@ pub mod pallet {
             merkle_proof: Vec<H256>,
             block_header: BtcBlockHeader,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // Verify intent exists and restrict proof submission to intent parties.
-            // Only the maker or taker may submit a BTC proof to prevent DoS or
-            // replay attacks from arbitrary accounts.
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let _who = Self::ensure_proof_submitter(origin, &intent)?;
 
             // The header behind this proof has to be one this chain already holds on
             // a checkpoint-anchored chain.
@@ -2552,6 +2557,35 @@ pub mod pallet {
     const MAX_EXPIRY_INDEX_SPILL_BLOCKS: u32 = 16;
 
     impl<T: Config> Pallet<T> {
+        /// Accept either an intent party or the runtime's authorized proof
+        /// origin.
+        ///
+        /// This path may advance an intent to `ExecutingExternal`, but it never
+        /// releases funds. Claims and refunds continue to require a signed
+        /// intent party, so an authorized relayer cannot take custody by
+        /// submitting evidence.
+        fn ensure_proof_submitter(
+            origin: OriginFor<T>,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<AccountIdOf<T>, DispatchError> {
+            let signer = ensure_signed(origin.clone()).ok();
+            if let Some(who) = signer.as_ref() {
+                if who == &intent.maker || who == &intent.taker {
+                    return Ok(who.clone());
+                }
+            }
+
+            if let Ok(origin_account) = T::SettlementProofOrigin::try_origin(origin) {
+                return Ok(origin_account);
+            }
+
+            if signer.is_some() {
+                Err(Error::<T>::NotAuthorized.into())
+            } else {
+                Err(DispatchError::BadOrigin)
+            }
+        }
+
         /// Register `intent_id` in the first deadline bucket at or after
         /// `start_block` that still has room, spilling forward when a bucket is full.
         ///
