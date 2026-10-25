@@ -28,7 +28,7 @@ def get_json(path, token):
         return json.load(response)
 
 
-def gather(repo, number, token, fetch=get_json, max_pages=5):
+def gather(repo, number, token, fetch=get_json, max_pages=5, expected_head=None):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
         raise ValueError("invalid repository")
     if number < 1 or max_pages < 1:
@@ -37,6 +37,8 @@ def gather(repo, number, token, fetch=get_json, max_pages=5):
     sha = (pr.get("head") or {}).get("sha")
     if not isinstance(sha, str) or not SHA.fullmatch(sha):
         raise ValueError("PR head is not a full commit SHA")
+    if expected_head is not None and sha != expected_head:
+        raise ValueError("PR head differs from requested head")
     if (pr.get("base") or {}).get("repo", {}).get("full_name") != repo:
         raise ValueError("PR does not target requested repository")
     runs = []
@@ -98,13 +100,14 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--repo", default=REPO)
     p.add_argument("--pr", type=int, required=True)
+    p.add_argument("--expected-head", help="Immutable head SHA from the triggering PR event")
     p.add_argument("--output", type=Path)
     args = p.parse_args(argv)
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if not token:
         p.exit(2, "GH_TOKEN or GITHUB_TOKEN required for read-only metadata query\n")
     try:
-        packet = gather(args.repo, args.pr, token)
+        packet = gather(args.repo, args.pr, token, expected_head=args.expected_head)
         data = json.dumps(packet, indent=2, sort_keys=True) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)
