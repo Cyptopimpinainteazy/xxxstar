@@ -13,6 +13,8 @@ on:
       - 'scripts/ci/test_autopilot_triage.py'
       - 'scripts/ci/integration_audit.py'
       - 'scripts/ci/test_integration_audit.py'
+      - 'scripts/ci/integration_e2e.py'
+      - 'scripts/ci/test_integration_e2e.py'
       - '.github/workflows/pr-agent.yml'
       - '.github/workflows/pr-agent-auto.yml'
       - '.pr_agent.toml'
@@ -39,6 +41,10 @@ jobs:
         run: |
           python3 -m unittest discover -s scripts/ci -p test_integration_audit.py -v
           python3 scripts/ci/integration_audit.py --output "$RUNNER_TEMP/x3-integration-audit.json"
+      - name: Run isolated integration fault-injection suite
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_integration_e2e.py -v
+          python3 scripts/ci/integration_e2e.py --output "$RUNNER_TEMP/x3-integration-synthetic.json"
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
@@ -51,5 +57,6 @@ jobs:
           path: |
             ${{ runner.temp }}/x3-ci-autopilot.json
             ${{ runner.temp }}/x3-integration-audit.json
+            ${{ runner.temp }}/x3-integration-synthetic.json
           if-no-files-found: warn
           retention-days: 14
