@@ -147,6 +147,10 @@ pub struct RpcSubmitter {
     svm_cluster: SolanaCluster,
     runtime_signer: Option<Arc<X3RuntimeSigner>>,
     evm_domain_chains: BTreeMap<u32, ExternalChainId>,
+    /// Runtime signing reads the account nonce from the node. Serialize the
+    /// sign-and-submit critical section so concurrent proofs cannot sign with
+    /// the same nonce.
+    submission_lock: Arc<tokio::sync::Mutex<()>>,
     /// Signing key derived from the relayer seed phrase (if provided).
     /// When custody is enabled, this field holds a zeroed placeholder and
     /// `sign_proof_payload` is not called (custody signer is used externally).
@@ -277,6 +281,7 @@ impl RpcSubmitter {
             svm_cluster,
             runtime_signer,
             evm_domain_chains: configured_evm_chains,
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key,
         })
     }
@@ -304,6 +309,7 @@ impl RpcSubmitter {
                 reason: "runtime intent id must not be zero".to_string(),
             });
         }
+        let _submission_guard = self.submission_lock.lock().await;
         let signer = self.runtime_signer.clone().ok_or_else(|| {
             SubmitterError::RuntimeSignerUnavailable {
                 leg: "evm",
@@ -812,6 +818,7 @@ mod tests {
             svm_cluster: TEST_CLUSTER,
             runtime_signer: None,
             evm_domain_chains: BTreeMap::new(),
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key,
         }
     }
@@ -912,6 +919,7 @@ mod tests {
             svm_cluster: TEST_CLUSTER,
             runtime_signer: None,
             evm_domain_chains: BTreeMap::new(),
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key,
         };
         let proof = EvmProof {
@@ -1017,6 +1025,7 @@ mod tests {
             svm_cluster: TEST_CLUSTER,
             runtime_signer: None,
             evm_domain_chains: BTreeMap::new(),
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key: RpcSubmitter::key_from_seed("mock RPC test"),
         };
 
@@ -1043,6 +1052,7 @@ mod tests {
             svm_cluster: TEST_CLUSTER,
             runtime_signer: None,
             evm_domain_chains: BTreeMap::new(),
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key: key,
         };
 
@@ -1226,6 +1236,7 @@ mod tests {
             svm_cluster: TEST_CLUSTER,
             runtime_signer: None,
             evm_domain_chains: BTreeMap::new(),
+            submission_lock: Arc::new(tokio::sync::Mutex::new(())),
             signing_key: RpcSubmitter::key_from_seed("custody authority test"),
         };
 
