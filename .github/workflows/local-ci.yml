@@ -68,6 +68,18 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "$iso/cargo/bin" >> "$GITHUB_PATH"
 
+      - name: Provision isolated Python test dependencies
+        # No global pip/site-packages mutation on shared self-hosted runners.
+        # Missing python3-venv or unavailable package sources fail the check;
+        # they must never turn a skipped pytest suite into a green CI verdict.
+        run: |
+          set -euo pipefail
+          python3 -m venv "${RUNNER_TEMP}/x3-python-tests"
+          "${RUNNER_TEMP}/x3-python-tests/bin/python" -m pip install \\
+            --disable-pip-version-check -r requirements-dev.txt
+          "${RUNNER_TEMP}/x3-python-tests/bin/python" -m pytest --version
+          echo "${RUNNER_TEMP}/x3-python-tests/bin" >> "${GITHUB_PATH}"
+
       - name: Show the resolved toolchain
         run: |
           for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker anvil forge; do
