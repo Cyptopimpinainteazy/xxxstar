@@ -19,4 +19,4 @@ codec = { workspace = true }
 # sign_digest_recoverable requires a newer `digest` crate than the one this
 # workspace's [patch] section pins — a real, workspace-wide conflict (see
 # crates/x3-atomic-swap's ethereum_tx.rs, broken by the same dependabot bump).
-k256 = { version = "=0.13.4", default-features = false, features = ["ecdsa"] }
+k256 = { version = "=0.14.0", default-features = false, features = ["ecdsa"] }

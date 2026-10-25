@@ -2,6 +2,7 @@ use super::{IsolatedSigner, SignerError};
 use crate::wallet_core::ipc::{IntentDraft, Attestation, SignerCaps};
 use base64::{engine::general_purpose, Engine as _};
 use k256::ecdsa::{signature::Signer as _, Signature, SigningKey};
+use k256::elliptic_curve::sec1::ToSec1Point;
 use sp_core::hashing::sha2_256;
 
 pub struct BtcSigner {
@@ -293,7 +294,7 @@ impl BtcSigner {
 impl IsolatedSigner for BtcSigner {
     fn derive_address(&self, _path: &str) -> Result<String, SignerError> {
         let verifying_key = self.signing_key.verifying_key();
-        let pubkey = verifying_key.to_encoded_point(true);
+        let pubkey = verifying_key.to_sec1_point(true);
         Ok(self.btc_address_from_pubkey(pubkey.as_bytes()))
     }
 
@@ -331,7 +332,7 @@ impl IsolatedSigner for BtcSigner {
         let sig: Signature = self.signing_key.sign(&digest_2);
         let mut psbt_sig = sig.to_der().as_bytes().to_vec();
         psbt_sig.push(0x01);
-        let compressed_pubkey = self.signing_key.verifying_key().to_encoded_point(true);
+        let compressed_pubkey = self.signing_key.verifying_key().to_sec1_point(true);
         let signed_psbt = Self::inject_partial_signatures(
             &psbt_raw,
             &psbt_sig,
@@ -415,7 +416,7 @@ mod tests {
             .decode(signed_b64)
             .expect("signed psbt decode");
         assert!(decoded.starts_with(b"psbt\xff"));
-        let pubkey = signer.signing_key.verifying_key().to_encoded_point(true);
+        let pubkey = signer.signing_key.verifying_key().to_sec1_point(true);
         let mut key = Vec::with_capacity(1 + pubkey.as_bytes().len());
         key.push(0x02);
         key.extend_from_slice(pubkey.as_bytes());

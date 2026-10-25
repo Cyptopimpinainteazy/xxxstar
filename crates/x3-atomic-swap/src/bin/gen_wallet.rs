@@ -20,7 +20,7 @@ fn main() {
 
     // Derive address
     let verifying_key = signing_key.verifying_key();
-    let public_key_bytes = verifying_key.to_encoded_point(false);
+    let public_key_bytes = verifying_key.to_sec1_point(false);
     let public_key = public_key_bytes.as_bytes();
     let hash = sha3::Keccak256::digest(&public_key[1..]);
     let address_bytes = &hash[12..];

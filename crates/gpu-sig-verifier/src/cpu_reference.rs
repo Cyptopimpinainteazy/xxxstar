@@ -34,7 +34,7 @@ mod tests {
     #[test]
     fn valid_signature_and_tampering() {
         let signing_key = SigningKey::from_bytes((&[7u8; 32]).into()).unwrap();
-        let public_key = signing_key.verifying_key().to_encoded_point(true);
+        let public_key = signing_key.verifying_key().to_sec1_point(true);
         let digest = [42u8; 32];
         let signature: Signature = signing_key.sign_prehash(&digest).unwrap();
         assert!(verify_secp256k1_digest(
@@ -68,7 +68,7 @@ mod tests {
 
         // A correctly formed signature from a different key must not pass.
         let other_key = SigningKey::from_bytes((&[8u8; 32]).into()).unwrap();
-        let other_public_key = other_key.verifying_key().to_encoded_point(true);
+        let other_public_key = other_key.verifying_key().to_sec1_point(true);
         assert!(!verify_secp256k1_digest(
             other_public_key.as_bytes(),
             &digest,

@@ -185,7 +185,7 @@ impl Transaction {
 
             // Get public key (uncompressed), strip 0x04 prefix, keccak256, take last 20 bytes
             let verifying_key = signing_key.verifying_key();
-            let public_key_bytes = verifying_key.to_encoded_point(false); // uncompressed
+            let public_key_bytes = verifying_key.to_sec1_point(false); // uncompressed
             let public_key = public_key_bytes.as_bytes();
             // First byte is 0x04 (uncompressed), the remaining 64 bytes are x,y
             let hash = sha3::Keccak256::digest(&public_key[1..]);

@@ -207,6 +207,22 @@ LOCK_ONLY_ADVISORIES = {
         "rsa 0.9.10, reached only through sqlx-mysql, which no crate in this workspace "
         "enables (stale lock entry). No target in deny.toml's [graph] builds it."
     ),
+    "RUSTSEC-2026-0344": (
+        "ruzstd 0.8.3 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "target that builds it."
+    ),
+    "RUSTSEC-2026-0367": (
+        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "target that builds it."
+    ),
+    "RUSTSEC-2026-0368": (
+        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "target that builds it."
+    ),
+    "RUSTSEC-2026-0369": (
+        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "target that builds it."
+    ),
 }
 
 

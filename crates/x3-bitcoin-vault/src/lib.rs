@@ -873,7 +873,7 @@ mod tests {
         let pubkeys: Vec<[u8; 33]> = keys
             .iter()
             .map(|k| {
-                let point = k.verifying_key().to_encoded_point(true);
+                let point = k.verifying_key().to_sec1_point(true);
                 let mut out = [0u8; 33];
                 out.copy_from_slice(point.as_bytes());
                 out
@@ -1413,7 +1413,7 @@ mod tests {
         outsider_scalar[31] = 99;
         let outsider = SigningKey::from_bytes(&outsider_scalar.into()).unwrap();
         let outsider_pubkey_id = {
-            let point = outsider.verifying_key().to_encoded_point(true);
+            let point = outsider.verifying_key().to_sec1_point(true);
             let mut out = [0u8; 33];
             out.copy_from_slice(point.as_bytes());
             let mut id = [0u8; 32];

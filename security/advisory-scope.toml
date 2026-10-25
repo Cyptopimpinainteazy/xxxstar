@@ -92,3 +92,58 @@ expected_resolved = ["0.24.1", "0.24.4", "0.25.2", "0.26.3"]
 # finally moves to 0.26.1+.
 accepted_reason = "O(n^2) name compression in BinEncoder; reachable only when encoding a message with many attacker-shaped records, which no consumer in this graph does - see the evidence document for the per-consumer call-path analysis."
 evidence = "docs/security/GHSA-q2qq-hmj6-3wpp.md"
+
+[[advisory]]
+id = "RUSTSEC-2026-0387"
+ecosystem = "rust"
+package = "crypto-bigint"
+status = "accepted_risk"
+published_range = "<0.7.6"
+vulnerable_range = "<0.7.6"
+expected_resolved = ["0.5.2", "0.5.5", "0.7.8"]
+accepted_reason = "X3-owned k256 consumers now resolve crypto-bigint 0.7.8. The remaining 0.5.5 copy is pinned by the unmodified polkadot-sdk stable2512 and Frontier k256 0.13 dependency lines and is used on public transaction/signature recovery and verification paths, not X3 private-key signing; see the evidence document for the path and re-review trigger."
+evidence = "docs/security/RUSTSEC-2026-0387-crypto-bigint.md"
+
+[[advisory]]
+id = "RUSTSEC-2026-0346"
+ecosystem = "rust"
+package = "rustls"
+status = "accepted_risk"
+published_range = "<0.23.46"
+vulnerable_range = "<0.23.46"
+expected_resolved = ["0.21.12", "0.23.31", "0.23.34", "0.23.36", "0.23.40", "0.23.43", "0.23.44", "0.23.45", "0.23.46"]
+accepted_reason = "The remaining rustls 0.21 copy is confined to legacy Ethers/Solana clients and dev/test programs. The secret-revealing Debug bug requires a custom ClientSessionStore that formats private session values; no X3 path implements that store. See the evidence document for the exact dependency paths and migration trigger."
+evidence = "docs/security/RUSTSEC-2026-legacy-tls-stack.md"
+
+[[advisory]]
+id = "RUSTSEC-2026-0349"
+ecosystem = "rust"
+package = "rustls"
+status = "accepted_risk"
+published_range = "<0.23.46"
+vulnerable_range = "<0.23.46"
+expected_resolved = ["0.21.12", "0.23.31", "0.23.34", "0.23.36", "0.23.40", "0.23.43", "0.23.44", "0.23.45", "0.23.46"]
+accepted_reason = "The ServerHello key-share prediction bug affects resumption with hybrid post-quantum key shares. Legacy rustls 0.21 consumers here do not enable a hybrid PQ key-exchange configuration; X3's node TLS path is on rustls 0.23.46. See the evidence document for the migration trigger."
+evidence = "docs/security/RUSTSEC-2026-legacy-tls-stack.md"
+
+[[advisory]]
+id = "RUSTSEC-2026-0381"
+ecosystem = "rust"
+package = "webpki-roots"
+status = "accepted_risk"
+published_range = "<1.0.10"
+vulnerable_range = "<1.0.10"
+expected_resolved = ["0.24.0", "0.25.2", "0.25.4", "0.25.5", "0.26.11", "1.0.6", "1.0.9", "1.0.10"]
+accepted_reason = "The affected 0.24/0.25 root stores are reached only through legacy Ethers/Solana websocket clients and dev/test programs. The 0.26.11 compatibility package in the root graph re-exports the fixed 1.0.10 store. Migration is required before those legacy clients are exposed to arbitrary peer URLs."
+evidence = "docs/security/RUSTSEC-2026-legacy-tls-stack.md"
+
+[[advisory]]
+id = "RUSTSEC-2026-0382"
+ecosystem = "rust"
+package = "rustls-webpki"
+status = "accepted_risk"
+published_range = "<0.103.16"
+vulnerable_range = "<0.103.16"
+expected_resolved = ["0.101.4", "0.101.7", "0.103.4", "0.103.7", "0.103.9", "0.103.13", "0.103.15", "0.103.16"]
+accepted_reason = "The distrusted-intermediate issue can matter only when a client trusts a path through the compromised emSign intermediates. X3 node TLS uses rustls-webpki 0.103.16; legacy Ethers/Solana clients and dev/test programs retain older copies and must migrate before accepting arbitrary TLS peers."
+evidence = "docs/security/RUSTSEC-2026-legacy-tls-stack.md"
