@@ -29,6 +29,7 @@ sp-core = { workspace = true }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 x3-finality-oracle = { path = "../x3-finality-oracle" }
 x3-verification-router = { path = "../x3-verification-router" }
+x3-runtime-signer = { path = "../x3-runtime-signer" }
 # RLP for the consensus encoding of a receipt — the leaf a receipts trie holds.
 rlp = { version = "0.5", default-features = false }
 # The settlement engine's proof type, which is what a produced proof has to

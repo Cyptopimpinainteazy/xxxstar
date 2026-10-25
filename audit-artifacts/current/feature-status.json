@@ -687,7 +687,7 @@
         "crates/x3-bridge/src/cross_chain_proofs.rs",
         "audit-artifacts/evidence/2026-10-25-solana-v3-blockhash-bank-hash.json",
         "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json",
-        "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; Solana proofs are V3 stake-weighted payloads that bind the blockhash and bank hash separately and are verified with the durable finalized-slot floor; the settlement gateway may now submit verified proofs, while the relayer executable still lacks runtime-intent binding and typed-extrinsic submission"
+        "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs, converted to the settlement-engine type, signed against the live runtime and self-submitted; Solana V3 evidence remains refused for settlement until independent transaction/bank-state inclusion exists"
       ],
       "id": "X3-XCHAIN-003",
       "implemented": 85,
@@ -696,7 +696,7 @@
       "mainnet_ready": 25,
       "missing_work": [
         "**CLOSED 2026-10-24 \u2014 the relayer emits only Solana V3 evidence.** The earlier evidence labelled the RPC blockhash as a bank hash. V3 now carries the finalized Solana blockhash and validator-attested bank hash as separate commitments, plus finalized/parent slots, the parent bank hash, the complete stake-table digest, the gateway transfer identity/intent, and independently signed votes; `SvmProof` encodes `SOLANA_FINALIZED_FORMAT_V3`. `RpcSubmitter::acquire_svm_proof` verifies every supplied Ed25519 vote over the full V3 message, rejects duplicates/unauthorized keys/tampered blockhashes, bank hashes, parent hashes, and stake digests, adds only this operator's authorized vote, and refuses unless the configured stake supermajority verifies. The verifier rejects zero identities even when a quorum signs them. `SvmHeaderWatcher` durably stores the highest observed finalized slot and the safety pipeline passes that floor into `verify_with_finalized_floor`. Measured: `cargo test -p x3-verification-router --lib` -> 66 passed; `cargo test -p x3-relayer --lib` -> 65 passed; gateway default 66 and runtime-benchmarks 79 passed; strict clippy clean across all affected crates.",
-        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for `submit_proof`, `submit_cross_domain_proof_set`, and `submit_btc_proof`; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody` (237 pallet tests), 94 runtime tests, and strict clippy. The relayer executable still does not bind a runtime intent id into its request or submit the typed extrinsic, so it cannot exercise this authority end to end yet",
+        "**CLOSED 2026-10-25 \u2014 the EVM authority and typed submission path exist.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` now carries the runtime intent id, decodes the portable proof into the exact settlement `SettlementProof`, signs the runtime-monomorphized extrinsic, and submits it through `author_submitExtrinsic`. The signer account must match the configured relayer account and the X3 domain must map to a configured EVM chain. Pinned by 69 relayer tests. The SVM path still refuses until independent transaction/bank-state evidence exists, and the standalone relayer executable still needs to be replaced by this library service",
         "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
         "The V3 proof binds the finalized blockhash, finalized bank hash, parent bank hash, and complete transfer intent under stake-weighted validator signatures, but it does not yet carry a bank-state or transaction-inclusion proof independent of those attestations.",
         "No production vote-exchange transport: the library now accepts and verifies independently signed V2 votes, but there is no deployed relayer/validator message bus that collects them from separate operators.",
@@ -1442,7 +1442,7 @@
       "mainnet_ready": 78,
       "missing_work": [
         "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
+        "**CLOSED 2026-10-25 \u2014 the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
         "No external audit of the SVM program or of this route"
       ],
       "name": "EVM \u2192 SVM route",
@@ -1565,7 +1565,7 @@
       "mainnet_ready": 78,
       "missing_work": [
         "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
+        "**CLOSED 2026-10-25 \u2014 the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
         "No external audit of the SVM program or of this route"
       ],
       "name": "SVM \u2192 EVM route",
@@ -1750,7 +1750,7 @@
       "mainnet_ready": 82,
       "missing_work": [
         "The X3-side lock and the SVM-side lock are both exercised end to end against a real validator, but nothing has been deployed to devnet or mainnet",
-        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** The settlement engine now admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer executable has not yet bound the runtime intent id or implemented typed-extrinsic submission, so live relayer use remains open",
+        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** The settlement engine admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer now binds runtime intents and submits typed EVM extrinsics; this X3-to-SVM row remains open because its SVM evidence does not yet prove transaction inclusion and bank state independently of validator attestations",
         "No external audit"
       ],
       "name": "X3 \u2192 SVM route",
@@ -4966,15 +4966,15 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "4d199aee3ef2f3f2fde404db7d308bcd25c08440e175b8c93159436e5fb6346e",
+    "source_digest": "87e62a45d03e2007875072b1c4dee8d0734fa7e8257ef5784e70560d2297528e",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "9ee1dc9ed92df1ed146b478247d56e9e84c4b4939874acdefa49fec38f61ca35",
-      "feature-matrix/cross-vm-atomic.toml": "252d3892bea366ec7e7a4ee2caabe431760a3b125e455cf68cae20196b3d49c9",
+      "feature-matrix/cross-chain.toml": "17e3b4cd8fdf5f33a6cf84c431b7c67dae3152eb087db989e3404c25b3daef39",
+      "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",
       "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",

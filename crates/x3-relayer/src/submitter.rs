@@ -7,10 +7,14 @@ use crate::types::{
 use anyhow::{anyhow, Result};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use log::{debug, info};
+use pallet_x3_settlement_engine::ExternalChainId;
 use sha2::{Digest, Sha256};
+use sp_core::crypto::Ss58Codec;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
+use x3_runtime_signer::X3RuntimeSigner;
 use x3_verification_router::{
     solana_finality_message_v3, solana_stake_table_digest, SolanaCluster,
     SolanaStakeWeightedVerifier, SolanaValidatorStake, Verifier as ProofVerifier,
@@ -24,30 +28,32 @@ use x3_verification_router::{
 /// replace an action a node would have rejected anyway.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum SubmitterError {
-    /// The chain admits a cross-chain proof only from the intent's own maker or
-    /// taker, and this pipeline holds neither key.
-    ///
-    /// The signer that builds `submit_proof` / `submit_cross_domain_proof_set`
-    /// now exists (`x3-runtime-signer`, shared with the node); what is undecided
-    /// is the authority path, and that is a security decision rather than a code
-    /// detail. Until it is decided, a submission signed here would be rejected
-    /// on chain, so it is not made.
+    /// This process has no local sr25519 signer for runtime extrinsics.
     #[error(
-        "refusing to submit the {leg} proof: the settlement engine records an external proof \
-         through `submit_proof` / `submit_cross_domain_proof_set`, and both require \
-         `who == intent.maker || who == intent.taker`, so a third-party relayer signature is \
-         rejected with `NotAuthorized`. The signer is no longer the missing piece: it is the \
-         `x3-runtime-signer` crate (`sign_submit_proof`, `prepare_cross_domain_proof_set`), \
-         shared with the node. What is undecided is who is authorized to submit. Configured \
-         signing authority: {authority}. Refusing rather than reporting a submission that would \
-         be rejected on chain."
+        "refusing to submit the {leg} proof: no local X3 runtime signer is configured \
+         (configured signing authority: {authority})"
     )]
-    UnauthorizedSubmitter {
-        /// Which proof leg refused (`evm` or `svm`).
+    RuntimeSignerUnavailable {
         leg: &'static str,
-        /// The configured signing authority, for the operator reading the log.
         authority: String,
     },
+
+    /// The proof cannot be represented as the runtime's typed call.
+    #[error("refusing to submit the {leg} proof: {reason}")]
+    InvalidRuntimeProof { leg: &'static str, reason: String },
+
+    /// Signing or submitting the signed extrinsic failed.
+    #[error("failed to submit the {leg} proof: {reason}")]
+    SubmissionFailed { leg: &'static str, reason: String },
+
+    /// The SVM V3 evidence is not yet a settlement-engine proof bound to a
+    /// transaction in the finalized slot. The runtime correctly refuses it.
+    #[error(
+        "refusing to submit the SVM settlement proof: the V3 evidence binds validator \
+         attestations but the settlement runtime still requires independent transaction \
+         inclusion and bank-state evidence"
+    )]
+    UnsupportedSvmSettlementProof,
 
     /// The configured validator set demands more distinct signatures than this
     /// pipeline can supply.
@@ -139,6 +145,8 @@ pub struct RpcSubmitter {
     svm_validators: AuthorizedValidatorSet,
     svm_stakes: Vec<SolanaValidatorStake>,
     svm_cluster: SolanaCluster,
+    runtime_signer: Option<Arc<X3RuntimeSigner>>,
+    evm_domain_chains: BTreeMap<u32, ExternalChainId>,
     /// Signing key derived from the relayer seed phrase (if provided).
     /// When custody is enabled, this field holds a zeroed placeholder and
     /// `sign_proof_payload` is not called (custody signer is used externally).
@@ -153,8 +161,23 @@ pub struct RpcSubmitterConfig {
     pub svm_validator_pubkeys: Vec<String>,
     pub svm_validator_stakes: Vec<SvmValidatorStakeConfig>,
     pub svm_cluster: SolanaCluster,
+    /// `(X3 domain id, external EVM chain id)` pairs from the relayer config.
+    pub evm_domain_chains: Vec<(u32, u64)>,
     pub max_retries: u32,
     pub retry_backoff_ms: u64,
+}
+
+fn external_chain_id(chain_id: u64) -> ExternalChainId {
+    match chain_id {
+        1 => ExternalChainId::Ethereum,
+        10 => ExternalChainId::Optimism,
+        56 => ExternalChainId::Bnb,
+        137 => ExternalChainId::Polygon,
+        8_453 => ExternalChainId::Base,
+        42_161 => ExternalChainId::Arbitrum,
+        43_114 => ExternalChainId::Avalanche,
+        other => ExternalChainId::EvmChain(other),
+    }
 }
 
 impl RpcSubmitter {
@@ -168,6 +191,7 @@ impl RpcSubmitter {
             svm_validator_pubkeys,
             svm_validator_stakes,
             svm_cluster,
+            evm_domain_chains,
             max_retries,
             retry_backoff_ms,
         } = config;
@@ -197,6 +221,34 @@ impl RpcSubmitter {
                 }
             }
         };
+        let runtime_signer = match relayer_seed_phrase.as_deref() {
+            Some(uri) => {
+                let signer =
+                    X3RuntimeSigner::from_uri("x3-mainnet".to_string(), x3_rpc_url.clone(), uri)
+                        .map_err(|error| anyhow!("invalid X3 runtime signer: {error}"))?;
+                let derived = signer.account().to_ss58check();
+                if derived != relayer_account {
+                    return Err(anyhow!(
+                        "configured relayer account {relayer_account} does not match runtime \
+                         signer account {derived}"
+                    ));
+                }
+                Some(Arc::new(signer))
+            }
+            None => None,
+        };
+        let mut configured_evm_chains = BTreeMap::new();
+        for (domain_id, chain_id) in evm_domain_chains {
+            if domain_id == 0 || chain_id == 0 {
+                return Err(anyhow!("EVM domain and chain ids must be non-zero"));
+            }
+            if configured_evm_chains
+                .insert(domain_id, external_chain_id(chain_id))
+                .is_some()
+            {
+                return Err(anyhow!("duplicate configured X3 EVM domain id {domain_id}"));
+            }
+        }
 
         // A malformed, wrongly sized or repeated key is refused at startup: a
         // set the operator did not mean must not size the quorum.
@@ -223,6 +275,8 @@ impl RpcSubmitter {
             svm_validators,
             svm_stakes,
             svm_cluster,
+            runtime_signer,
+            evm_domain_chains: configured_evm_chains,
             signing_key,
         })
     }
@@ -237,30 +291,126 @@ impl RpcSubmitter {
         SigningKey::from_bytes(&hash)
     }
 
-    /// Refused, by name: see [`SubmitterError::UnauthorizedSubmitter`].
-    ///
-    /// The proof is consumed so that a caller cannot mistake a refusal for a
-    /// submission, and the error is a typed variant rather than a string a caller
-    /// would have to match on.
-    pub async fn submit_evm_proof(&self, proof: EvmProof) -> Result<String, SubmitterError> {
-        let _ = proof;
-        Err(self.unauthorized_submitter("evm"))
+    /// Convert and sign one EVM proof for the settlement engine, then submit the
+    /// exact SCALE-encoded extrinsic.
+    pub async fn submit_evm_proof(
+        &self,
+        runtime_intent_id: sp_core::H256,
+        proof: EvmProof,
+    ) -> Result<String, SubmitterError> {
+        if runtime_intent_id == sp_core::H256::zero() {
+            return Err(SubmitterError::InvalidRuntimeProof {
+                leg: "evm",
+                reason: "runtime intent id must not be zero".to_string(),
+            });
+        }
+        let signer = self.runtime_signer.clone().ok_or_else(|| {
+            SubmitterError::RuntimeSignerUnavailable {
+                leg: "evm",
+                authority: self.authority_label(),
+            }
+        })?;
+        let chain = self
+            .evm_domain_chains
+            .get(&proof.source_domain)
+            .copied()
+            .ok_or_else(|| SubmitterError::InvalidRuntimeProof {
+                leg: "evm",
+                reason: format!(
+                    "no external chain is configured for X3 domain {}",
+                    proof.source_domain
+                ),
+            })?;
+        let settlement = crate::evm_receipt_proof::settlement_proof_from_evm_proof(&proof)
+            .map_err(|error| SubmitterError::InvalidRuntimeProof {
+                leg: "evm",
+                reason: error.to_string(),
+            })?;
+        let signed = tokio::task::spawn_blocking(move || {
+            signer.sign_submit_proof(runtime_intent_id, chain, settlement)
+        })
+        .await
+        .map_err(|error| SubmitterError::SubmissionFailed {
+            leg: "evm",
+            reason: format!("runtime signer task failed: {error}"),
+        })?
+        .map_err(|error| SubmitterError::SubmissionFailed {
+            leg: "evm",
+            reason: format!("runtime signer refused the extrinsic: {error}"),
+        })?;
+
+        let tx_hash = self.submit_signed_extrinsic("evm", &signed).await?;
+        let mut nonce = self.nonce.write().await;
+        *nonce = nonce.saturating_add(1);
+        Ok(tx_hash)
     }
 
-    /// Refused, by name, for the same reason as the EVM leg — and because the
-    /// payload this path used to post was a JSON blob rather than a hex-encoded
-    /// SCALE extrinsic the settlement engine can decode.
+    /// The SVM V3 evidence does not yet include the independent transaction and
+    /// bank-state proof the settlement runtime requires. Refuse rather than
+    /// sending evidence the chain will reject.
     pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String, SubmitterError> {
         let _ = proof;
-        Err(self.unauthorized_submitter("svm"))
+        Err(SubmitterError::UnsupportedSvmSettlementProof)
     }
 
-    /// The single refusal the submission authority decision produces, shared by
-    /// both proof legs so they cannot drift apart.
-    fn unauthorized_submitter(&self, leg: &'static str) -> SubmitterError {
-        SubmitterError::UnauthorizedSubmitter {
-            leg,
-            authority: self.authority_label(),
+    async fn submit_signed_extrinsic(
+        &self,
+        leg: &'static str,
+        signed_extrinsic: &str,
+    ) -> Result<String, SubmitterError> {
+        let mut attempt = 0u32;
+        loop {
+            let response = self
+                .rpc_client
+                .post(&self.x3_rpc_url)
+                .json(&serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "author_submitExtrinsic",
+                    "params": [signed_extrinsic],
+                    "id": 1,
+                }))
+                .send()
+                .await;
+            match response {
+                Ok(response) => {
+                    let body: serde_json::Value = response.json().await.map_err(|error| {
+                        SubmitterError::SubmissionFailed {
+                            leg,
+                            reason: format!("invalid author_submitExtrinsic response: {error}"),
+                        }
+                    })?;
+                    if let Some(error) = body.get("error").filter(|error| !error.is_null()) {
+                        return Err(SubmitterError::SubmissionFailed {
+                            leg,
+                            reason: format!(
+                                "author_submitExtrinsic rejected the extrinsic: {error}"
+                            ),
+                        });
+                    }
+                    return body
+                        .get("result")
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_string)
+                        .ok_or_else(|| SubmitterError::SubmissionFailed {
+                            leg,
+                            reason: "author_submitExtrinsic returned no transaction hash"
+                                .to_string(),
+                        });
+                }
+                Err(_) if attempt < self.max_retries => {
+                    attempt = attempt.saturating_add(1);
+                    tokio::time::sleep(std::time::Duration::from_millis(
+                        self.retry_backoff_ms.saturating_mul(u64::from(attempt)),
+                    ))
+                    .await;
+                }
+                Err(error) => {
+                    return Err(SubmitterError::SubmissionFailed {
+                        leg,
+                        reason: format!("author_submitExtrinsic transport failed: {error}"),
+                    });
+                }
+            }
         }
     }
 
@@ -587,6 +737,7 @@ mod tests {
 
     fn test_request(stakes: &[SolanaValidatorStake]) -> SvmProofRequest {
         SvmProofRequest {
+            runtime_intent_id: [0x30u8; 32],
             source_domain: 200,
             proof_id: [0x31u8; 32],
             cluster: TEST_CLUSTER,
@@ -659,6 +810,8 @@ mod tests {
             svm_validators: AuthorizedValidatorSet::from_keys(pubkeys),
             svm_stakes: stakes,
             svm_cluster: TEST_CLUSTER,
+            runtime_signer: None,
+            evm_domain_chains: BTreeMap::new(),
             signing_key,
         }
     }
@@ -757,6 +910,8 @@ mod tests {
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             svm_stakes: Vec::new(),
             svm_cluster: TEST_CLUSTER,
+            runtime_signer: None,
+            evm_domain_chains: BTreeMap::new(),
             signing_key,
         };
         let proof = EvmProof {
@@ -775,35 +930,102 @@ mod tests {
             expected_amount: 1_000,
         };
 
-        // Submitting means signing a runtime extrinsic with the intent party's
-        // key — `submit_proof` requires `who == intent.maker || who ==
-        // intent.taker` — and this pipeline holds no such key, so it refuses
-        // rather than posting a payload a node cannot accept.
+        // This fixture has no local runtime signer. The refusal must be explicit
+        // before trying to convert or submit a proof.
         let error = submitter
-            .submit_evm_proof(proof)
+            .submit_evm_proof(sp_core::H256::repeat_byte(0x11), proof)
             .await
-            .expect_err("no authorized signing key for the intent");
-        // The refusal is a matchable variant, not a string a caller must parse.
+            .expect_err("no runtime signing key");
         assert_eq!(
             error,
-            SubmitterError::UnauthorizedSubmitter {
+            SubmitterError::RuntimeSignerUnavailable {
                 leg: "evm",
                 authority: "seed-derived".to_string(),
             }
         );
-        let message = error.to_string();
-        assert!(
-            message.contains("intent.maker"),
-            "the refusal must name the origin rule it cannot satisfy, got: {message}"
+        assert!(error.to_string().contains("runtime signer"));
+    }
+
+    #[tokio::test]
+    async fn evm_submission_rejects_zero_intent_before_any_network_call() {
+        let submitter = test_submitter(
+            RpcSubmitter::key_from_seed("zero intent test"),
+            Vec::new(),
+            Vec::new(),
         );
-        assert!(
-            message.contains("x3-runtime-signer"),
-            "and say where the real signer now lives, got: {message}"
-        );
-        assert!(
-            message.contains("NotAuthorized"),
-            "and name the on-chain error a third-party signature produces, got: {message}"
-        );
+        let proof = EvmProof {
+            source_domain: 200,
+            proof_id: [0x56u8; 32],
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 123,
+            proof_nonce: 7,
+            proof_payload: vec![1u8; 96],
+            source_asset: [0x57u8; 20],
+            expected_sender: [0x58u8; 20],
+            expected_contract: [0x59u8; 20],
+            expected_beneficiary: vec![0x60u8; 32],
+            expected_nonce: 5,
+            expected_amount: 1_000,
+        };
+        let error = submitter
+            .submit_evm_proof(sp_core::H256::zero(), proof)
+            .await
+            .expect_err("zero intent");
+        assert!(matches!(
+            error,
+            SubmitterError::InvalidRuntimeProof { leg: "evm", .. }
+        ));
+    }
+
+    #[test]
+    fn external_chain_ids_are_mapped_without_accepting_an_unknown_domain() {
+        assert_eq!(external_chain_id(1), ExternalChainId::Ethereum);
+        assert_eq!(external_chain_id(8_453), ExternalChainId::Base);
+        assert_eq!(external_chain_id(777), ExternalChainId::EvmChain(777));
+    }
+
+    #[tokio::test]
+    async fn author_submit_extrinsic_returns_the_node_transaction_hash() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock RPC");
+        let address = listener.local_addr().expect("mock RPC address");
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept RPC request");
+            let mut request = [0u8; 4096];
+            let _ = stream.read(&mut request);
+            let body = r#"{"jsonrpc":"2.0","id":1,"result":"0xdeadbeef"}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("write RPC response");
+        });
+        let submitter = RpcSubmitter {
+            x3_rpc_url: format!("http://{address}"),
+            nonce: Arc::new(RwLock::new(0)),
+            rpc_client: reqwest::Client::new(),
+            max_retries: 0,
+            retry_backoff_ms: 0,
+            relayer_custody_key_id: None,
+            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
+            svm_stakes: Vec::new(),
+            svm_cluster: TEST_CLUSTER,
+            runtime_signer: None,
+            evm_domain_chains: BTreeMap::new(),
+            signing_key: RpcSubmitter::key_from_seed("mock RPC test"),
+        };
+
+        let tx_hash = submitter
+            .submit_signed_extrinsic("evm", "0x0102")
+            .await
+            .expect("node result");
+        assert_eq!(tx_hash, "0xdeadbeef");
+        server.join().expect("mock RPC thread");
     }
 
     #[test]
@@ -819,6 +1041,8 @@ mod tests {
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             svm_stakes: Vec::new(),
             svm_cluster: TEST_CLUSTER,
+            runtime_signer: None,
+            evm_domain_chains: BTreeMap::new(),
             signing_key: key,
         };
 
@@ -1000,6 +1224,8 @@ mod tests {
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
             svm_stakes: Vec::new(),
             svm_cluster: TEST_CLUSTER,
+            runtime_signer: None,
+            evm_domain_chains: BTreeMap::new(),
             signing_key: RpcSubmitter::key_from_seed("custody authority test"),
         };
 

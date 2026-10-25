@@ -28,8 +28,9 @@
 use crate::types::EvmProof;
 use serde_json::{json, Value};
 use x3_verification_router::evm_receipt::{
-    encode_proof_payload, keccak256_32, receipt_trie_key, receipts_trie_proof, receipts_trie_root,
-    verify_merkle_patricia_proof, EvmBlockHeader, EvmReceipt,
+    deposit_locked_selector, encode_proof_payload, keccak256_32, receipt_trie_key,
+    receipts_trie_proof, receipts_trie_root, verify_merkle_patricia_proof, DecodedProof,
+    EvmBlockHeader, EvmReceipt, EvmReceiptExpectations,
 };
 
 /// A receipt's inclusion in a block's receipts trie, as the settlement engine
@@ -202,6 +203,124 @@ impl ReceiptInclusion {
             min_confirmations,
         })
     }
+}
+
+/// Convert the relayer's portable EVM proof into the settlement engine's typed
+/// `SettlementProof`.
+///
+/// The portable proof carries the canonical verifier payload, not the runtime
+/// SCALE type. This function decodes that payload under the event fields the
+/// relayer claims and refuses any mismatch, then binds the resulting receipt,
+/// roots, block height, confirmations, and trie path into one runtime call.
+pub fn settlement_proof_from_evm_proof(
+    proof: &EvmProof,
+) -> Result<pallet_x3_settlement_engine::SettlementProof, ProducerError> {
+    use frame_support::{traits::ConstU32, BoundedVec};
+    use pallet_x3_settlement_engine::{
+        ProofType, SettlementProof, MAX_MERKLE_PROOF_DEPTH, MAX_RECEIPT_DATA_SIZE,
+        MAX_TRIE_PROOF_SIZE,
+    };
+
+    if proof.proof_payload.len() < 16 {
+        return Err(ProducerError::Malformed(
+            "EVM proof payload is shorter than its block-height header".to_string(),
+        ));
+    }
+    let current_block =
+        u64::from_le_bytes(proof.proof_payload[0..8].try_into().map_err(|_| {
+            ProducerError::Malformed("EVM proof current block is truncated".into())
+        })?);
+    let min_confirmations =
+        u64::from_le_bytes(proof.proof_payload[8..16].try_into().map_err(|_| {
+            ProducerError::Malformed("EVM proof confirmation bound is truncated".into())
+        })?);
+    let decoded = DecodedProof::decode(
+        &proof.proof_payload[16..],
+        EvmReceiptExpectations {
+            amount: proof.expected_amount,
+            contract: proof.expected_contract,
+            sender: proof.expected_sender.to_vec(),
+            beneficiary: proof.expected_beneficiary.clone(),
+            source_asset: Some(proof.source_asset),
+            nonce: Some(proof.expected_nonce),
+            proof_id: proof.proof_id,
+            selector: deposit_locked_selector(),
+            min_confirmations,
+            current_block_number: current_block,
+            chain_id: u64::from(proof.source_domain),
+        },
+    )
+    .map_err(|error| ProducerError::Malformed(format!("EVM proof payload: {error}")))?;
+    decoded
+        .validate()
+        .map_err(|error| ProducerError::Malformed(format!("EVM deposit proof: {error}")))?;
+
+    let header_hash = keccak256_32(&decoded.header_rlp);
+    if decoded.header.number != proof.finalized_block
+        || header_hash != proof.block_hash
+        || decoded.header.state_root != proof.state_root
+    {
+        return Err(ProducerError::Malformed(
+            "EVM proof payload does not match the claimed block header".to_string(),
+        ));
+    }
+    if proof.block_hash.iter().all(|byte| *byte == 0)
+        || proof.state_root.iter().all(|byte| *byte == 0)
+        || decoded.header.receipts_root.iter().all(|byte| *byte == 0)
+    {
+        return Err(ProducerError::Malformed(
+            "EVM proof block and roots must be non-zero".to_string(),
+        ));
+    }
+    let confirmations = current_block
+        .checked_sub(decoded.header.number)
+        .and_then(|depth| u32::try_from(depth).ok())
+        .ok_or_else(|| {
+            ProducerError::Malformed(
+                "EVM proof current block precedes the claimed block".to_string(),
+            )
+        })?;
+    let receipt_index = decoded
+        .receipt_index
+        .iter()
+        .try_fold(0u32, |value, byte| {
+            value
+                .checked_mul(256)
+                .and_then(|value| value.checked_add(u32::from(*byte)))
+        })
+        .ok_or_else(|| ProducerError::Malformed("EVM receipt index exceeds u32".to_string()))?;
+    let receipt_data =
+        BoundedVec::<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>::try_from(decoded.receipt_rlp.clone())
+            .map_err(|_| ProducerError::ProofTooLarge {
+                what: "receipt",
+                size: decoded.receipt_rlp.len(),
+                limit: MAX_RECEIPT_DATA_SIZE as usize,
+            })?;
+    let trie_proof = BoundedVec::<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>::try_from(
+        decoded.proof.clone(),
+    )
+    .map_err(|_| ProducerError::ProofTooLarge {
+        what: "inclusion path",
+        size: decoded.proof.len(),
+        limit: MAX_TRIE_PROOF_SIZE as usize,
+    })?;
+    let merkle_proof = BoundedVec::<_, ConstU32<MAX_MERKLE_PROOF_DEPTH>>::try_from(vec![
+        sp_core::H256(decoded.header.state_root),
+        sp_core::H256(decoded.header.receipts_root),
+    ])
+    .map_err(|_| ProducerError::Malformed("two EVM roots always fit".to_string()))?;
+
+    Ok(SettlementProof {
+        proof_type: ProofType::MerkleTrie,
+        tx_hash: sp_core::H256(keccak256_32(&decoded.receipt_rlp)),
+        block_hash: sp_core::H256(header_hash),
+        chain_height: Some(decoded.header.number),
+        confirmations,
+        merkle_proof,
+        receipt_data,
+        receipt_index: Some(receipt_index),
+        trie_proof: Some(trie_proof),
+    })
 }
 
 /// All event and transfer fields a receipt inclusion must match.
@@ -1039,6 +1158,102 @@ mod tests {
         assert_eq!(proof.expected_beneficiary, beneficiary);
         assert_eq!(proof.expected_nonce, nonce);
         assert_eq!(proof.expected_amount, amount);
+    }
+
+    fn settlement_test_header(receipts_root: [u8; 32]) -> Vec<u8> {
+        rlp_list(&[
+            rlp_value(&[0x11; 32]),
+            rlp_value(&[0x12; 32]),
+            rlp_value(&[0x13; 20]),
+            rlp_value(&[0x14; 32]),
+            rlp_value(&[0x15; 32]),
+            rlp_value(&receipts_root),
+            rlp_value(&[0u8; 256]),
+            rlp_quantity(&[]),
+            rlp_quantity(&[100]),
+            rlp_quantity(&[0x05, 0xf5, 0xe1]),
+            rlp_quantity(&[0x52, 0x08]),
+            rlp_quantity(&[0x65]),
+            rlp_value(&[]),
+            rlp_value(&[0x16; 32]),
+            rlp_value(&[0u8; 8]),
+            rlp_quantity(&[1]),
+        ])
+    }
+
+    #[test]
+    fn a_portable_evm_deposit_becomes_a_typed_settlement_proof() {
+        let gateway = [0xB1; 20];
+        let token = [0xB2; 20];
+        let depositor = [0xB3; 20];
+        let beneficiary = [0xB4; 32];
+        let message_id = [0xB5; 32];
+        let nonce = 19u64;
+        let chain_id = 84_532u64;
+        let amount = 654_321u128;
+
+        let mut data = vec![0u8; 192];
+        data[31] = 128;
+        data[48..64].copy_from_slice(&amount.to_be_bytes());
+        data[88..96].copy_from_slice(&nonce.to_be_bytes());
+        data[120..128].copy_from_slice(&chain_id.to_be_bytes());
+        data[159] = beneficiary.len() as u8;
+        data[160..].copy_from_slice(&beneficiary);
+        let mut token_topic = [0u8; 32];
+        token_topic[12..].copy_from_slice(&token);
+        let mut depositor_topic = [0u8; 32];
+        depositor_topic[12..].copy_from_slice(&depositor);
+        let deposit = rlp_list(&[
+            rlp_value(&gateway),
+            rlp_list(&[
+                rlp_value(&deposit_locked_selector()),
+                rlp_value(&message_id),
+                rlp_value(&token_topic),
+                rlp_value(&depositor_topic),
+            ]),
+            rlp_value(&data),
+        ]);
+        let receipt = rlp_list(&[rlp_value(&[0x01]), rlp_value(&[]), rlp_list(&[deposit])]);
+        let receipts_root = receipts_trie_root(std::slice::from_ref(&receipt)).unwrap();
+        let trie_proof = receipts_trie_proof(std::slice::from_ref(&receipt), 0).unwrap();
+        let header_rlp = settlement_test_header(receipts_root);
+        let block_hash = keccak256_32(&header_rlp);
+        let state_root = [0x14; 32];
+        let payload = encode_proof_payload(112, 12, &header_rlp, &receipt, &[], &trie_proof);
+        let proof = EvmProof {
+            source_domain: chain_id as u32,
+            proof_id: message_id,
+            block_hash,
+            state_root,
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: payload,
+            source_asset: token,
+            expected_sender: depositor,
+            expected_contract: gateway,
+            expected_beneficiary: beneficiary.to_vec(),
+            expected_nonce: nonce,
+            expected_amount: amount,
+        };
+
+        let settlement = settlement_proof_from_evm_proof(&proof).expect("typed settlement proof");
+        assert!(matches!(
+            settlement.proof_type,
+            pallet_x3_settlement_engine::ProofType::MerkleTrie
+        ));
+        assert_eq!(settlement.block_hash.0, block_hash);
+        assert_eq!(settlement.chain_height, Some(100));
+        assert_eq!(settlement.confirmations, 12);
+        assert_eq!(settlement.receipt_index, Some(0));
+        assert_eq!(
+            settlement.tx_hash.0,
+            <sha3::Keccak256 as sha3::Digest>::digest(&receipt).as_slice()
+        );
+        assert_eq!(settlement.receipt_data.as_slice(), receipt.as_slice());
+        assert_eq!(
+            settlement.trie_proof.as_ref().map(|proof| proof.as_slice()),
+            Some(trie_proof.as_slice())
+        );
     }
 
     #[test]

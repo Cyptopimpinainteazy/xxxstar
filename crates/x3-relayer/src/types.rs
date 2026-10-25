@@ -166,6 +166,8 @@ pub struct EvmProof {
 /// Inputs required to bind a finalized EVM header to an event-specific receipt proof.
 #[derive(Clone, Debug)]
 pub struct EvmProofRequest {
+    /// Settlement-engine intent this proof is intended to advance.
+    pub runtime_intent_id: [u8; 32],
     pub source_domain: u32,
     pub proof_id: [u8; 32],
     pub finalized_block: u64,
@@ -222,6 +224,8 @@ pub struct SvmProof {
 /// aggregate before the configured threshold is reachable.
 #[derive(Clone, Debug)]
 pub struct SvmProofRequest {
+    /// Settlement-engine intent this proof is intended to advance.
+    pub runtime_intent_id: [u8; 32],
     pub source_domain: u32,
     pub proof_id: [u8; 32],
     pub cluster: SolanaCluster,

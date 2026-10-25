@@ -71,6 +71,7 @@ struct RelayerInternalState {
 
 #[derive(Clone)]
 struct PendingEvmReceipt {
+    runtime_intent_id: [u8; 32],
     finalized_block: u64,
     verified_header: VerifiedEthereumExecutionHeader,
     proof_payload: Vec<u8>,
@@ -86,6 +87,7 @@ struct PendingEvmReceipt {
 /// A finalized EVM receipt and the exact `DepositLocked` fields it must prove.
 #[derive(Clone)]
 pub struct EvmReceiptProofRequest {
+    pub runtime_intent_id: [u8; 32],
     pub domain_id: u32,
     pub finalized_block: u64,
     pub verified_header: VerifiedEthereumExecutionHeader,
@@ -199,6 +201,11 @@ impl RelayerService {
             svm_validator_pubkeys: config.validator_set.svm_validator_pubkeys.clone(),
             svm_validator_stakes: config.validator_set.svm_validator_stakes.clone(),
             svm_cluster,
+            evm_domain_chains: config
+                .evm_chains
+                .iter()
+                .map(|chain| (chain.x3_domain_id, chain.chain_id.into()))
+                .collect(),
             max_retries: config.submission.max_retries,
             retry_backoff_ms: config.submission.retry_backoff_ms,
         })
@@ -251,6 +258,9 @@ impl RelayerService {
         if request.proof_id == [0u8; 32] {
             anyhow::bail!("EVM gateway message id must not be zero");
         }
+        if request.runtime_intent_id == [0u8; 32] {
+            anyhow::bail!("EVM settlement intent id must not be zero");
+        }
         if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
             anyhow::bail!("EVM deposit beneficiary must be between 1 and 128 bytes");
         }
@@ -264,6 +274,7 @@ impl RelayerService {
             .entry(request.domain_id)
             .or_default()
             .push(PendingEvmReceipt {
+                runtime_intent_id: request.runtime_intent_id,
                 finalized_block: request.finalized_block,
                 verified_header: request.verified_header,
                 proof_payload: request.proof_payload,
@@ -282,6 +293,9 @@ impl RelayerService {
     /// watcher has observed that finalized slot, and no bank hash or transfer
     /// field is derived from a caller-chosen conclusion.
     pub async fn queue_svm_proof_request(&self, request: SvmProofRequest) -> Result<()> {
+        if request.runtime_intent_id == [0u8; 32] {
+            anyhow::bail!("SVM settlement intent id must not be zero");
+        }
         let configured = self
             .config
             .svm_clusters
@@ -603,6 +617,7 @@ impl RelayerService {
                 if let Ok(proof) = self
                     .submitter
                     .acquire_evm_proof(EvmProofRequest {
+                        runtime_intent_id: pending.runtime_intent_id,
                         source_domain: domain_id,
                         proof_id: pending.proof_id,
                         finalized_block: block_number,
@@ -672,7 +687,11 @@ impl RelayerService {
                     }
 
                     // Submit proof with retries
-                    match self.submitter.submit_evm_proof(proof).await {
+                    match self
+                        .submitter
+                        .submit_evm_proof(sp_core::H256(pending.runtime_intent_id), proof)
+                        .await
+                    {
                         Ok(tx_hash) => {
                             debug!("Submitted EVM proof: {}", tx_hash);
                             state.pending_submissions = state.pending_submissions.saturating_sub(1);

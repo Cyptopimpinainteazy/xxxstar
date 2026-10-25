@@ -27427,6 +27427,7 @@ dependencies = [
  "x3-finality-oracle",
  "x3-gateway-risk-engine",
  "x3-proof-dispute",
+ "x3-runtime-signer",
  "x3-validator-attestation",
  "x3-verification-router",
 ]

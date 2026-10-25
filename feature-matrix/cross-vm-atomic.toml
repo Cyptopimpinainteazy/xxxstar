@@ -97,7 +97,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-  "**CLOSED 2026-10-25 — proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
+  "**CLOSED 2026-10-25 — the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
   "No external audit of the SVM program or of this route",
 ]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: network-level external execution proof added 2026-09-22 — solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"]
@@ -183,7 +183,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-  "**CLOSED 2026-10-25 — proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
+  "**CLOSED 2026-10-25 — the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
   "No external audit of the SVM program or of this route",
 ]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: network-level external execution proof added 2026-09-22 — the same validator-backed lifecycle that covers EVM → SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"]
@@ -331,7 +331,7 @@ launch_scope = "core"
 claim_risk = false
 blockers = [
   "The X3-side lock and the SVM-side lock are both exercised end to end against a real validator, but nothing has been deployed to devnet or mainnet",
-  "**CLOSED 2026-10-25 — proof submission has a configured authority.** The settlement engine now admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer executable has not yet bound the runtime intent id or implemented typed-extrinsic submission, so live relayer use remains open",
+  "**CLOSED 2026-10-25 — proof submission has a configured authority.** The settlement engine admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer now binds runtime intents and submits typed EVM extrinsics; this X3-to-SVM row remains open because its SVM evidence does not yet prove transaction inclusion and bank state independently of validator attestations",
   "No external audit",
 ]
 evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: the external boundary this row called separate is now exercised — X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"]
