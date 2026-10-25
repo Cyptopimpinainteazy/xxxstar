@@ -52,11 +52,12 @@ svm_clusters:
     # Primary RPC (QuickNode recommended)
     rpc_endpoint: "https://mainnet.quicknode.pro/?token=YOUR_QUICKNODE_KEY"
     
-    # Fallback RPC (Helius)
-    fallback_rpc: "https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_KEY"
-    
-    # Backup RPC (Triton/Public)
-    backup_rpc: "https://api.mainnet-beta.solana.com"
+    # Two additional independently operated RPC providers are mandatory.
+    # The relayer refuses to start mainnet with fewer than three distinct
+    # endpoints and requires a two-thirds agreement quorum per transaction.
+    rpc_quorum_endpoints:
+      - "https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_KEY"
+      - "https://YOUR_TRITON_OR_OTHER_PROVIDER_ENDPOINT"
     
     # Finality threshold (128 slots = ~50 seconds for confirmed finality)
     # Note: Changed from testnet (32) to mainnet (128) for higher safety
