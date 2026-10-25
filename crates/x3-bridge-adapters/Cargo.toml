@@ -33,6 +33,7 @@ log = "0.4"
 
 # SHA-256 for escrow tickets
 sha2 = "0.10"
+sha3 = "0.10"
 hex = "0.4"
 thiserror = "1.0"
 

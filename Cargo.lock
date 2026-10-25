@@ -26075,6 +26075,7 @@ dependencies = [
  "sc-client-api",
  "serde_json",
  "sha2 0.10.9",
+ "sha3",
  "sp-api",
  "sp-blockchain",
  "sp-core",
