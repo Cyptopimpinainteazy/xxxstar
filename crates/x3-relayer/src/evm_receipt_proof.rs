@@ -323,6 +323,12 @@ fn hex32(value: &Value, what: &str) -> Result<[u8; 32], ProducerError> {
         .map_err(|_| ProducerError::Malformed(format!("{what} is not 32 bytes")))
 }
 
+fn fixed_hex<const N: usize>(value: &Value, what: &str) -> Result<[u8; N], ProducerError> {
+    hex_bytes(value, what)?
+        .try_into()
+        .map_err(|_| ProducerError::Malformed(format!("{what} is not {N} bytes")))
+}
+
 /// RLP-encode a quantity the way the consensus spec does: big-endian with
 /// leading zeros removed, and zero as the empty string.
 fn rlp_quantity(bytes: &[u8]) -> Vec<u8> {
@@ -348,6 +354,150 @@ fn rlp_value(bytes: &[u8]) -> Vec<u8> {
     let mut stream = rlp::RlpStream::new();
     stream.append(&bytes.to_vec());
     stream.out().to_vec()
+}
+
+fn header_field<'a>(block: &'a Value, name: &str) -> Result<&'a Value, ProducerError> {
+    block
+        .get(name)
+        .filter(|value| !value.is_null())
+        .ok_or_else(|| ProducerError::Malformed(format!("block header has no {name}")))
+}
+
+/// Reconstruct the canonical Ethereum header RLP from the JSON representation
+/// returned by `eth_getBlockByNumber`.
+///
+/// `debug_getRawHeader` is disabled by many public providers. The standard
+/// block representation carries every consensus header field, so the producer
+/// can encode the same field list without a debug namespace. The caller still
+/// checks the resulting Keccak hash against the block hash returned by the
+/// provider.
+fn canonical_header_rlp(block: &Value) -> Result<Vec<u8>, ProducerError> {
+    let mut fields = Vec::with_capacity(22);
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "parentHash")?,
+        "parentHash",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "sha3Uncles")?,
+        "sha3Uncles",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<20>(
+        header_field(block, "miner")?,
+        "miner",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "stateRoot")?,
+        "stateRoot",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "transactionsRoot")?,
+        "transactionsRoot",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "receiptsRoot")?,
+        "receiptsRoot",
+    )?));
+    let logs_bloom = hex_bytes(header_field(block, "logsBloom")?, "logsBloom")?;
+    if logs_bloom.len() != 256 {
+        return Err(ProducerError::Malformed(format!(
+            "logsBloom is {} bytes, not 256",
+            logs_bloom.len()
+        )));
+    }
+    fields.push(rlp_value(&logs_bloom));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "difficulty")?,
+        "difficulty",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "number")?,
+        "number",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "gasLimit")?,
+        "gasLimit",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "gasUsed")?,
+        "gasUsed",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "timestamp")?,
+        "timestamp",
+    )?));
+    fields.push(rlp_value(&hex_bytes(
+        header_field(block, "extraData")?,
+        "extraData",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "mixHash")?,
+        "mixHash",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<8>(
+        header_field(block, "nonce")?,
+        "nonce",
+    )?));
+
+    // Fork fields are a prefix: a later field cannot be present when an earlier
+    // one is absent, because that would describe a header no fork defines.
+    let optional_quantities = ["baseFeePerGas", "blobGasUsed", "excessBlobGas"];
+    let optional_hashes = ["withdrawalsRoot", "parentBeaconBlockRoot", "requestsHash"];
+    let optional_order = [
+        "baseFeePerGas",
+        "withdrawalsRoot",
+        "blobGasUsed",
+        "excessBlobGas",
+        "parentBeaconBlockRoot",
+        "requestsHash",
+    ];
+    let present: Vec<usize> = optional_order
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| block.get(*name).filter(|v| !v.is_null()).map(|_| index))
+        .collect();
+    if present
+        .iter()
+        .copied()
+        .enumerate()
+        .any(|(expected, actual)| expected != actual)
+    {
+        return Err(ProducerError::Malformed(
+            "block header has a non-contiguous fork-field set".to_string(),
+        ));
+    }
+    for name in optional_order {
+        let Some(value) = block.get(name).filter(|value| !value.is_null()) else {
+            break;
+        };
+        if optional_quantities.contains(&name) {
+            fields.push(rlp_quantity(&hex_quantity_bytes(value, name)?));
+        } else if optional_hashes.contains(&name) {
+            fields.push(rlp_value(&hex32(value, name)?));
+        } else {
+            return Err(ProducerError::Malformed(format!(
+                "unhandled optional header field {name}"
+            )));
+        }
+    }
+
+    Ok(rlp_list(&fields))
+}
+
+async fn canonical_header_from_rpc(
+    client: &reqwest::Client,
+    rpc_url: &str,
+    block_tag: &str,
+    block: &Value,
+) -> Result<Vec<u8>, ProducerError> {
+    match rpc(client, rpc_url, "debug_getRawHeader", json!([block_tag])).await {
+        Ok(raw) => hex_bytes(&raw, "raw block header"),
+        // A public provider without the debug namespace is the common case, not
+        // a reason to fail when the standard block response is sufficient.
+        Err(ProducerError::Rpc { message, .. }) if message.contains("-32601") => {
+            canonical_header_rlp(block)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 /// The consensus encoding of one `eth_getTransactionReceipt` result.
@@ -561,8 +711,7 @@ pub async fn prove_evm_receipt(
             .ok_or_else(|| ProducerError::Malformed("header has no stateRoot".to_string()))?,
         "stateRoot",
     )?;
-    let raw_header = rpc(&client, rpc_url, "debug_getRawHeader", json!([block_tag])).await?;
-    let header_rlp = hex_bytes(&raw_header, "raw block header")?;
+    let header_rlp = canonical_header_from_rpc(&client, rpc_url, &block_tag, &header).await?;
     let decoded_header = EvmBlockHeader::decode(&header_rlp)
         .map_err(|error| ProducerError::Malformed(format!("raw header: {error}")))?;
     let header_hash = keccak256_32(&header_rlp);
