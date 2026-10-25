@@ -181,6 +181,28 @@ def test_a_nonempty_p0_blocker_list_fails(tmp_path):
     ]
 
 
+def test_a_closed_blocker_is_not_open_launch_work(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    features = gate.load_matrix(matrix)["feature"]
+    features[0]["blockers"] = [
+        "**CLOSED 2026-10-25 — the historical blocker was fixed and verified**"
+    ]
+    assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == []
+
+
+def test_a_closed_blocker_does_not_hide_a_separate_open_blocker(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    features = gate.load_matrix(matrix)["feature"]
+    features[0]["blockers"] = [
+        "**CLOSED 2026-10-25 — the historical blocker was fixed and verified**",
+        "Live external-chain evidence is still pending",
+    ]
+    assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == [
+        "X3-P0-000: P0 release has 1 open blocker: "
+        "Live external-chain evidence is still pending"
+    ]
+
+
 def test_a_named_required_test_that_does_not_resolve_fails(tmp_path):
     matrix, _ = matrix_fixture(tmp_path)
     features = gate.load_matrix(matrix)["feature"]
