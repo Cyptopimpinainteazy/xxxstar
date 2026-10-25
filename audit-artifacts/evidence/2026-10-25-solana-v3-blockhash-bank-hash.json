@@ -1,0 +1,68 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "7a4f31f744a6cf13a6a4784c5d604abd51095b77",
+  "scope": "Solana finalized-proof evidence",
+  "issue_fixed": "The previous proof described the Solana RPC blockhash as a bank hash and signed that single value. A blockhash and the validator bank-state commitment are distinct and now travel as separate fields.",
+  "wire_format": {
+    "version": 3,
+    "fields": [
+      "cluster",
+      "finalized_slot",
+      "parent_slot",
+      "finalized_blockhash",
+      "finalized_bank_hash",
+      "parent_bank_hash",
+      "stake_table_digest",
+      "independent_validator_signatures"
+    ],
+    "signature_binding": "Validators sign the proof id, cluster, slots, finalized blockhash, finalized bank hash, parent bank hash, stake-table digest, and complete transfer intent."
+  },
+  "verification": [
+    {
+      "command": "cargo test -p x3-verification-router --lib",
+      "result": "PASS",
+      "tests_passed": 65,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo test -p x3-relayer --lib",
+      "result": "PASS",
+      "tests_passed": 65,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo test -p pallet-x3-crosschain-gateway --lib",
+      "result": "PASS",
+      "tests_passed": 66,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo test -p pallet-x3-crosschain-gateway --features runtime-benchmarks --lib",
+      "result": "PASS",
+      "tests_passed": 79,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 cargo test -p e2e_tests --test gateway_integration_test verification_request_translation_for_each_chain -- --nocapture",
+      "result": "PASS",
+      "tests_passed": 1,
+      "tests_failed": 0
+    },
+    {
+      "command": "cargo clippy for x3-verification-router, x3-relayer, pallet-x3-crosschain-gateway (default and runtime-benchmarks), and x3-gateway",
+      "result": "PASS",
+      "warnings_denied": true
+    },
+    {
+      "command": "bash scripts/local-ci.sh --only workspace-check,matrix-tests-exist,matrix-test-evidence,feature-matrix-check,fake-code-scan,test-cheat-scan",
+      "result": "PASS"
+    }
+  ],
+  "ci_regression_fixed": "The exact-head root CI failure reused proof id 0x05 for a second otherwise-valid translation check; the router correctly treated it as replay. The second request now uses a fresh proof id.",
+  "limitations": [
+    "The bank hash is independently signed by the configured Solana stake quorum, but the repository still lacks a bank-state proof that can reconstruct the bank hash from account-state evidence.",
+    "A transaction-inclusion proof independent of validator attestations remains to be implemented.",
+    "No Sepolia, Solana devnet, or Solana mainnet-beta live run was performed in this evidence capture."
+  ]
+}
