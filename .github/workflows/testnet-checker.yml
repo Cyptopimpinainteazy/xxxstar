@@ -9,7 +9,9 @@ permissions:
   contents: read
 jobs:
   checker-unit:
-    runs-on: ubuntu-latest
+    # The repository cannot run GitHub-hosted jobs. Reject fork PR code on our machines.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
