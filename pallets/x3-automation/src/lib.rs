@@ -292,6 +292,8 @@ pub mod pallet {
         PriceUnavailable,
         /// The task already ran to a terminal state.
         TaskNotActive,
+        /// Runtime event triggers require a bounded, consensus-safe index; absent here.
+        EventConditionUnavailable,
     }
 
     #[pallet::call]
@@ -572,7 +574,13 @@ pub mod pallet {
                     // than storing a task that is dead on arrival.
                     ensure!(lower <= upper, Error::<T>::InvalidTask);
                 }
-                Condition::Event { .. } | Condition::Manual => {}
+                Condition::Event { .. } => {
+                    // System::Events is unbounded; scanning it inside consensus
+                    // makes block proof size unbounded. Keep this disabled until
+                    // a bounded, weighted event index is implemented.
+                    return Err(Error::<T>::EventConditionUnavailable.into());
+                }
+                Condition::Manual => {}
                 Condition::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -625,9 +633,10 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => frame_system::Events::<T>::get()
-                    .iter()
-                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
+                Condition::Event { .. } => {
+                    // Existing stored event tasks must also fail closed after an upgrade.
+                    return Err(Error::<T>::EventConditionUnavailable.into());
+                }
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })
