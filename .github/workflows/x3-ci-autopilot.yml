@@ -9,6 +9,8 @@ on:
       - 'scripts/ci/test_autopilot.py'
       - 'scripts/ci/autopilot_capacity.py'
       - 'scripts/ci/test_autopilot_capacity.py'
+      - 'scripts/ci/autopilot_triage.py'
+      - 'scripts/ci/test_autopilot_triage.py'
       - '.github/workflows/x3-ci-autopilot.yml'
 
 permissions:
