@@ -5,7 +5,7 @@
 **Owner:** User (lojak)
 **Send-gate:** Per-program approval required before any external send.
 
-> **Honest ceiling:** the universe of verifiable real grant programs is in the low thousands. This DB captures every real, named program we could confirm via URL probe. Total rows: **~1,757**. Going to 100k requires fabrication, which is prohibited.
+> **Historical prospect inventory, not an active grants feed.** This collection also includes VCs, hackathons, bounties, free tiers, paid services, unverified leads and discontinued programs. Editorial totals below are historical estimates; a 2026-10-18 table-ID audit parsed **1,617 program rows** from the 12 files. See `docs/funding-os/LEGACY_CATALOG_RECOVERY.md`. No entry is a confirmed currently open or eligible funding opportunity without fresh official-source verification.
 
 ---
 
@@ -26,7 +26,7 @@
 | C31 | `C31-crowdfunding.md` | 26 | 26 (5 defunct marked) | 22 KB | ✅ done (2nd attempt) |
 | C32 | `C32-foundations.md` | 25 | 25 | 21 KB | ✅ done (4th attempt; overwrote 3rd) |
 
-**Total: ~1,772 rows of named grant programs** (excluding header/summary rows).
+**Historical editorial estimate: ~1,772 named prospects.** A strict parse of identifiable rows on the inspected master revision found **1,617**; source-level counts require reconciliation. Neither total represents currently open grants.
 
 ---
 
@@ -121,7 +121,7 @@ Total DEFUNCT marked: ~30 (Datadog, ClickUp, PearAI, Gitcoin legacy, Linea Voyag
 1. **Open `INDEX.md` (this file)** — orient on coverage
 2. **Open `C13-saas-devtools.md`** — apply to the Tier 1 zero-cost credits first; these are no-equity and immediate
 3. **Open `GRANTS_DATABASE.md`** — original C1–C12, contains the highest-value rows (AWS, GCP, Microsoft, Web3 Foundation, audit firms)
-4. **Draft the Web3 Foundation application** — use `grants/GRANTS_DATABASE.md` C4.1 notes; need treasury wallet, founder bio, milestones (these need your input)
+4. **Do not draft against the discontinued Web3 Foundation general Grants Program (C4.1).** Research the current Polkadot OpenGov Treasury route (C4.2) and any verified active funding channels; first establish eligibility, wallet/deposit requirements, technical evidence and milestones.
 5. **Browse `C25-vc-accelerators.md`** for VCs/accelerators you want to start a relationship with
 
 ---
@@ -130,7 +130,7 @@ Total DEFUNCT marked: ~30 (Datadog, ClickUp, PearAI, Gitcoin legacy, Linea Voyag
 
 - **C25 verification depth** is shallow (489 rows, 4 spot-verified). A follow-up agent could deepen this.
 - **Per-protocol bug bounty live status** on C30: 65 rows total, 21 fully verified. Some entries might be inactive or have moved platforms.
-- **C32 Foundations** is only 10 rows — most major foundations covered; niche ones deferred.
+- **C32 Foundations** has 25 identified program rows in the current file; their present availability and eligibility still require fresh verification.
 - **No dedicated regional agents for Africa / LatAm / SEA** beyond what C28 covered.
 
 ---
