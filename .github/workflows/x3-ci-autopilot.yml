@@ -24,6 +24,8 @@ on:
       - 'scripts/ci/test_github_evidence.py'
       - 'scripts/ci/integration_join.py'
       - 'scripts/ci/test_integration_join.py'
+      - 'scripts/ci/review_evidence.py'
+      - 'scripts/ci/test_review_evidence.py'
       - '.github/workflows/pr-agent.yml'
       - '.github/workflows/pr-agent-auto.yml'
       - '.pr_agent.toml'
@@ -68,6 +70,8 @@ jobs:
           python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
       - name: Verify exact-head PR-Agent and CI evidence join
         run: python3 -m unittest discover -s scripts/ci -p test_integration_join.py -v
+      - name: Verify PR-Agent output evidence bridge
+        run: python3 -m unittest discover -s scripts/ci -p test_review_evidence.py -v
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
