@@ -704,3 +704,20 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         );
     });
 }
+
+
+#[test]
+fn event_trigger_registration_is_refused_without_a_bounded_event_index() {
+    new_test_ext().execute_with(|| {
+        let reserved_before = reserved(1);
+        assert!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Event { topic: [0u8; 32] },
+            Action::NoChange,
+            1000,
+        )
+        .is_err(), "unbounded system event scans cannot be admitted in consensus");
+        assert!(Automation::account_tasks(1).is_empty());
+        assert_eq!(reserved(1), reserved_before, "refusal must not reserve funds");
+    });
+}
