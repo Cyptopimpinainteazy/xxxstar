@@ -27,7 +27,11 @@ use x3_lang_execution::{
     trading::*,
 };
 
-type NativeVenueRoute<T> = (<T as frame_system::Config>::AccountId, <T as Config>::AssetId, <T as Config>::AssetId);
+type NativeVenueRoute<T> = (
+    <T as frame_system::Config>::AccountId,
+    <T as Config>::AssetId,
+    <T as Config>::AssetId,
+);
 
 fn error(message: &str) -> HostError {
     HostError {
