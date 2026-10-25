@@ -486,6 +486,11 @@ GATES_FAST=(
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
   # `test_verify_too_short_merkle_proof`); a warm run is seconds, a cold one about a minute.
   "test x3-cross-vm-bridge:cargo test -p x3-cross-vm-bridge"
+  # The Bitcoin vault owns X3's threshold-signing state machine and SPV checks.
+  # It had no dedicated gate, so its signer and withdrawal tests only ran under
+  # the slow whole-workspace job.
+  "clippy x3-bitcoin-vault:cargo clippy --locked -p x3-bitcoin-vault --all-targets -- -D warnings"
+  "test x3-bitcoin-vault:cargo test --locked -p x3-bitcoin-vault"
   # The coordinator verifies release beacons, but verification is only useful
   # when the authority path can actually sign and exchange them. This gate
   # covers the shared statement primitive, durable exchange, equivocation

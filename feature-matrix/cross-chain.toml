@@ -6,9 +6,9 @@ name = "BTC Fortress gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-btc-spv/src/lib.rs"]
-implemented = 85
-tested = 90
-mainnet_ready = 50
+implemented = 90
+tested = 92
+mainnet_ready = 53
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -18,7 +18,7 @@ blockers = [
   "A chain can be born anchored — `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) — and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
   "The sender runs unattended (`push-headers.mjs --loop --cursor …`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
   "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks — which alternate `nBits` mid-epoch after a twenty-minute gap — are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
-  "No BTC signer quorum for withdrawals",
+  "The vault now verifies an injected X3 proof authority, reserves UTXOs, enforces cumulative daily limits, and requires a threshold of distinct secp256k1 signer approvals bound to the exact withdrawal payload. The runtime/pallet path still has no withdrawal-request or release dispatchables, so the live bridge cannot yet exercise this vault flow.",
   "BTC mainnet disabled by feature flag; no external audit",
 ]
 # `crates/x3-gateway` used to be this row's only path. It is the REST/GraphQL API
@@ -29,7 +29,14 @@ blockers = [
 # (deposits, withdrawals, PSBTs, header-chain verification) and the bridge's HTLC
 # and SPV modules.
 evidence = ["pallets/x3-settlement-engine/src/btc_gateway.rs", "pallets/x3-settlement-engine/src/lib.rs", "crates/x3-bitcoin-vault/src/lib.rs", "crates/x3-bridge/src/bitcoin_htlc.rs", "crates/x3-btc-spv/src/lib.rs", "scripts/btc/push-headers.py", "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"]
-test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "pallets/x3-settlement-engine/src/tests/data/btc_relayer_testnet_headers.txt", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "scripts/testnet/btc-header-source-drill.sh", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, four tests over data a real Bitcoin Core v28.1.0 regtest node produced, the `submit_btc_headers` batch tests, and two tests that decode the relayer's own payload from a real testnet3 run and admit it on an anchored chain while refusing it with its first header dropped) plus the vault's 23 tests including header-chain linkage and tampered-signature rejection; the drill follows public testnet live and refuses a tampered answer with a non-zero exit naming the height"]
+test_evidence = ["pallets/x3-settlement-engine/src/tests.rs", "pallets/x3-settlement-engine/src/tests/data/btc_relayer_testnet_headers.txt", "crates/x3-bitcoin-vault/src/lib.rs", "scripts/btc/capture-regtest-spv.py", "scripts/testnet/btc-header-source-drill.sh", "note: the pallet's BTC tests (targets Bitcoin refuses, wire-header hash, merkle path, block binding, the eight anchor negative controls, four tests over data a real Bitcoin Core v28.1.0 regtest node produced, the `submit_btc_headers` batch tests, and two tests that decode the relayer's own payload from a real testnet3 run and admit it on an anchored chain while refusing it with its first header dropped) plus 29 vault tests including header-chain linkage, tampered-signature rejection, withdrawal proof-authority refusal, exact-payload signer binding, distinct-signer threshold progression, reserve accounting and cumulative daily limits; the drill follows public testnet live and refuses a tampered answer with a non-zero exit naming the height"]
+required_tests = [
+  "withdrawal_x3_proof_must_verify_before_signer_approval",
+  "withdrawal_requires_distinct_verified_signer_threshold",
+  "withdrawal_approval_is_bound_to_the_exact_payload",
+  "pending_withdrawals_reserve_vault_utxos",
+  "daily_withdrawal_limit_accumulates_and_resets_only_forward",
+]
 registry_feature = "btc_fortress_gateway"
 
 [[feature]]
@@ -48,7 +55,7 @@ claim_risk = false
 blockers = [
   "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
   "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
-  "No signer quorum for withdrawals; no external audit",
+  "The vault now has verifier-gated, exact-payload threshold approvals and reserve accounting for withdrawals; the runtime/pallet release path and external audit remain open.",
   "Three SPV implementations still exist — this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` — and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it",
 ]
 # The old note said "proof verification was placeholder". Half true, and the wrong

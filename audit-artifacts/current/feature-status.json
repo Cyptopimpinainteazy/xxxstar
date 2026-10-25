@@ -595,7 +595,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 72,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "pallets/x3-settlement-engine/src/btc_gateway.rs",
@@ -607,16 +607,16 @@
         "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"
       ],
       "id": "X3-XCHAIN-001",
-      "implemented": 85,
+      "implemented": 90,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 50,
+      "mainnet_ready": 53,
       "missing_work": [
         "Regtest is real and the header source now runs against public testnet; mainnet and a live deposit are not: a Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`), `scripts/btc/push-headers.py` reads real testnet3 headers and `scripts/testnet/btc-header-source-drill.sh` proves it live and proves it refuses a tampered answer \u2014 but no X3 chain has admitted a public-network header and no coin has ever moved on a network anyone else can see",
         "A chain can be born anchored \u2014 `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) \u2014 and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
         "The sender runs unattended (`push-headers.mjs --loop --cursor \u2026`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
         "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks \u2014 which alternate `nBits` mid-epoch after a twenty-minute gap \u2014 are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
-        "No BTC signer quorum for withdrawals",
+        "The vault now verifies an injected X3 proof authority, reserves UTXOs, enforces cumulative daily limits, and requires a threshold of distinct secp256k1 signer approvals bound to the exact withdrawal payload. The runtime/pallet path still has no withdrawal-request or release dispatchables, so the live bridge cannot yet exercise this vault flow.",
         "BTC mainnet disabled by feature flag; no external audit"
       ],
       "name": "BTC Fortress gateway",
@@ -631,8 +631,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 90,
-      "tests": "tested score 90% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -654,7 +654,7 @@
       "missing_work": [
         "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
         "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
-        "No signer quorum for withdrawals; no external audit",
+        "The vault now has verifier-gated, exact-payload threshold approvals and reserve accounting for withdrawals; the runtime/pallet release path and external audit remain open.",
         "Three SPV implementations still exist \u2014 this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` \u2014 and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it"
       ],
       "name": "Bitcoin HTLC script logic",
@@ -4995,14 +4995,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "4533a8b7f9fd8ffbc042dc5e36b2f1326db5e45ddaf0e19be2beea014ef05d2b",
+    "source_digest": "2ee6e1fdbde999c499f397234d2a04ecfb424969c00a9a2d2539291eb7c3df6f",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "880ae98763f6d5e91b3914a8f261df40e9619cedca2db037c86e1b2aa5aebc43",
+      "feature-matrix/cross-chain.toml": "338ae8b3708fcc3879aba227e5cb6ef797f0c3846a30d284b18ff003d637abce",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",
