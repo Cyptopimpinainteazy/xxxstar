@@ -182,6 +182,12 @@ elif [ "$via_router" = 1 ]; then
   # Same reason as --local: a PR-Agent fallback would reach a provider directly
   # and escape the router's accounting.
   export CONFIG__FALLBACK_MODELS='[]'
+  # DeepSeek runs thinking mode by default and reasoning tokens count against
+  # max_tokens. At PR-Agent's default bound the reasoning consumes the whole
+  # allowance, the response arrives incomplete, and the router reports the
+  # provider as failed and silently serves the review from a free local model.
+  # Measured on PR #672: max_tokens=4096 -> qwen3:8b, 16000 -> deepseek-v4-pro.
+  overrides+=("--config.max_tokens=${PR_AGENT_ROUTER_MAX_TOKENS:-16000}")
 elif [ -n "$model_override" ]; then
   overrides+=("--config.model=$model_override")
 fi

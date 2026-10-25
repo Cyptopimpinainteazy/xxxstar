@@ -336,7 +336,7 @@ X3_ROUTER_TOKEN=probe-token PR_AGENT_VENV="$fake_venv" PR_AGENT_ARGV_LOG="$argv_
   X3_ROUTER_BASE="http://127.0.0.1:$stub_port/v1" GITHUB_TOKEN="test-token" \
   bash "$ROOT_DIR/services/pr-agent/review.sh" --via-router --diff /tmp/x.diff review >"$tmp/out" 2>&1 || true
 actual="$(tr '\n' ' ' < "$argv_log" | sed 's/ $//')"
-expected="--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=openai/x3-deep"
+expected="--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=openai/x3-deep --config.max_tokens=16000"
 if [ "$actual" = "$expected" ]; then
   pass "--via-router routes through the router policy with no direct fallback"
 else
