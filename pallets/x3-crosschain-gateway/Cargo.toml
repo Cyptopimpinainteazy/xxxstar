@@ -24,6 +24,7 @@ frame-system = { workspace = true, default-features = false }
 frame-benchmarking = { workspace = true, optional = true, default-features = false }
 sp-std = { workspace = true, default-features = false }
 sp-runtime = { workspace = true, default-features = false }
+sp-core = { workspace = true, optional = true, default-features = false }
 
 # Verification router provides the proof routing + verifier implementations.
 x3-verification-router = { path = "../../crates/x3-verification-router", default-features = false }
@@ -32,7 +33,6 @@ serde = { version = "1.0", default-features = false, features = ["derive", "allo
 log = { workspace = true, default-features = false }
 
 [dev-dependencies]
-sp-core = { workspace = true, features = ["std"] }
 # The off-chain gateway derives the same withdrawal id this pallet emits and keys its
 # store by, so the tests assert the two derivations agree by calling the crate. The
 # pallet's test helper used to repeat the derivation instead — and when the pallet's
@@ -64,11 +64,14 @@ std = [
   "frame-benchmarking?/std",
   "sp-std/std",
   "sp-runtime/std",
+  "dep:sp-core",
+  "sp-core?/std",
   "serde/std",
   "log/std",
   "x3-verification-router/std",
 ]
 runtime-benchmarks = [
+    "dep:sp-core",
     "frame-benchmarking/runtime-benchmarks",
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
