@@ -11,6 +11,7 @@ PATTERNS = (
     ("INFRASTRUCTURE", (r"lost communication with the server", r"runner connection lost", r"the runner has received a shutdown signal", r"no space left on device", r"could not resolve host")),
     ("TEST_FAILURE", (r"test result: failed", r"assertion.*failed", r"failures:", r"\bpanicked at\b", r"error: test failed")),
     ("BUILD_FAILURE", (r"error\[e[0-9]{4}\]", r"compilation failed", r"could not compile")),
+    ("EVIDENCE_STORAGE", (r"artifact storage quota has been hit", r"unable to upload any new artifacts")),
 )
 
 

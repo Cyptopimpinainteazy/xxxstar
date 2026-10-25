@@ -19,6 +19,22 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(value["classification"], "INFRASTRUCTURE")
         self.assertFalse(value["safe_to_ignore"])
 
+    def test_artifact_quota_is_evidence_storage_failure_not_code(self):
+        value = triage.classify(
+            {"status": "completed", "conclusion": "failure"},
+            "Failed to CreateArtifact: Artifact storage quota has been hit. Unable to upload any new artifacts."
+        )
+        self.assertEqual(value["classification"], "EVIDENCE_STORAGE")
+        self.assertFalse(value["safe_to_ignore"])
+
+    def test_artifact_quota_does_not_mask_real_build_failure(self):
+        value = triage.classify(
+            {"status": "completed", "conclusion": "failure"},
+            "error: could not compile pallet-x3-automation\\nFailed to CreateArtifact: Artifact storage quota has been hit."
+        )
+        self.assertEqual(value["classification"], "BUILD_FAILURE")
+        self.assertFalse(value["safe_to_ignore"])
+
     def test_authentication_is_configuration_failure(self):
         value = triage.classify({"status": "completed", "conclusion": "failure"}, "Permission denied (publickey)")
         self.assertEqual(value["classification"], "CONFIGURATION")
