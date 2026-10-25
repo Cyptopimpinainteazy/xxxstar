@@ -86,6 +86,7 @@ PRODUCTION_WORKSPACE_PATHS = (
     "pallets/**",
     "node/**",
     "runtime/**",
+    "scripts/**",
     "tests/**",
     "x3-lang/**",
 )
