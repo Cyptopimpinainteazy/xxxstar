@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "f2a8e537e",
+  "candidate_commit": "6015a6ca1",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "Solana finalized transaction inclusion and bank-state evidence",
@@ -14,6 +14,7 @@
     "Poll Solana finality with getSlot/getBlock finalized commitment instead of inferring finality from slot age.",
     "Query getTransaction and getBlock with finalized commitment and require the transaction signature, slot, blockhash, index, and successful execution status to agree.",
     "Require at least three distinct Solana RPC endpoints for mainnet and a two-thirds provider quorum reporting identical evidence.",
+    "Reject a mainnet relayer configuration with fewer than three distinct non-empty RPC endpoints at startup.",
     "Carry the signed transaction evidence through relayer proof hashing, validator quorum verification, settlement verification, and gateway benchmarks."
   ],
   "verification": [
@@ -26,7 +27,7 @@
     {
       "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --no-fail-fast",
       "result": "PASS",
-      "tests_passed": 79,
+      "tests_passed": 80,
       "tests_failed": 0
     },
     {
@@ -70,6 +71,7 @@
     "A changed serialized-transaction signature or commitment is refused.",
     "An RPC transaction whose slot, blockhash, signature index, execution status, or serialized signature disagrees with the claim is refused.",
     "A mainnet configuration with fewer than three distinct RPC endpoints is refused before any proof can be produced.",
+    "Duplicate or empty RPC endpoints cannot inflate the configured mainnet provider count.",
     "Finality uses the RPC finalized commitment; changing the configured age threshold cannot turn an unfinalized slot into a finalized one.",
     "Provider observations that do not reach the two-thirds agreement threshold are refused."
   ],
