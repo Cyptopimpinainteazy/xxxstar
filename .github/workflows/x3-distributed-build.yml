@@ -62,7 +62,7 @@ jobs:
           failed=$(grep -oE '[0-9]+ failed' "$log" 2>/dev/null | awk '{s+=$1} END {print s+0}')
           {
             echo "host=$(hostname)"
-            echo "commit=$(git rev-parse --short HEAD)"
+            echo "commit=$(git rev-parse HEAD)"
             echo "passed=$passed"
             echo "failed=$failed"
             echo "seconds=${SECONDS_TAKEN:-n/a}"
@@ -114,7 +114,7 @@ jobs:
           failed=$(grep -oE '[0-9]+ failed' "$log" 2>/dev/null | awk '{s+=$1} END {print s+0}')
           {
             echo "host=$(hostname)"
-            echo "commit=$(git rev-parse --short HEAD)"
+            echo "commit=$(git rev-parse HEAD)"
             echo "passed=$passed"
             echo "failed=$failed"
             echo "seconds=${SECONDS_TAKEN:-n/a}"
@@ -147,9 +147,10 @@ jobs:
             echo
             echo "| Job | Host | Commit | Result | Tests passed | Tests failed | Seconds |"
             echo "|---|---|---|---|---|---|---|"
-            echo "| x3-lang workspace | $A_HOST | $A_COMMIT | $A_RESULT | $A_PASSED | $A_FAILED | $A_SECONDS |"
-            echo "| kernel, integration, gateway | $B_HOST | $B_COMMIT | $B_RESULT | $B_PASSED | $B_FAILED | $B_SECONDS |"
+            echo "| x3-lang workspace | $A_HOST | ${A_COMMIT:0:10} | $A_RESULT | $A_PASSED | $A_FAILED | $A_SECONDS |"
+            echo "| kernel, integration, gateway | $B_HOST | ${B_COMMIT:0:10} | $B_RESULT | $B_PASSED | $B_FAILED | $B_SECONDS |"
           } | tee -a "$GITHUB_STEP_SUMMARY"
           test "$A_RESULT" = success && test "$B_RESULT" = success
           test "$A_HOST" = x3star1 && test "$B_HOST" = x3star2
-          test "$A_COMMIT" = "$B_COMMIT"
+          # Full hashes: `--short` length depends on each clone, so short forms can differ.
+          test -n "$A_COMMIT" && test "$A_COMMIT" = "$B_COMMIT"
