@@ -60,6 +60,7 @@ pub mod pallet {
     };
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
+    use sp_std::vec::Vec;
     use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
 
     use x3_automation::{
@@ -624,7 +625,7 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => frame_system::Pallet::<T>::events()
+                Condition::Event { topic } => frame_system::Events::<T>::get()
                     .iter()
                     .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
                 Condition::Manual => true,
