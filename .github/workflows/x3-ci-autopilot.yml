@@ -22,6 +22,8 @@ on:
       - 'scripts/ci/test_integration_e2e.py'
       - 'scripts/ci/github_evidence.py'
       - 'scripts/ci/test_github_evidence.py'
+      - 'scripts/ci/integration_join.py'
+      - 'scripts/ci/test_integration_join.py'
       - '.github/workflows/pr-agent.yml'
       - '.github/workflows/pr-agent-auto.yml'
       - '.pr_agent.toml'
@@ -64,6 +66,8 @@ jobs:
         run: |
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'PR number must be numeric' >&2; exit 2; }
           python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
+      - name: Verify exact-head PR-Agent and CI evidence join
+        run: python3 -m unittest discover -s scripts/ci -p test_integration_join.py -v
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
