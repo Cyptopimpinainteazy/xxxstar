@@ -6,9 +6,9 @@ name: Local CI
 # that runs without someone starting it by hand.
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
+    branches: [master, main]
     types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
@@ -28,6 +28,8 @@ concurrency:
 
 jobs:
   local-ci:
+    # A green draft preflight must not resemble the full required CI gate.
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'draft-preflight (not merge evidence)' || 'local-ci (full verification)' }}
     # The repository is public and the runners are our own machines: never run
     # code from a fork's pull request on them.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository

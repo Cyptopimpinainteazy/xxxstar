@@ -20,23 +20,28 @@ DESKTOP_GATES = COMMON_GATES + ("test-js-x3-desktop",)
 
 
 def _docs(path):
-    if path == "README.md":
-        return True
-    if not path.startswith("docs/") or not path.endswith(".md"):
-        return False
-    # CI and security documentation describe release policy; keep their verification broad.
-    return not (
-        path == "docs/local-ci.md"
-        or path.startswith("docs/reports/")
-        or path.startswith("docs/security/")
-        or path.startswith("docs/mainnet/")
+    # Positive allowlist only: deployment, economics, mainnet, CI policy, and
+    # release notes are not proven harmless just because they end in .md.
+    return path == "README.md" or (
+        path.endswith(".md") and (
+            path in ("docs/guide.md", "docs/notes.md")
+            or path.startswith("docs/guides/")
+            or path.startswith("docs/tutorials/")
+        )
     )
 
 
 def _desktop_ui(path):
-    return (
-        path.startswith("apps/x3-desktop/src/")
-        and PurePosixPath(path).suffix in (".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".html")
+    # Never treat arbitrary frontend TS/JS as presentation-only: even a .tsx
+    # entrypoint can invoke transaction signing, network APIs, or Tauri IPC.
+    styles = (
+        "apps/x3-desktop/src/styles.css",
+        "apps/x3-desktop/src/index.css",
+        "apps/x3-desktop/src/App.css",
+    )
+    return path in styles or (
+        path.startswith("apps/x3-desktop/src/ui/presentation/")
+        and PurePosixPath(path).suffix in (".tsx", ".css", ".scss")
     )
 
 

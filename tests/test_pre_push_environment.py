@@ -1,5 +1,6 @@
 """A push gate must not export the sending repository into test repositories."""
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -28,6 +29,12 @@ class PushEnvironmentTests(unittest.TestCase):
             head = git("rev-parse", "HEAD").stdout.strip()
             scripts = sending / "scripts"
             scripts.mkdir()
+            planner = scripts / "ci"
+            planner.mkdir()
+            # The hook always validates its risk selector before touching the
+            # sending repo. Keep this isolated fixture faithful to that contract.
+            for file in ("risk_plan.py", "test_risk_plan.py"):
+                shutil.copy2(ROOT / "scripts" / "ci" / file, planner / file)
             # This is the gate's foreign-repository operation, without a build.
             (scripts / "local-ci.sh").write_text(
                 "#!/usr/bin/env bash\nset -euo pipefail\n"
@@ -49,6 +56,25 @@ class PushEnvironmentTests(unittest.TestCase):
                 "rev-parse", "HEAD"], env=env, capture_output=True, text=True)
             self.assertEqual(foreign.returncode, 0, foreign.stderr)
             self.assertNotEqual(foreign.stdout.strip(), head)
+
+            # Regression: pushing a different branch tip from this checkout may
+            # contain critical edits. The hook must not classify the safe HEAD.
+            (sending / "runtime.rs").write_text("consensus critical\n")
+            git("add", "runtime.rs")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "-qm", "off-head critical change")
+            pushed_sha = git("rev-parse", "HEAD").stdout.strip()
+            git("reset", "--hard", head)
+            mismatch = subprocess.run(["bash", str(ROOT / ".githooks/pre-push")],
+                cwd=sending, env={**env, "GIT_DIR": str(sending / ".git"),
+                    "GIT_WORK_TREE": str(sending),
+                    "GIT_INDEX_FILE": str(sending / ".git/index"),
+                    "FOREIGN_REPO": str(root / "foreign")},
+                input=f"refs/heads/topic {pushed_sha} refs/heads/topic {'0' * 40}\n",
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(mismatch.returncode, 0, mismatch.stdout + mismatch.stderr)
+            self.assertIn("pushed ref does not match HEAD", mismatch.stdout)
+            self.assertIn("full pre-push verification", mismatch.stdout)
 
 
 if __name__ == "__main__":

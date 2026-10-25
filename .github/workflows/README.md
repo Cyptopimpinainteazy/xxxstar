@@ -5,14 +5,14 @@ The gate of record for this repository is **local CI**, not GitHub-hosted Action
 ## Canonical verification
 
 - `scripts/local-ci.sh` runs the real gate suite with real exit codes.
-- `.githooks/pre-push` invokes `scripts/local-ci.sh --pre-push`.
+- `.githooks/pre-push` invokes full `scripts/local-ci.sh --pre-push` for protected, critical, unknown, or off-HEAD pushes; narrowly allowlisted low-risk pushes receive advisory scoped checks.
 - Trusted Linux workflows use the self-hosted runner labels `[self-hosted, Linux, X64, x3]`.
 - Heavy, release, security, deployment, desktop, and cross-domain workflows are retained for **manual dispatch**.
 - Cross-domain reusable workflows may also retain `workflow_call` where another manual workflow composes them.
 
 ## Automatic GitHub Actions policy
 
-Automatic GitHub-**hosted** CI is disabled because these jobs terminate before executing test steps. The trusted `local-ci.yml` workflow instead runs on self-hosted runners for master pushes and same-repository PRs; forks are excluded explicitly.
+Automatic GitHub-**hosted** CI is disabled because these jobs terminate before executing test steps. The trusted `local-ci.yml` workflow instead runs on self-hosted runners for master/main pushes and same-repository PRs targeting master/main; forks are excluded explicitly.
 
 Draft PRs run a lightweight, non-signoff preflight. When a PR is marked ready for review, the exact-head full local CI suite runs and publishes the required `x3/local-ci` status. Pre-push focused checks on low-risk files cannot satisfy that requirement. Do **not** run untrusted fork code on self-hosted runners.
 

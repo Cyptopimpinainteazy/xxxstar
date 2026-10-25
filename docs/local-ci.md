@@ -170,9 +170,9 @@ PASS.
 ### Publishing the verdict
 
 The trusted `.github/workflows/local-ci.yml` runs automatically on
-same-repository pull requests and master pushes (fork PRs are excluded).
+same-repository pull requests targeting `master`/`main` and pushes to those branches (fork PRs are excluded).
 Draft PRs receive only a non-signoff preflight, and `ready_for_review`
-triggers full exact-head CI. Other heavy workflows remain manual.
+triggers full exact-head CI. Other workflows may run automatically under their own triggers; heavyweight release/deployment gates retain separate authorization.
 `--publish-status` posts
 the run's verdict as the commit status `x3/local-ci` on the exact SHA the run
 tested (`scripts/x3-publish-status.sh` wraps the API call). `success` is posted
@@ -368,12 +368,12 @@ queue slot:
 inspection. The batch branch is never merged automatically — review its runner
 verdict and merge whichever branches it proves.
 
-`.githooks/pre-push` delegates to `scripts/local-ci.sh --pre-push`:
+`.githooks/pre-push` selects verification using the pushed ref and a fail-closed risk plan:
 
-1. the fast gate set above, always;
-2. `--live` when the diff touches `X3-contracts/evm/**` or `X3-contracts/svm/**`;
-3. `--variants` when the diff touches `runtime/**`;
-4. `--release` and `--variants` when the push targets `master`/`main`.
+1. pushes targeting protected `master`/`main` run full `--pre-push` release and variant gates;
+2. runtime, contracts, consensus, CI policy, unknown paths, unresolvable history, or pushes whose target commit is not checked-out `HEAD` run full `--pre-push`;
+3. positively allowlisted informational docs and presentation-only desktop changes may run focused advisory checks after passing the risk-selector self-tests;
+4. all ready-for-review PRs still require full exact-head `x3/local-ci` before merge. Focused checks never publish that status.
 
 Escape hatches, both deliberately loud:
 

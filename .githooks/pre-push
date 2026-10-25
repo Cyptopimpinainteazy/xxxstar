@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # pre-push — the only gate a push passes through on this machine.
 #
-# GitHub-hosted Actions cannot execute for this account (every run finishes
-# step-less), so a push that skips this hook is genuinely unverified. The hook
-# delegates to scripts/local-ci.sh --pre-push, which runs:
-#   * the fast gate set (format, guards, wiring, check, clippy matrix, unit tests)
-#   * every gate the outgoing diff implies (contract gates, runtime variants)
-#   * the release gate + variant dry-runs when the default branch is the target
+# Protected branches, unknown/critical changes, and off-HEAD ref pushes run
+# the complete pre-push checks. Explicitly allowlisted presentation-only or
+# informational-doc edits may use focused advisory checks. Neither case replaces
+# the full exact-commit CI required before merge.
 #
 # Escape hatches, both loud:
 #   X3_LOCAL_CI_SKIP_ALL=1   run nothing (the push is unverified)
@@ -25,11 +23,16 @@ fi
 
 # Read the whole ref list first: the gate run must not consume the hook's stdin.
 refs="$(cat)"
+# A push can name another branch while HEAD remains on a harmless checkout.
+# Never apply a focused HEAD-based risk plan to another commit being pushed.
+head_sha="$(git rev-parse --verify 'HEAD^{commit}' 2>/dev/null)" || head_sha=""
+ref_mismatch=0
 push_ref=""
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -z "${remote_ref:-}" ] && continue
   # Skip deletions: there is nothing to verify.
   case "$local_sha" in 0000000000000000000000000000000000000000) continue ;; esac
+  [ -n "$head_sha" ] && [ "$local_sha" = "$head_sha" ] || ref_mismatch=1
   push_ref="$remote_ref"
   case "$remote_ref" in
     refs/heads/master|refs/heads/main) push_ref="$remote_ref"; break ;;
@@ -69,7 +72,12 @@ else
       # Unknown paths, unresolvable Git history and changes to this very policy
       # always select "full". Focused checks are advisory: they never publish
       # the exact-head x3/local-ci status required to merge.
-      plan="$(python3 scripts/ci/risk_plan.py --base "${X3_LOCAL_CI_BASE:-origin/master}")" || plan=full
+      if [ "$ref_mismatch" -ne 0 ]; then
+        echo "[pre-push] pushed ref does not match HEAD: forcing full verification"
+        plan=full
+      else
+        plan="$(python3 scripts/ci/risk_plan.py --base "${X3_LOCAL_CI_BASE:-origin/master}")" || plan=full
+      fi
       case "$plan" in
         focused:*)
           gates="${plan#focused:}"

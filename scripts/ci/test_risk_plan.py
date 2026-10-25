@@ -17,7 +17,7 @@ class RiskPlanTests(unittest.TestCase):
         self.assertNotIn("workspace-check", gates)
 
     def test_ui_only_tests_the_desktop(self):
-        mode, gates = choose_profile(["apps/x3-desktop/src/App.tsx", "docs/notes.md"])
+        mode, gates = choose_profile(["apps/x3-desktop/src/ui/presentation/Header.tsx", "docs/notes.md"])
         self.assertEqual(mode, "focused")
         self.assertIn("test-js-x3-desktop", gates)
 
@@ -32,12 +32,12 @@ class RiskPlanTests(unittest.TestCase):
                 self.assertEqual(choose_profile([path])[0], "full")
 
     def test_non_ui_desktop_files_are_full(self):
-        for path in ["apps/x3-desktop/src-tauri/src/main.rs", "apps/x3-desktop/package.json", "apps/x3-desktop/src/api/ledger.py"]:
+        for path in ["apps/x3-desktop/src-tauri/src/main.rs", "apps/x3-desktop/package.json", "apps/x3-desktop/src/api/ledger.py", "apps/x3-desktop/src/api/sign_and_send_tx.ts", "apps/x3-desktop/src/App.tsx", "apps/x3-desktop/src/ui/wallet.tsx", "apps/x3-desktop/src/agent.ts"]:
             with self.subTest(path=path):
                 self.assertEqual(choose_profile([path])[0], "full")
 
     def test_unknown_and_mixed_critical_changes_fail_closed(self):
-        for paths in [[], ["random/new.rs"], ["docs/guide.md", "runtime/src/lib.rs"], ["docs/reports/SECURITY_BLOCKERS.md"], ["docs/local-ci.md"], ["../README.md"]]:
+        for paths in [[], ["random/new.rs"], ["docs/guide.md", "runtime/src/lib.rs"], ["docs/reports/SECURITY_BLOCKERS.md"], ["docs/local-ci.md"], ["docs/deployment.md"], ["docs/mainnet-upgrade.md"], ["docs/gas-policy.md"], ["docs/release-process.md"], ["../README.md"]]:
             with self.subTest(paths=paths):
                 self.assertEqual(choose_profile(paths)[0], "full")
 
