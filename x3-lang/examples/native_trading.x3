@@ -1,0 +1,18 @@
+asset A = x3vm.x3.0x01 { decimals: 0 }
+asset B = x3vm.x3.0x02 { decimals: 0 }
+risk policy Native {
+    max_slippage: 50 bps
+    max_gas: 10 A
+    max_flash_fee: 0 bps
+    deadline: 100 blocks
+    require_private_submission: false
+}
+atomic trade NativeArb using Native {
+    borrow 100 A from lender as debt
+    let b = swap debt.amount A -> B via left min_out 190 B
+    let a = swap b B -> A via right min_out 180 A
+    repay debt
+    require net_profit >= 1 A
+    require all_debts_repaid
+    emit receipt
+}

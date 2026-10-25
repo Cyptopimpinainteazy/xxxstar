@@ -16,6 +16,9 @@ targets = ["x86_64-unknown-linux-gnu"]
 crate-type = ["rlib"]
 
 [dependencies]
+x3-dex = { path = "../../crates/x3-dex", default-features = false }
+x3-lang-execution = { path = "../../x3-lang/crates/x3-execution", default-features = false }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 frame-benchmarking = { workspace = true, default-features = false, optional = true }
@@ -52,6 +55,9 @@ x3-common = { path = "../../crates/x3-common", default-features = false }
 [features]
 default = ["std"]
 std = [
+    "x3-dex/std",
+    "x3-lang-execution/std",
+    "serde_json/std",
     "frame-support/std",
     "frame-system/std",
     "pallet-balances/std",

@@ -137,6 +137,7 @@ REFUSES = {
     "events_and_host_calls.x3": "X3_PARSE_NO_INTENT",
     "flagship_b52.x3": "X3_PARSE_NO_INTENT",
     "mainnet_safe_swap.x3": "X3_PARSE_NO_INTENT",
+    "native_trading.x3": "X3_PARSE_NO_INTENT",
     "objective_routing.x3": "X3_PARSE_NO_INTENT",
     "opportunity_graph.x3": "X3_PARSE_NO_INTENT",
     "parallel_dag.x3": "X3_PARSE_NO_INTENT",

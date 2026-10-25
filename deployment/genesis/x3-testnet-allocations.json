@@ -2,7 +2,7 @@
   "network": "x3-testnet",
   "generated_at": "2026-02-18",
   "token": {
-    "asset_id": 1000,
+    "asset_id": 0,
     "symbol": "X3",
     "decimals": 12,
     "total_supply": "8888888888",

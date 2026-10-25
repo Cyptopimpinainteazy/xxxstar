@@ -103,6 +103,7 @@ impl EvmHeaderWatcher {
                         block_number: block_num,
                         block_hash: header.hash,
                         state_root: header.state_root,
+                        receipts_root: header.receipts_root,
                         timestamp: header.timestamp,
                         chain_id: self.config.chain_id,
                     });
@@ -213,6 +214,9 @@ impl EvmHeaderWatcher {
         let state_root_str = block["stateRoot"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing state root"))?;
+        let receipts_root_str = block["receiptsRoot"]
+            .as_str()
+            .ok_or_else(|| anyhow!("Missing receipts root"))?;
         let timestamp_str = block["timestamp"]
             .as_str()
             .ok_or_else(|| anyhow!("Missing timestamp"))?;
@@ -220,6 +224,7 @@ impl EvmHeaderWatcher {
         // Convert hex strings to [u8; 32] arrays
         let block_hash = hex_to_array32(hash_str)?;
         let state_root = hex_to_array32(state_root_str)?;
+        let receipts_root = hex_to_array32(receipts_root_str)?;
 
         let timestamp = u64::from_str_radix(timestamp_str.trim_start_matches("0x"), 16)
             .map_err(|e| anyhow!("Failed to parse timestamp: {}", e))?;
@@ -227,6 +232,7 @@ impl EvmHeaderWatcher {
         Ok(BlockHeader {
             hash: block_hash,
             state_root,
+            receipts_root,
             timestamp,
         })
     }
@@ -236,6 +242,7 @@ impl EvmHeaderWatcher {
 struct BlockHeader {
     hash: [u8; 32],
     state_root: [u8; 32],
+    receipts_root: [u8; 32],
     timestamp: u64,
 }
 

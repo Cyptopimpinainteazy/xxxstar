@@ -13,7 +13,8 @@ use pallet_x3_kernel::X3VmAdapter;
 use pallet_x3_kernel::{X3ExecutorAdapter, EXECUTION_RECEIPT_VERSION};
 
 fn compile(source: &str) -> Vec<u8> {
-    x3_x3_integration::compiler_bridge::compile_source(source).expect("valid source must compile")
+    x3_x3_integration::compiler_bridge::compile_legacy_source(source)
+        .expect("valid source must compile")
 }
 
 #[test]

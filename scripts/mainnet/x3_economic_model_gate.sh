@@ -62,6 +62,11 @@ m = re.search(r"pub const X3_DECIMALS: u8 = ([0-9]+);", pallet)
 code_decimals = int(m.group(1)) if m else None
 check("pallet decimals match the manifest", code_decimals == manifest_decimals,
       f"pallet={code_decimals} manifest={manifest_decimals}")
+asset = re.search(r"pub const X3_ASSET_ID: u32 = ([0-9]+);", pallet)
+code_asset_id = int(asset.group(1)) if asset else None
+manifest_asset_id = int(manifest["token"]["asset_id"])
+check("pallet asset id matches the manifest", code_asset_id == manifest_asset_id,
+      f"pallet={code_asset_id} manifest={manifest_asset_id}")
 cs = re.search(r"const X3: u128 = 1_000_000_000_000;", read("node/src/chain_spec.rs"))
 check("genesis endowment unit is 1 X3 = 10^12 (12 decimals)", bool(cs) and manifest_decimals == 12)
 check("manifest base units match its decimals",

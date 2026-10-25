@@ -8,6 +8,7 @@
 
 use super::genome::{Gene, GeneType, Genome};
 use crate::types::StrategyId;
+use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -160,12 +161,23 @@ impl Population {
 
     /// Initialize with random genomes based on template
     pub fn initialize_random(&mut self, template: &Genome, count: usize) {
+        let mut rng = thread_rng();
+        self.initialize_random_with_rng(template, count, &mut rng);
+    }
+
+    /// Deterministic equivalent of [`Self::initialize_random`].
+    pub fn initialize_random_with_rng<R: Rng + ?Sized>(
+        &mut self,
+        template: &Genome,
+        count: usize,
+        rng: &mut R,
+    ) {
         self.genomes.clear();
         self.ids.clear();
 
         for _ in 0..count {
             let mut genome = template.clone();
-            genome.randomize();
+            genome.randomize_with_rng(rng);
             self.add(genome);
         }
     }
@@ -212,7 +224,7 @@ impl Population {
         let mut best_id = StrategyId::nil();
 
         for (id, genome) in &self.genomes {
-            if genome.fitness > best_fitness {
+            if genome.fitness > best_fitness || (genome.fitness == best_fitness && *id < best_id) {
                 best_fitness = genome.fitness;
                 best_id = *id;
             }
@@ -228,6 +240,7 @@ impl Population {
             b.fitness
                 .partial_cmp(&a.fitness)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
         sorted.into_iter().take(n).collect()
     }
@@ -237,14 +250,28 @@ impl Population {
         if self.genomes.is_empty() {
             return 0.0;
         }
-        let sum: f64 = self.genomes.values().map(|g| g.fitness).sum();
+        let mut genomes: Vec<_> = self.genomes.values().collect();
+        genomes.sort_by_key(|genome| genome.id);
+        let sum: f64 = genomes.iter().map(|genome| genome.fitness).sum();
         sum / self.genomes.len() as f64
     }
 
     /// Tournament selection
     pub fn tournament_select(&self, tournament_size: usize, count: usize) -> Vec<Genome> {
+        let mut rng = thread_rng();
+        self.tournament_select_with_rng(tournament_size, count, &mut rng)
+    }
+
+    /// Deterministic tournament selection.
+    pub fn tournament_select_with_rng<R: Rng + ?Sized>(
+        &self,
+        tournament_size: usize,
+        count: usize,
+        rng: &mut R,
+    ) -> Vec<Genome> {
         let mut selected = Vec::new();
-        let ids: Vec<_> = self.genomes.keys().cloned().collect();
+        let mut ids: Vec<_> = self.genomes.keys().cloned().collect();
+        ids.sort();
 
         for _ in 0..count {
             if ids.is_empty() {
@@ -254,7 +281,7 @@ impl Population {
             // Select tournament participants
             let mut best: Option<&Genome> = None;
             for _ in 0..tournament_size {
-                let idx = rand::random::<usize>() % ids.len();
+                let idx = rng.gen_range(0..ids.len());
                 let genome = self.genomes.get(&ids[idx]).unwrap();
                 if best.is_none() || genome.fitness > best.unwrap().fitness {
                     best = Some(genome);
@@ -271,12 +298,23 @@ impl Population {
 
     /// Roulette wheel selection
     pub fn roulette_select(&self, count: usize) -> Vec<Genome> {
+        let mut rng = thread_rng();
+        self.roulette_select_with_rng(count, &mut rng)
+    }
+
+    /// Deterministic roulette selection.
+    pub fn roulette_select_with_rng<R: Rng + ?Sized>(
+        &self,
+        count: usize,
+        rng: &mut R,
+    ) -> Vec<Genome> {
         let mut selected = Vec::new();
+        let mut ordered_genomes: Vec<_> = self.genomes.values().collect();
+        ordered_genomes.sort_by_key(|genome| genome.id);
 
         // Calculate total fitness (shifted to be positive)
-        let min_fitness = self
-            .genomes
-            .values()
+        let min_fitness = ordered_genomes
+            .iter()
             .map(|g| g.fitness)
             .fold(f64::INFINITY, f64::min);
 
@@ -285,25 +323,27 @@ impl Population {
         } else {
             0.0
         };
-        let total: f64 = self.genomes.values().map(|g| g.fitness + shift).sum();
+        let total: f64 = ordered_genomes.iter().map(|g| g.fitness + shift).sum();
 
         for _ in 0..count {
             if total <= 0.0 {
                 // Uniform selection if all fitness is zero
-                let idx = rand::random::<usize>() % self.ids.len();
-                if let Some(genome) = self.genomes.get(&self.ids[idx]) {
+                let mut ids = self.ids.clone();
+                ids.sort();
+                let idx = rng.gen_range(0..ids.len());
+                if let Some(genome) = self.genomes.get(&ids[idx]) {
                     selected.push(genome.clone());
                 }
                 continue;
             }
 
-            let threshold = rand::random::<f64>() * total;
+            let threshold = rng.gen::<f64>() * total;
             let mut cumulative = 0.0;
 
-            for genome in self.genomes.values() {
+            for genome in &ordered_genomes {
                 cumulative += genome.fitness + shift;
                 if cumulative >= threshold {
-                    selected.push(genome.clone());
+                    selected.push((*genome).clone());
                     break;
                 }
             }
@@ -314,11 +354,18 @@ impl Population {
 
     /// Rank-based selection
     pub fn rank_select(&self, count: usize) -> Vec<Genome> {
+        let mut rng = thread_rng();
+        self.rank_select_with_rng(count, &mut rng)
+    }
+
+    /// Deterministic rank selection.
+    pub fn rank_select_with_rng<R: Rng + ?Sized>(&self, count: usize, rng: &mut R) -> Vec<Genome> {
         let mut sorted: Vec<_> = self.genomes.values().collect();
         sorted.sort_by(|a, b| {
             a.fitness
                 .partial_cmp(&b.fitness)
                 .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
         });
 
         let n = sorted.len();
@@ -326,7 +373,7 @@ impl Population {
         let mut selected = Vec::new();
 
         for _ in 0..count {
-            let threshold = rand::random::<usize>() % total_rank;
+            let threshold = rng.gen_range(0..total_rank);
             let mut cumulative = 0;
 
             for (rank, genome) in sorted.iter().enumerate() {
@@ -343,9 +390,15 @@ impl Population {
 
     /// NSGA-II selection (multi-objective)
     pub fn nsga2_select(&self, count: usize) -> Vec<Genome> {
+        let mut rng = thread_rng();
+        self.nsga2_select_with_rng(count, &mut rng)
+    }
+
+    /// Deterministic NSGA-II fallback selection.
+    pub fn nsga2_select_with_rng<R: Rng + ?Sized>(&self, count: usize, rng: &mut R) -> Vec<Genome> {
         // For now, fall back to tournament selection
         // Full NSGA-II would require multiple objectives
-        self.tournament_select(5, count)
+        self.tournament_select_with_rng(5, count, rng)
     }
 
     /// Replace all genomes

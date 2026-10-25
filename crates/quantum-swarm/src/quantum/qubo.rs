@@ -8,6 +8,8 @@
 
 use crate::error::{SwarmError, SwarmResult};
 use rand::Rng;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 
 /// QUBO matrix representation
@@ -240,6 +242,8 @@ pub struct QuboSolver {
     pub schedule: AnnealingSchedule,
     /// Number of reads (independent runs)
     pub num_reads: usize,
+    /// Seed for reproducible annealing.
+    pub seed: u64,
 }
 
 /// Annealing schedule
@@ -261,6 +265,7 @@ impl Default for QuboSolver {
             num_sweeps: 1000,
             schedule: AnnealingSchedule::Geometric,
             num_reads: 10,
+            seed: 0,
         }
     }
 }
@@ -284,6 +289,11 @@ impl QuboSolver {
 
     pub fn with_reads(mut self, reads: usize) -> Self {
         self.num_reads = reads;
+        self
+    }
+
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
         self
     }
 
@@ -316,7 +326,7 @@ impl QuboSolver {
 
     /// Run simulated annealing on Ising model
     fn anneal_ising(&self, ising: &IsingModel) -> SwarmResult<(Vec<i8>, Vec<f64>, f64)> {
-        let mut rng = rand::thread_rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(self.seed);
         let n = ising.size;
 
         // Run multiple reads and keep best
@@ -387,7 +397,7 @@ impl QuboSolver {
     /// Quantum-inspired parallel tempering
     pub fn parallel_tempering(&self, qubo: &QuboMatrix) -> SwarmResult<AnnealingResult> {
         let ising = qubo.to_ising();
-        let mut rng = rand::thread_rng();
+        let mut rng = ChaCha20Rng::seed_from_u64(self.seed ^ 0xa076_1d64_78bd_642f);
         let n = ising.size;
 
         // Number of replicas
@@ -522,5 +532,24 @@ mod tests {
         let result = solver.parallel_tempering(&qubo).unwrap();
 
         assert!(result.energy <= 0.0 + 1e-6);
+    }
+
+    #[test]
+    fn annealing_is_reproducible_from_its_seed() {
+        let mut qubo = QuboMatrix::new(4);
+        for i in 0..4 {
+            qubo.set(i, i, 1.0);
+        }
+        let solver = QuboSolver::default()
+            .with_sweeps(200)
+            .with_reads(4)
+            .with_seed(42);
+
+        let first = solver.solve(&qubo).unwrap();
+        let second = solver.solve(&qubo).unwrap();
+
+        assert_eq!(first.solution, second.solution);
+        assert_eq!(first.energy.to_bits(), second.energy.to_bits());
+        assert_eq!(first.history, second.history);
     }
 }

@@ -97,6 +97,7 @@ x3-vm = { path = "../x3-vm", optional = true }
 x3-mir = { path = "../x3-mir", optional = true }
 x3-gpu-validator-swarm = { path = "../x3-gpu-validator-swarm", optional = true }
 x3-backend = { path = "../x3-backend", optional = true }
+x3-evolution = { path = "../x3-evolution" }
 
 [dev-dependencies]
 tokio-test = "0.4"

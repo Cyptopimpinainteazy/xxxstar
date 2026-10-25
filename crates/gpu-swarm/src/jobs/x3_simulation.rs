@@ -7,7 +7,11 @@ use crate::error::{SwarmError, SwarmResult};
 use crate::jobs::{JobOutput, JobType, SwarmJob};
 use crate::task::TaskPriority;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Duration;
+use x3_evolution::{
+    EvolutionConfig, EvolutionEngine, FitnessScore, MarketTick, SimulationConfig, SimulatorFitness,
+};
 
 /// Configuration for X3 simulation job
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +77,10 @@ pub struct StrategyCandidate {
     pub parents: Vec<[u8; 32]>,
     /// Fitness score
     pub fitness: Option<FitnessMetrics>,
+    /// Canonical portfolio state hash from the strategy simulation.
+    pub state_hash: [u8; 32],
+    /// Canonical simulation receipt digest.
+    pub receipt_hash: [u8; 32],
 }
 
 /// Fitness metrics for strategy evaluation
@@ -205,86 +213,201 @@ impl X3SimulationJob {
 
     /// Execute simulation using x3-evolution
     fn run_simulation(&self) -> SwarmResult<SimulationResult> {
-        use blake3::hash;
-        use std::time::Instant;
-
-        let start = Instant::now();
-
-        // In production, this would call into x3-evolution::EvolutionEngine
-        // For now, generate mock results
-        let mut top_strategies = Vec::new();
-        let mut generation_stats = Vec::new();
-        let mut best_fitness = 0.0;
-
-        // Simulate evolution generations
-        for gen in 0..self.config.generations.min(10) {
-            let gen_best = 0.5 + (gen as f64 * 0.05);
-            let gen_avg = 0.3 + (gen as f64 * 0.03);
-
-            generation_stats.push(GenerationStats {
-                generation: gen,
-                best_fitness: gen_best,
-                avg_fitness: gen_avg,
-                worst_fitness: 0.1,
-                diversity: 0.8 - (gen as f64 * 0.02),
-            });
-
-            if gen_best > best_fitness {
-                best_fitness = gen_best;
-            }
+        if self.seed_strategies.is_empty() {
+            return Err(SwarmError::InvalidPayload(
+                "simulation requires at least one canonical strategy seed".into(),
+            ));
         }
-
-        // Generate top strategies
-        for i in 0..5 {
-            let bytecode = vec![0x20, 0x64 + i as u8, 0x00, 0x00, 0x30, 0x01, 0x00, 0x00];
-            let id = hash(&bytecode).into();
-
-            let mut fitness = FitnessMetrics {
-                pnl_pct: 15.0 - (i as f64 * 2.0),
-                sharpe_ratio: 2.5 - (i as f64 * 0.3),
-                sortino_ratio: 3.0 - (i as f64 * 0.4),
-                max_drawdown_pct: -5.0 - (i as f64),
-                win_rate: 0.65 - (i as f64 * 0.02),
-                profit_factor: 1.8 - (i as f64 * 0.1),
-                calmar_ratio: 3.0 - (i as f64 * 0.5),
-                trade_count: 150 - (i * 10),
-                avg_trade_duration: 3600.0,
-                gas_estimate: 50000 + (i as u64 * 5000),
-                latency_ms: 10.0 + (i as f64 * 2.0),
-                total_score: 0.0,
-            };
-            fitness.calculate_total();
-
-            top_strategies.push(StrategyCandidate {
-                id,
-                bytecode,
-                generation: self.config.generations,
-                parents: Vec::new(),
-                fitness: Some(fitness),
-            });
+        if self.market_data.is_empty() {
+            return Err(SwarmError::InvalidPayload(
+                "simulation requires market data".into(),
+            ));
         }
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-        let compute_units =
-            self.config.population_size as u64 * self.config.generations as u64 * 100; // 100 CU per strategy-generation
-
-        // Calculate result hash
-        let mut hasher = blake3::Hasher::new();
-        for strat in &top_strategies {
-            hasher.update(&strat.id);
+        if self.config.population_size < 2 || self.config.generations == 0 {
+            return Err(SwarmError::InvalidPayload(
+                "simulation population must be at least 2 and generations must be non-zero".into(),
+            ));
         }
-        let result_hash: [u8; 32] = hasher.finalize().into();
+        let seed = self.config.seed.ok_or_else(|| {
+            SwarmError::InvalidPayload(
+                "distributed simulation requires an explicit deterministic seed".into(),
+            )
+        })?;
 
-        Ok(SimulationResult {
+        let start = std::time::Instant::now();
+        let market_data: Vec<MarketTick> = self
+            .market_data
+            .iter()
+            .map(|point| {
+                let mut data = HashMap::new();
+                data.insert("volume".into(), point.volume);
+                MarketTick {
+                    timestamp: point.timestamp,
+                    symbol: point.asset.clone(),
+                    price: point.price,
+                    volume: point.volume,
+                    bid: point.bid,
+                    ask: point.ask,
+                    data,
+                }
+            })
+            .collect();
+
+        let evolution_config = EvolutionConfig {
+            population_size: self.config.population_size,
+            generations: self.config.generations,
+            mutation_rate: self.config.mutation_rate,
+            crossover_rate: self.config.crossover_rate,
+            elite_ratio: self.config.elite_ratio,
+            tournament_size: 3.min(self.config.population_size),
+            seed: Some(seed),
+            simulations_per_strategy: market_data.len(),
+            max_bytecode_size: 1024 * 1024,
+            parallel: false,
+        };
+        let simulator_config = SimulationConfig {
+            initial_capital: self.config.initial_capital,
+            fee_rate: self.config.fee_rate,
+            slippage_rate: self.config.slippage_rate,
+            max_position_size: self.config.max_position_pct,
+            risk_free_rate: 0.02,
+            timeout: Duration::from_secs(60),
+            gas_limit_per_tick: 100_000,
+            realistic_execution: false,
+        };
+
+        let mut engine = EvolutionEngine::new(evolution_config);
+        engine
+            .seed_population(self.seed_strategies.clone())
+            .map_err(|error| {
+                SwarmError::InvalidPayload(format!("invalid strategy seed: {error}"))
+            })?;
+        let evaluator = SimulatorFitness::new(simulator_config, market_data);
+        let evolution = engine.evolve(&evaluator).map_err(|error| {
+            SwarmError::ExecutionError(format!("evolution simulation failed: {error}"))
+        })?;
+
+        let top_strategies = engine
+            .ranked(5)
+            .into_iter()
+            .filter_map(|individual| {
+                let fitness = individual.fitness.as_ref()?;
+                Some(StrategyCandidate {
+                    id: individual.chromosome.hash(),
+                    bytecode: individual.chromosome.to_bytecode(),
+                    generation: individual.birth_generation,
+                    parents: individual.parent_ids,
+                    fitness: Some(FitnessMetrics::from_score(
+                        fitness,
+                        self.config.initial_capital,
+                    )),
+                    state_hash: fitness.simulation_state_hash,
+                    receipt_hash: fitness.simulation_receipt_hash,
+                })
+            })
+            .collect();
+        let generation_stats = evolution
+            .generation_stats
+            .iter()
+            .map(|stats| GenerationStats {
+                generation: stats.generation,
+                best_fitness: stats.best_fitness,
+                avg_fitness: stats.average_fitness,
+                worst_fitness: stats.worst_fitness,
+                diversity: stats.fitness_variance.sqrt(),
+            })
+            .collect();
+        let total_evaluated = self
+            .config
+            .population_size
+            .saturating_mul(evolution.generations_run);
+
+        let mut result = SimulationResult {
             top_strategies,
             generation_stats,
-            best_fitness,
-            total_evaluated: self.config.population_size * self.config.generations,
-            duration_ms,
-            compute_units,
-            result_hash,
-        })
+            best_fitness: evolution.best_fitness,
+            total_evaluated,
+            duration_ms: start.elapsed().as_millis() as u64,
+            compute_units: evolution.total_execution_gas,
+            result_hash: [0u8; 32],
+        };
+        result.result_hash = simulation_result_hash(&result);
+        Ok(result)
     }
+}
+
+impl FitnessMetrics {
+    fn from_score(score: &FitnessScore, initial_capital: f64) -> Self {
+        let mut metrics = Self {
+            pnl_pct: if initial_capital > 0.0 {
+                score.pnl / initial_capital * 100.0
+            } else {
+                0.0
+            },
+            sharpe_ratio: score.sharpe_ratio,
+            sortino_ratio: score.sortino_ratio,
+            max_drawdown_pct: -score.max_drawdown.abs(),
+            win_rate: score.win_rate,
+            profit_factor: score.profit_factor,
+            calmar_ratio: score.calmar_ratio,
+            trade_count: score.trade_count,
+            avg_trade_duration: score.avg_duration,
+            gas_estimate: score.execution_gas,
+            latency_ms: score.execution_latency_ms,
+            total_score: 0.0,
+        };
+        metrics.calculate_total();
+        metrics
+    }
+}
+
+fn simulation_result_hash(result: &SimulationResult) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"x3-swarm-simulation-result-v1");
+    hasher.update(&(result.top_strategies.len() as u64).to_le_bytes());
+    for strategy in &result.top_strategies {
+        hasher.update(&strategy.id);
+        hasher.update(&(strategy.bytecode.len() as u64).to_le_bytes());
+        hasher.update(&strategy.bytecode);
+        hasher.update(&(strategy.generation as u64).to_le_bytes());
+        for parent in &strategy.parents {
+            hasher.update(parent);
+        }
+        hasher.update(&strategy.state_hash);
+        hasher.update(&strategy.receipt_hash);
+        if let Some(fitness) = &strategy.fitness {
+            for value in [
+                fitness.pnl_pct,
+                fitness.sharpe_ratio,
+                fitness.sortino_ratio,
+                fitness.max_drawdown_pct,
+                fitness.win_rate,
+                fitness.profit_factor,
+                fitness.calmar_ratio,
+                fitness.avg_trade_duration,
+                fitness.total_score,
+            ] {
+                hasher.update(&value.to_bits().to_le_bytes());
+            }
+            hasher.update(&(fitness.trade_count as u64).to_le_bytes());
+            hasher.update(&fitness.gas_estimate.to_le_bytes());
+        }
+    }
+    hasher.update(&(result.generation_stats.len() as u64).to_le_bytes());
+    for stats in &result.generation_stats {
+        hasher.update(&(stats.generation as u64).to_le_bytes());
+        for value in [
+            stats.best_fitness,
+            stats.avg_fitness,
+            stats.worst_fitness,
+            stats.diversity,
+        ] {
+            hasher.update(&value.to_bits().to_le_bytes());
+        }
+    }
+    hasher.update(&result.best_fitness.to_bits().to_le_bytes());
+    hasher.update(&(result.total_evaluated as u64).to_le_bytes());
+    hasher.finalize().into()
 }
 
 impl SwarmJob for X3SimulationJob {
@@ -310,14 +433,7 @@ impl SwarmJob for X3SimulationJob {
     fn verify(&self, result: &JobOutput) -> SwarmResult<bool> {
         match result {
             JobOutput::X3Simulation(sim_result) => {
-                // Verify result hash
-                let mut hasher = blake3::Hasher::new();
-                for strat in &sim_result.top_strategies {
-                    hasher.update(&strat.id);
-                }
-                let expected_hash: [u8; 32] = hasher.finalize().into();
-
-                Ok(expected_hash == sim_result.result_hash)
+                Ok(simulation_result_hash(sim_result) == sim_result.result_hash)
             }
             _ => Err(SwarmError::InvalidResult("Wrong result type".into())),
         }
@@ -328,17 +444,50 @@ impl SwarmJob for X3SimulationJob {
     }
 
     fn requires_gpu(&self) -> bool {
-        true
+        false
     }
 
     fn min_vram_mb(&self) -> u32 {
-        1024 // 1GB for large populations
+        0
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_backend::bc_format::{BytecodeModule, FunctionEntry};
+    use x3_backend::opcode::Opcode;
+    use x3_evolution::{STRATEGY_ENTRYPOINT, STRATEGY_PARAM_COUNT};
+
+    fn strategy_module(decision: i64) -> Vec<u8> {
+        let mut module = BytecodeModule::new();
+        let constant = module.const_pool.add_integer(decision).expect("constant");
+        module.functions.push(FunctionEntry {
+            name: STRATEGY_ENTRYPOINT.to_string(),
+            entry_point: 0,
+            param_count: STRATEGY_PARAM_COUNT as u8,
+            local_count: STRATEGY_PARAM_COUNT,
+            max_stack: 16,
+            return_type_tag: 1,
+        });
+        module.code = vec![Opcode::LoadConst.to_byte(), 0];
+        module.code.extend_from_slice(&constant.0.to_le_bytes());
+        module.code.extend_from_slice(&[Opcode::Ret.to_byte(), 0]);
+        module.to_bytes()
+    }
+
+    fn market_data() -> Vec<MarketDataPoint> {
+        (0..4)
+            .map(|index| MarketDataPoint {
+                timestamp: 1_000 + index * 1_000,
+                asset: "ETH/USDC".into(),
+                price: 2_000.0 + index as f64 * 10.0,
+                volume: 100.0,
+                bid: 1_999.0 + index as f64 * 10.0,
+                ask: 2_001.0 + index as f64 * 10.0,
+            })
+            .collect()
+    }
 
     #[test]
     fn test_sim_config_default() {
@@ -370,7 +519,7 @@ mod tests {
     }
 
     #[test]
-    fn test_simulation_job_execution() {
+    fn simulation_requires_seed_strategies_and_market_data() {
         let config = SimConfig {
             population_size: 10,
             generations: 5,
@@ -378,13 +527,73 @@ mod tests {
         };
 
         let job = X3SimulationJob::new(config);
-        let result = job.execute().unwrap();
+        let error = job.execute().expect_err("missing inputs must fail closed");
+        assert!(
+            error.to_string().contains("canonical strategy seed"),
+            "{error}"
+        );
+    }
 
-        if let JobOutput::X3Simulation(sim_result) = result {
-            assert!(!sim_result.top_strategies.is_empty());
-            assert!(sim_result.best_fitness > 0.0);
-        } else {
-            panic!("Wrong result type");
-        }
+    #[test]
+    fn distributed_simulation_requires_a_deterministic_seed() {
+        let config = SimConfig {
+            population_size: 2,
+            generations: 1,
+            seed: None,
+            ..Default::default()
+        };
+        let job = X3SimulationJob::new(config)
+            .with_seeds(vec![strategy_module(1)])
+            .with_market_data(market_data());
+        let error = job
+            .execute()
+            .expect_err("unseeded simulation must fail closed");
+        assert!(error.to_string().contains("deterministic seed"), "{error}");
+    }
+
+    #[test]
+    fn simulation_runs_evolution_through_the_x3_vm() {
+        let config = SimConfig {
+            population_size: 4,
+            generations: 1,
+            seed: Some(7),
+            ..Default::default()
+        };
+        let job = X3SimulationJob::new(config)
+            .with_seeds(vec![strategy_module(1)])
+            .with_market_data(market_data());
+
+        let mut output = job.execute().expect("simulation");
+        let JobOutput::X3Simulation(result) = &output else {
+            panic!("wrong job output");
+        };
+        assert_eq!(result.generation_stats.len(), 1);
+        assert!(!result.top_strategies.is_empty());
+        assert_ne!(result.top_strategies[0].state_hash, [0u8; 32]);
+        assert_ne!(result.top_strategies[0].receipt_hash, [0u8; 32]);
+        assert!(result.compute_units > 0);
+        assert!(!job.requires_gpu());
+        assert!(job.verify(&output).expect("verification"));
+
+        let JobOutput::X3Simulation(result) = &mut output else {
+            unreachable!();
+        };
+        result.top_strategies[0].state_hash[0] ^= 0xff;
+        assert!(!job.verify(&output).expect("hash recomputation"));
+    }
+
+    #[test]
+    fn simulation_rejects_an_invalid_seed_module() {
+        let config = SimConfig {
+            population_size: 2,
+            generations: 1,
+            seed: Some(7),
+            ..Default::default()
+        };
+        let job = X3SimulationJob::new(config)
+            .with_seeds(vec![vec![0x20, 0x64, 0, 0]])
+            .with_market_data(market_data());
+
+        assert!(job.execute().is_err());
     }
 }

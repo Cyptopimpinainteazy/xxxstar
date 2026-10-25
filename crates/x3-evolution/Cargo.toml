@@ -10,6 +10,7 @@ authors = ["X3 Chain Team"]
 # X3 compiler stack
 x3-ast = { path = "../x3-ast" }
 x3-backend = { path = "../x3-backend" }
+x3bc-core = { path = "../x3bc-core" }
 x3-vm = { path = "../x3-vm" }
 x3-verifier = { path = "../x3-verifier" }
 

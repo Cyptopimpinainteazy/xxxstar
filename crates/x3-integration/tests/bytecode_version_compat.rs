@@ -24,8 +24,10 @@ const MIN_VERSION_OFFSET: usize = 16;
 
 /// A program compiled now, by the same bridge the node uses.
 fn compiled_now() -> Vec<u8> {
-    x3_x3_integration::compiler_bridge::compile_source("fn main() -> i64 {\n    return 7;\n}\n")
-        .expect("the fixture must compile")
+    x3_x3_integration::compiler_bridge::compile_legacy_source(
+        "fn main() -> i64 {\n    return 7;\n}\n",
+    )
+    .expect("the fixture must compile")
 }
 
 fn with_u32_at(bytes: &[u8], offset: usize, value: u32) -> Vec<u8> {

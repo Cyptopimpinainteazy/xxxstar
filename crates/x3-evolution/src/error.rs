@@ -158,6 +158,12 @@ impl From<std::io::Error> for EvolutionError {
     }
 }
 
+impl From<x3bc_core::codec::CodecError> for EvolutionError {
+    fn from(error: x3bc_core::codec::CodecError) -> Self {
+        EvolutionError::SerializationError(format!("{error:?}"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -19,6 +19,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4305c38b25d97ef35a8ad1f985ccf2d2242004f2 # stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2
@@ -43,3 +44,12 @@ jobs:
 
       - name: Lint nested workspace with warnings denied
         run: cargo clippy --manifest-path x3-lang/Cargo.toml --locked --workspace --all-targets --all-features -- -D warnings
+
+      - name: Verify canonical compiler and native ledger execution
+        run: |
+          cargo test --locked -p x3-x3-integration --features compile --test canonical_compiler
+          cargo test --locked -p pallet-x3-kernel canonical_trading_tests --lib
+          cargo check --locked -p pallet-x3-kernel --no-default-features --target wasm32-unknown-unknown
+
+      - name: Verify shared interpreter without std
+        run: cargo check --manifest-path x3-lang/Cargo.toml --locked -p x3-lang-execution --no-default-features --target wasm32-unknown-unknown

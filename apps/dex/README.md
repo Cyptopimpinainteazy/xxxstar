@@ -196,6 +196,39 @@ Frontend (display amount_out)
 - **Invalid Response:** Displays error message to user
 - **Network Error:** Retries connection automatically
 
+## External Base Swap (0x)
+
+The **Base · 0x** tab is a separate external-EVM route. It requests exact-input quotes from
+the 0x Swap API for Base Mainnet WETH and Circle USDC, then asks an injected EIP-1193 wallet
+to approve and submit transactions. This is a normal Base transaction, not X3-atomic or
+cross-chain-atomic settlement.
+
+Configure `ZEROX_API_KEY` in `apps/dex/.env.local` using the provider key from the 0x
+dashboard. The key is read only by the server route; do not rename it to a `NEXT_PUBLIC_*`
+variable or commit a populated `.env.local`. Missing configuration fails with an explicit
+service error.
+
+Configure `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` as server-only secrets in
+the same deployment environment. The quote API uses a shared Upstash sliding-window limiter
+(60 requests/minute per trusted client IP and 30/minute per wallet). IP identifiers are
+SHA-256 hashed before storage. Missing or unreachable rate-limit storage fails closed with
+HTTP 503; excess requests receive HTTP 429 and `Retry-After`. The deployment must provide
+`x-real-ip` or `cf-connecting-ip` from its trusted edge proxy; forwarded-for headers are
+intentionally not trusted.
+
+The wallet must be connected to Base Mainnet (chain ID 8453). If needed, the UI requests a
+separate approval for exactly the sell amount, then requires a fresh quote before the user can
+submit the swap. It checks the quote's block age, simulates the transaction, waits for three
+Base block confirmations, and verifies the input/output ERC-20 transfers in the receipt.
+Wallet approval is required for each transaction; the app never holds signing keys.
+
+The API route is publicly callable and consumes the configured 0x quota. Configure both the
+provider key and shared Redis rate-limit secrets before exposing it to untrusted traffic.
+Live provider quotes and signed swaps require a configured 0x key and a funded Base wallet;
+local build validation does not execute a mainnet trade.
+
+Use `apps/dex/.env.example` as the variable-name template.
+
 ## Running the DEX
 
 ### Development

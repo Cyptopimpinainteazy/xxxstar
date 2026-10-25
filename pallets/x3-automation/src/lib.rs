@@ -61,6 +61,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
+    use sp_std::vec::Vec;
 
     use x3_automation::{
         Action, ActionOutcome, Condition, ExecutionReceipt, Task, TaskId, TaskStatus,
@@ -98,18 +99,18 @@ pub mod pallet {
         ) -> Result<(ActionOutcome, Weight, [u8; 64]), DispatchError>;
     }
 
-    /// Default evaluator that always returns false — safe no-op.
-    pub struct NoopCustomEvaluator;
-    impl CustomConditionEvaluator for NoopCustomEvaluator {
+    /// Default evaluator that refuses every custom condition.
+    pub struct RefuseCustomEvaluator;
+    impl CustomConditionEvaluator for RefuseCustomEvaluator {
         fn evaluate(_data: &[u8; 64]) -> bool {
             false
         }
     }
 
-    /// No-op oracle that always returns `None` — safe default when no oracle
+    /// Unavailable oracle that always returns `None` — safe default when no oracle
     /// is configured. Policy conditions depending on price will never trigger.
-    pub struct NoopOracle;
-    impl OracleProvider for NoopOracle {
+    pub struct UnavailableOracle;
+    impl OracleProvider for UnavailableOracle {
         fn get_price(_asset_id: &[u8]) -> Option<u128> {
             None
         }
@@ -173,7 +174,7 @@ pub mod pallet {
         /// Oracle provider for price-feed conditions.
         type Oracle: OracleProvider;
 
-        /// Custom condition evaluator (default: NoopCustomEvaluator).
+        /// Custom condition evaluator (default: RefuseCustomEvaluator).
         type CustomEvaluator: CustomConditionEvaluator;
 
         /// Executes task actions. Every effect a task can have goes through here.
@@ -571,7 +572,11 @@ pub mod pallet {
                     // than storing a task that is dead on arrival.
                     ensure!(lower <= upper, Error::<T>::InvalidTask);
                 }
-                Condition::Event { .. } | Condition::Manual => {}
+                // Matching an unbounded System::Events list in consensus execution
+                // can exhaust PoV. No bounded, indexed event source exists yet.
+                // Reject registration rather than charge for a task that cannot fire.
+                Condition::Event { .. } => return Err(Error::<T>::InvalidTask.into()),
+                Condition::Manual => {}
                 Condition::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -582,7 +587,7 @@ pub mod pallet {
                 | Action::TransferLedgerAsset { amount, .. } => {
                     ensure!(*amount > 0, Error::<T>::InvalidTask);
                 }
-                Action::Noop => {}
+                Action::NoChange => {}
                 Action::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -624,9 +629,11 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => frame_system::Pallet::<T>::events()
-                    .iter()
-                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
+                // Legacy event tasks must also fail closed at execution, never
+                // scan an unbounded block event list or pretend the event fired.
+                Condition::Event { .. } => {
+                    return Err(DispatchError::Other("EventConditionUnsupported"));
+                },
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })

@@ -29,7 +29,6 @@ QUIET=0
 # Documented overrides. Each entry is <file-substring>:<token>; a line containing
 # the token in that file is intentional and named here. Keep this list shrink-only.
 ALLOW=(
-  "scripts/mainnet/rc2_internal_settlement_smoke.sh:X3_ORIGINAL_WORKSPACE"
   # A system unit (User=lojak) cannot use `%h` — that expands to the manager's
   # home for system units — and systemd does not expand $VAR in
   # WorkingDirectory=/Environment=, so it names this checkout explicitly.

@@ -86,10 +86,10 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
             from cryptography.hazmat.primitives import hashes
             from cryptography.hazmat.primitives.asymmetric import ec
 
-            private_key = ec.generate_private_key(ec.SECP256K1(), default_backend())
+            signer = ec.generate_private_key(ec.SECP256K1(), default_backend())
             data = b"x3-chain-test-vector"
-            signature = private_key.sign(data, ec.ECDSA(hashes.SHA256()))
-            public_key = private_key.public_key()
+            signature = signer.sign(data, ec.ECDSA(hashes.SHA256()))
+            public_key = signer.public_key()
 
             # This should not raise
             public_key.verify(signature, data, ec.ECDSA(hashes.SHA256()))
@@ -225,13 +225,11 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
         from cross_chain_gpu_validator.gpu import CudaRuntime, Secp256k1BatchVerifier
 
         message = hashlib.sha256(b"x3-chain-secp256k1-fallback-test").digest()
-        private_key = ec.generate_private_key(ec.SECP256K1())
-        der_signature = private_key.sign(
-            message, ec.ECDSA(utils.Prehashed(hashes.SHA256()))
-        )
+        signer = ec.generate_private_key(ec.SECP256K1())
+        der_signature = signer.sign(message, ec.ECDSA(utils.Prehashed(hashes.SHA256())))
         r, s = utils.decode_dss_signature(der_signature)
         signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
-        numbers = private_key.public_key().public_numbers()
+        numbers = signer.public_key().public_numbers()
         pubkey = numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
 
         verifier = Secp256k1BatchVerifier(
@@ -251,7 +249,7 @@ class TestGpuSigVerificationConsistency(unittest.TestCase):
             [False],
         )
 
-        compressed_pubkey = private_key.public_key().public_bytes(
+        compressed_pubkey = signer.public_key().public_bytes(
             encoding=serialization.Encoding.X962,
             format=serialization.PublicFormat.CompressedPoint,
         )

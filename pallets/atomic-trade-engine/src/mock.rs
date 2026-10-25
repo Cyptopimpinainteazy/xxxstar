@@ -349,6 +349,7 @@ impl pallet_x3_kernel::Config for Test {
     type Currency = Balances;
     type Balance = u128;
     type AssetId = u32;
+    type NativeFeeAssetId = frame_support::traits::ConstU32<0>;
     type AtlasId = u64;
     type MaxAssetsPerAccount = MaxAssetsPerAccount;
     type MaxAssetSymbolLength = MaxAssetSymbolLength;

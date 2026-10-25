@@ -46,6 +46,9 @@
 //!   remove the authorized Solana validator set and the distinct-signer
 //!   threshold that `SolanaFinalizedProof` routes verify against. With no set
 //!   installed every Solana proof fails closed.
+//! - `set_solana_stake_committee` / `clear_solana_stake_committee`
+//!   (governance): install the stake-weighted Solana finality committee used by
+//!   mainnet-beta. Accepted proofs advance a persisted finalized-slot floor.
 //! - `submit_deposit_proof` (relayer, signed): verify a deposit proof
 //!   and create a `GatewayTransfer`.
 //! - `credit_x3_representation` (relayer, signed): after the dispute
@@ -102,7 +105,8 @@ pub mod pallet {
 
     use x3_verification_router::{
         evm_receipt::withdrawal_released_selector, BitcoinSpvVerifier, ChainKind,
-        ProductionEvmReceiptVerifier, ProofEnvelope, SolanaFinalizedVerifier,
+        ProductionEvmReceiptVerifier, ProofEnvelope, SolanaCluster, SolanaFinalizedVerifier,
+        SolanaStakeWeightedVerifier, SolanaValidatorStake, SolanaVerifierConfigError,
         ValidatorQuorumVerifier, VerificationRouter, VerificationStrategy, Verifier,
         X3InternalVerifier,
     };
@@ -278,6 +282,39 @@ pub mod pallet {
         pub validators: BoundedVec<[u8; 32], MaxSvmValidators>,
     }
 
+    /// One validator and its effective stake in a Solana finality committee.
+    #[derive(
+        Clone,
+        Copy,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Debug,
+        TypeInfo,
+        MaxEncodedLen,
+        PartialEq,
+        Eq,
+    )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+    pub struct SolanaStakeEntry {
+        pub pubkey: [u8; 32],
+        pub stake: u64,
+    }
+
+    /// Governance-configured stake-weighted finality committee.
+    ///
+    /// The legacy key-count committee remains readable for storage
+    /// compatibility, but a V2 committee takes precedence for Solana routes.
+    #[derive(
+        Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
+    )]
+    #[cfg_attr(feature = "std", derive(serde::Serialize, serde::Deserialize))]
+    pub struct SolanaStakeCommittee {
+        pub threshold_numerator: u32,
+        pub threshold_denominator: u32,
+        pub validators: BoundedVec<SolanaStakeEntry, MaxSvmValidators>,
+    }
+
     /// Gateway route configuration.
     #[derive(
         Clone, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen, PartialEq, Eq,
@@ -428,6 +465,18 @@ pub mod pallet {
     #[pallet::storage]
     pub type SvmValidatorSets<T: Config> =
         StorageMap<_, Blake2_128Concat, ExternalChainId, SvmValidatorSet, OptionQuery>;
+
+    /// Governance-controlled stake-weighted Solana committees. When present,
+    /// these supersede the legacy key-count committee for the same chain.
+    #[pallet::storage]
+    pub type SolanaStakeCommittees<T: Config> =
+        StorageMap<_, Blake2_128Concat, ExternalChainId, SolanaStakeCommittee, OptionQuery>;
+
+    /// Highest finalized Solana slot accepted for a chain. The verifier
+    /// requires every new proof to be at or above this floor.
+    #[pallet::storage]
+    pub type SolanaFinalizedSlots<T: Config> =
+        StorageMap<_, Blake2_128Concat, ExternalChainId, u64, ValueQuery>;
 
     #[pallet::storage]
     pub type Assets<T: Config> = StorageDoubleMap<
@@ -714,6 +763,20 @@ pub mod pallet {
         SvmValidatorsCleared {
             chain: ExternalChainId,
         },
+        SolanaStakeCommitteeSet {
+            chain: ExternalChainId,
+            threshold_numerator: u32,
+            threshold_denominator: u32,
+            count: u32,
+            total_stake: u64,
+        },
+        SolanaStakeCommitteeCleared {
+            chain: ExternalChainId,
+        },
+        SolanaFinalizedSlotAdvanced {
+            chain: ExternalChainId,
+            finalized_slot: u64,
+        },
         RouteEnabled {
             route_id: RouteId,
         },
@@ -798,6 +861,22 @@ pub mod pallet {
         InvalidSvmThreshold,
         /// A validator key appears more than once in the submitted set.
         DuplicateSvmValidator,
+        /// The chain does not identify a supported Solana cluster.
+        UnsupportedSolanaCluster,
+        /// A stake committee must contain at least one validator.
+        EmptySolanaStakeCommittee,
+        /// Stake entries must be sorted by public key with no duplicates.
+        InvalidSolanaStakeOrder,
+        /// Every stake entry must carry non-zero stake.
+        ZeroSolanaStake,
+        /// The stake threshold must be non-zero and no greater than its denominator.
+        InvalidSolanaStakeThreshold,
+        /// The total or signed stake could not be represented.
+        SolanaStakeOverflow,
+        /// `X3Internal` verification on a gateway route. Every gateway route has an external
+        /// source chain, and the internal strategy needs no external evidence, so a route
+        /// configured with it would credit deposits nobody proved.
+        InternalVerificationOnExternalRoute,
     }
 
     // ── Hooks ───────────────────────────────────────────────────────────
@@ -852,6 +931,10 @@ pub mod pallet {
             ensure!(
                 config.min_amount <= config.max_amount,
                 Error::<T>::AmountAboveMaximum
+            );
+            ensure!(
+                config.verification_level != RouteVerificationLevel::X3Internal,
+                Error::<T>::InternalVerificationOnExternalRoute
             );
             match config.mode {
                 GatewayMode::Disabled | GatewayMode::DryRun => {}
@@ -962,7 +1045,7 @@ pub mod pallet {
             // and keeps storage simple).
             let router = Self::build_router(&route);
             let envelope = Self::envelope_from_deposit(&proof, &route);
-            router
+            let outcome = router
                 .route(&envelope)
                 .map_err(|_| Error::<T>::VerificationFailed)?;
 
@@ -989,6 +1072,8 @@ pub mod pallet {
             })?;
             Self::check_collateral_invariant(route.x3_asset_id)?;
             Transfers::<T>::insert(transfer_id, transfer);
+
+            Self::record_solana_finalized_slot(&route, outcome.verified_at_height);
 
             Self::deposit_event(Event::DepositProofVerified {
                 route_id,
@@ -1201,9 +1286,10 @@ pub mod pallet {
                 // so a Bitcoin release is refused there rather than read as a deposit.
                 expected_beneficiary: Vec::new(),
             };
-            router
+            let outcome = router
                 .route(&envelope)
                 .map_err(|_| Error::<T>::VerificationFailed)?;
+            Self::record_solana_finalized_slot(&route, outcome.verified_at_height);
 
             let x3_asset_id = withdrawal.x3_asset_id;
             let amount = withdrawal.amount;
@@ -1282,11 +1368,142 @@ pub mod pallet {
             Self::deposit_event(Event::SvmValidatorsCleared { chain });
             Ok(())
         }
+
+        /// Governance: install the stake-weighted Solana finality committee.
+        ///
+        /// Entries must be sorted by public key, unique, and carry non-zero
+        /// stake. The threshold is the fraction of total stake that must sign.
+        #[pallet::call_index(11)]
+        #[pallet::weight(T::WeightInfo::set_solana_stake_committee())]
+        pub fn set_solana_stake_committee(
+            origin: OriginFor<T>,
+            chain: ExternalChainId,
+            validators: BoundedVec<SolanaStakeEntry, MaxSvmValidators>,
+            threshold_numerator: u32,
+            threshold_denominator: u32,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            Self::solana_cluster(chain).ok_or(Error::<T>::UnsupportedSolanaCluster)?;
+            ensure!(
+                !validators.is_empty(),
+                Error::<T>::EmptySolanaStakeCommittee
+            );
+            ensure!(
+                threshold_numerator > 0
+                    && threshold_denominator > 0
+                    && threshold_numerator <= threshold_denominator,
+                Error::<T>::InvalidSolanaStakeThreshold
+            );
+            for (index, entry) in validators.iter().enumerate() {
+                ensure!(entry.stake > 0, Error::<T>::ZeroSolanaStake);
+                if let Some(next) = validators.get(index + 1) {
+                    ensure!(
+                        entry.pubkey < next.pubkey,
+                        Error::<T>::InvalidSolanaStakeOrder
+                    );
+                }
+            }
+
+            let count = validators.len() as u32;
+            let committee = SolanaStakeCommittee {
+                threshold_numerator,
+                threshold_denominator,
+                validators,
+            };
+            let verifier = Self::build_solana_stake_verifier(chain, committee.clone())?;
+            SolanaStakeCommittees::<T>::insert(chain, committee);
+            Self::deposit_event(Event::SolanaStakeCommitteeSet {
+                chain,
+                threshold_numerator,
+                threshold_denominator,
+                count,
+                total_stake: verifier.total_stake(),
+            });
+            Ok(())
+        }
+
+        /// Governance: remove the stake-weighted committee. Solana proof
+        /// verification fails closed until a replacement is installed.
+        #[pallet::call_index(12)]
+        #[pallet::weight(T::WeightInfo::clear_solana_stake_committee())]
+        pub fn clear_solana_stake_committee(
+            origin: OriginFor<T>,
+            chain: ExternalChainId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            SolanaStakeCommittees::<T>::remove(chain);
+            Self::deposit_event(Event::SolanaStakeCommitteeCleared { chain });
+            Ok(())
+        }
     }
 
     // ── Internal helpers ───────────────────────────────────────────────
 
     impl<T: Config> Pallet<T> {
+        fn solana_cluster(chain: ExternalChainId) -> Option<SolanaCluster> {
+            match chain {
+                ExternalChainId::SolanaMainnet => Some(SolanaCluster::MainnetBeta),
+                ExternalChainId::SolanaDevnet => Some(SolanaCluster::Devnet),
+                _ => None,
+            }
+        }
+
+        fn map_solana_config_error(error: SolanaVerifierConfigError) -> Error<T> {
+            match error {
+                SolanaVerifierConfigError::EmptyStakeTable => Error::<T>::EmptySolanaStakeCommittee,
+                SolanaVerifierConfigError::ZeroStake => Error::<T>::ZeroSolanaStake,
+                SolanaVerifierConfigError::DuplicateValidator
+                | SolanaVerifierConfigError::UnsortedValidatorSet => {
+                    Error::<T>::InvalidSolanaStakeOrder
+                }
+                SolanaVerifierConfigError::InvalidThreshold => {
+                    Error::<T>::InvalidSolanaStakeThreshold
+                }
+                SolanaVerifierConfigError::StakeOverflow => Error::<T>::SolanaStakeOverflow,
+            }
+        }
+
+        fn build_solana_stake_verifier(
+            chain: ExternalChainId,
+            committee: SolanaStakeCommittee,
+        ) -> Result<SolanaStakeWeightedVerifier, Error<T>> {
+            let cluster =
+                Self::solana_cluster(chain).ok_or(Error::<T>::UnsupportedSolanaCluster)?;
+            let stakes = committee
+                .validators
+                .iter()
+                .map(|entry| SolanaValidatorStake {
+                    pubkey: entry.pubkey,
+                    stake: entry.stake,
+                })
+                .collect::<Vec<_>>();
+            SolanaStakeWeightedVerifier::new(
+                cluster,
+                stakes,
+                committee.threshold_numerator,
+                committee.threshold_denominator,
+                SolanaFinalizedSlots::<T>::get(chain),
+            )
+            .map_err(Self::map_solana_config_error)
+        }
+
+        fn record_solana_finalized_slot(route: &RouteConfig, finalized_slot: Option<u64>) {
+            if route.verification_level != RouteVerificationLevel::SolanaFinalizedProof {
+                return;
+            }
+            let Some(finalized_slot) = finalized_slot else {
+                return;
+            };
+            let previous = SolanaFinalizedSlots::<T>::get(route.external_chain_id);
+            if finalized_slot > previous {
+                SolanaFinalizedSlots::<T>::insert(route.external_chain_id, finalized_slot);
+                Self::deposit_event(Event::SolanaFinalizedSlotAdvanced {
+                    chain: route.external_chain_id,
+                    finalized_slot,
+                });
+            }
+        }
+
         /// Build a fresh verification router for the route's
         /// configured verification level. The router is created
         /// per-call because the verifier set is small and the pallet
@@ -1307,17 +1524,35 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
-                    // The authorized validator set is governance-controlled
-                    // (`set_svm_validators`). With no set installed the verifier
-                    // is constructed empty and refuses every proof instead of
-                    // accepting it unchecked.
-                    let verifier = match SvmValidatorSets::<T>::get(route.external_chain_id) {
-                        Some(set) if !set.validators.is_empty() && set.threshold > 0 => {
-                            SolanaFinalizedVerifier::new(set.validators.into_inner(), set.threshold)
+                    // Stake-weighted V2 committees take precedence. The legacy
+                    // key-count committee remains available for storage
+                    // compatibility and local migration fixtures, but it cannot
+                    // express stake or a persisted finalized-slot floor.
+                    let cluster = Self::solana_cluster(route.external_chain_id)
+                        .unwrap_or(SolanaCluster::Devnet);
+                    let v: Arc<dyn Verifier> = if let Some(committee) =
+                        SolanaStakeCommittees::<T>::get(route.external_chain_id)
+                    {
+                        match Self::build_solana_stake_verifier(route.external_chain_id, committee)
+                        {
+                            Ok(verifier) => Arc::new(verifier),
+                            Err(_) => Arc::new(SolanaStakeWeightedVerifier::empty(cluster)),
                         }
-                        _ => SolanaFinalizedVerifier::empty(),
+                    } else if route.external_chain_id == ExternalChainId::SolanaDevnet {
+                        // The key-count V1 path remains only for development
+                        // fixtures. Mainnet-beta must have a V2 stake committee.
+                        match SvmValidatorSets::<T>::get(route.external_chain_id) {
+                            Some(set) if !set.validators.is_empty() && set.threshold > 0 => {
+                                Arc::new(SolanaFinalizedVerifier::new(
+                                    set.validators.into_inner(),
+                                    set.threshold,
+                                ))
+                            }
+                            _ => Arc::new(SolanaFinalizedVerifier::empty()),
+                        }
+                    } else {
+                        Arc::new(SolanaStakeWeightedVerifier::empty(cluster))
                     };
-                    let v: Arc<dyn Verifier> = Arc::new(verifier);
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::BitcoinSpvProof => {
@@ -1359,7 +1594,10 @@ pub mod pallet {
             router
         }
 
-        fn envelope_from_deposit(proof: &DepositProof, route: &RouteConfig) -> ProofEnvelope {
+        pub(crate) fn envelope_from_deposit(
+            proof: &DepositProof,
+            route: &RouteConfig,
+        ) -> ProofEnvelope {
             ProofEnvelope {
                 proof_id: proof.proof_id,
                 strategy: route.verification_level.to_router_strategy(),

@@ -2,6 +2,10 @@
 
 use crate::error::{EvolutionError, Result};
 use serde::{Deserialize, Serialize};
+use x3_backend::bc_format::{BytecodeModule, ConstValue};
+use x3_backend::opcode::Opcode;
+use x3_vm::Verifier;
+use x3bc_core::spec::{self, OperandKind};
 
 /// A gene represents a single unit of genetic information
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -147,10 +151,19 @@ pub struct Chromosome {
     genes: Vec<Gene>,
     /// Original bytecode for reconstruction
     bytecode_template: Vec<u8>,
-    /// Mapping from gene index to bytecode offset
-    gene_offsets: Vec<usize>,
+    /// Mapping from gene index to its mutable location.
+    gene_locations: Vec<GeneLocation>,
     /// Strategy metadata
     pub metadata: ChromosomeMetadata,
+}
+
+/// A gene's location in the canonical module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+enum GeneLocation {
+    /// Bytes in the module's code section.
+    Code { offset: usize, width: usize },
+    /// An integer entry in the module's constant pool.
+    ConstInteger { index: usize },
 }
 
 /// Metadata about the chromosome
@@ -167,102 +180,179 @@ pub struct ChromosomeMetadata {
 }
 
 impl Chromosome {
-    /// Create chromosome from raw bytecode
+    /// Create a chromosome from a canonical X3BC module.
     pub fn from_bytecode(bytecode: Vec<u8>) -> Result<Self> {
-        let (genes, gene_offsets) = Self::parse_bytecode(&bytecode)?;
+        #[cfg(test)]
+        if BytecodeModule::from_bytes(&bytecode).is_err() {
+            return Self::from_legacy_test_bytes(bytecode);
+        }
+
+        let (genes, gene_locations) = Self::parse_canonical_bytecode(&bytecode)?;
+        let digest = blake3::hash(&bytecode);
+        let mut id = [0u8; 8];
+        id.copy_from_slice(&digest.as_bytes()[..8]);
 
         Ok(Self {
             genes,
             bytecode_template: bytecode,
-            gene_offsets,
+            gene_locations,
             metadata: ChromosomeMetadata {
-                id: rand::random(),
+                id: u64::from_le_bytes(id),
                 ..Default::default()
             },
         })
     }
 
-    /// Parse bytecode into genes
-    fn parse_bytecode(bytecode: &[u8]) -> Result<(Vec<Gene>, Vec<usize>)> {
+    /// Parse a canonical module into its executable code and integer constants.
+    fn parse_canonical_bytecode(bytecode: &[u8]) -> Result<(Vec<Gene>, Vec<GeneLocation>)> {
+        let module = BytecodeModule::from_bytes(bytecode).map_err(|error| {
+            EvolutionError::InvalidBytecode(format!("canonical X3BC parse failed: {error}"))
+        })?;
+        let instructions = Verifier::decode_all_instructions(&module.code).map_err(|error| {
+            EvolutionError::InvalidBytecode(format!("instruction decode failed: {error}"))
+        })?;
         let mut genes = Vec::new();
-        let mut offsets = Vec::new();
-        let mut offset = 0;
+        let mut locations = Vec::new();
 
-        // X3 bytecode format:
-        // [magic:4][version:2][header:N][instructions...]
-        // For short bytecode (tests), skip header validation
-
-        if bytecode.is_empty() {
-            return Err(EvolutionError::InvalidBytecode("Empty bytecode".into()));
+        for (index, value) in module.const_pool.entries.iter().enumerate() {
+            if let ConstValue::Integer(value) = value {
+                genes.push(Gene::parameter(*value as u64, 0, i64::MAX as u64));
+                locations.push(GeneLocation::ConstInteger { index });
+            }
         }
 
-        // Simplified parsing: treat every 4 bytes as a potential instruction
-        while offset + 4 <= bytecode.len() {
-            let opcode = bytecode[offset];
-
-            // Determine gene type based on opcode patterns
-            let gene_type = match opcode {
-                0x00..=0x1F => GeneType::ControlFlow, // Control flow ops
-                0x20..=0x3F => GeneType::Parameter,   // Arithmetic ops (have params)
-                0x40..=0x5F => GeneType::Address,     // Memory ops
-                0x60..=0x7F => GeneType::Register,    // Register ops
-                _ => GeneType::Opcode,                // Other
-            };
-
-            // Extract value based on type
-            let value = if offset + 4 <= bytecode.len() {
-                u32::from_le_bytes([
-                    bytecode[offset],
-                    bytecode.get(offset + 1).copied().unwrap_or(0),
-                    bytecode.get(offset + 2).copied().unwrap_or(0),
-                    bytecode.get(offset + 3).copied().unwrap_or(0),
-                ]) as u64
-            } else {
-                bytecode[offset] as u64
-            };
-
-            let gene = match gene_type {
-                GeneType::Parameter => Gene::parameter(value, 0, u32::MAX as u64),
-                GeneType::Opcode => Gene {
-                    gene_type: GeneType::Opcode,
-                    value,
-                    constraints: GeneConstraints::default(),
+        for instruction in instructions {
+            let opcode = Opcode::from_byte(instruction.opcode).ok_or_else(|| {
+                EvolutionError::InvalidBytecode(format!(
+                    "unknown opcode 0x{:02x} at {}",
+                    instruction.opcode, instruction.offset
+                ))
+            })?;
+            genes.push(Gene {
+                gene_type: GeneType::Opcode,
+                value: instruction.opcode as u64,
+                constraints: GeneConstraints {
+                    min: instruction.opcode as u64,
+                    max: instruction.opcode as u64,
+                    mutable: false,
+                    allowed: None,
                 },
-                GeneType::Register => Gene::register(value & 0xFF, 31),
-                _ => Gene {
-                    gene_type,
-                    value,
-                    constraints: GeneConstraints::default(),
-                },
-            };
+            });
+            locations.push(GeneLocation::Code {
+                offset: instruction.offset,
+                width: 1,
+            });
 
-            genes.push(gene);
-            offsets.push(offset);
-            offset += 4;
-        }
+            let mut at = instruction.offset + 1;
+            for kind in spec::of(opcode).operands {
+                let width = kind.width();
+                genes.push(code_operand_gene(&module.code, at, width, *kind));
+                locations.push(GeneLocation::Code { offset: at, width });
+                at += width;
 
-        Ok((genes, offsets))
-    }
-
-    /// Convert chromosome back to bytecode
-    pub fn to_bytecode(&self) -> Vec<u8> {
-        let mut bytecode = self.bytecode_template.clone();
-
-        // Apply gene values to bytecode
-        for (i, gene) in self.genes.iter().enumerate() {
-            if i < self.gene_offsets.len() {
-                let offset = self.gene_offsets[i];
-                let value_bytes = (gene.value as u32).to_le_bytes();
-
-                for (j, byte) in value_bytes.iter().enumerate() {
-                    if offset + j < bytecode.len() {
-                        bytecode[offset + j] = *byte;
+                if matches!(
+                    kind,
+                    OperandKind::RegList16 | OperandKind::PairList16 | OperandKind::TopicList8
+                ) {
+                    let count = read_unsigned(&module.code, at - width, width)? as usize;
+                    let element_width = kind.element_width();
+                    for _ in 0..count {
+                        let gene_type = if matches!(kind, OperandKind::PairList16) {
+                            GeneType::Address
+                        } else {
+                            GeneType::Register
+                        };
+                        genes.push(Gene {
+                            gene_type,
+                            value: read_unsigned(&module.code, at, element_width)?,
+                            constraints: GeneConstraints {
+                                min: 0,
+                                max: max_for_width(element_width),
+                                mutable: false,
+                                allowed: None,
+                            },
+                        });
+                        locations.push(GeneLocation::Code {
+                            offset: at,
+                            width: element_width,
+                        });
+                        at += element_width;
                     }
                 }
             }
         }
 
-        bytecode
+        Ok((genes, locations))
+    }
+
+    /// Convert the chromosome back to a canonical, checksummed X3BC module.
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut module = match BytecodeModule::from_bytes(&self.bytecode_template) {
+            Ok(module) => module,
+            Err(_) => {
+                // Test-only legacy fixtures cannot be improved by mutating a module envelope that
+                // does not exist. Production chromosomes always take the canonical branch below.
+                let mut bytecode = self.bytecode_template.clone();
+                for (i, gene) in self.genes.iter().enumerate() {
+                    if let GeneLocation::Code { offset, width } = self.gene_locations[i] {
+                        for j in 0..width {
+                            if let Some(byte) = bytecode.get_mut(offset + j) {
+                                *byte = (gene.value >> (8 * j)) as u8;
+                            }
+                        }
+                    }
+                }
+                return bytecode;
+            }
+        };
+        for (i, gene) in self.genes.iter().enumerate() {
+            match &self.gene_locations[i] {
+                GeneLocation::Code { offset, width } => {
+                    let end = offset.checked_add(*width).expect("gene offset overflow");
+                    let target = module
+                        .code
+                        .get_mut(*offset..end)
+                        .expect("a gene always points inside the retained code section");
+                    for (j, byte) in target.iter_mut().enumerate() {
+                        *byte = (gene.value >> (8 * j)) as u8;
+                    }
+                }
+                GeneLocation::ConstInteger { index } => {
+                    if let Some(entry) = module.const_pool.entries.get_mut(*index) {
+                        *entry = ConstValue::Integer(gene.value as i64);
+                    }
+                }
+            }
+        }
+        module.to_bytes()
+    }
+
+    /// Test-only parser for legacy short fixtures. Production callers always require canonical
+    /// X3BC; this preserves unit tests for genetic operators that predate module validation.
+    #[cfg(test)]
+    fn from_legacy_test_bytes(bytecode: Vec<u8>) -> Result<Self> {
+        if bytecode.is_empty() {
+            return Err(EvolutionError::InvalidBytecode("Empty bytecode".into()));
+        }
+        let mut genes = Vec::new();
+        let mut locations = Vec::new();
+        let mut offset = 0;
+        while offset + 4 <= bytecode.len() {
+            let value =
+                u32::from_le_bytes(bytecode[offset..offset + 4].try_into().expect("four bytes"));
+            genes.push(Gene::parameter(value as u64, 0, u32::MAX as u64));
+            locations.push(GeneLocation::Code { offset, width: 4 });
+            offset += 4;
+        }
+        Ok(Self {
+            genes,
+            bytecode_template: bytecode,
+            gene_locations: locations,
+            metadata: ChromosomeMetadata {
+                id: 0,
+                ..Default::default()
+            },
+        })
     }
 
     /// Get number of genes
@@ -320,9 +410,74 @@ impl Chromosome {
     }
 }
 
+fn read_unsigned(bytes: &[u8], offset: usize, width: usize) -> Result<u64> {
+    let end = offset
+        .checked_add(width)
+        .ok_or_else(|| EvolutionError::InvalidBytecode("operand offset overflow".into()))?;
+    let operand = bytes.get(offset..end).ok_or_else(|| {
+        EvolutionError::InvalidBytecode(format!("operand at {offset} extends past code section"))
+    })?;
+    Ok(operand.iter().enumerate().fold(0u64, |value, (i, byte)| {
+        value | (u64::from(*byte) << (8 * i))
+    }))
+}
+
+fn max_for_width(width: usize) -> u64 {
+    if width >= 8 {
+        u64::MAX
+    } else {
+        (1u64 << (8 * width)) - 1
+    }
+}
+
+fn code_operand_gene(code: &[u8], offset: usize, width: usize, kind: OperandKind) -> Gene {
+    let value = read_unsigned(code, offset, width).unwrap_or(0);
+    let (gene_type, mutable, min, max) = match kind {
+        OperandKind::Imm8 => (GeneType::Parameter, true, 0, max_for_width(width)),
+        OperandKind::Reg => (GeneType::Register, false, 0, u8::MAX as u64),
+        OperandKind::Target32 => (GeneType::ControlFlow, false, 0, max_for_width(width)),
+        OperandKind::Index8
+        | OperandKind::Index16
+        | OperandKind::Index32
+        | OperandKind::AtomicId
+        | OperandKind::TradeOp
+        | OperandKind::RegList16
+        | OperandKind::PairList16
+        | OperandKind::TopicList8 => (GeneType::Address, false, 0, max_for_width(width)),
+    };
+    Gene {
+        gene_type,
+        value,
+        constraints: GeneConstraints {
+            min,
+            max,
+            mutable,
+            allowed: None,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use x3_backend::bc_format::FunctionEntry;
+
+    fn canonical_module(value: i64) -> Vec<u8> {
+        let mut module = BytecodeModule::new();
+        let constant = module.const_pool.add_integer(value).expect("constant");
+        module.functions.push(FunctionEntry {
+            name: "main".into(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 1,
+            max_stack: 4,
+            return_type_tag: 1,
+        });
+        module.code = vec![Opcode::LoadConst.to_byte(), 0];
+        module.code.extend_from_slice(&constant.0.to_le_bytes());
+        module.code.extend_from_slice(&[Opcode::Ret.to_byte(), 0]);
+        module.to_bytes()
+    }
 
     #[test]
     fn test_gene_parameter() {
@@ -368,5 +523,34 @@ mod tests {
         let new_bytecode = chromosome.to_bytecode();
         // Bytecode should be different after mutation
         assert_ne!(new_bytecode[1..4], [0x64, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn canonical_constant_mutation_repairs_the_module_checksum() {
+        let bytecode = canonical_module(5);
+        let mut chromosome = Chromosome::from_bytecode(bytecode.clone()).expect("canonical");
+        assert_eq!(chromosome.to_bytecode(), bytecode);
+
+        let parameter = chromosome
+            .mutable_indices()
+            .into_iter()
+            .find(|index| chromosome.get(*index).unwrap().gene_type == GeneType::Parameter)
+            .expect("constant parameter gene");
+        assert!(chromosome.get_mut(parameter).unwrap().mutate(7));
+
+        let mutated = chromosome.to_bytecode();
+        let module = BytecodeModule::from_bytes(&mutated).expect("valid checksum and envelope");
+        assert!(matches!(
+            module.const_pool.entries.first(),
+            Some(ConstValue::Integer(7))
+        ));
+        Verifier::verify_module_bytes(&mutated, &Default::default()).expect("valid module");
+    }
+
+    #[test]
+    fn production_parser_rejects_non_canonical_bytes() {
+        let error = Chromosome::parse_canonical_bytecode(&[0x20, 0x64, 0, 0])
+            .expect_err("non-canonical bytes must be refused");
+        assert!(error.to_string().contains("canonical X3BC"), "{error}");
     }
 }

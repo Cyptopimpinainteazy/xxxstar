@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "servers": [
+    {
+      "name": "x3star1",
+      "reported_model": "Lenovo System x3550 M5",
+      "observed_vendor": "LENOVO",
+      "observed_product": "-[546345Z]-",
+      "observed_os": "Ubuntu 22.04.5 LTS",
+      "observed_address": "192.168.0.70/24",
+      "observed_interface": "eno2",
+      "observed_mac": "08:94:ef:37:68:c3",
+      "observed_speed_mbps": 1000,
+      "observed_duplex": "Full",
+      "tailscale_address": "100.89.236.89",
+      "roles": "repository checkout observed; running validator role not verified",
+      "other_physical_interfaces": [
+        "eno1",
+        "eno3",
+        "eno4",
+        "ens1f0",
+        "ens1f1"
+      ],
+      "other_physical_link_state": "DOWN",
+      "usb_ethernet": "enx0a94ef3768c9 UP without IP; IBM RNDIS device observed"
+    },
+    {
+      "name": "x3star2",
+      "reported_model": "Lenovo System x3550 M5",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "x3star3",
+      "reported_model": "HP DL360 G7",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-dl380-g7-1",
+      "reported_model": "HP DL380 G7",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-dl380-g7-2",
+      "reported_model": "HP DL380 G7",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-dl380-g7-3",
+      "reported_model": "HP DL380 G7",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-dl380-g7-4",
+      "reported_model": "HP DL380 G7",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-dl380-gen8",
+      "reported_model": "HP DL380 Gen8",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-r710",
+      "reported_model": "Dell PowerEdge R710",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "operator-2950",
+      "reported_model": "Dell PowerEdge 2950",
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    },
+    {
+      "name": "x3gpu1",
+      "reported_model": null,
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false,
+      "resolver_address": "192.168.0.30",
+      "icmp_probe": "3/3 replies; identity and GPU role unverified"
+    },
+    {
+      "name": "x3gpu2",
+      "reported_model": null,
+      "evidence": "operator inventory; generated operator-* names are inventory labels, not discovered hostnames",
+      "observed_address": null,
+      "roles_verified": false
+    }
+  ]
+}

@@ -34,7 +34,7 @@ use sp_runtime::{
 
 use pallet_x3_kernel::{MockEvmAdapter, MockSvmAdapter, X3ExecutorAdapter, X3VmAdapter};
 use x3_backend::{BytecodeModule, FunctionEntry};
-use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::compiler_bridge::compile_legacy_source as compile_source;
 
 type AccountId = u64;
 type Balance = u128;
@@ -146,6 +146,7 @@ impl pallet_x3_kernel::Config for StorageTest {
     type Currency = Balances;
     type Balance = Balance;
     type AssetId = u32;
+    type NativeFeeAssetId = frame_support::traits::ConstU32<0>;
     type AtlasId = u32;
     type MaxAssetsPerAccount = ConstU32<16>;
     type MaxAssetSymbolLength = ConstU32<16>;

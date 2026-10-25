@@ -15,7 +15,7 @@
 //! `execute_on_chain`, and the three have to agree.
 #![cfg(all(feature = "std", feature = "compile"))]
 
-use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::compiler_bridge::compile_legacy_source as compile_source;
 use x3_x3_integration::mini_x3::{self, MiniValue};
 use x3_x3_integration::{X3Executor, X3ExecutorConfig};
 

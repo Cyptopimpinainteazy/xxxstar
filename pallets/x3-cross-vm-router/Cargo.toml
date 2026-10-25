@@ -43,6 +43,14 @@ mainnet-rc1 = [
     "kernel-invariants",
 ]
 
+# The public mainnet surface is the audited RC-1 scope plus the real external
+# gateway path. It remains separate from `mainnet-rc1`, which is closed-testnet
+# scope and must not activate external routes.
+mainnet-v1 = [
+    "mainnet-rc1",
+    "external-gateway",
+]
+
 # Internal modules that form the RC-1 critical path.
 internal-ixl    = []   # x3-ixl bundle execution (always on in mainnet-rc1)
 packet-standard = []   # x3-packet-standard lifecycle (always on in mainnet-rc1)

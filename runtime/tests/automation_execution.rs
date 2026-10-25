@@ -3,7 +3,7 @@
 //! These run against the real `x3-chain-runtime`, not the pallet's mock, so they
 //! pin the two things the audit found broken:
 //!
-//! * the runtime wires the median price oracle rather than `NoopOracle`, and an
+//! * the runtime wires the median price oracle rather than `UnavailableOracle`, and an
 //!   asset with no median **fails closed** instead of reading as zero;
 //! * a task's action moves real balances through `RuntimeActionDispatcher`, and
 //!   the keeper is paid only when a dispatch happened.
@@ -103,7 +103,7 @@ fn a_price_condition_fails_closed_when_the_oracle_has_no_median() {
                 threshold: 1_000,
                 above: false,
             },
-            Action::Noop,
+            Action::NoChange,
         );
 
         let keeper_before = free(&keeper);
@@ -155,7 +155,7 @@ fn the_runtime_oracle_supplies_the_automation_price() {
                 threshold: 1_000,
                 above: true,
             },
-            Action::Noop,
+            Action::NoChange,
         );
 
         assert_ok!(Automation::execute_task(
@@ -231,7 +231,7 @@ fn a_ledger_asset_transfer_is_refused_until_atomic_account_moves_exist() {
 
 #[test]
 fn the_oracle_pallet_is_the_wired_source_of_truth() {
-    // Guards against a regression to `NoopOracle`: if the runtime went back to a
+    // Guards against a regression to `UnavailableOracle`: if the runtime went back to a
     // provider that always answers `None`, the price above would never be read.
     setup().execute_with(|| {
         assert!(Oracle::get_price(9999).is_none());
@@ -271,7 +271,7 @@ fn a_stale_median_is_refused_like_a_missing_one() {
                 threshold: 2_000,
                 above: false,
             },
-            Action::Noop,
+            Action::NoChange,
         );
 
         let keeper_before = free(&keeper);
@@ -313,7 +313,7 @@ fn a_fresh_median_is_usable() {
                 threshold: 2_000,
                 above: false,
             },
-            Action::Noop,
+            Action::NoChange,
         );
         assert_ok!(Automation::execute_task(
             RuntimeOrigin::signed(keeper),

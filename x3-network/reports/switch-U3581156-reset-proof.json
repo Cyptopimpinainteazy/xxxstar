@@ -1,0 +1,40 @@
+{
+  "chassis_serial": "U3581156",
+  "model": "OS6860E-P24",
+  "aos": "8.1.1.497.R01",
+  "approval": "isolated spare; reboot and prior-config loss accepted by operator",
+  "checks": {
+    "bootloader_password_recovery": "PASS: default admin login succeeded",
+    "working_and_certified_config_archive": "PASS: four files moved, archive listing verified",
+    "firmware_retention": "PASS: firmware version and image byte lengths retained; no independent cryptographic authenticity claim",
+    "post_reload_old_vlan_110_absent": "PASS",
+    "post_reload_old_management_address_absent": "PASS",
+    "post_reload_old_static_routes_absent": "PASS",
+    "fan_temperature": "PASS: observed values within reported ranges",
+    "redundant_power": "BLOCKED: second PSU UNPLUG",
+    "startup_readiness": "PASS: Master/Running after final reboot; both modules UP",
+    "old_account_removal": "PASS: persists after reboot; only admin and built-in non-login default remain",
+    "secure_administrator_password": "PASS: fresh login and post-reboot login with generated credential",
+    "live_vlan_connectivity": "NOT RUN",
+    "ssh_management": "NOT RUN",
+    "configuration_saved_and_certified": "PASS: CERTIFIED/SYNCHRONIZED after final reboot",
+    "remote_management_authentication": "PASS: remote services denied by AAA; local console authentication only",
+    "final_reboot_persistence": "PASS: generated credential, account cleanup and clean startup settings verified"
+  },
+  "private_evidence": {
+    "authenticated_identity": "/home/lojak/.local/state/x3-network/aos-inspect-27sfnwrw/capture.json",
+    "config_exports": "/home/lojak/.local/state/x3-network/aos-read-f0tgubvh/configuration-exports/manifest.json",
+    "config_archive": "/home/lojak/.local/state/x3-network/aos-config-reset-fnxs06pr/capture.json",
+    "approved_reload": "/home/lojak/.local/state/x3-network/aos-reset-reboot-jkeenmwy/capture.json",
+    "post_reload_verification": "/home/lojak/.local/state/x3-network/aos-reset-verify-5bxolfjw/capture.json",
+    "hardware_health": "/home/lojak/.local/state/x3-network/aos-read-dr26o_xw/capture.json",
+    "readiness": "/home/lojak/.local/state/x3-network/aos-read-3vb70150/capture.json",
+    "administrator_hardening": "/home/lojak/.local/state/x3-network/credentials-U3581156-r1n0kf1e/proof.json",
+    "configuration_save": "/home/lojak/.local/state/x3-network/aos-save-defaults-hmjrxl_3/capture.json",
+    "persistence_reload": "/home/lojak/.local/state/x3-network/aos-reset-reboot-n4o186n9/capture.json",
+    "final_persistence": "/home/lojak/.local/state/x3-network/persistence-U3581156-endqbql4/summary.json",
+    "final_capture": "/home/lojak/.local/state/x3-network/persistence-U3581156-endqbql4/capture.json"
+  },
+  "final_capture_sha256": "a6902bd0f8779b8b412d60bcb71164e50fa97c828bd959cf9030623a176f79fd",
+  "reset_scope": "startup configuration and account cleanup; archival data, firmware, certificates, licenses and logs are not securely erased"
+}

@@ -1,0 +1,36 @@
+{
+  "base_commit": "a72b2303981ddbbb5bd9296effa7ee1751b3283e",
+  "branch": "automation/lowering",
+  "repository_state": "dirty; pre-existing compiler and lockfile changes preserved",
+  "scope": "refuse fabricated quotes when no liquidity source is configured",
+  "verification": [
+    {
+      "command": "cargo test --locked -p x3-swap-router unconfigured_quote_engine_never_turns_a_limit_into_a_market_quote",
+      "phase": "before implementation",
+      "status": "FAIL",
+      "exit_code": 101,
+      "reason": "unconfigured engine fabricated a successful quote"
+    },
+    {
+      "command": "cargo test --locked -p x3-swap-router",
+      "status": "PASS",
+      "exit_code": 0,
+      "unit_tests": 13,
+      "integration_tests": 25
+    },
+    {
+      "command": "cargo clippy --locked -p x3-swap-router --all-targets -- -D warnings",
+      "status": "PASS",
+      "exit_code": 0
+    },
+    {
+      "command": "rustfmt --edition 2021 --check --config skip_children=true crates/x3-swap-router/src/lib.rs crates/x3-swap-router/src/quote_engine.rs crates/x3-swap-router/src/tests.rs",
+      "status": "PASS",
+      "exit_code": 0
+    }
+  ],
+  "external_liquidity": "NOT RUN",
+  "live_execution": "NOT RUN",
+  "workspace_gates": "NOT RUN",
+  "copilot_acknowledgement": "not received"
+}

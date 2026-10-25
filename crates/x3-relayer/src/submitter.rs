@@ -1,6 +1,6 @@
 /// Proof Submitter - Submits proofs to X3 runtime via RPC
 use crate::quorum::AuthorizedValidatorSet;
-use crate::types::{EvmProof, SvmProof, ValidatorSignature};
+use crate::types::{EvmProof, EvmProofRequest, SvmProof, ValidatorSignature};
 use anyhow::{anyhow, Result};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use log::{debug, info};
@@ -207,16 +207,20 @@ impl RpcSubmitter {
     }
 
     /// Acquire EVM proof for submission from finalized block data
-    pub async fn acquire_evm_proof(
-        &self,
-        domain_id: u32,
-        block_number: u64,
-        block_hash: [u8; 32],
-        state_root: [u8; 32],
-    ) -> Result<EvmProof> {
+    pub async fn acquire_evm_proof(&self, request: EvmProofRequest) -> Result<EvmProof> {
+        if request.proof_payload.is_empty() {
+            return Err(anyhow!(
+                "refusing to acquire an EVM proof without receipt-inclusion evidence"
+            ));
+        }
+        if request.expected_recipient.len() != 20 {
+            return Err(anyhow!(
+                "refusing to acquire an EVM proof with a non-20-byte recipient"
+            ));
+        }
         debug!(
             "Acquiring EVM proof for domain {}, block {}",
-            domain_id, block_number
+            request.source_domain, request.finalized_block
         );
 
         let nonce = {
@@ -225,11 +229,14 @@ impl RpcSubmitter {
         };
 
         Ok(EvmProof {
-            source_domain: domain_id,
-            finalized_block: block_number,
-            block_hash,
-            state_root,
+            source_domain: request.source_domain,
+            finalized_block: request.finalized_block,
+            block_hash: request.block_hash,
+            state_root: request.state_root,
             proof_nonce: nonce,
+            proof_payload: request.proof_payload,
+            expected_recipient: request.expected_recipient,
+            expected_amount: request.expected_amount,
         })
     }
 
@@ -401,6 +408,9 @@ mod tests {
             block_hash,
             state_root,
             proof_nonce: 0,
+            proof_payload: vec![1u8; 96],
+            expected_recipient: vec![2u8; 20],
+            expected_amount: 1_000,
         };
 
         assert_eq!(proof.source_domain, 11155111);
@@ -472,6 +482,9 @@ mod tests {
             state_root: [2u8; 32],
             finalized_block: 123,
             proof_nonce: 7,
+            proof_payload: vec![1u8; 96],
+            expected_recipient: vec![2u8; 20],
+            expected_amount: 1_000,
         };
 
         // Submitting means signing a runtime extrinsic with the intent party's

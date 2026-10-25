@@ -62,6 +62,8 @@ pub trait WeightInfo {
 	fn submit_release_proof() -> Weight;
 	fn set_svm_validators() -> Weight;
 	fn clear_svm_validators() -> Weight;
+	fn set_solana_stake_committee() -> Weight;
+	fn clear_solana_stake_committee() -> Weight;
 }
 
 /// Weights for `pallet_x3_crosschain_gateway` using the Substrate node and recommended hardware.
@@ -120,9 +122,9 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Measured:  `490`
 		//  Estimated: `3955`
 		// Minimum execution time: 95_185_000 picoseconds.
-		Weight::from_parts(97_411_000, 3955)
-			.saturating_add(T::DbWeight::get().reads(6_u64))
-			.saturating_add(T::DbWeight::get().writes(5_u64))
+		Weight::from_parts(105_000_000, 3955)
+			.saturating_add(T::DbWeight::get().reads(8_u64))
+			.saturating_add(T::DbWeight::get().writes(6_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Transfers` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Transfers` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -190,9 +192,9 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Measured:  `813`
 		//  Estimated: `4278`
 		// Minimum execution time: 81_220_000 picoseconds.
-		Weight::from_parts(82_282_000, 4278)
-			.saturating_add(T::DbWeight::get().reads(4_u64))
-			.saturating_add(T::DbWeight::get().writes(3_u64))
+		Weight::from_parts(90_000_000, 4278)
+			.saturating_add(T::DbWeight::get().reads(6_u64))
+			.saturating_add(T::DbWeight::get().writes(4_u64))
 	}
 	/// Storage: `X3CrosschainGateway::SvmValidatorSets` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::SvmValidatorSets` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -211,6 +213,18 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Measured:  `0`
 		//  Estimated: `0`
 		// Minimum execution time: 22_174_000 picoseconds.
+		Weight::from_parts(23_718_000, 0)
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	/// Storage: `X3CrosschainGateway::SolanaFinalizedSlots` (r:1 w:0)
+	/// Storage: `X3CrosschainGateway::SolanaStakeCommittees` (r:0 w:1)
+	fn set_solana_stake_committee() -> Weight {
+		Weight::from_parts(28_000_000, 3_539)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	/// Storage: `X3CrosschainGateway::SolanaStakeCommittees` (r:0 w:1)
+	fn clear_solana_stake_committee() -> Weight {
 		Weight::from_parts(23_718_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
@@ -271,9 +285,9 @@ impl WeightInfo for () {
 		//  Measured:  `490`
 		//  Estimated: `3955`
 		// Minimum execution time: 95_185_000 picoseconds.
-		Weight::from_parts(97_411_000, 3955)
-			.saturating_add(RocksDbWeight::get().reads(6_u64))
-			.saturating_add(RocksDbWeight::get().writes(5_u64))
+		Weight::from_parts(105_000_000, 3955)
+			.saturating_add(RocksDbWeight::get().reads(8_u64))
+			.saturating_add(RocksDbWeight::get().writes(6_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Transfers` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Transfers` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -341,9 +355,9 @@ impl WeightInfo for () {
 		//  Measured:  `813`
 		//  Estimated: `4278`
 		// Minimum execution time: 81_220_000 picoseconds.
-		Weight::from_parts(82_282_000, 4278)
-			.saturating_add(RocksDbWeight::get().reads(4_u64))
-			.saturating_add(RocksDbWeight::get().writes(3_u64))
+		Weight::from_parts(90_000_000, 4278)
+			.saturating_add(RocksDbWeight::get().reads(6_u64))
+			.saturating_add(RocksDbWeight::get().writes(4_u64))
 	}
 	/// Storage: `X3CrosschainGateway::SvmValidatorSets` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::SvmValidatorSets` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -362,6 +376,18 @@ impl WeightInfo for () {
 		//  Measured:  `0`
 		//  Estimated: `0`
 		// Minimum execution time: 22_174_000 picoseconds.
+		Weight::from_parts(23_718_000, 0)
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	/// Storage: `X3CrosschainGateway::SolanaFinalizedSlots` (r:1 w:0)
+	/// Storage: `X3CrosschainGateway::SolanaStakeCommittees` (r:0 w:1)
+	fn set_solana_stake_committee() -> Weight {
+		Weight::from_parts(28_000_000, 3_539)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	/// Storage: `X3CrosschainGateway::SolanaStakeCommittees` (r:0 w:1)
+	fn clear_solana_stake_committee() -> Weight {
 		Weight::from_parts(23_718_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}

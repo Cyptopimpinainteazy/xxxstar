@@ -36,6 +36,8 @@ struct OracleHost {
     manifest: CapabilityManifest,
     pre: TradingPreState,
     reserves: BTreeMap<String, (u128, u128)>,
+    /// Reserves as they stood at `begin_transaction`, restored by `rollback_transaction`.
+    snapshot: Option<BTreeMap<String, (u128, u128)>>,
 }
 
 fn asset_id(key: &AssetKey) -> u32 {
@@ -70,6 +72,7 @@ impl OracleHost {
             manifest,
             pre,
             reserves,
+            snapshot: None,
         }
     }
 
@@ -93,6 +96,20 @@ impl OracleHost {
 impl TradingHost for OracleHost {
     fn capabilities(&self) -> &CapabilityManifest {
         &self.manifest
+    }
+    fn begin_transaction(&mut self) -> Result<(), HostError> {
+        self.snapshot = Some(self.reserves.clone());
+        Ok(())
+    }
+    fn commit_transaction(&mut self) -> Result<(), HostError> {
+        self.snapshot = None;
+        Ok(())
+    }
+    fn rollback_transaction(&mut self) -> Result<(), HostError> {
+        if let Some(reserves) = self.snapshot.take() {
+            self.reserves = reserves;
+        }
+        Ok(())
     }
     fn open_debt(&mut self, request: BorrowRequest) -> Result<BorrowResult, HostError> {
         let pool = &self.pre.flash_pools[0];
