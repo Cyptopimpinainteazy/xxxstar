@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "6015a6ca1",
+  "candidate_commit": "c45a9d7e4",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "Solana finalized transaction inclusion and bank-state evidence",
@@ -15,6 +15,7 @@
     "Query getTransaction and getBlock with finalized commitment and require the transaction signature, slot, blockhash, index, and successful execution status to agree.",
     "Require at least three distinct Solana RPC endpoints for mainnet and a two-thirds provider quorum reporting identical evidence.",
     "Reject a mainnet relayer configuration with fewer than three distinct non-empty RPC endpoints at startup.",
+    "Publish a mainnet relayer configuration with three distinct Solana RPC endpoint placeholders.",
     "Carry the signed transaction evidence through relayer proof hashing, validator quorum verification, settlement verification, and gateway benchmarks."
   ],
   "verification": [
