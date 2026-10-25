@@ -11,6 +11,13 @@ on:
       - 'scripts/ci/test_autopilot_capacity.py'
       - 'scripts/ci/autopilot_triage.py'
       - 'scripts/ci/test_autopilot_triage.py'
+      - 'scripts/ci/integration_audit.py'
+      - 'scripts/ci/test_integration_audit.py'
+      - '.github/workflows/pr-agent.yml'
+      - '.github/workflows/pr-agent-auto.yml'
+      - '.pr_agent.toml'
+      - 'services/pr-agent/**'
+      - '.github/workflows/local-ci.yml'
       - '.github/workflows/x3-ci-autopilot.yml'
 
 permissions:
@@ -28,6 +35,10 @@ jobs:
           persist-credentials: false
       - name: Test diagnostics
         run: python3 -m unittest discover -s scripts/ci -p 'test_autopilot*.py' -v
+      - name: Test PR-Agent integration wiring
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_integration_audit.py -v
+          python3 scripts/ci/integration_audit.py --output "$RUNNER_TEMP/x3-integration-audit.json"
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
@@ -37,6 +48,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: x3-ci-autopilot-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/x3-ci-autopilot.json
+          path: |
+            ${{ runner.temp }}/x3-ci-autopilot.json
+            ${{ runner.temp }}/x3-integration-audit.json
           if-no-files-found: warn
           retention-days: 14
