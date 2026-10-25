@@ -589,6 +589,10 @@ digest = { path = "patches/digest" }
 # icu_properties = { path = "patches/icu_properties_stub" }
 # Patch idna_adapter to work with our icu_properties_stub GeneralCategory newtype
 idna_adapter = { path = "patches/idna_adapter" }
+# `libp2p-websocket` requires webpki-roots 0.25, whose bundled root store
+# contains trust anchors removed in 2026 (RUSTSEC-2026-0381). This 0.25.5 shim
+# retains the API while sourcing the current, cleaned 1.0.10 root store.
+webpki-roots = { path = "patches/webpki-roots" }
 # Force sp-io to use patched Substrate git version (don't use crates.io 23.0.0 which lacks wasm support)
 # NOTE: [patch] entries do not support default-features/features — those fields are silently ignored.
 sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }

@@ -1,0 +1,12 @@
+[package]
+name = "webpki-roots"
+version = "0.25.5"
+edition = "2021"
+description = "0.25-compatible view of the current Mozilla root store"
+license = "MPL-2.0"
+
+[dependencies]
+webpki-roots-current = { package = "webpki-roots", version = "=1.0.10" }
+
+[lib]
+path = "src/lib.rs"
