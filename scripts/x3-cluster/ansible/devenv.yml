@@ -1,0 +1,133 @@
+# Developer environment for a cluster node, matching the control node (x3star1): the repository on
+# the control node's branch, working toolchains, Codex on DeepSeek, VS Code settings and extensions,
+# and a GitHub Actions runner check. Re-running is safe: every task reports changed only when it
+# changed something.
+#
+#   ansible-playbook -i scripts/x3-cluster/x3-ansible-inventory scripts/x3-cluster/ansible/devenv.yml -l x3star2
+#
+# Run `x3cluster.py onboard <node>` (or let discovery do it) first: that installs the tooling and
+# makes the checkout. No sudo is used. The DeepSeek key is read from the control node's Codex config
+# and sent over SSH only; it is never written to a log or to this repository.
+- name: X3 developer environment
+  hosts: all:!control
+  gather_facts: false
+  vars:
+    x3_controller_repo: "{{ lookup('ansible.builtin.env', 'HOME') }}/Desktop/xxxstar-main"
+    x3_branch: "{{ lookup('ansible.builtin.pipe', 'git -C ' ~ x3_controller_repo ~ ' branch --show-current') }}"
+    x3_codex_config: "{{ lookup('ansible.builtin.env', 'HOME') }}/.codex/config.toml"
+    x3_codex_models: "{{ lookup('ansible.builtin.env', 'HOME') }}/.codex/models.json"
+    x3_vscode_cli: code-insiders
+    x3_vscode_settings: "{{ lookup('ansible.builtin.env', 'HOME') }}/.config/Code - Insiders/User/settings.json"
+    # Non-interactive SSH has none of the per-user toolchains a login shell adds.
+    x3_path: >-
+      export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$(ls -d $HOME/.nvm/versions/node/v*/bin 2>/dev/null | sort -V | tail -1):$PATH";
+  tasks:
+    - name: Identity
+      ansible.builtin.command: hostname
+      register: x3_hostname
+      changed_when: false
+      failed_when: x3_hostname.stdout != inventory_hostname
+
+    - name: Repository on the control node's branch ({{ x3_branch }})
+      ansible.builtin.shell: "{{ lookup('ansible.builtin.template', 'repo-branch.sh.j2') }}"
+      args:
+        executable: /bin/bash
+      register: x3_repo
+      changed_when: x3_repo.stdout is search('^CHANGED', multiline=True)
+      failed_when: x3_repo.rc != 0
+
+    - name: Toolchains
+      ansible.builtin.shell: |
+        {{ x3_path }}
+        for t in git cargo rustc node npm python3; do printf '%s ' "$t"; command -v "$t" >/dev/null && "$t" --version 2>&1 | head -1 || echo MISSING; done
+      args:
+        executable: /bin/bash
+      register: x3_tools
+      changed_when: false
+      failed_when: x3_tools.stdout is search('MISSING')
+
+    - name: Codex model catalogue
+      ansible.builtin.copy:
+        src: "{{ x3_codex_models }}"
+        dest: ~/.codex/models.json
+        mode: "0600"
+        backup: true
+
+    # The control node's config holds the DeepSeek key: it goes to a 0600 file, never on a command
+    # line, and the script deletes it.
+    - name: Stage the control node's Codex config
+      ansible.builtin.copy:
+        content: "{{ lookup('ansible.builtin.file', x3_codex_config) }}"
+        dest: ~/.codex/.x3-control-config.toml
+        mode: "0600"
+      no_log: true
+      changed_when: false
+
+    - name: Codex on DeepSeek (provider and model settings from the control node)
+      ansible.builtin.script:
+        cmd: codex_deepseek.py ~/.codex/.x3-control-config.toml
+        executable: python3
+      register: x3_codex
+      no_log: true
+      changed_when: x3_codex.stdout is search('^CHANGED', multiline=True)
+
+    - name: VS Code installation
+      ansible.builtin.shell: |
+        for c in code-insiders code; do command -v "$c" >/dev/null && { echo "$c"; exit 0; }; done; exit 1
+      register: x3_code
+      changed_when: false
+      failed_when: false
+
+    - name: VS Code settings (control node's values win; keys only this node has are kept)
+      when: x3_code.rc == 0
+      ansible.builtin.script:
+        cmd: "vscode_settings.py {{ x3_code.stdout }} {{ lookup('ansible.builtin.file', x3_vscode_settings) | b64encode }}"
+        executable: python3
+      register: x3_settings
+      changed_when: x3_settings.stdout is search('^CHANGED', multiline=True)
+
+    - name: VS Code extensions the control node has
+      when: x3_code.rc == 0
+      ansible.builtin.shell: |
+        have=$({{ x3_code.stdout }} --list-extensions 2>/dev/null | tr 'A-Z' 'a-z')
+        for e in {{ lookup('ansible.builtin.pipe', x3_vscode_cli ~ ' --list-extensions') | lower | split | join(' ') }}; do
+          echo "$have" | grep -qxF "$e" && continue
+          {{ x3_code.stdout }} --install-extension "$e" >/dev/null 2>&1 && echo "INSTALLED $e" || echo "FAILED $e"
+        done
+      args:
+        executable: /bin/bash
+      register: x3_ext
+      changed_when: x3_ext.stdout is search('INSTALLED')
+
+    - name: GitHub Actions runner
+      ansible.builtin.shell: |
+        for f in $(find ~ -maxdepth 3 -name .runner 2>/dev/null); do
+          name=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1],encoding='utf-8-sig'))['agentName'])" "$f")
+          pgrep -f "$(dirname "$f")/bin/Runner.Listener" >/dev/null && state=running || state=stopped
+          echo "$name $state $(dirname "$f")"
+        done
+      args:
+        executable: /bin/bash
+      register: x3_runner
+      changed_when: false
+
+    - name: Codex answers through DeepSeek
+      ansible.builtin.shell: |
+        {{ x3_path }}
+        cd /tmp && timeout 180 codex exec --skip-git-repo-check "Reply with exactly: pong" </dev/null 2>&1 | grep -v '^hook' | tail -3
+      args:
+        executable: /bin/bash
+      register: x3_pong
+      changed_when: false
+      failed_when: x3_pong.stdout is not search('pong')
+
+    - name: Report
+      ansible.builtin.debug:
+        msg:
+          host: "{{ inventory_hostname }}"
+          repo: "{{ x3_repo.stdout_lines | last }}"
+          toolchains: "{{ x3_tools.stdout_lines }}"
+          codex: "{{ 'changed' if x3_codex.changed else 'unchanged' }}"
+          vscode: "{{ (x3_code.stdout ~ ' settings ' ~ (x3_settings.stdout_lines | default(['n/a']) | last) ~ ', extensions installed ' ~ (x3_ext.stdout_lines | default([]) | select('search', 'INSTALLED') | list | length)) if x3_code.rc == 0 else 'not installed' }}"
+          runner: "{{ x3_runner.stdout_lines | select('search', '^' ~ inventory_hostname ~ ' ') | list | default(['none'], true) }}"
+          codex_pong: "{{ x3_pong.stdout is search('pong') }}"

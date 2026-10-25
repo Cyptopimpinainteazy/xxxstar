@@ -1,0 +1,25 @@
+set -euo pipefail
+# The checkout `x3cluster.py onboard` made (or an existing one), moved to {{ x3_branch }}. A checkout
+# with uncommitted changes, or a local {{ x3_branch }} with commits origin does not have, is left alone.
+b={{ x3_branch | quote }}
+r=""
+for d in ~/xxxstar ~/Desktop/xxxstar-main ~/Desktop/xxxstar-master; do
+  [ -e "$d/.git" ] && { r=$(readlink -f "$d"); break; }
+done
+[ -n "$r" ] || { echo "no checkout: run x3cluster.py onboard {{ inventory_hostname }} first"; exit 3; }
+cd "$r"
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+  echo "LEFT-ALONE $r has uncommitted changes on $(git branch --show-current)"; exit 0
+fi
+want="+refs/heads/$b:refs/remotes/origin/$b"
+git config --get-all remote.origin.fetch | grep -qxF "$want" || git config --add remote.origin.fetch "$want"
+git fetch -q origin "$b"
+if git rev-parse -q --verify "refs/heads/$b" >/dev/null && [ -n "$(git rev-list "origin/$b..$b")" ]; then
+  echo "LEFT-ALONE $r: local $b has commits origin/$b does not"; exit 0
+fi
+before="$(git branch --show-current) $(git rev-parse HEAD)"
+git checkout -q -B "$b" "origin/$b"
+git branch -q -u "origin/$b"
+after="$b $(git rev-parse HEAD)"
+[ "$before" = "$after" ] && state=UNCHANGED || state=CHANGED
+echo "$state $r $b $(git rev-parse --short HEAD)"

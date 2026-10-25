@@ -64,3 +64,39 @@ Tests: `python3 -m unittest scripts/x3-cluster/test_x3jobs.py`.
 
 It carries no secrets (user from `X3_ANSIBLE_USER`, default `lojak`). The validator-net playbooks
 under `ansible/` keep their own inventory; this one covers the build cluster.
+
+## Adding a new server
+
+1. **On the new server** (Ubuntu, this repo cloned, VS Code installed), as `lojak`:
+
+       bash scripts/x3-cluster/x3-join.sh --role build --name x3build1
+
+   It installs base packages, trusts x3star1's public key, enables linger and a LAN-only firewall,
+   and prints the machine's **host key** fingerprint. The name must be a node in `inventory.json`.
+2. **On x3star1**, add the node to `inventory.json` if it is new and pin its key:
+   `"hostkey": "SHA256:..."`, the fingerprint step 1 printed. Compare it with what
+   `ssh-keyscan -t ed25519 <ip> | ssh-keygen -lf -` shows from x3star1 before pinning.
+3. Within five minutes `x3-cluster-discover.timer` finds it, verifies the key, and runs
+   `x3cluster.py onboard`: tooling, checkout, role bootstrap, benchmark and a first real job.
+   Watch `~/.local/state/x3-cluster/events.log`.
+4. **Developer environment** (repo on x3star1's branch, toolchains, Codex on DeepSeek, VS Code
+   settings and extensions, runner check, a Codex "pong" test):
+
+       ansible-playbook -i scripts/x3-cluster/x3-ansible-inventory scripts/x3-cluster/ansible/devenv.yml -l x3build1
+
+   Re-running it is safe; a second run reports no changes. It never uses sudo, never moves a
+   checkout with uncommitted work or unpushed commits, and never writes the DeepSeek key to a
+   command line or log.
+
+A GitHub Actions runner still needs a registration token and sudo for its service, so it is
+reported, not created: register it with labels `self-hosted,Linux,X64,x3,<hostname>`.
+
+### Addresses change; host keys do not
+
+DHCP moves machines (x3star1 has been .65, .68 and .70). A node with a pinned `hostkey` is
+identified by that key: discovery follows it to any address where the key matches, treats several
+addresses with the same key (wired and Wi-Fi) as one node, and reports an address whose key does not
+match as a conflict without trusting it. Every sweep rewrites `~/.ssh/x3-cluster.conf` (Included
+first in `~/.ssh/config`) with `HostKeyAlias <name>` and strict checking, so `ssh <name>`, Ansible
+and jobs follow a move without prompts. DHCP reservations on the router remain the simplest
+permanent fix; this keeps the cluster working without them.
