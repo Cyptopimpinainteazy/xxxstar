@@ -1,0 +1,49 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-24",
+  "candidate_commit": "f9f6e3c9fa0b5c414ff824e32be2b99e3d8a9c64",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "host": {
+    "driver": "580.178.04",
+    "gpus": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce GTX 1070",
+        "memory_mib": 8192,
+        "adapter_backend": "Vulkan"
+      },
+      {
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 2060 SUPER",
+        "memory_mib": 8192,
+        "adapter_backend": "Vulkan"
+      }
+    ]
+  },
+  "command": "WGPU_BACKEND=vulkan X3_REQUIRE_GPU=1 cargo test -p x3-accel-wgpu --lib every_hardware_adapter_matches_cpu_hashes -- --nocapture",
+  "result": {
+    "status": "PASS",
+    "tests_passed": 1,
+    "tests_failed": 0,
+    "adapters_exercised": 2,
+    "algorithms": [
+      "sha256",
+      "keccak256"
+    ],
+    "comparison": "Every adapter output was compared byte-for-byte with the repository CPU reference over empty, short, rate-boundary, and 1 KiB inputs."
+  },
+  "full_suite_command": "WGPU_BACKEND=vulkan X3_REQUIRE_GPU=1 cargo test -p x3-accel-wgpu --lib",
+  "full_suite_result": {
+    "status": "PASS",
+    "tests_passed": 7,
+    "tests_failed": 0
+  },
+  "clippy_command": "cargo clippy -p x3-accel-wgpu --all-targets --no-deps -- -D warnings",
+  "clippy_result": "PASS",
+  "limitations": [
+    "This proves hardware parity for SHA-256 and Keccak-256 batches on both installed adapters.",
+    "It does not by itself prove hardware Ed25519 verification or hardware secp256k1 signature-batch parity for every primitive.",
+    "GPU output remains non-consensus evidence; the CPU reference is the acceptance authority."
+  ]
+}
