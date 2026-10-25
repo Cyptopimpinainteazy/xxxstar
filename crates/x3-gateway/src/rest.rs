@@ -1844,6 +1844,45 @@ mod tests {
         BenchmarkWorkloadProfile,
     };
 
+    #[tokio::test]
+    async fn svm_proof_summary_refuses_unverifiable_transaction_bytes() {
+        let request = RelayerProofRequest::Svm {
+            source_domain: 200,
+            proof_id: [8u8; 32],
+            cluster: "devnet".into(),
+            slot: 42,
+            parent_slot: 41,
+            blockhash: [7u8; 32],
+            bank_hash: [6u8; 32],
+            parent_bank_hash: [5u8; 32],
+            stake_table_digest: [4u8; 32],
+            expected_asset_id: [3u8; 32],
+            expected_amount: "5000".into(),
+            expected_sender: vec![2u8; 32],
+            expected_recipient: vec![1u8; 32],
+            expected_beneficiary: vec![9u8; 32],
+            transaction: SolanaTransactionEvidenceWire {
+                slot: 42,
+                index: 0,
+                succeeded: true,
+                raw_transaction: vec![1, 2, 3],
+            },
+            validator_signatures: vec![ValidatorAttestationWire {
+                validator_pubkey: [10u8; 32],
+                signature: vec![11u8; 64],
+            }],
+            required_signatures: 1,
+        };
+
+        let error = post_relayer_proof_summary(Json(request))
+            .await
+            .expect_err("syntactically invalid transaction bytes are not evidence");
+        assert!(
+            format!("{error:?}").contains("invalid SVM transaction evidence"),
+            "{error:?}"
+        );
+    }
+
     fn sample_report() -> BenchmarkReport {
         BenchmarkReport {
             report_id: "report-1".to_string(),
