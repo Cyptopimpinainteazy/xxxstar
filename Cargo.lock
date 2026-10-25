@@ -26145,10 +26145,10 @@ name = "x3-atomic-swap"
 version = "0.1.0"
 dependencies = [
  "blake2 0.10.6",
+ "ed25519-dalek 2.2.0",
  "hex",
  "k256 0.14.0",
  "parity-scale-codec",
- "rand 0.8.8",
  "rlp 0.5.2",
  "scale-info",
  "serde",
@@ -26357,6 +26357,7 @@ dependencies = [
  "criterion",
  "cross-chain-gpu-validator",
  "cumulus-primitives-proof-size-hostfunction",
+ "ed25519-dalek 2.2.0",
  "env_logger 0.10.2",
  "frame-benchmarking-cli",
  "frame-support",

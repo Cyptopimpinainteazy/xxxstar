@@ -186,7 +186,9 @@ pub use scoreboard::{
     AdapterScoreEntry, AdapterScoreboard, ScoredCategory, SettlementScope, SwapScoreboard,
 };
 pub use secret_release::{
+    rpc_provider_statement_hash, RpcProviderObservation, RpcQuorumAttestation,
     SecretReleaseEvidence, SecretReleaseFirewall, SecretReleasePermit, SecretReleaseRequirement,
+    RPC_PROVIDER_PUBLIC_KEY_LEN, RPC_PROVIDER_SIGNATURE_LEN,
 };
 pub use slashing::{
     SlashCaseStatus, SlashReason, SlashRecord, SlashSummary, SlashableActor, SlashingEngine,

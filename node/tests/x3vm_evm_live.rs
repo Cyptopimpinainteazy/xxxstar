@@ -1,4 +1,5 @@
 use codec::{Decode, Encode};
+use ed25519_dalek::{Signer, SigningKey};
 use serde_json::Value;
 use sp_core::{crypto::Ss58Codec, Pair as _, H256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
@@ -9,7 +10,9 @@ use x3_atomic_swap::intent::{
     AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath,
     RouteMode,
 };
-use x3_atomic_swap::secret_release::{RefundObservation, RpcQuorumAttestation};
+use x3_atomic_swap::secret_release::{
+    rpc_provider_statement_hash, RefundObservation, RpcProviderObservation, RpcQuorumAttestation,
+};
 use x3_atomic_swap::{
     CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, FinalityProof,
     LiveEvmExecutor, LiveX3VmAdapter, NativeX3NodeTransport, RpcClient, SecretReleaseEvidence,
@@ -21,6 +24,33 @@ use x3_chain_runtime::{AccountId, Signature};
 
 const X3_RPC: &str = "http://127.0.0.1:19945";
 const EVM_RPC: &str = "http://127.0.0.1:18545";
+const HARNESS_PROVIDER_SEED: u8 = 0x41;
+
+fn harness_provider_key() -> SigningKey {
+    SigningKey::from_bytes(&[HARNESS_PROVIDER_SEED; 32])
+}
+
+fn signed_rpc_quorum(
+    provider_id: &str,
+    chain_id: &str,
+    vm_type: VmType,
+    tx_id: &str,
+    block_hash: &str,
+) -> RpcQuorumAttestation {
+    let key = harness_provider_key();
+    let statement =
+        rpc_provider_statement_hash(provider_id, chain_id, vm_type, tx_id, block_hash, true);
+    RpcQuorumAttestation {
+        tx_id: tx_id.into(),
+        block_hash: block_hash.into(),
+        providers: vec![RpcProviderObservation {
+            provider_id: provider_id.into(),
+            public_key: key.verifying_key().to_bytes(),
+            signature: key.sign(&statement).to_bytes(),
+        }],
+        finalized: true,
+    }
+}
 
 struct NodeGuard(Child);
 
@@ -502,6 +532,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         // purpose: the attestation used to carry its own `required_quorum`, so the
         // evidence chose the bar it had to clear.
         min_providers: 1,
+        authorized_providers: vec![harness_provider_key().verifying_key().to_bytes()],
     };
     // The EVM executor labels its chain `anvil`; the intent's Ethereum policy
     // requires one confirmation. The firewall matches domains by chain family,
@@ -513,6 +544,7 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         vm_type: VmType::Evm,
         min_confirmations: 1,
         min_providers: 1,
+        authorized_providers: vec![harness_provider_key().verifying_key().to_bytes()],
     };
     let evm_lock_finality = FinalityProof {
         chain_id: String::from("ethereum-anvil"),
@@ -531,12 +563,13 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         SecretReleaseEvidence {
             lock: x3_lock.clone(),
             finality: x3_lock_finality,
-            rpc_quorum: RpcQuorumAttestation {
-                tx_id: x3_lock.tx_id.clone(),
-                block_hash: x3_lock.block_hash.clone(),
-                providers: vec![String::from("x3-local")],
-                finalized: true,
-            },
+            rpc_quorum: signed_rpc_quorum(
+                "x3-local",
+                "x3-local",
+                VmType::X3Vm,
+                &x3_lock.tx_id,
+                &x3_lock.block_hash,
+            ),
             refund: RefundObservation {
                 tx_id: x3_lock.tx_id.clone(),
                 block_hash: x3_lock.block_hash.clone(),
@@ -546,12 +579,13 @@ fn real_x3vm_evm_lock_claim_atomic_lifecycle() {
         SecretReleaseEvidence {
             lock: evm_escrow,
             finality: evm_lock_finality,
-            rpc_quorum: RpcQuorumAttestation {
-                tx_id: evm_lock.tx_id.clone(),
-                block_hash: evm_lock.block_hash.clone(),
-                providers: vec![String::from("ethereum-anvil")],
-                finalized: true,
-            },
+            rpc_quorum: signed_rpc_quorum(
+                "ethereum-anvil",
+                "ethereum-anvil",
+                VmType::Evm,
+                &evm_lock.tx_id,
+                &evm_lock.block_hash,
+            ),
             refund: RefundObservation {
                 tx_id: evm_lock.tx_id.clone(),
                 block_hash: evm_lock.block_hash.clone(),

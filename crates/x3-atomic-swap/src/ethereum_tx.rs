@@ -111,13 +111,14 @@ impl Transaction {
             // RLP encode for signing
             let rlp_data = self.rlp_encode_for_signing()?;
 
-            // Keccak256 hash
-            let digest = sha3::Keccak256::new_with_prefix(&rlp_data);
+            // Ethereum signs the Keccak-256 prehash. Passing the fixed digest to
+            // k256's prehash API also keeps this boundary independent of which
+            // `digest` trait version `sha3` and `ecdsa` resolve internally.
+            let digest = sha3::Keccak256::digest(&rlp_data);
 
             // Sign with recovery id
-            let (signature, rec_id): (k256::ecdsa::Signature, RecoveryId) = signing_key
-                .sign_digest_recoverable(digest)
-                .map_err(|e| SwapError::RpcError(format!("Signing failed: {}", e)))?;
+            let (signature, rec_id): (k256::ecdsa::Signature, RecoveryId) =
+                signing_key.sign_prehash_recoverable(digest.as_slice());
 
             // Convert to v,r,s format
             let (r_bytes, s_bytes) = signature.split_bytes();
@@ -249,6 +250,63 @@ mod tests {
         assert_eq!(tx.value, 0);
         assert_eq!(tx.data, "0xdeadbeef");
         assert_eq!(tx.chain_id, 11155111);
+    }
+
+    #[test]
+    fn signed_transaction_recovers_to_its_signing_address() {
+        use k256::ecdsa::{RecoveryId, Signature, VerifyingKey};
+        use rlp::Rlp;
+        use sha3::{Digest, Keccak256};
+
+        let key = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let tx = Transaction {
+            nonce: 0,
+            gas_price: 1_000_000_000,
+            gas_limit: 21_000,
+            to: Some("0x1111111111111111111111111111111111111111".into()),
+            value: 1,
+            data: "0x".into(),
+            chain_id: 1,
+        };
+
+        let raw = hex::decode(
+            tx.sign(key)
+                .expect("transaction signs with the std feature")
+                .trim_start_matches("0x"),
+        )
+        .expect("signed transaction is hex");
+        let decoded = Rlp::new(&raw);
+        assert_eq!(decoded.item_count().expect("signed transaction list"), 9);
+
+        let v = decoded.val_at::<u64>(6).expect("EIP-155 v");
+        let recovery_byte = v
+            .checked_sub(tx.chain_id * 2 + 35)
+            .and_then(|value| u8::try_from(value).ok())
+            .expect("v carries a canonical recovery id");
+        let recovery_id = RecoveryId::try_from(recovery_byte).expect("valid recovery id");
+
+        let mut r = [0u8; 32];
+        let r_bytes = decoded.val_at::<Vec<u8>>(7).expect("signature r");
+        r[32 - r_bytes.len()..].copy_from_slice(&r_bytes);
+        let mut s = [0u8; 32];
+        let s_bytes = decoded.val_at::<Vec<u8>>(8).expect("signature s");
+        s[32 - s_bytes.len()..].copy_from_slice(&s_bytes);
+        let signature = Signature::from_scalars(r, s).expect("canonical r and s");
+
+        let unsigned = tx
+            .rlp_encode_for_signing()
+            .expect("unsigned transaction encoding");
+        let digest = Keccak256::digest(&unsigned);
+        let recovered =
+            VerifyingKey::recover_from_prehash(digest.as_slice(), &signature, recovery_id)
+                .expect("signature recovers to a public key");
+        let public_key = recovered.to_sec1_point(false);
+        let recovered_hash = Keccak256::digest(&public_key.as_bytes()[1..]);
+        let recovered_address = format!("0x{}", hex::encode(&recovered_hash[12..]));
+        assert_eq!(
+            recovered_address,
+            Transaction::address_from_private_key(key).expect("signer address")
+        );
     }
 
     #[test]

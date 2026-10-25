@@ -355,6 +355,7 @@ mod tests {
         AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath, RouteMode,
     };
     use core::sync::atomic::{AtomicUsize, Ordering};
+    use ed25519_dalek::{Signer, SigningKey};
     use std::sync::Arc;
 
     #[derive(Debug, Default)]
@@ -616,6 +617,15 @@ mod tests {
         );
 
         let finality = adapter.finality_status(&lock.tx_id).expect("lock finality");
+        let provider_key = SigningKey::from_bytes(&[7u8; 32]);
+        let provider_statement = crate::rpc_provider_statement_hash(
+            "x3-local",
+            "x3-local",
+            VmType::X3Vm,
+            &lock.tx_id,
+            &lock.block_hash,
+            true,
+        );
         let permit = crate::SecretReleaseFirewall::authorize(
             &intent,
             preimage,
@@ -629,6 +639,7 @@ mod tests {
                 // requirement so that evidence cannot choose it; a joinable
                 // network sets this from its provider set.
                 min_providers: 1,
+                authorized_providers: vec![provider_key.verifying_key().to_bytes()],
             }],
             &[crate::SecretReleaseEvidence {
                 lock: lock.clone(),
@@ -636,7 +647,11 @@ mod tests {
                 rpc_quorum: crate::secret_release::RpcQuorumAttestation {
                     tx_id: lock.tx_id.clone(),
                     block_hash: lock.block_hash.clone(),
-                    providers: vec![String::from("x3-local")],
+                    providers: vec![crate::RpcProviderObservation {
+                        provider_id: String::from("x3-local"),
+                        public_key: provider_key.verifying_key().to_bytes(),
+                        signature: provider_key.sign(&provider_statement).to_bytes(),
+                    }],
                     finalized: true,
                 },
                 refund: crate::secret_release::RefundObservation {

@@ -1,4 +1,5 @@
 use codec::{Decode, Encode};
+use ed25519_dalek::{Signer, SigningKey};
 use serde_json::Value;
 use sp_core::{crypto::Ss58Codec, Pair as _, H256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
@@ -9,7 +10,9 @@ use x3_atomic_swap::intent::{
     AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath,
     RouteMode,
 };
-use x3_atomic_swap::secret_release::{RefundObservation, RpcQuorumAttestation};
+use x3_atomic_swap::secret_release::{
+    rpc_provider_statement_hash, RefundObservation, RpcProviderObservation, RpcQuorumAttestation,
+};
 use x3_atomic_swap::{
     CrossDomainOperation, CrossDomainProofBundle, CrossDomainProofSet, LiveX3VmAdapter,
     NativeX3NodeTransport, ProofKind, RpcClient, SecretReleaseEvidence, SecretReleaseFirewall,
@@ -19,6 +22,33 @@ use x3_chain_node::x3vm_runtime_signer::X3RuntimeSigner;
 use x3_chain_runtime::{AccountId, Signature};
 
 const RPC_URL: &str = "http://127.0.0.1:19944";
+const HARNESS_PROVIDER_SEED: u8 = 0x43;
+
+fn harness_provider_key() -> SigningKey {
+    SigningKey::from_bytes(&[HARNESS_PROVIDER_SEED; 32])
+}
+
+fn signed_rpc_quorum(
+    provider_id: &str,
+    chain_id: &str,
+    vm_type: VmType,
+    tx_id: &str,
+    block_hash: &str,
+) -> RpcQuorumAttestation {
+    let key = harness_provider_key();
+    let statement =
+        rpc_provider_statement_hash(provider_id, chain_id, vm_type, tx_id, block_hash, true);
+    RpcQuorumAttestation {
+        tx_id: tx_id.into(),
+        block_hash: block_hash.into(),
+        providers: vec![RpcProviderObservation {
+            provider_id: provider_id.into(),
+            public_key: key.verifying_key().to_bytes(),
+            signature: key.sign(&statement).to_bytes(),
+        }],
+        finalized: true,
+    }
+}
 
 struct NodeGuard(Child);
 
@@ -651,6 +681,7 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         // the attestation: an attestation that carries its own quorum is one the
         // evidence gets to set for itself.
         min_providers: 1,
+        authorized_providers: vec![harness_provider_key().verifying_key().to_bytes()],
     };
     let evidence = SecretReleaseEvidence {
         lock: lock.clone(),
@@ -659,12 +690,13 @@ fn real_local_node_lock_finalized_claim_lifecycle() {
         // `tx_id`/`block_hash` to match the lock proof, at least the requirement's
         // number of *distinct* providers to have reported, and `finalized`. The
         // observed lock is not refunded, so the release path stays open.
-        rpc_quorum: RpcQuorumAttestation {
-            tx_id: lock.tx_id.clone(),
-            block_hash: lock.block_hash.clone(),
-            providers: vec![String::from("x3-local")],
-            finalized: true,
-        },
+        rpc_quorum: signed_rpc_quorum(
+            "x3-local",
+            &chain_id,
+            VmType::X3Vm,
+            &lock.tx_id,
+            &lock.block_hash,
+        ),
         refund: RefundObservation {
             tx_id: lock.tx_id.clone(),
             block_hash: lock.block_hash.clone(),

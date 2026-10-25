@@ -366,16 +366,16 @@ name = "Secret-release firewall"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-atomic-swap"]
-implemented = 92
-tested = 88
+implemented = 94
+tested = 95
 mainnet_ready = 72
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
 blockers = [
-  "**NARROWED 2026-09-27 \u2014 the constructed part that mattered is gone; the live runs are real and the identities are not.** The evidence for this row *was* constructed in the place that decided the outcome: the quorum attestation carried its own `provider_count` and `required_quorum`, so the firewall's RPC-quorum gate was satisfied by numbers the evidence chose for itself, and the live EVM/SVM tests typed `provider_count: 3, required_quorum: 2` against a single anvil or solana-test-validator endpoint. The bar is now `SecretReleaseRequirement::min_providers` (policy; zero refused) and the attestation is a list of distinct provider ids the firewall counts itself \u2014 so the failure modes are duplicates, blank ids, and a policy bar the evidence cannot lower, all four of which have tests (`the_evidence_cannot_set_its_own_quorum_bar`, `one_provider_listed_twice_is_one_provider`, `an_unnamed_provider_does_not_count`, `a_zero_provider_policy_is_refused`). The live lifecycles still run against real chains and real contracts (`real_x3vm_evm_lock_claim_atomic_lifecycle`, `real_local_node_lock_finalized_claim_lifecycle`, and the SVM pair), and their requirements now say `min_providers: 1` with a comment, because one endpoint is what exists in those harnesses \u2014 the honest number instead of a typed two-of-three.",
-  "Still open on TICKET-095: the provider ids are **unauthenticated**. A caller can name three providers that never answered and clear `min_providers: 3`; what stops that is a signature over each observation from a key the verifier knows, which is the relayer's `x3-validator-attestation` model and is not wired here. The finality side has the same shape in miniature: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
+  "**CLOSED 2026-10-25 \u2014 provider identities and the quorum bar are authenticated policy inputs.** `SecretReleaseRequirement` now owns both `min_providers` and the authorized Ed25519 provider keys. Each `RpcProviderObservation` carries its key and signature over a canonical statement binding the provider id, chain, VM, transaction, block, and finalized result. The firewall counts only distinct authorized keys whose signatures pass `verify_strict`, so a caller cannot invent provider names, relabel another provider's observation, substitute a self-generated key, or change the observation without invalidating the signature. The prior constructed-count failure and all new identity-binding failures have named tests, and the real EVM/SVM/X3 live harnesses now produce signed observations through the same API.",
+  "Still open on TICKET-095: no production RPC collector obtains and relays signatures from independent external providers yet; the live harnesses exercise the verification boundary with one operator-controlled key. The finality side also remains narrower than mainnet: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
   "No live BTC release: the EVM and SVM paths have live lifecycles, Bitcoin does not.",
 ]
 required_tests = [
@@ -384,9 +384,16 @@ required_tests = [
   "rejects_refunded_destination",
   "rejects_wrong_preimage",
   "rejects_stale_intent_hash_and_terminal_status",
+  "rejects_a_forged_provider_signature",
+  "rejects_a_valid_signature_from_an_unauthorized_provider",
+  "provider_identity_and_observation_bind_the_signature",
+  "a_duplicated_or_empty_authorized_provider_set_is_refused",
 ]
-test_evidence = ["note: firewall and permit are landed in crates/x3-atomic-swap/src/secret_release.rs, which holds 11 tests; measured 2026-09-23 (TICKET-101 third pass). The 2026-09-23 second pass reported 'no tests of those behaviours' because it searched for names starting with test_ — these are sentence-named."]
-evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability", "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; provenance recorded 2026-09-22; tests measured on master 2026-09-23"]
+test_evidence = [
+  "note: 2026-10-25 \u2014 `cargo test -p x3-atomic-swap --lib` ran 685 tests with 0 failures; `cargo check -p x3-atomic-swap --no-default-features` passed; and the three node live-lifecycle binaries compile with the signed-observation API. The named tests are in crates/x3-atomic-swap/src/secret_release.rs.",
+  "note: the k256 0.14 std-feature signing boundary has its own recoverable-signature regression (`signed_transaction_recovers_to_its_signing_address`) in the x3-atomic-swap std library test suite."
+]
+evidence = ["crates/x3-atomic-swap/src/secret_release.rs", "crates/x3-atomic-swap/src/ethereum_tx.rs", "note: PR #162 adds domain/finality/refund/replay validation; #163 hardens permit capability", "note: 2026-10-25 adds policy-authorized Ed25519 RPC provider observations and fixes the k256 prehash signing API"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22

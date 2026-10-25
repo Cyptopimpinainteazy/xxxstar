@@ -11,7 +11,13 @@ use crate::intent::{AtomicIntent, AtomicSwapStatus, ChainKind, FinalityLevel, In
 use alloc::collections::BTreeSet;
 use alloc::string::String;
 use alloc::vec::Vec;
+use ed25519_dalek::{Signature, VerifyingKey};
 use sha2::{Digest, Sha256};
+
+/// Length of an authorized RPC provider's Ed25519 public key.
+pub const RPC_PROVIDER_PUBLIC_KEY_LEN: usize = 32;
+/// Length of an RPC provider's Ed25519 signature.
+pub const RPC_PROVIDER_SIGNATURE_LEN: usize = 64;
 
 /// One domain that must be safely locked before the secret may be released.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,32 +36,93 @@ pub struct SecretReleaseRequirement {
     /// security gate. A bar that the thing being judged gets to set is not a bar.
     /// `0` is refused: "no providers must agree" is not a quorum.
     pub min_providers: u32,
+    /// RPC-provider signing keys authorized by policy for this domain.
+    ///
+    /// The quorum counts distinct keys from this set, never the labels carried
+    /// by the evidence. An empty or duplicated set is refused rather than
+    /// silently treated as an unauthenticated provider list.
+    pub authorized_providers: Vec<[u8; RPC_PROVIDER_PUBLIC_KEY_LEN]>,
 }
 
-/// Quorum attestation produced by the RPC/finality verifier.
+/// A cryptographically authenticated observation from one RPC provider.
+#[derive(Clone, PartialEq, Eq)]
+pub struct RpcProviderObservation {
+    /// Operator-visible provider identity, bound into the signed statement.
+    pub provider_id: String,
+    /// Ed25519 public key of the provider.
+    pub public_key: [u8; RPC_PROVIDER_PUBLIC_KEY_LEN],
+    /// Ed25519 signature over [`rpc_provider_statement_hash`].
+    pub signature: [u8; RPC_PROVIDER_SIGNATURE_LEN],
+}
+
+/// Canonical statement signed by one RPC provider.
+///
+/// The statement binds every field that changes the release decision, including
+/// the provider identity. Relabelling a valid observation as another provider,
+/// moving it to another chain or VM, or changing the transaction, block, or
+/// finality result invalidates the signature.
+pub fn rpc_provider_statement_hash(
+    provider_id: &str,
+    chain_id: &str,
+    vm_type: VmType,
+    tx_id: &str,
+    block_hash: &str,
+    finalized: bool,
+) -> [u8; 32] {
+    fn component(hasher: &mut Sha256, bytes: &[u8]) {
+        hasher.update((bytes.len() as u64).to_be_bytes());
+        hasher.update(bytes);
+    }
+
+    let mut hasher = Sha256::new();
+    component(&mut hasher, b"x3-rpc-provider-observation-v1");
+    component(&mut hasher, provider_id.as_bytes());
+    component(&mut hasher, chain_id.as_bytes());
+    component(&mut hasher, vm_type.name().as_bytes());
+    component(&mut hasher, tx_id.as_bytes());
+    component(&mut hasher, block_hash.as_bytes());
+    hasher.update([u8::from(finalized)]);
+    hasher.finalize().into()
+}
+
+/// Signed quorum attestation produced by the RPC/finality verifier.
 #[derive(Clone, PartialEq, Eq)]
 pub struct RpcQuorumAttestation {
     pub tx_id: String,
     pub block_hash: String,
-    /// The providers that reported this observation, by id.
-    ///
-    /// Ids rather than a count, so the firewall counts *distinct* reporters
-    /// itself: the old shape let one provider be listed once while its `count`
-    /// said three. What this still does not establish is that each id really
-    /// observed anything — the identities are unauthenticated, and a signed
-    /// observation per provider is the next step (see the row's residual).
-    pub providers: Vec<String>,
+    /// Provider observations with per-provider signatures.
+    pub providers: Vec<RpcProviderObservation>,
     pub finalized: bool,
 }
 
 impl RpcQuorumAttestation {
-    /// Distinct, non-empty provider ids — the only count the firewall uses.
-    pub fn distinct_providers(&self) -> BTreeSet<&str> {
+    /// Distinct authorized provider keys with a valid statement signature.
+    fn verified_providers(
+        &self,
+        chain_id: &str,
+        vm_type: VmType,
+        authorized_providers: &[[u8; RPC_PROVIDER_PUBLIC_KEY_LEN]],
+    ) -> BTreeSet<[u8; RPC_PROVIDER_PUBLIC_KEY_LEN]> {
         self.providers
             .iter()
-            .map(String::as_str)
-            .map(str::trim)
-            .filter(|provider| !provider.is_empty())
+            .filter(|provider| !provider.provider_id.trim().is_empty())
+            .filter(|provider| authorized_providers.contains(&provider.public_key))
+            .filter(|provider| {
+                let Ok(verifying_key) = VerifyingKey::from_bytes(&provider.public_key) else {
+                    return false;
+                };
+                let statement = rpc_provider_statement_hash(
+                    provider.provider_id.trim(),
+                    chain_id,
+                    vm_type,
+                    &self.tx_id,
+                    &self.block_hash,
+                    self.finalized,
+                );
+                let signature = Signature::from_bytes(&provider.signature);
+                verifying_key.verify_strict(&statement, &signature).is_ok()
+            })
+            .map(|provider| provider.public_key)
             .collect()
     }
 }
@@ -222,6 +289,26 @@ impl SecretReleaseFirewall {
                     ),
                 });
             }
+            let distinct_authorized: BTreeSet<_> =
+                required.authorized_providers.iter().copied().collect();
+            if required.min_providers == 0
+                || distinct_authorized.len() != required.authorized_providers.len()
+                || required
+                    .authorized_providers
+                    .iter()
+                    .any(|key| key.iter().all(|b| *b == 0))
+                || distinct_authorized.len() < required.min_providers as usize
+            {
+                return Err(SwapError::ProofVerificationFailed {
+                    proof_name: "secret-release RPC provider policy",
+                    reason: alloc::format!(
+                        "provider policy for {} / {} is empty, duplicated, malformed, or smaller \
+                         than its quorum",
+                        required.chain_id,
+                        required.vm_type.name()
+                    ),
+                });
+            }
             let Some(policy) = intent.finality_requirements.iter().find(|policy| {
                 chain_matches_kind(&required.chain_id, policy.chain)
                     && vm_matches_kind(required.vm_type, policy.chain)
@@ -286,12 +373,17 @@ impl SecretReleaseFirewall {
                 });
             }
 
-            // The bar is the requirement's; the count is the firewall's own count
-            // of the distinct providers that reported. Neither is read from the
-            // attestation's idea of what the quorum is.
-            let distinct_providers = item.rpc_quorum.distinct_providers().len();
-            if required.min_providers == 0
-                || distinct_providers < required.min_providers as usize
+            // The bar and authorized key set are the requirement's. The count is
+            // the firewall's own count of distinct authorized keys that produced
+            // a valid signature over this exact domain, transaction, block, and
+            // finality result.
+            let verified_providers = item.rpc_quorum.verified_providers(
+                &required.chain_id,
+                required.vm_type,
+                &required.authorized_providers,
+            );
+            let distinct_providers = verified_providers.len();
+            if distinct_providers < required.min_providers as usize
                 || !item.rpc_quorum.finalized
                 || item.rpc_quorum.tx_id != item.lock.tx_id
                 || item.rpc_quorum.block_hash != item.lock.block_hash
@@ -411,6 +503,60 @@ mod tests {
     use super::*;
     use crate::intent::{AtomicSwapStatus, ChainKind, FinalityRequirement, RefundPath, RouteMode};
     use alloc::vec;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    const PROVIDER_SEEDS: [u8; 3] = [1, 2, 3];
+
+    fn provider_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; RPC_PROVIDER_PUBLIC_KEY_LEN])
+    }
+
+    fn provider_public_key(seed: u8) -> [u8; RPC_PROVIDER_PUBLIC_KEY_LEN] {
+        provider_key(seed).verifying_key().to_bytes()
+    }
+
+    fn provider_observation(
+        provider_id: &str,
+        seed: u8,
+        chain: &str,
+        vm: VmType,
+        tx: &str,
+        block_hash: &str,
+        finalized: bool,
+    ) -> RpcProviderObservation {
+        let key = provider_key(seed);
+        let statement =
+            rpc_provider_statement_hash(provider_id.trim(), chain, vm, tx, block_hash, finalized);
+        RpcProviderObservation {
+            provider_id: provider_id.into(),
+            public_key: key.verifying_key().to_bytes(),
+            signature: key.sign(&statement).to_bytes(),
+        }
+    }
+
+    fn all_provider_observations(
+        chain: &str,
+        vm: VmType,
+        tx: &str,
+        block_hash: &str,
+        finalized: bool,
+    ) -> Vec<RpcProviderObservation> {
+        PROVIDER_SEEDS
+            .iter()
+            .enumerate()
+            .map(|(index, seed)| {
+                provider_observation(
+                    &alloc::format!("provider-{}", (b'a' + index as u8) as char),
+                    *seed,
+                    chain,
+                    vm,
+                    tx,
+                    block_hash,
+                    finalized,
+                )
+            })
+            .collect()
+    }
 
     fn intent(preimage: [u8; 32]) -> AtomicIntent {
         let hashlock = Sha256::digest(preimage);
@@ -486,11 +632,7 @@ mod tests {
             rpc_quorum: RpcQuorumAttestation {
                 tx_id: tx.into(),
                 block_hash: block_hash.clone(),
-                providers: alloc::vec![
-                    String::from("provider-a"),
-                    String::from("provider-b"),
-                    String::from("provider-c"),
-                ],
+                providers: all_provider_observations(chain, vm, tx, &block_hash, true),
                 finalized: true,
             },
             refund: RefundObservation {
@@ -507,6 +649,10 @@ mod tests {
             vm_type: vm,
             min_confirmations,
             min_providers: 2,
+            authorized_providers: PROVIDER_SEEDS
+                .iter()
+                .map(|seed| provider_public_key(*seed))
+                .collect(),
         }
     }
 
@@ -576,7 +722,7 @@ mod tests {
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
         // One provider reported; the policy requires two.
-        evm.rpc_quorum.providers = vec!["provider-a".into()];
+        evm.rpc_quorum.providers.truncate(1);
         assert!(SecretReleaseFirewall::authorize(
             &intent,
             preimage,
@@ -623,7 +769,8 @@ mod tests {
         let preimage = [0x18u8; 32];
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        evm.rpc_quorum.providers = vec!["provider-a".into(), "provider-a".into()];
+        let first = evm.rpc_quorum.providers[0].clone();
+        evm.rpc_quorum.providers = vec![first.clone(), first];
         assert!(
             SecretReleaseFirewall::authorize(
                 &intent,
@@ -641,7 +788,19 @@ mod tests {
         let preimage = [0x19u8; 32];
         let intent = intent(preimage);
         let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
-        evm.rpc_quorum.providers = vec!["provider-a".into(), "   ".into()];
+        let first = evm.rpc_quorum.providers[0].clone();
+        evm.rpc_quorum.providers = vec![
+            first,
+            provider_observation(
+                "   ",
+                2,
+                "eth-mainnet",
+                VmType::Evm,
+                "0xevm",
+                "0xblock10",
+                true,
+            ),
+        ];
         assert!(
             SecretReleaseFirewall::authorize(
                 &intent,
@@ -667,6 +826,89 @@ mod tests {
             SecretReleaseFirewall::authorize(&intent, preimage, &[nonsense], &[evm]).is_err(),
             "\"no provider has to agree\" is not a quorum"
         );
+    }
+
+    #[test]
+    fn rejects_a_forged_provider_signature() {
+        let preimage = [0x1bu8; 32];
+        let intent = intent(preimage);
+        let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        evm.rpc_quorum.providers.truncate(1);
+        evm.rpc_quorum.providers[0].signature[0] ^= 1;
+        assert!(
+            SecretReleaseFirewall::authorize(
+                &intent,
+                preimage,
+                &[req("eth-mainnet", VmType::Evm, 12)],
+                &[evm]
+            )
+            .is_err(),
+            "a provider label without a valid signature is not a provider observation"
+        );
+    }
+
+    #[test]
+    fn rejects_a_valid_signature_from_an_unauthorized_provider() {
+        let preimage = [0x1cu8; 32];
+        let intent = intent(preimage);
+        let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        evm.rpc_quorum.providers[2] = provider_observation(
+            "provider-outsider",
+            9,
+            "eth-mainnet",
+            VmType::Evm,
+            "0xevm",
+            "0xblock10",
+            true,
+        );
+        let strict = SecretReleaseRequirement {
+            min_providers: 3,
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(
+            SecretReleaseFirewall::authorize(&intent, preimage, &[strict], &[evm]).is_err(),
+            "a valid signature proves key control, not authorization"
+        );
+    }
+
+    #[test]
+    fn provider_identity_and_observation_bind_the_signature() {
+        let preimage = [0x1du8; 32];
+        let intent = intent(preimage);
+        let mut evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        evm.rpc_quorum.providers[2].provider_id = "provider-relabelled".into();
+        let strict = SecretReleaseRequirement {
+            min_providers: 3,
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(
+            SecretReleaseFirewall::authorize(&intent, preimage, &[strict], &[evm]).is_err(),
+            "relabelling a signed provider observation must invalidate it"
+        );
+    }
+
+    #[test]
+    fn a_duplicated_or_empty_authorized_provider_set_is_refused() {
+        let preimage = [0x1eu8; 32];
+        let intent = intent(preimage);
+        let evm = evidence("eth-mainnet", VmType::Evm, "0xevm", 10, intent.hashlock, 12);
+        let duplicated = SecretReleaseRequirement {
+            authorized_providers: vec![provider_public_key(1), provider_public_key(1)],
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(SecretReleaseFirewall::authorize(
+            &intent,
+            preimage,
+            &[duplicated],
+            core::slice::from_ref(&evm),
+        )
+        .is_err());
+
+        let empty = SecretReleaseRequirement {
+            authorized_providers: Vec::new(),
+            ..req("eth-mainnet", VmType::Evm, 12)
+        };
+        assert!(SecretReleaseFirewall::authorize(&intent, preimage, &[empty], &[evm]).is_err());
     }
 
     #[test]
