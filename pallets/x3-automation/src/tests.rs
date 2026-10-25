@@ -704,3 +704,20 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         );
     });
 }
+
+// Event matching needs a bounded on-chain index before it is consensus-admissible.
+#[test]
+fn event_registration_fails_closed_without_bounded_index() {
+    new_test_ext().execute_with(|| {
+        assert_noop!(
+            Automation::register_task(
+                RuntimeOrigin::signed(1),
+                Condition::Event { topic: [7u8; 32] },
+                Action::NoChange,
+                1000,
+            ),
+            Error::<Test>::InvalidTask
+        );
+        assert!(Automation::account_tasks(1).is_empty());
+    });
+}
