@@ -84,8 +84,10 @@ jobs:
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
           python3 -m json.tool "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
-      - name: Preserve diagnostic evidence
+      - name: Preserve diagnostic evidence (best effort)
+        id: diagnostic_upload
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: x3-ci-autopilot-${{ github.run_id }}-${{ github.run_attempt }}
@@ -96,3 +98,14 @@ jobs:
             ${{ runner.temp }}/x3-github-evidence.json
           if-no-files-found: warn
           retention-days: 14
+      - name: Report evidence retention status
+        if: always()
+        env:
+          UPLOAD_OUTCOME: ${{ steps.diagnostic_upload.outcome }}
+        run: |
+          if [ "$UPLOAD_OUTCOME" = "success" ]; then
+            echo "Diagnostic evidence artifact uploaded for this run." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Diagnostic evidence artifact unavailable (upload outcome: $UPLOAD_OUTCOME). Check artifact storage quota and repository retention settings."
+            echo "Diagnostic artifact UNAVAILABLE; automated integration evidence is incomplete. This does not override earlier test results or grant release approval." >> "$GITHUB_STEP_SUMMARY"
+          fi
