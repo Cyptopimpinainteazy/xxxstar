@@ -3,6 +3,8 @@ use frame_support::parameter_types;
 use frame_system as system;
 use sp_core::H256;
 use sp_runtime::traits::IdentityLookup;
+#[cfg(feature = "runtime-benchmarks")]
+use sp_runtime::BuildStorage;
 
 type Block = frame_system::mocking::MockBlock<MockRuntime>;
 
@@ -16,6 +18,14 @@ frame_support::construct_runtime!(
         CrossChainValidator: crate,
     }
 );
+
+#[cfg(feature = "runtime-benchmarks")]
+pub fn new_test_ext() -> sp_io::TestExternalities {
+    frame_system::GenesisConfig::<MockRuntime>::default()
+        .build_storage()
+        .expect("mock genesis storage")
+        .into()
+}
 
 parameter_types! {
     pub BlockWeights: frame_system::limits::BlockWeights =

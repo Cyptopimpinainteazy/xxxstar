@@ -79,6 +79,7 @@ blockers = [
   "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
   "The V2 proof binds the finalized/parent bank hashes and the complete transfer intent under stake-weighted validator signatures, but it does not yet carry a bank-state or transaction-inclusion proof independent of those attestations.",
   "No production vote-exchange transport: the library now accepts and verifies independently signed V2 votes, but there is no deployed relayer/validator message bus that collects them from separate operators.",
+  "All nine `pallet-cross-chain-validator` dispatchables now have executable `runtime-benchmarks` cases, including the beacon checkpoint, sync-committee update, and execution proof over the repository's real Ethereum fixtures; the benchmark test suite passes 36/36. Weight regeneration is still blocked on this host by 2.8 GB free disk versus the release benchmark build requirement.",
   "`crates/x3-relayer/src/main.rs` is still a separate monolith with its own config and dev-only `x3_submitCrossVmTransaction` wiring; it does not use the V2 `RelayerService`. The `//Alice` proof-signer fallback was removed and the old placeholder SVM submission path now refuses by name, but the executable still needs to be replaced by the library service before mainnet.",
 ]
 # The row used to cite `crates/x3-atomic-swap/src/relayer.rs`, a second watcher
