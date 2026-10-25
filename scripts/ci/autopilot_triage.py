@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 PATTERNS = (
+    ("EVIDENCE_STORAGE", (r"artifact storage quota has been hit", r"unable to upload any new artifacts")),
     ("CONFIGURATION", (r"permission denied \(publickey\)", r"authentication failed", r"bad credentials", r"resource not accessible by integration", r"no such host")),
     ("INFRASTRUCTURE", (r"lost communication with the server", r"runner connection lost", r"the runner has received a shutdown signal", r"no space left on device", r"could not resolve host")),
     ("TEST_FAILURE", (r"test result: failed", r"assertion.*failed", r"failures:", r"\bpanicked at\b", r"error: test failed")),
