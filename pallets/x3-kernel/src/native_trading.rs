@@ -28,7 +28,11 @@ use x3_lang_execution::{
 };
 
 // Keep the concrete route tuple named so the host's type contract is readable.
-type NativeRoute<T> = (<T as frame_system::Config>::AccountId, <T as Config>::AssetId, <T as Config>::AssetId);
+type NativeRoute<T: Config> = (
+    <T as frame_system::Config>::AccountId,
+    T::AssetId,
+    T::AssetId,
+);
 
 fn error(message: &str) -> HostError {
     HostError {
