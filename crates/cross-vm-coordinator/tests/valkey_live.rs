@@ -11,6 +11,8 @@ use std::sync::{Arc, Barrier};
 #[cfg(feature = "canonical-proofs")]
 use std::thread;
 #[cfg(feature = "canonical-proofs")]
+use ed25519_dalek::{Signer, SigningKey};
+#[cfg(feature = "canonical-proofs")]
 use x3_atomic_swap::{
     adapter::{FinalityProof, VmType},
     intent::{AtomicIntentBuilder, ChainKind, RefundPath},
@@ -19,9 +21,10 @@ use x3_atomic_swap::{
 #[cfg(feature = "canonical-proofs")]
 use x3_cross_vm_coordinator::{
     ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
-    SessionPersistence, SettlementOutboxRecord, SettlementOutboxStatus, SettlementOutboxStore,
+    ReleaseBeaconAttestation, ReleaseBeaconEvidence, ReleaseBeaconPolicy, SessionPersistence,
+    SettlementOutboxRecord, SettlementOutboxStatus, SettlementOutboxStore,
     SettlementSubmissionOutbox, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
-    ValkeySettlementOutboxStore,
+    ValkeySettlementOutboxStore, VerifiedReleaseBeacon,
 };
 
 fn test_url() -> Option<String> {
@@ -36,6 +39,31 @@ fn test_url() -> Option<String> {
 
 fn namespace(suffix: &str) -> String {
     format!("x3-ci-{}-{suffix}", std::process::id())
+}
+
+#[cfg(feature = "canonical-proofs")]
+fn verified_release_beacon() -> VerifiedReleaseBeacon {
+    const BLOCK_NUMBER: u64 = 77;
+    const BLOCK_HASH: [u8; 32] = [0x91; 32];
+    let key = SigningKey::from_bytes(&[1u8; 32]);
+    let statement = x3_cross_vm_coordinator::settlement_outbox::release_beacon_statement_hash(
+        "validator-a",
+        BLOCK_NUMBER,
+        BLOCK_HASH,
+    );
+    let policy =
+        ReleaseBeaconPolicy::new(1, vec![key.verifying_key().to_bytes()]).unwrap();
+    policy
+        .verify(&ReleaseBeaconEvidence {
+            block_number: BLOCK_NUMBER,
+            block_hash: BLOCK_HASH,
+            attestations: vec![ReleaseBeaconAttestation {
+                attestor_id: "validator-a".into(),
+                public_key: key.verifying_key().to_bytes(),
+                signature: key.sign(&statement).to_bytes().to_vec(),
+            }],
+        })
+        .unwrap()
 }
 
 #[test]
@@ -390,8 +418,9 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
 
     // Network send uses exactly signed.signed_extrinsic. Only after the RPC
     // send returns do we move durable state to Broadcast.
+    let beacon = verified_release_beacon();
     let broadcast = coordinator
-        .record_settlement_submission_broadcast(&signed, [0x91; 32], 108)
+        .record_settlement_submission_broadcast(&signed, &beacon, 108)
         .unwrap();
     assert_eq!(
         coordinator
@@ -475,8 +504,8 @@ fn live_valkey_cross_domain_release_order_survives_restart() {
     let restarted = SettlementSubmissionOutbox::new(
         ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap(),
     );
-    let beacon = [0x91; 32];
-    let order = restarted.canonical_release_order(beacon).unwrap();
+    let beacon = verified_release_beacon();
+    let order = restarted.canonical_release_order(&beacon).unwrap();
     assert_eq!(order.len(), 2);
 
     let second_signed = restarted
@@ -492,7 +521,7 @@ fn live_valkey_cross_domain_release_order_survives_restart() {
             .expect("first signed submission survives restart")
     };
     let error = restarted
-        .record_broadcast_ordered(&later, beacon, 104)
+        .record_broadcast_ordered(&later, &beacon, 104)
         .expect_err("a later release must remain refused after restart");
     assert!(error
         .to_string()
@@ -503,13 +532,13 @@ fn live_valkey_cross_domain_release_order_survives_restart() {
         .unwrap()
         .expect("canonical first submission survives restart");
     restarted
-        .record_broadcast_ordered(&canonical_first, beacon, 105)
+        .record_broadcast_ordered(&canonical_first, &beacon, 105)
         .unwrap();
     let canonical_second = restarted
         .latest(order[1])
         .unwrap()
         .expect("canonical second submission survives restart");
     restarted
-        .record_broadcast_ordered(&canonical_second, beacon, 106)
+        .record_broadcast_ordered(&canonical_second, &beacon, 106)
         .unwrap();
 }

@@ -1382,11 +1382,11 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
     pub fn record_settlement_submission_broadcast(
         &self,
         signed: &crate::SettlementOutboxRecord,
-        x3_block_hash: [u8; 32],
+        beacon: &crate::VerifiedReleaseBeacon,
         now_unix: u64,
     ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
         crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
-            .record_broadcast_ordered(signed, x3_block_hash, now_unix)
+            .record_broadcast_ordered(signed, beacon, now_unix)
     }
 
     #[cfg(feature = "canonical-proofs")]

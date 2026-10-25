@@ -84,18 +84,19 @@ Tests: `a_domain_the_policy_never_sized_is_refused_instead_of_defaulted`,
 
 ### S4 — Ordering: a relayer picks which settlement lands first — **NARROWED**
 
-The settlement outbox now derives a canonical cross-domain release key from
-`SHA-256("X3:CROSS_DOMAIN_RELEASE_ORDER:V1" || finalized X3 block hash ||
+The settlement outbox now accepts only a `VerifiedReleaseBeacon`, whose fields are
+private. Verification requires a policy-owned Ed25519 key set and threshold;
+every counted attestation signs the block height, block hash, and its own
+attestor id. The outbox then derives a canonical release key from
+`SHA-256("X3:CROSS_DOMAIN_RELEASE_ORDER:V1" || verified X3 block hash ||
 submission id)`. Prepared and signed submissions form the complete pending set;
 the in-memory and Valkey stores sort that set and refuse any broadcast that is
 not canonical next. Valkey persists an explicit submission index, so a relayer
-cannot hide a pending settlement by racing a weak key scan, and the order exists
-only after a block hash is fixed.
+cannot hide a pending settlement by racing a weak key scan.
 
-Still open: the X3 node's finality-notification watcher must authenticate the
-finalized block hash it supplies to the coordinator. Until that producer is
-wired, the ordering rule is deterministic but its beacon is an input the caller
-must trust.
+Still open: the seven authority validators must publish these attestations
+through a production node/service path, and the policy keys and threshold must
+be deployed and rotated through governance.
 
 ### S5 — Withholding — **OPEN, and unavoidable at this layer**
 

@@ -6,6 +6,7 @@
 //! second extrinsic.
 
 use crate::CoordinatorError;
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
@@ -34,6 +35,150 @@ pub enum SettlementOutboxRecovery {
     ObserveSettlementState,
     Done,
     ManualHalt,
+}
+
+/// Ed25519 public key length for an X3 release-order attestor.
+pub const RELEASE_BEACON_PUBLIC_KEY_LEN: usize = 32;
+/// Ed25519 signature length for an X3 release-order attestor.
+pub const RELEASE_BEACON_SIGNATURE_LEN: usize = 64;
+
+/// One authorized attestor's signature over the finalized X3 release beacon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleaseBeaconAttestation {
+    pub attestor_id: String,
+    pub public_key: [u8; RELEASE_BEACON_PUBLIC_KEY_LEN],
+    pub signature: Vec<u8>,
+}
+
+/// Threshold evidence that an X3 block is the release ordering beacon.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReleaseBeaconEvidence {
+    pub block_number: u64,
+    pub block_hash: [u8; 32],
+    pub attestations: Vec<ReleaseBeaconAttestation>,
+}
+
+/// Policy-owned attestor keys and threshold for an X3 release beacon.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReleaseBeaconPolicy {
+    required_signatures: u32,
+    authorized_attestors: Vec<[u8; RELEASE_BEACON_PUBLIC_KEY_LEN]>,
+}
+
+impl ReleaseBeaconPolicy {
+    pub fn new(
+        required_signatures: u32,
+        authorized_attestors: Vec<[u8; RELEASE_BEACON_PUBLIC_KEY_LEN]>,
+    ) -> Result<Self, CoordinatorError> {
+        let unique: std::collections::BTreeSet<_> = authorized_attestors.iter().copied().collect();
+        if required_signatures == 0
+            || authorized_attestors.is_empty()
+            || unique.len() != authorized_attestors.len()
+            || authorized_attestors
+                .iter()
+                .any(|key| key.iter().all(|byte| *byte == 0))
+            || unique.len() < required_signatures as usize
+        {
+            return Err(CoordinatorError::Internal(
+                "release beacon policy is empty, duplicated, malformed, or below its threshold"
+                    .into(),
+            ));
+        }
+        Ok(Self {
+            required_signatures,
+            authorized_attestors,
+        })
+    }
+
+    pub fn required_signatures(&self) -> u32 {
+        self.required_signatures
+    }
+
+    /// Verify the threshold and authenticate every counted attestation.
+    pub fn verify(
+        &self,
+        evidence: &ReleaseBeaconEvidence,
+    ) -> Result<VerifiedReleaseBeacon, CoordinatorError> {
+        let mut valid = std::collections::BTreeSet::new();
+        for attestation in &evidence.attestations {
+            if attestation.attestor_id.trim().is_empty()
+                || !self
+                    .authorized_attestors
+                    .contains(&attestation.public_key)
+            {
+                continue;
+            }
+            let Ok(key) = VerifyingKey::from_bytes(&attestation.public_key) else {
+                continue;
+            };
+            let statement = release_beacon_statement_hash(
+                attestation.attestor_id.trim(),
+                evidence.block_number,
+                evidence.block_hash,
+            );
+            if attestation.signature.len() != RELEASE_BEACON_SIGNATURE_LEN {
+                continue;
+            }
+            let Ok(signature) = Signature::from_slice(&attestation.signature) else {
+                continue;
+            };
+            if key.verify_strict(&statement, &signature).is_ok() {
+                valid.insert(attestation.public_key);
+            }
+        }
+        if valid.len() < self.required_signatures as usize {
+            return Err(CoordinatorError::Internal(format!(
+                "release beacon {}:{} has {} valid authorized attestations, policy requires {}",
+                evidence.block_number,
+                hex::encode(evidence.block_hash),
+                valid.len(),
+                self.required_signatures
+            )));
+        }
+        Ok(VerifiedReleaseBeacon {
+            block_number: evidence.block_number,
+            block_hash: evidence.block_hash,
+        })
+    }
+}
+
+/// A release ordering beacon that passed the configured threshold policy.
+///
+/// Fields are private and there is no public constructor, so release paths
+/// cannot accept a raw caller-chosen X3 block hash.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VerifiedReleaseBeacon {
+    block_number: u64,
+    block_hash: [u8; 32],
+}
+
+impl VerifiedReleaseBeacon {
+    pub fn block_number(&self) -> u64 {
+        self.block_number
+    }
+
+    pub fn block_hash(&self) -> [u8; 32] {
+        self.block_hash
+    }
+}
+
+/// Statement signed by an X3 release-order attestor.
+pub fn release_beacon_statement_hash(
+    attestor_id: &str,
+    block_number: u64,
+    block_hash: [u8; 32],
+) -> [u8; 32] {
+    fn component(hasher: &mut Sha256, bytes: &[u8]) {
+        hasher.update((bytes.len() as u64).to_be_bytes());
+        hasher.update(bytes);
+    }
+
+    let mut hasher = Sha256::new();
+    component(&mut hasher, b"X3:CROSS_DOMAIN_RELEASE_BEACON:V1");
+    component(&mut hasher, attestor_id.as_bytes());
+    hasher.update(block_number.to_be_bytes());
+    hasher.update(block_hash);
+    hasher.finalize().into()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -166,7 +311,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
     /// terminal records have had their decision and no longer block the next.
     pub fn canonical_release_order(
         &self,
-        x3_block_hash: [u8; 32],
+        beacon: &VerifiedReleaseBeacon,
     ) -> Result<Vec<[u8; 32]>, CoordinatorError> {
         let mut candidates = Vec::new();
         for submission_id in self.store.submission_ids()? {
@@ -178,7 +323,7 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
                 SettlementOutboxStatus::Prepared | SettlementOutboxStatus::Signed
             ) {
                 candidates.push((
-                    Self::release_order_key(x3_block_hash, submission_id),
+                    Self::release_order_key(beacon.block_hash(), submission_id),
                     submission_id,
                 ));
             }
@@ -194,10 +339,10 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
     pub fn record_broadcast_ordered(
         &self,
         signed: &SettlementOutboxRecord,
-        x3_block_hash: [u8; 32],
+        beacon: &VerifiedReleaseBeacon,
         now: u64,
     ) -> Result<SettlementOutboxRecord, CoordinatorError> {
-        let order = self.canonical_release_order(x3_block_hash)?;
+        let order = self.canonical_release_order(beacon)?;
         let next = order.first().copied().ok_or_else(|| {
             CoordinatorError::Internal("settlement release order is empty at broadcast time".into())
         })?;
@@ -528,6 +673,56 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    fn attestor_key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; RELEASE_BEACON_PUBLIC_KEY_LEN])
+    }
+
+    fn attestation(
+        attestor_id: &str,
+        seed: u8,
+        block_number: u64,
+        block_hash: [u8; 32],
+    ) -> ReleaseBeaconAttestation {
+        let key = attestor_key(seed);
+        let statement = release_beacon_statement_hash(
+            attestor_id,
+            block_number,
+            block_hash,
+        );
+        ReleaseBeaconAttestation {
+            attestor_id: attestor_id.into(),
+            public_key: key.verifying_key().to_bytes(),
+            signature: key.sign(&statement).to_bytes().to_vec(),
+        }
+    }
+
+    fn verified_beacon(
+        block_number: u64,
+        block_hash: [u8; 32],
+        required: u32,
+    ) -> VerifiedReleaseBeacon {
+        let policy = ReleaseBeaconPolicy::new(
+            required,
+            [1u8, 2, 3]
+                .into_iter()
+                .map(|seed| attestor_key(seed).verifying_key().to_bytes())
+                .collect(),
+        )
+        .unwrap();
+        policy
+            .verify(&ReleaseBeaconEvidence {
+                block_number,
+                block_hash,
+                attestations: vec![
+                    attestation("validator-a", 1, block_number, block_hash),
+                    attestation("validator-b", 2, block_number, block_hash),
+                    attestation("validator-c", 3, block_number, block_hash),
+                ],
+            })
+            .unwrap()
+    }
 
     fn prepared() -> SettlementOutboxRecord {
         prepared_with([1u8; 32], [2u8; 32])
@@ -633,8 +828,8 @@ mod tests {
             .record_signed(&second, "0xsecond", vec![4, 5, 6], "worker-a", 7, 102)
             .unwrap();
 
-        let beacon = [0x91; 32];
-        let order = outbox.canonical_release_order(beacon).unwrap();
+        let beacon = verified_beacon(77, [0x91; 32], 2);
+        let order = outbox.canonical_release_order(&beacon).unwrap();
         assert_eq!(order.len(), 2);
         let canonical_first = if order[0] == first.submission_id {
             &first_signed
@@ -648,18 +843,82 @@ mod tests {
         };
 
         let error = outbox
-            .record_broadcast_ordered(canonical_second, beacon, 103)
+            .record_broadcast_ordered(canonical_second, &beacon, 103)
             .expect_err("the later release must be refused");
         assert!(error
             .to_string()
             .contains("out-of-order settlement release"));
 
         outbox
-            .record_broadcast_ordered(canonical_first, beacon, 104)
+            .record_broadcast_ordered(canonical_first, &beacon, 104)
             .expect("the canonical first release");
         outbox
-            .record_broadcast_ordered(canonical_second, beacon, 105)
+            .record_broadcast_ordered(canonical_second, &beacon, 105)
             .expect("the second release becomes canonical after the first");
+    }
+
+    #[test]
+    fn release_beacon_requires_valid_authorized_threshold_signatures() {
+        let block_hash = [0x91; 32];
+        let policy = ReleaseBeaconPolicy::new(
+            2,
+            [1u8, 2]
+                .into_iter()
+                .map(|seed| attestor_key(seed).verifying_key().to_bytes())
+                .collect(),
+        )
+        .unwrap();
+
+        let forged = ReleaseBeaconEvidence {
+            block_number: 77,
+            block_hash,
+            attestations: vec![attestation("validator-a", 1, 77, block_hash)],
+        };
+        assert!(policy.verify(&forged).is_err());
+
+        let mut outsider = attestation("validator-outside", 9, 77, block_hash);
+        outsider.public_key = attestor_key(9).verifying_key().to_bytes();
+        let unauthorized = ReleaseBeaconEvidence {
+            block_number: 77,
+            block_hash,
+            attestations: vec![
+                attestation("validator-a", 1, 77, block_hash),
+                outsider,
+            ],
+        };
+        assert!(policy.verify(&unauthorized).is_err());
+    }
+
+    #[test]
+    fn release_beacon_signatures_bind_height_hash_and_attestor_identity() {
+        let block_hash = [0x91; 32];
+        let policy = ReleaseBeaconPolicy::new(
+            1,
+            vec![attestor_key(1).verifying_key().to_bytes()],
+        )
+        .unwrap();
+
+        let mut wrong_height = attestation("validator-a", 1, 77, block_hash);
+        wrong_height.attestor_id = "validator-b".into();
+        let evidence = ReleaseBeaconEvidence {
+            block_number: 78,
+            block_hash,
+            attestations: vec![wrong_height],
+        };
+        assert!(policy.verify(&evidence).is_err());
+
+        let evidence = ReleaseBeaconEvidence {
+            block_number: 77,
+            block_hash: [0x92; 32],
+            attestations: vec![attestation("validator-a", 1, 77, block_hash)],
+        };
+        assert!(policy.verify(&evidence).is_err());
+    }
+
+    #[test]
+    fn release_beacon_policy_counts_distinct_keys_once() {
+        let repeated = attestor_key(1).verifying_key().to_bytes();
+        assert!(ReleaseBeaconPolicy::new(2, vec![repeated, repeated]).is_err());
     }
 
     #[test]
