@@ -76,7 +76,10 @@ update, which means updating this file, the manifest, the pallet constants and t
 
 ## Known open items (ticketed, not waived)
 
-1. Validator payout path from the security reserve (`X3_VALIDATOR_SECURITY_RESERVE`) — not implemented.
+1. Validator payout from the security reserve (`X3_VALIDATOR_SECURITY_RESERVE`) is implemented by
+   governance call `pay_validator_reward`; it relocates existing canonical supply and cannot mint.
+   Generated benchmark weights still need to replace the conservative pre-benchmark accounting on a
+   release-build host.
 2. Tip/priority-fee routing — not implemented; Alpha burns 100%.
 3. Dynamic fee multiplier — deliberately deferred; Alpha is static.
 4. The former token-scale and asset-id mismatches are reconciled by the economic gate: the only

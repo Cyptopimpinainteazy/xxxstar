@@ -947,7 +947,7 @@ pub mod pallet {
         /// mint. The configured origin is the governance approval boundary.
         #[transactional]
         #[pallet::call_index(6)]
-        #[pallet::weight(<T as Config>::WeightInfo::mint())]
+        #[pallet::weight(<T as Config>::WeightInfo::pay_validator_reward())]
         pub fn pay_validator_reward(
             origin: OriginFor<T>,
             validator: T::AccountId,
