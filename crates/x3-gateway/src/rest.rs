@@ -26,7 +26,9 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use x3_bridge::bitcoin_htlc::{HTLCContract, HTLCState, Preimage};
 use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
-use x3_relayer::types::{EvmProof, SolanaCluster, SvmProof, ValidatorSignature};
+use x3_relayer::types::{
+    EvmProof, SolanaCluster, SolanaTransactionEvidence, SvmProof, ValidatorSignature,
+};
 use x3_rpc::benchmark::{BenchmarkProfile, BenchmarkReport};
 
 /// Application state.
@@ -368,6 +370,18 @@ pub struct ValidatorAttestationWire {
     pub signature: Vec<u8>,
 }
 
+/// Transaction-inclusion evidence accepted by the SVM proof-summary endpoint.
+///
+/// The transaction signature, recent blockhash, and raw-transaction commitment
+/// are derived from `raw_transaction`; callers cannot choose them independently.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SolanaTransactionEvidenceWire {
+    pub slot: u64,
+    pub index: u32,
+    pub succeeded: bool,
+    pub raw_transaction: Vec<u8>,
+}
+
 fn into_validator_signatures(
     wires: &[ValidatorAttestationWire],
 ) -> Result<Vec<ValidatorSignature>, GatewayError> {
@@ -411,6 +425,7 @@ pub enum RelayerProofRequest {
         expected_sender: Vec<u8>,
         expected_recipient: Vec<u8>,
         expected_beneficiary: Vec<u8>,
+        transaction: SolanaTransactionEvidenceWire,
         validator_signatures: Vec<ValidatorAttestationWire>,
         required_signatures: u32,
     },
@@ -465,6 +480,7 @@ async fn post_relayer_proof_summary(
             expected_sender,
             expected_recipient,
             expected_beneficiary,
+            transaction,
             validator_signatures,
             required_signatures,
         } => {
@@ -503,6 +519,20 @@ async fn post_relayer_proof_summary(
                     "SVM beneficiary must be between 1 and 128 bytes".into(),
                 ));
             }
+            let transaction = SolanaTransactionEvidence::from_raw(
+                transaction.slot,
+                transaction.index,
+                transaction.succeeded,
+                transaction.raw_transaction,
+            )
+            .map_err(|error| {
+                GatewayError::BadRequest(format!("invalid SVM transaction evidence: {error}"))
+            })?;
+            if transaction.slot != slot {
+                return Err(GatewayError::BadRequest(
+                    "SVM transaction slot does not match the finalized slot".into(),
+                ));
+            }
             let meets_quorum =
                 proof_id != [0u8; 32] && (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
@@ -523,6 +553,7 @@ async fn post_relayer_proof_summary(
                 expected_sender,
                 expected_recipient,
                 expected_beneficiary,
+                transaction,
                 validator_signatures: validators,
                 required_signatures,
             };
@@ -2227,6 +2258,13 @@ mod tests {
         assert_eq!(proof["kind"], json!("evm"));
         assert_eq!(proof["meets_quorum"], json!(true));
 
+        let raw_transaction = hex::decode(concat!(
+            "010ca9bbc1fd52fb8a2d08c512ccdb720fc3100804cb2fb8cba4bbc9ce4df7a7d0",
+            "567d96e7a21e7356e6f2b2b6d9efd725c6dd40bf4ad25dac00a27cb2dde3f509",
+            "01000001d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+            "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c00"
+        ))
+        .expect("signed Solana transaction fixture");
         let svm_proof = json!({
             "kind": "svm",
             "source_domain": 200,
@@ -2243,6 +2281,12 @@ mod tests {
             "expected_sender": vec![3u8; 32],
             "expected_recipient": vec![2u8; 32],
             "expected_beneficiary": vec![1u8; 32],
+            "transaction": {
+                "slot": 42,
+                "index": 0,
+                "succeeded": true,
+                "raw_transaction": raw_transaction
+            },
             "validator_signatures": [{
                 "validator_pubkey": vec![9u8; 32],
                 "signature": vec![10u8; 64]
@@ -2250,7 +2294,7 @@ mod tests {
             "required_signatures": 1u32
         });
         serde_json::from_value::<RelayerProofRequest>(svm_proof.clone())
-            .expect("the documented SVM V3 proof shape must deserialize");
+            .expect("the documented SVM V4 proof shape must deserialize");
         let svm_resp = client
             .post(format!("{base}/api/v1/relayer/proof-summary"))
             .json(&svm_proof)
