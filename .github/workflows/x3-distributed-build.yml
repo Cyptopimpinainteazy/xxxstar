@@ -1,0 +1,155 @@
+name: X3 Distributed Build
+
+# Proof that both Lenovo M5 servers execute and report real X3 work in one run: each job is pinned
+# to one machine by its runner label, builds and tests a different part of the tree, and the report
+# job puts both machines' results side by side. A job that lands on the wrong host fails.
+
+on:
+  push:
+    branches: ['feat/x3-guardian']
+    paths:
+      - '.github/workflows/x3-distributed-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-distributed-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  x3-lang-workspace:
+    name: x3-lang workspace (x3star1)
+    runs-on: [self-hosted, Linux, X64, x3, x3star1]
+    timeout-minutes: 90
+    outputs:
+      host: ${{ steps.result.outputs.host }}
+      commit: ${{ steps.result.outputs.commit }}
+      passed: ${{ steps.result.outputs.passed }}
+      failed: ${{ steps.result.outputs.failed }}
+      seconds: ${{ steps.result.outputs.seconds }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use this machine's toolchain, isolated per runner
+        run: |
+          set -euo pipefail
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+            [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
+          done
+          iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
+          [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
+          [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
+          ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
+          { echo "CARGO_HOME=$iso/cargo"; echo "RUSTUP_HOME=$iso/rustup"; } >> "$GITHUB_ENV"
+          echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+      - name: Confirm host
+        run: test "$(hostname)" = x3star1
+      - name: cargo test (x3-lang workspace)
+        working-directory: x3-lang
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          cargo test --locked --workspace --no-fail-fast 2>&1 | tee "$RUNNER_TEMP/test.log"
+          echo "SECONDS_TAKEN=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+      - name: Result
+        id: result
+        if: ${{ always() }}
+        run: |
+          log="$RUNNER_TEMP/test.log"
+          passed=$(grep -oE 'test result: [a-zA-Z]+\. [0-9]+ passed' "$log" 2>/dev/null | awk '{s+=$4} END {print s+0}')
+          failed=$(grep -oE '[0-9]+ failed' "$log" 2>/dev/null | awk '{s+=$1} END {print s+0}')
+          {
+            echo "host=$(hostname)"
+            echo "commit=$(git rev-parse --short HEAD)"
+            echo "passed=$passed"
+            echo "failed=$failed"
+            echo "seconds=${SECONDS_TAKEN:-n/a}"
+          } >> "$GITHUB_OUTPUT"
+
+  runtime-crates:
+    name: kernel, integration, gateway (x3star2)
+    runs-on: [self-hosted, Linux, X64, x3, x3star2]
+    timeout-minutes: 120
+    outputs:
+      host: ${{ steps.result.outputs.host }}
+      commit: ${{ steps.result.outputs.commit }}
+      passed: ${{ steps.result.outputs.passed }}
+      failed: ${{ steps.result.outputs.failed }}
+      seconds: ${{ steps.result.outputs.seconds }}
+    env:
+      SKIP_WASM_BUILD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use this machine's toolchain, isolated per runner
+        run: |
+          set -euo pipefail
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin"; do
+            [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
+          done
+          iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
+          mkdir -p "$iso"
+          [ -d "$iso/cargo" ] || cp -al "$HOME/.cargo" "$iso/cargo"
+          [ -d "$iso/rustup" ] || cp -al "$HOME/.rustup" "$iso/rustup"
+          ln -f "$HOME/.cargo/bin/rustup" "$iso/cargo/bin/rustup"
+          { echo "CARGO_HOME=$iso/cargo"; echo "RUSTUP_HOME=$iso/rustup"; } >> "$GITHUB_ENV"
+          echo "$iso/cargo/bin" >> "$GITHUB_PATH"
+      - name: Confirm host
+        run: test "$(hostname)" = x3star2
+      - name: cargo test (kernel, integration, crosschain gateway)
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          cargo test --locked --no-fail-fast \
+            -p pallet-x3-kernel -p x3-x3-integration -p pallet-x3-crosschain-gateway \
+            2>&1 | tee "$RUNNER_TEMP/test.log"
+          echo "SECONDS_TAKEN=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+      - name: Result
+        id: result
+        if: ${{ always() }}
+        run: |
+          log="$RUNNER_TEMP/test.log"
+          passed=$(grep -oE 'test result: [a-zA-Z]+\. [0-9]+ passed' "$log" 2>/dev/null | awk '{s+=$4} END {print s+0}')
+          failed=$(grep -oE '[0-9]+ failed' "$log" 2>/dev/null | awk '{s+=$1} END {print s+0}')
+          {
+            echo "host=$(hostname)"
+            echo "commit=$(git rev-parse --short HEAD)"
+            echo "passed=$passed"
+            echo "failed=$failed"
+            echo "seconds=${SECONDS_TAKEN:-n/a}"
+          } >> "$GITHUB_OUTPUT"
+
+  report:
+    name: Distributed build report
+    needs: [x3-lang-workspace, runtime-crates]
+    if: ${{ always() }}
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 5
+    steps:
+      - name: Report
+        env:
+          A_RESULT: ${{ needs.x3-lang-workspace.result }}
+          A_HOST: ${{ needs.x3-lang-workspace.outputs.host }}
+          A_COMMIT: ${{ needs.x3-lang-workspace.outputs.commit }}
+          A_PASSED: ${{ needs.x3-lang-workspace.outputs.passed }}
+          A_FAILED: ${{ needs.x3-lang-workspace.outputs.failed }}
+          A_SECONDS: ${{ needs.x3-lang-workspace.outputs.seconds }}
+          B_RESULT: ${{ needs.runtime-crates.result }}
+          B_HOST: ${{ needs.runtime-crates.outputs.host }}
+          B_COMMIT: ${{ needs.runtime-crates.outputs.commit }}
+          B_PASSED: ${{ needs.runtime-crates.outputs.passed }}
+          B_FAILED: ${{ needs.runtime-crates.outputs.failed }}
+          B_SECONDS: ${{ needs.runtime-crates.outputs.seconds }}
+        run: |
+          {
+            echo "## X3 distributed build"
+            echo
+            echo "| Job | Host | Commit | Result | Tests passed | Tests failed | Seconds |"
+            echo "|---|---|---|---|---|---|---|"
+            echo "| x3-lang workspace | $A_HOST | $A_COMMIT | $A_RESULT | $A_PASSED | $A_FAILED | $A_SECONDS |"
+            echo "| kernel, integration, gateway | $B_HOST | $B_COMMIT | $B_RESULT | $B_PASSED | $B_FAILED | $B_SECONDS |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$A_RESULT" = success && test "$B_RESULT" = success
+          test "$A_HOST" = x3star1 && test "$B_HOST" = x3star2
+          test "$A_COMMIT" = "$B_COMMIT"
