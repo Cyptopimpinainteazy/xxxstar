@@ -225,6 +225,12 @@ impl SolanaStakeWeightedVerifier {
         if decoded.parent_slot >= decoded.finalized_slot {
             return Err(VerificationError::MalformedProof);
         }
+        if decoded.finalized_blockhash == [0u8; 32]
+            || decoded.finalized_bank_hash == [0u8; 32]
+            || decoded.parent_bank_hash == [0u8; 32]
+        {
+            return Err(VerificationError::MalformedProof);
+        }
         if decoded.stake_table_digest != self.stake_table_digest {
             return Err(VerificationError::StakeTableMismatch);
         }
@@ -898,6 +904,37 @@ mod tests {
             verifier.verify_with_finalized_floor(&proof_id_changed, 0),
             Err(VerificationError::InsufficientStake)
         );
+    }
+
+    #[test]
+    fn zero_finality_identities_fail_closed_even_with_a_quorum() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let entries = stakes(&[&a, &b], &[50, 50]);
+        let verifier =
+            SolanaStakeWeightedVerifier::new(SolanaCluster::MainnetBeta, entries, 2, 3, 0)
+                .expect("valid stake table");
+        for (blockhash, bank_hash, parent_bank_hash) in [
+            ([0u8; 32], [8u8; 32], [7u8; 32]),
+            ([6u8; 32], [0u8; 32], [7u8; 32]),
+            ([6u8; 32], [8u8; 32], [0u8; 32]),
+        ] {
+            let envelope = proof(ProofInput {
+                cluster: SolanaCluster::MainnetBeta,
+                finalized_slot: 400,
+                parent_slot: 399,
+                finalized_blockhash: blockhash,
+                finalized_bank_hash: bank_hash,
+                parent_bank_hash,
+                stake_table_digest: verifier.stake_table_digest(),
+                keys: &[&a, &b],
+                sender: b"sender",
+                recipient: b"recipient",
+            });
+            assert_eq!(
+                verifier.verify_with_finalized_floor(&envelope, 0),
+                Err(VerificationError::MalformedProof)
+            );
+        }
     }
 
     #[test]
