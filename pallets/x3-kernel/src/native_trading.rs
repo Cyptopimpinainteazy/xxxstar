@@ -27,11 +27,7 @@ use x3_lang_execution::{
     trading::*,
 };
 
-type NativeVenueRoute<T> = (
-    <T as frame_system::Config>::AccountId,
-    <T as Config>::AssetId,
-    <T as Config>::AssetId,
-);
+type NativeVenueRoute<AccountId, AssetId> = (AccountId, AssetId, AssetId);
 
 fn error(message: &str) -> HostError {
     HostError {
@@ -289,7 +285,7 @@ impl<T: Config> NativeHost<T> {
         venue: &str,
         from: &AssetKey,
         to: &AssetKey,
-    ) -> Result<NativeVenueRoute<T>, HostError> {
+    ) -> Result<NativeVenueRoute<T::AccountId, T::AssetId>, HostError> {
         let name =
             capability_name(venue.as_bytes().to_vec()).map_err(|_| error("invalid venue name"))?;
         let (account, a, b) =
