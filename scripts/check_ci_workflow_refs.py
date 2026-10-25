@@ -78,6 +78,17 @@ UNFILTERED_EVENTS = (
     "deployment",
 )
 BRANCH_EVENTS = ("push", "pull_request", "pull_request_target")
+PRODUCTION_WORKFLOW = "x3lang-production-unification.yml"
+PRODUCTION_WORKSPACE_PATHS = (
+    "Cargo.toml",
+    "Cargo.lock",
+    "crates/**",
+    "pallets/**",
+    "node/**",
+    "runtime/**",
+    "tests/**",
+    "x3-lang/**",
+)
 
 
 def workflow_files() -> list[pathlib.Path]:
@@ -153,6 +164,32 @@ def event_branches(events: dict, event_names: tuple[str, ...]) -> list[str] | No
     if not branches:
         return None
     return sorted(branches)
+
+
+def event_paths(events: dict, event: str) -> list[str]:
+    config = events.get(event)
+    if not isinstance(config, dict):
+        return []
+    value = config.get("paths")
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [entry for entry in value if isinstance(entry, str)]
+    return []
+
+
+def production_trigger_path_gaps(events: dict) -> list[dict[str, object]]:
+    """The root-workspace proof must fire for every root-workspace area."""
+    gaps: list[dict[str, object]] = []
+    for event in BRANCH_EVENTS[:2]:
+        paths = event_paths(events, event)
+        if not paths:
+            gaps.append({"event": event, "missing_paths": list(PRODUCTION_WORKSPACE_PATHS)})
+            continue
+        missing = [required for required in PRODUCTION_WORKSPACE_PATHS if required not in paths]
+        if missing:
+            gaps.append({"event": event, "missing_paths": missing})
+    return gaps
 
 
 def strip_dot_slash(value: str) -> str:
@@ -308,6 +345,11 @@ def collect(path: pathlib.Path, known_targets: set[str], branch: str):
     has_pr = "pull_request" in events or "pull_request_target" in events
     push_branches = event_branches(events, ("push",))
     pr_branches = event_branches(events, ("pull_request", "pull_request_target"))
+    path_gaps = (
+        production_trigger_path_gaps(events)
+        if path.relative_to(WORKFLOW_DIR).as_posix() == PRODUCTION_WORKFLOW
+        else []
+    )
     # A workflow can still fire if it has any unfiltered or unrecognised event.
     escapes_filter = bool(unfiltered) or bool(unknown)
     push_reachable = (
@@ -343,6 +385,7 @@ def collect(path: pathlib.Path, known_targets: set[str], branch: str):
         "unfiltered_events": unfiltered,
         "unreachable_on_default_branch": unreachable,
         "trigger_gaps": gaps,
+        "trigger_path_gaps": path_gaps,
         "missing": missing,
     }
 
@@ -379,6 +422,11 @@ def main() -> int:
         for record in records
         for gap in record["trigger_gaps"]
     ]
+    trigger_path_gaps = [
+        {"workflow": record["workflow"], **gap}
+        for record in records
+        for gap in record["trigger_path_gaps"]
+    ]
     # A self-hosted workflow that can never fire is our own wiring, so it fails.
     dead_local = [
         item["workflow"] for item in unreachable if item["workflow"] in self_hosted
@@ -396,9 +444,10 @@ def main() -> int:
         "self_hosted_workflows": self_hosted,
         "unreachable_workflows": unreachable,
         "trigger_gaps": trigger_gaps,
+        "trigger_path_gaps": trigger_path_gaps,
         "dead_local_workflows": dead_local,
         "missing": missing,
-        "ok": not missing and not dead_local,
+        "ok": not missing and not dead_local and not trigger_path_gaps,
     }
 
     if args.json:
@@ -430,9 +479,16 @@ def main() -> int:
             for item in trigger_gaps:
                 listed = ", ".join(item["branches"]) or "none"
                 print(f"    - {item['workflow']}: {item['event']} (branches: {listed})")
+            print(f"  trigger path gaps:     {len(trigger_path_gaps)}")
+            for item in trigger_path_gaps:
+                missing_paths = ", ".join(item["missing_paths"]) or "none"
+                print(
+                    f"    - {item['workflow']}: {item['event']} "
+                    f"(missing paths: {missing_paths})"
+                )
         print(f"  missing refs:          {len(missing)}")
 
-    if missing or dead_local:
+    if missing or dead_local or trigger_path_gaps:
         if missing:
             print("\nMISSING REFERENCES (a workflow step would fail here):")
             for item in missing:
@@ -441,6 +497,13 @@ def main() -> int:
             print("\nDEAD SELF-HOSTED WORKFLOWS (wired to a branch this repo lacks):")
             for name in dead_local:
                 print(f"  x {name}")
+        if trigger_path_gaps:
+            print("\nINCOMPLETE ROOT-WORKSPACE TRIGGERS:")
+            for item in trigger_path_gaps:
+                print(
+                    f"  x {item['workflow']}: {item['event']} "
+                    f"missing {item['missing_paths']}"
+                )
         return 1
 
     if not args.quiet:
