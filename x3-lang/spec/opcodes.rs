@@ -627,7 +627,7 @@ pub fn if_measured_payload(unit_code: u8, invert: bool, threshold_bps: u16, skip
 /// malformed record would branch on a quantity the artifact never named, and a branch is worse than
 /// a refusal because the program then runs a path nobody chose.
 pub fn parse_if_measured(payload: &[u8]) -> Option<(u8, bool, u16, u32)> {
-    let text = std::str::from_utf8(payload).ok()?;
+    let text = core::str::from_utf8(payload).ok()?;
     let mut fields = text.split(':');
     let unit = fields.next()?.parse::<u8>().ok()?;
     if !is_known_measured_unit_code(unit) {

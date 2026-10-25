@@ -429,7 +429,10 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
     // leg; a leg runs only the execution it committed to), so its encoding changed and
     // `transaction_version` goes to 2.
-    spec_version: 24,
+    // 25: canonical X3Lang native trading, shared WASM verifier/interpreter,
+    // and appended asset/lender/venue registration calls. Existing call/event
+    // indices and transaction_version remain stable.
+    spec_version: 25,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 2,
@@ -1239,7 +1242,7 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
     ) -> Result<(x3_automation::ActionOutcome, Weight, [u8; 64]), DispatchError> {
         use x3_automation::{Action, ActionOutcome};
         match action {
-            Action::Noop => Ok((ActionOutcome::Noop, Weight::zero(), [0u8; 64])),
+            Action::NoChange => Ok((ActionOutcome::NoChange, Weight::zero(), [0u8; 64])),
             Action::TransferNative { recipient, amount } => {
                 let destination = AccountId::decode(&mut &recipient[..])
                     .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
@@ -1280,7 +1283,7 @@ impl pallet_x3_automation::Config for Runtime {
     type Now = AutomationNow;
     type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
     type Oracle = AutomationOracle;
-    type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
+    type CustomEvaluator = pallet_x3_automation::RefuseCustomEvaluator;
     type Dispatcher = RuntimeActionDispatcher;
 }
 
@@ -1944,6 +1947,7 @@ impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltControlle
 impl pallet_x3_kernel::Config for Runtime {
     type Balance = Balance;
     type AssetId = AssetId;
+    type NativeFeeAssetId = frame_support::traits::ConstU32<0>;
     type AtlasId = AtlasId;
     type MaxAssetsPerAccount = MaxAssetsPerAccount;
     type MaxAssetSymbolLength = MaxAssetSymbolLength;
@@ -2185,6 +2189,7 @@ impl pallet_x3_coin::Config for Runtime {
     type MinEvmConfirmations = ConstU32<12>;
     type MinSvmConfirmations = ConstU32<32>;
     type MinBtcConfirmations = ConstU32<6>;
+    type ValidatorPayoutOrigin = EnsureRootOrHalfCouncil;
 }
 
 // ===== AtomicTradeEngine Configuration =====
@@ -3026,7 +3031,7 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     // root to that chain's consensus, and `register_external_root` writes a value the bridge
     // surface later trusts. Wire a per-chain light client here and the extrinsic becomes usable;
     // until then it fails closed with `ExternalRootVerificationUnavailable`.
-    type ExternalRootVerifier = pallet_x3_cross_vm_router::RefuseExternalRoots;
+    type ExternalRootVerifier = RuntimeExternalRootVerifier;
     type VmAdapterOrigin = EnsureX3LangGateway;
     type X3LangOrigin = EnsureX3LangGateway;
     type EconomicHalt = X3SupplyLedger;
@@ -3086,6 +3091,98 @@ parameter_types! {
 /// pallet for proof verification.  Proofs are never silently accepted; a
 /// verification failure returns `false` and the settlement is rejected.
 pub struct RuntimeCrossChainValidator;
+
+/// Binds registered bridge roots to headers this chain already holds for the
+/// claimed Ethereum, Solana, or Bitcoin block.
+pub struct RuntimeExternalRootVerifier;
+
+fn external_root_error(
+    error: x3_verification_router::external_root::ExternalRootError,
+) -> DispatchError {
+    use x3_verification_router::external_root::ExternalRootError;
+    DispatchError::Other(match error {
+        ExternalRootError::UnsupportedProofFormat => "ExternalRootUnsupportedProofFormat",
+        ExternalRootError::MalformedProof => "ExternalRootMalformedProof",
+        ExternalRootError::UnsupportedChain => "ExternalRootUnsupportedChain",
+        ExternalRootError::WrongChain => "ExternalRootWrongChain",
+        ExternalRootError::WrongRootKind => "ExternalRootWrongKind",
+        ExternalRootError::BlockMismatch => "ExternalRootBlockMismatch",
+        ExternalRootError::RootMismatch => "ExternalRootHashMismatch",
+        ExternalRootError::UnanchoredBlock => "ExternalRootUnanchoredBlock",
+    })
+}
+
+impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExternalRootVerifier {
+    fn verify_root(
+        chain_id: u32,
+        root_hash: H256,
+        block_number: u32,
+        proof: &[u8],
+    ) -> Result<(), DispatchError> {
+        use x3_verification_router::external_root::{
+            verify_btc_root, verify_evm_root, verify_svm_root, BtcRootState, EvmRootState,
+            SvmRootState, EXTERNAL_ROOT_BITCOIN, EXTERNAL_ROOT_ETHEREUM, EXTERNAL_ROOT_SOLANA,
+        };
+
+        let result = match chain_id {
+            EXTERNAL_ROOT_ETHEREUM => {
+                if pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::get()
+                    != pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee
+                {
+                    return Err(DispatchError::Other(
+                        "ExternalRootEvmNativeFinalityUnavailable",
+                    ));
+                }
+                let header = pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::get()
+                    .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
+                verify_evm_root(
+                    block_number as u64,
+                    root_hash.0,
+                    proof,
+                    EvmRootState {
+                        block_number: header.block_number,
+                        block_hash: header.block_hash.0,
+                        state_root: header.state_root.0,
+                        receipts_root: header.merkle_root.0,
+                    },
+                )
+            }
+            EXTERNAL_ROOT_SOLANA => {
+                let header = pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::get()
+                    .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
+                verify_svm_root(
+                    block_number as u64,
+                    root_hash.0,
+                    proof,
+                    SvmRootState {
+                        slot: header.slot,
+                        block_hash: header.block_hash.0,
+                        state_root: header.state_root.0,
+                        validator_set_hash: header.validator_set_hash.0,
+                    },
+                )
+            }
+            EXTERNAL_ROOT_BITCOIN => {
+                let meta =
+                    pallet_x3_settlement_engine::BtcHeaderMetaStore::<Runtime>::get(root_hash)
+                        .ok_or(DispatchError::Other("ExternalRootBtcHeaderUnavailable"))?;
+                verify_btc_root(
+                    block_number as u64,
+                    root_hash.0,
+                    proof,
+                    BtcRootState {
+                        height: meta.height,
+                        block_hash: root_hash.0,
+                        anchored: meta.anchored,
+                    },
+                )
+            }
+            _ => return Err(DispatchError::Other("ExternalRootUnsupportedChain")),
+        };
+
+        result.map_err(external_root_error)
+    }
+}
 
 impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
     for RuntimeCrossChainValidator

@@ -29,6 +29,20 @@ fn hop(amount: u64) -> Hop {
 }
 
 #[tokio::test]
+async fn unconfigured_quote_engine_never_turns_a_limit_into_a_market_quote() {
+    let engine = QuoteEngine::new().unwrap();
+    for minimum in [U256::zero(), U256::from(900_000u64), U256::MAX] {
+        let mut params = sample_params();
+        params.min_amount_out = minimum;
+        assert_eq!(
+            engine.get_comprehensive_quotes(&params).await.err(),
+            Some(SwapRouterError::NoLiquiditySourceConfigured),
+            "an engine without a liquidity source must not invent a market quote"
+        );
+    }
+}
+
+#[tokio::test]
 async fn optimizer_picks_highest_output_lowest_gas() {
     let opt = RouteOptimizer::new().unwrap();
     let p = sample_params();

@@ -6,6 +6,8 @@ description = "X3 Chain integration for X3 virtual machine and compiler"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+x3-lang-compiler = { path = "../../x3-lang/compiler", optional = true }
+x3-lang-execution = { path = "../../x3-lang/crates/x3-execution", default-features = false }
 # The X3 engine. It builds without `std`, so the wasm runtime executes X3BC with the same
 # interpreter and verifier the native runtime, tests and tools use.
 x3-vm = { path = "../x3-vm", default-features = false }
@@ -78,6 +80,8 @@ std = [
     "x3-vm/std",
     "x3-backend/std",
     "x3-compiler",
+    "x3-lang-compiler",
+    "x3-lang-execution/std",
 ]
 # Enable contract compilation from source
 compile = []

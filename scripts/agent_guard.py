@@ -57,6 +57,14 @@ ALLOW_LINE_PATTERNS = [
     r"(?i)api-key=(\$|\$\{|<|\[|YOUR_)",
     r"(?i)apiKey=(\$|\$\{|<|\[|sk_x3_test_bootstrap)",
     r"(?i)API_KEY\s*=\s*(process\.env|os\.environ|\$INFRA_API_KEY|\"infra_x+\"|your-secret-api-key)",
+    # The JS/TS camelCase spelling of the same legitimate read. The entry above
+    # matches `API_KEY = process.env...` but requires the underscore, so
+    # `const apiKey = process.env.ZEROX_API_KEY?.trim()` — reading a key from the
+    # environment, which is the correct pattern — matched the broad rule (an
+    # assignment to something named *api key* of eight or more characters) and
+    # reddened `make guard`. Python (`os.environ.`), Rust (`std::env::`) and the
+    # generic `env.` case are already allowed the same way.
+    r"(?i)\b(api|rpc)[_-]?key\b\s*[:=]\s*process\.env\.",
     # The bip39 2.x constructor. The broad rule above (line 32: an assignment to
     # `mnemonic` of eight or more characters) matches
     # `let mnemonic = bip39::Mnemonic::parse_in(...)`, which parses a

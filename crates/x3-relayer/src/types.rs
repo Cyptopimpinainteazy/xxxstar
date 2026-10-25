@@ -79,6 +79,19 @@ pub struct ValidatorSetConfig {
     /// refused at startup rather than silently dropped.
     #[serde(default)]
     pub svm_validator_pubkeys: Vec<String>,
+    /// Optional stake weights for the same validator set. Mainnet Solana proofs
+    /// require these; the V1 signer-count path is never registered by production.
+    #[serde(default)]
+    pub svm_validator_stakes: Vec<SvmValidatorStakeConfig>,
+}
+
+/// One governance-authorized Solana validator stake entry.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SvmValidatorStakeConfig {
+    /// Hex-encoded Ed25519 public key, with or without `0x`.
+    pub pubkey: String,
+    /// Effective stake weight.
+    pub stake: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -115,6 +128,7 @@ pub struct HeaderInfo {
     pub block_number: u64,
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
+    pub receipts_root: [u8; 32],
     pub timestamp: u64,
     pub chain_id: u32,
 }
@@ -126,6 +140,24 @@ pub struct EvmProof {
     pub state_root: [u8; 32],
     pub finalized_block: u64,
     pub proof_nonce: u32,
+    /// Canonical payload for `ProductionEvmReceiptVerifier`.
+    pub proof_payload: Vec<u8>,
+    /// Exact X3 recipient encoded in the deposit log.
+    pub expected_recipient: Vec<u8>,
+    /// Exact deposit amount encoded in the deposit log.
+    pub expected_amount: u128,
+}
+
+/// Inputs required to bind a finalized EVM header to an event-specific receipt proof.
+#[derive(Clone, Debug)]
+pub struct EvmProofRequest {
+    pub source_domain: u32,
+    pub finalized_block: u64,
+    pub block_hash: [u8; 32],
+    pub state_root: [u8; 32],
+    pub proof_payload: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_amount: u128,
 }
 
 /// A single validator attestation: identity key and its Ed25519 signature

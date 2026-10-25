@@ -10,33 +10,30 @@ use sp_std::marker::PhantomData;
 
 /// Weight functions for pallet_x3_consensus.
 pub trait WeightInfo {
-	fn set_validators() -> Weight;
-	fn report_misbehavior() -> Weight;
-	fn on_initialize() -> Weight;
+    fn set_validators() -> Weight;
+    fn report_misbehavior() -> Weight;
+    fn on_initialize() -> Weight;
 }
 
 /// Weights for pallet_x3_consensus using the Substrate node and recommended hardware.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-	fn set_validators() -> Weight {
-		// Storage: Consensus NextValidators (r:0 w:1)
-		// Storage: Consensus ValidatorSetActivationBlock (r:0 w:1)
-		Weight::from_parts(14_000_000, 0)
-			.saturating_add(T::DbWeight::get().writes(2))
-	}
-	fn report_misbehavior() -> Weight {
-		// Storage: Offences Reports (r:1 w:1)
-		Weight::from_parts(8_000_000, 0)
-			.saturating_add(T::DbWeight::get().reads_writes(1, 1))
-	}
-	fn on_initialize() -> Weight {
-		// Storage: Consensus ValidatorSetActivationBlock (r:1 w:0)
-		// Storage: Consensus NextValidators (r:1 w:1)
-		// Storage: Consensus Validators (r:0 w:1)
-		// Storage: Aura Authorities (r:1 w:0)
-		// Storage: Grandpa Authorities (r:1 w:0)
-		// Storage: Consensus ConsensusState (r:0 w:1)
-		Weight::from_parts(15_000_000, 0)
-			.saturating_add(T::DbWeight::get().reads_writes(4, 3))
-	}
+    fn set_validators() -> Weight {
+        // Storage: Consensus NextValidators (r:0 w:1)
+        // Storage: Consensus ValidatorSetActivationBlock (r:0 w:1)
+        Weight::from_parts(14_000_000, 0).saturating_add(T::DbWeight::get().writes(2))
+    }
+    fn report_misbehavior() -> Weight {
+        // Storage: Offences Reports (r:1 w:1)
+        Weight::from_parts(8_000_000, 0).saturating_add(T::DbWeight::get().reads_writes(1, 1))
+    }
+    fn on_initialize() -> Weight {
+        // Storage: Consensus ValidatorSetActivationBlock (r:1 w:0)
+        // Storage: Consensus NextValidators (r:1 w:1)
+        // Storage: Consensus Validators (r:0 w:1)
+        // Storage: Aura Authorities (r:1 w:0)
+        // Storage: Grandpa Authorities (r:1 w:0)
+        // Storage: Consensus ConsensusState (r:0 w:1)
+        Weight::from_parts(15_000_000, 0).saturating_add(T::DbWeight::get().reads_writes(4, 3))
+    }
 }

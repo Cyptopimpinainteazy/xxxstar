@@ -1,6 +1,6 @@
 //! Benchmarking setup for `pallet-x3-crosschain-gateway`.
 //!
-//! All eleven dispatchables charged `Weight::from_parts(20_000..60_000, 0)` with
+//! The original dispatchables charged `Weight::from_parts(20_000..60_000, 0)` with
 //! no read or write count, behind a `runtime-benchmarks` feature that pulled the
 //! two frame passthroughs and nothing else.
 //!
@@ -17,8 +17,6 @@
 //! this one gates governance on a council majority and the other two on root or
 //! half the council, while the mock uses root and any signed account.
 
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use frame_benchmarking::v2::*;
 use frame_support::traits::{ConstU32, EnsureOrigin};
@@ -26,15 +24,15 @@ use frame_support::BoundedVec;
 use frame_system::RawOrigin;
 use sp_runtime::traits::SaturatedConversion;
 // A benchmark module also compiles into the runtime's `wasm32v1-none` build,
-// where `vec!` and `Vec` are not in the prelude.
+// where `vec!` is not in the prelude.
 use sp_std::vec;
-use sp_std::vec::Vec;
 
 #[benchmarks]
 mod benchmarks {
     use super::*;
 
     const CHAIN: ExternalChainId = ExternalChainId::BaseSepolia;
+    const SOLANA_CHAIN: ExternalChainId = ExternalChainId::SolanaDevnet;
     const ROUTE_ID: RouteId = [1u8; 32];
     const X3_ASSET: X3AssetId = [9u8; 32];
     const PROOF_ID: ProofId = [1u8; 32];
@@ -65,6 +63,14 @@ mod benchmarks {
         BoundedVec::try_from(b"valid_payload".to_vec()).map_err(|_| BenchmarkError::Weightless)
     }
 
+    fn solana_stakes() -> Result<BoundedVec<SolanaStakeEntry, MaxSvmValidators>, BenchmarkError> {
+        BoundedVec::try_from(vec![SolanaStakeEntry {
+            pubkey: [3u8; 32],
+            stake: 100,
+        }])
+        .map_err(|_| BenchmarkError::Weightless)
+    }
+
     fn external_asset() -> Result<ExternalAssetRef, BenchmarkError> {
         Ok(ExternalAssetRef {
             chain_id: CHAIN,
@@ -87,8 +93,13 @@ mod benchmarks {
             daily_reset_at_block: 0,
             pending_limit: 10,
             finality_requirement: 12,
-            // The one level whose verifier accepts a proof this repository can build.
-            verification_level: RouteVerificationLevel::X3Internal,
+            // `X3Internal` is refused on a gateway route (it needs no external evidence). The
+            // quorum verifier accepts this payload only under `test-verifier`; in a production
+            // build it fails closed and the proof-dependent benchmarks report `Weightless`.
+            verification_level: RouteVerificationLevel::ValidatorQuorum {
+                threshold: 2,
+                total: 3,
+            },
             fee_bps: 10,
             mode: GatewayMode::TestnetLive,
             require_dispute_window: false,
@@ -306,6 +317,33 @@ mod benchmarks {
         clear_svm_validators(gov::<T>()?, CHAIN);
 
         assert!(!SvmValidatorSets::<T>::contains_key(CHAIN));
+        Ok(())
+    }
+
+    #[benchmark]
+    fn set_solana_stake_committee() -> Result<(), BenchmarkError> {
+        #[extrinsic_call]
+        set_solana_stake_committee(gov::<T>()?, SOLANA_CHAIN, solana_stakes()?, 2u32, 3u32);
+
+        assert!(SolanaStakeCommittees::<T>::contains_key(SOLANA_CHAIN));
+        Ok(())
+    }
+
+    #[benchmark]
+    fn clear_solana_stake_committee() -> Result<(), BenchmarkError> {
+        Pallet::<T>::set_solana_stake_committee(
+            gov::<T>()?,
+            SOLANA_CHAIN,
+            solana_stakes()?,
+            2u32,
+            3u32,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
+
+        #[extrinsic_call]
+        clear_solana_stake_committee(gov::<T>()?, SOLANA_CHAIN);
+
+        assert!(!SolanaStakeCommittees::<T>::contains_key(SOLANA_CHAIN));
         Ok(())
     }
 

@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { SwapInterface } from './components/SwapInterface';
 import { WalletConnector } from './components/WalletConnector';
 import { LimitOrderInterface } from './components/LimitOrderInterface';
+import { BaseSwapInterface } from './components/BaseSwapInterface';
 
 export default function HomePage() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletId, setWalletId] = useState('');
   const [rpcEndpoint] = useState('wss://ws.x3star.net');
-  const [activeTab, setActiveTab] = useState<'swap' | 'limit'>('swap');
+  const [activeTab, setActiveTab] = useState<'swap' | 'limit' | 'base'>('swap');
 
   const handleConnect = (id: string) => {
     setWalletConnected(true);
@@ -36,12 +37,16 @@ export default function HomePage() {
                 <p className="text-xs text-gray-400">Decentralized Exchange</p>
               </div>
             </div>
-            <WalletConnector
-              connected={walletConnected}
-              walletId={walletId}
-              onConnect={handleConnect}
-              onDisconnect={handleDisconnect}
-            />
+            {activeTab === 'base' ? (
+              <span className="text-sm text-gray-400">Base wallet connects in the swap panel</span>
+            ) : (
+              <WalletConnector
+                connected={walletConnected}
+                walletId={walletId}
+                onConnect={handleConnect}
+                onDisconnect={handleDisconnect}
+              />
+            )}
           </div>
         </div>
       </header>
@@ -71,10 +76,22 @@ export default function HomePage() {
             >
               Limit Orders
             </button>
+            <button
+              onClick={() => setActiveTab('base')}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition ${
+                activeTab === 'base'
+                  ? 'bg-blue-700 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+              }`}
+            >
+              Base · 0x
+            </button>
           </div>
 
           {/* Trading Interface */}
-          {activeTab === 'swap' ? (
+          {activeTab === 'base' ? (
+            <BaseSwapInterface />
+          ) : activeTab === 'swap' ? (
             <SwapInterface
               walletConnected={walletConnected}
               walletId={walletId}
@@ -87,27 +104,35 @@ export default function HomePage() {
           )}
 
           {/* Info Cards */}
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm mb-1">24h Volume</div>
-              <div className="text-2xl font-bold">$2.4M</div>
+          {activeTab !== 'base' && (
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div className="text-gray-400 text-sm mb-1">24h Volume</div>
+                <div className="text-2xl font-bold">$2.4M</div>
+              </div>
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div className="text-gray-400 text-sm mb-1">Total Liquidity</div>
+                <div className="text-2xl font-bold">$20.1M</div>
+              </div>
             </div>
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <div className="text-gray-400 text-sm mb-1">Total Liquidity</div>
-              <div className="text-2xl font-bold">$20.1M</div>
-            </div>
-          </div>
+          )}
 
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-500">
-            <p>Connected to: {rpcEndpoint}</p>
-            <p className="mt-2">
-              Powered by X3 Chain Settlement Engine
-            </p>
+            {activeTab === 'base' ? (
+              <>
+                <p>Base Mainnet · chain ID 8453</p>
+                <p className="mt-2">External EVM swap; not X3 atomic settlement</p>
+              </>
+            ) : (
+              <>
+                <p>Connected to: {rpcEndpoint}</p>
+                <p className="mt-2">Powered by X3 Chain Settlement Engine</p>
+              </>
+            )}
           </div>
         </div>
       </div>
     </main>
   );
 }
-

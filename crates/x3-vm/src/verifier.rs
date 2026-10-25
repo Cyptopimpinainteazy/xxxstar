@@ -50,6 +50,12 @@ pub struct VerifyOptions {
     /// chain only through [`VerifyOptions::on_chain_trading`], which the runtime selects for a
     /// trade submission.
     pub allow_trading: bool,
+    /// Exact parameter count required on function 0.
+    ///
+    /// The chain calls function 0 with no arguments. Deterministic strategy simulation has an
+    /// explicit argument ABI, so it uses this field to admit a non-zero exact count while applying
+    /// every other on-chain admission rule.
+    pub expected_entry_params: Option<u16>,
 }
 
 impl Default for VerifyOptions {
@@ -61,6 +67,7 @@ impl Default for VerifyOptions {
             max_module_size: 16 * 1024 * 1024, // 16 MB
             deny_float_arithmetic: false,
             allow_trading: true,
+            expected_entry_params: None,
         }
     }
 }
@@ -75,6 +82,7 @@ impl VerifyOptions {
             max_module_size: 1024 * 1024, // 1 MB
             deny_float_arithmetic: true,
             allow_trading: false,
+            expected_entry_params: Some(0),
         }
     }
 
@@ -82,6 +90,20 @@ impl VerifyOptions {
     pub fn on_chain_trading() -> Self {
         Self {
             allow_trading: true,
+            ..Self::on_chain()
+        }
+    }
+
+    /// The deterministic ABI used for off-chain strategy simulation.
+    ///
+    /// This applies the on-chain admission restrictions (no debug, GPU, cross-VM, or other
+    /// host-dependent opcodes), forbids floating-point arithmetic, and requires function 0 to have
+    /// exactly `entry_params` parameters. The trading extension stays disabled: a simulator
+    /// decision is not a trade submission and must not mutate chain trading state.
+    pub fn deterministic_simulation(entry_params: u16) -> Self {
+        Self {
+            allow_trading: false,
+            expected_entry_params: Some(entry_params),
             ..Self::on_chain()
         }
     }
@@ -201,7 +223,7 @@ impl Verifier {
         // Last, so a module refused for what its code does is told that rather than that its
         // function table is incomplete.
         if options.on_chain {
-            Self::verify_on_chain_entry(module)?;
+            Self::verify_on_chain_entry(module, options)?;
         }
 
         Ok(())
@@ -572,14 +594,19 @@ impl Verifier {
         Ok(())
     }
 
-    /// On chain the runtime calls function 0 with no arguments, so it must exist and take none.
-    fn verify_on_chain_entry(module: &BytecodeModule) -> VerifierResult<()> {
+    /// On chain the runtime calls function 0 with no arguments. Deterministic simulation may use
+    /// an explicit argument ABI and declares its exact parameter count in `options`.
+    fn verify_on_chain_entry(
+        module: &BytecodeModule,
+        options: &VerifyOptions,
+    ) -> VerifierResult<()> {
         let entry = module.functions.first().ok_or_else(|| {
             VerifierError::without_offset(VerifierErrorKind::MissingEntryFunction)
         })?;
-        if entry.param_count != 0 {
+        let expected = options.expected_entry_params.unwrap_or(0);
+        if expected > u8::MAX as u16 || entry.param_count != expected as u8 {
             return Err(VerifierError::without_offset(
-                VerifierErrorKind::InvalidParamCount(0, entry.param_count),
+                VerifierErrorKind::InvalidParamCount(expected as usize, entry.param_count),
             ));
         }
         Ok(())
@@ -895,6 +922,37 @@ mod tests {
         let result = Verifier::verify_module(&module, &VerifyOptions::on_chain());
         assert!(matches!(
             result.unwrap_err().kind,
+            VerifierErrorKind::ForbiddenOnChain(_)
+        ));
+    }
+
+    #[test]
+    fn deterministic_simulation_allows_only_the_declared_entry_arity() {
+        let mut module = make_simple_module(vec![Opcode::Nop.to_byte(), Opcode::Halt.to_byte()]);
+        module.functions.push(entry(8, 8, 0));
+
+        Verifier::verify_module(&module, &VerifyOptions::deterministic_simulation(8))
+            .expect("declared ABI arity");
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::deterministic_simulation(7))
+            .expect_err("wrong ABI arity");
+        assert!(matches!(
+            refusal.kind,
+            VerifierErrorKind::InvalidParamCount(7, 8)
+        ));
+    }
+
+    #[test]
+    fn deterministic_simulation_forbids_host_dependent_opcodes() {
+        let mut module = make_simple_module(vec![
+            Opcode::DebugPrint.to_byte(),
+            0x00,
+            Opcode::Halt.to_byte(),
+        ]);
+        module.functions.push(entry(8, 8, 0));
+        let refusal = Verifier::verify_module(&module, &VerifyOptions::deterministic_simulation(8))
+            .expect_err("debug output is not deterministic simulation");
+        assert!(matches!(
+            refusal.kind,
             VerifierErrorKind::ForbiddenOnChain(_)
         ));
     }

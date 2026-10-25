@@ -252,7 +252,7 @@ const STORE_SOURCE: &str = "fn main() -> i64 {\n    evm_sstore(0, 7);\n    retur
 const LOAD_SOURCE: &str = "fn main() -> i64 {\n    return evm_sload(0);\n}\n";
 
 fn compiled(source: &str) -> Vec<u8> {
-    let program = x3_x3_integration::compiler_bridge::compile_source(source)
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(source)
         .unwrap_or_else(|e| panic!("{source:?} must compile: {e}"));
     assert!(program.starts_with(X3BC_MAGIC), "the compiler emits X3BC");
     program
@@ -754,7 +754,7 @@ fn a_compiled_x3_receipt_is_readable_from_a_validator_that_did_not_submit_it() {
     );
 
     // Compile the program in the test: this is the compiler's output, not a fixture blob.
-    let program = x3_x3_integration::compiler_bridge::compile_source(PROGRAM_SOURCE)
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(PROGRAM_SOURCE)
         .expect("the fixture must compile");
     assert!(
         program.starts_with(X3BC_MAGIC),

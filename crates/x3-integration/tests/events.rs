@@ -11,7 +11,7 @@
 //! and simulation reach, and `mini_x3`, which a block runs — to journal the same events for it.
 #![cfg(all(feature = "std", feature = "compile"))]
 
-use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::compiler_bridge::compile_legacy_source as compile_source;
 use x3_x3_integration::mini_x3;
 use x3_x3_integration::{X3Executor, X3ExecutorConfig};
 

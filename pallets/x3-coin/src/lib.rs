@@ -243,6 +243,7 @@ pub enum CrossChainOperation {
 pub mod pallet {
     use super::*;
     use frame_support::traits::Get;
+    use frame_support::transactional;
     use sp_runtime::traits::Saturating;
 
     #[pallet::config]
@@ -284,6 +285,9 @@ pub mod pallet {
         /// Minimum BTC confirmations for finality proofs.
         #[pallet::constant]
         type MinBtcConfirmations: Get<u32>;
+
+        /// Origin allowed to approve a validator compensation payout.
+        type ValidatorPayoutOrigin: EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     #[pallet::pallet]
@@ -299,6 +303,11 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn treasury_balance)]
     pub type TreasuryBalance<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
+    /// Unspent validator-security reserve, denominated in canonical X3.
+    #[pallet::storage]
+    #[pallet::getter(fn validator_reserve_balance)]
+    pub type ValidatorReserveBalance<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
     /// Community bonus pool balance
     #[pallet::storage]
@@ -394,6 +403,12 @@ pub mod pallet {
             let treasury_balance: T::Balance = X3_TREASURY_ALLOCATION.saturated_into();
             TreasuryBalance::<T>::put(treasury_balance);
 
+            // The validator reserve is real, spendable-by-governance balance. It
+            // is not minted on payout; a payout relabels reserve into a
+            // validator's canonical balance and conserves total supply.
+            let validator_reserve: T::Balance = X3_VALIDATOR_SECURITY_RESERVE.saturated_into();
+            ValidatorReserveBalance::<T>::put(validator_reserve);
+
             // Set bonus pool balance
             let bonus_pool_balance: T::Balance = X3_BONUS_POOL_ALLOCATION.saturated_into();
             BonusPoolBalance::<T>::put(bonus_pool_balance);
@@ -463,6 +478,12 @@ pub mod pallet {
         CrossChainOperationFinalized { operation_id: H256, success: bool },
         /// Treasury allocation updated
         TreasuryAllocationUpdated { new_balance: T::Balance },
+        /// Governance-approved validator compensation paid from the security reserve.
+        ValidatorRewardPaid {
+            validator: T::AccountId,
+            amount: T::Balance,
+            reserve_remaining: T::Balance,
+        },
         /// S1-3: An account was added to the authorized-minter allow-list.
         MinterAdded { account: T::AccountId },
         /// S1-3: An account was removed from the authorized-minter allow-list.
@@ -505,6 +526,12 @@ pub mod pallet {
         SupplyInvariantViolation,
         /// S1-3: caller is not in the authorized minter allow-list.
         UnauthorizedMinter,
+        /// Caller is not authorized to approve validator compensation.
+        UnauthorizedValidatorPayout,
+        /// The validator security reserve cannot cover the requested payout.
+        InsufficientValidatorReserve,
+        /// A validator compensation payout must be non-zero.
+        InvalidValidatorPayoutAmount,
     }
 
     #[pallet::call]
@@ -913,6 +940,37 @@ pub mod pallet {
             Self::deposit_event(Event::MinterRemoved { account: who });
             Ok(())
         }
+
+        /// Pay validator compensation from the governed security reserve.
+        ///
+        /// This is a relocation of already-issued canonical supply, never a
+        /// mint. The configured origin is the governance approval boundary.
+        #[transactional]
+        #[pallet::call_index(6)]
+        #[pallet::weight(<T as Config>::WeightInfo::mint())]
+        pub fn pay_validator_reward(
+            origin: OriginFor<T>,
+            validator: T::AccountId,
+            amount: T::Balance,
+        ) -> DispatchResult {
+            T::ValidatorPayoutOrigin::ensure_origin(origin)
+                .map_err(|_| Error::<T>::UnauthorizedValidatorPayout)?;
+            ensure!(!amount.is_zero(), Error::<T>::InvalidValidatorPayoutAmount);
+
+            let reserve = ValidatorReserveBalance::<T>::get();
+            ensure!(reserve >= amount, Error::<T>::InsufficientValidatorReserve);
+            let remaining = reserve.saturating_sub(amount);
+            ValidatorReserveBalance::<T>::put(remaining);
+            Self::increase_canonical_balance(&validator, amount);
+            Self::verify_supply_invariant()?;
+
+            Self::deposit_event(Event::ValidatorRewardPaid {
+                validator,
+                amount,
+                reserve_remaining: remaining,
+            });
+            Ok(())
+        }
     }
 
     impl<T: Config> Pallet<T> {
@@ -1189,10 +1247,12 @@ pub mod pallet {
             let total_supply = TotalSupply::<T>::get();
             let treasury = TreasuryBalance::<T>::get();
             let bonus = BonusPoolBalance::<T>::get();
+            let validator_reserve = ValidatorReserveBalance::<T>::get();
 
-            // Basic sanity check: treasury + bonus must not exceed total supply
+            // Basic sanity check: accounted pools must not exceed total supply.
             let treasury_plus_bonus = treasury
                 .checked_add(&bonus)
+                .and_then(|value| value.checked_add(&validator_reserve))
                 .ok_or(Error::<T>::SupplyInvariantViolation)?;
 
             ensure!(

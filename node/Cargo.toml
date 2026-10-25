@@ -136,6 +136,7 @@ dev = ["x3-chain-runtime/dev"]
 
 testnet = ["x3-chain-runtime/testnet"]
 mainnet-rc1 = ["x3-chain-runtime/mainnet-rc1"]
+mainnet-v1 = ["mainnet-rc1", "x3-chain-runtime/mainnet-v1"]
 
 gpu-validator = [
     "x3-gpu-validator-swarm",

@@ -84,6 +84,8 @@ pub enum SwapRouterError {
     /// `AtomicSwapExecutor::execute_swap_bundle` used to return `Ok` with a fabricated
     /// success record instead (TICKET-094).
     NoExecutorConfigured,
+    /// No liquidity source is wired; user limits cannot serve as market prices.
+    NoLiquiditySourceConfigured,
 }
 
 impl core::fmt::Display for SwapRouterError {
@@ -93,6 +95,12 @@ impl core::fmt::Display for SwapRouterError {
             SwapRouterError::HighSlippage => write!(f, "slippage tolerance too high or unset"),
             SwapRouterError::InvalidParameters => write!(f, "invalid swap parameters"),
             SwapRouterError::ExecutionFailed => write!(f, "route execution failed"),
+            SwapRouterError::NoLiquiditySourceConfigured => {
+                write!(
+                    f,
+                    "no liquidity source is configured: market quotes are unavailable"
+                )
+            }
             SwapRouterError::NoExecutorConfigured => write!(
                 f,
                 "no swap executor is configured: this router has no chain integration, so it \

@@ -12,6 +12,10 @@ use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+fn next_strategy_id<R: Rng + ?Sized>(rng: &mut R) -> StrategyId {
+    StrategyId::from_bytes(rng.gen::<[u8; 16]>())
+}
+
 /// A single gene in the genome
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Gene {
@@ -125,6 +129,11 @@ impl Gene {
     /// Randomize this gene
     pub fn randomize(&mut self) {
         let mut rng = thread_rng();
+        self.randomize_with_rng(&mut rng);
+    }
+
+    /// Randomize this gene from a caller-owned deterministic RNG.
+    pub fn randomize_with_rng<R: Rng + ?Sized>(&mut self, rng: &mut R) {
         match &mut self.gene_type {
             GeneType::Float { value, min, max } => {
                 *value = rng.gen_range(*min..=*max);
@@ -156,11 +165,16 @@ impl Gene {
 
     /// Mutate this gene with given strength
     pub fn mutate(&mut self, strength: f64) {
+        let mut rng = thread_rng();
+        self.mutate_with_rng(strength, &mut rng);
+    }
+
+    /// Mutate from a caller-owned deterministic RNG.
+    pub fn mutate_with_rng<R: Rng + ?Sized>(&mut self, strength: f64, rng: &mut R) {
         if !self.mutable {
             return;
         }
 
-        let mut rng = thread_rng();
         match &mut self.gene_type {
             GeneType::Float { value, min, max } => {
                 // Gaussian mutation
@@ -288,14 +302,26 @@ impl Genome {
 
     /// Randomize all genes
     pub fn randomize(&mut self) {
-        self.id = StrategyId::new_v4();
+        let mut rng = thread_rng();
+        self.randomize_with_rng(&mut rng);
+    }
+
+    /// Randomize all genes from a caller-owned deterministic RNG.
+    pub fn randomize_with_rng<R: Rng + ?Sized>(&mut self, rng: &mut R) {
+        self.id = next_strategy_id(rng);
         for gene in &mut self.genes {
-            gene.randomize();
+            gene.randomize_with_rng(rng);
         }
     }
 
     /// Mutate genome with given operator
     pub fn mutate(&mut self, operator: &MutationOperator) {
+        let mut rng = thread_rng();
+        self.mutate_with_rng(operator, &mut rng);
+    }
+
+    /// Deterministic equivalent of [`Self::mutate`].
+    pub fn mutate_with_rng<R: Rng + ?Sized>(&mut self, operator: &MutationOperator, rng: &mut R) {
         let strength = match operator {
             MutationOperator::Uniform { strength } => *strength,
             MutationOperator::Gaussian { sigma } => *sigma,
@@ -310,25 +336,31 @@ impl Genome {
         };
 
         // Create new ID for mutated genome
-        self.id = StrategyId::new_v4();
+        self.id = next_strategy_id(rng);
 
         for gene in &mut self.genes {
-            if gene.mutable && rand::random::<f64>() < 0.5 {
-                gene.mutate(strength);
+            if gene.mutable && rng.gen::<f64>() < 0.5 {
+                gene.mutate_with_rng(strength, rng);
             }
         }
     }
 
     /// Crossover with another genome
     pub fn crossover(&self, other: &Genome) -> Genome {
+        let mut rng = thread_rng();
+        self.crossover_with_rng(other, &mut rng)
+    }
+
+    /// Deterministic equivalent of [`Self::crossover`].
+    pub fn crossover_with_rng<R: Rng + ?Sized>(&self, other: &Genome, rng: &mut R) -> Genome {
         let mut child = self.clone();
-        child.id = StrategyId::new_v4();
+        child.id = next_strategy_id(rng);
         child.parents = vec![self.id, other.id];
         child.fitness = 0.0;
 
         // Uniform crossover
         for (i, gene) in child.genes.iter_mut().enumerate() {
-            if rand::random::<bool>() && i < other.genes.len() {
+            if rng.gen::<bool>() && i < other.genes.len() {
                 *gene = other.genes[i].clone();
             }
         }

@@ -9,6 +9,8 @@ use super::backend::{LocalSimulator, QuantumBackend};
 use super::circuit::{CircuitBuilder, Gate, QuantumCircuit};
 use crate::error::{SwarmError, SwarmResult};
 use crate::types::OptimizationProblem;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -27,6 +29,8 @@ pub struct QaoaConfig {
     pub learning_rate: f64,
     /// Use gradient-based optimization
     pub use_gradient: bool,
+    /// Seed for non-gradient exploration.
+    pub seed: u64,
 }
 
 impl Default for QaoaConfig {
@@ -38,6 +42,7 @@ impl Default for QaoaConfig {
             convergence_threshold: 0.001,
             learning_rate: 0.1,
             use_gradient: true,
+            seed: 0,
         }
     }
 }
@@ -181,6 +186,7 @@ impl QaoaOptimizer {
         let mut best_value = f64::MAX;
         let mut best_solution = vec![false; problem.num_qubits];
         let mut evaluations = 0;
+        let mut rng = ChaCha20Rng::seed_from_u64(self.config.seed);
 
         // Simple gradient descent optimization
         for iteration in 0..self.config.max_iterations {
@@ -193,7 +199,9 @@ impl QaoaOptimizer {
             let mut exp_value = 0.0;
             let mut total_count = 0u64;
 
-            for (bitstring, count) in &result.counts {
+            let mut outcomes: Vec<_> = result.counts.iter().collect();
+            outcomes.sort_by_key(|(bitstring, _)| *bitstring);
+            for (bitstring, count) in outcomes {
                 let bits: Vec<bool> = bitstring.chars().map(|c| c == '1').collect();
                 let cost = self.evaluate_bitstring(problem, &bits);
                 exp_value += cost * (*count as f64);
@@ -232,8 +240,6 @@ impl QaoaOptimizer {
                 }
             } else {
                 // Random perturbation for exploration
-                use rand::Rng;
-                let mut rng = rand::thread_rng();
                 for p in &mut params {
                     *p += rng.gen_range(-0.1..0.1);
                 }

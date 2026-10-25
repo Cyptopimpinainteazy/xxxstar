@@ -1,2 +1,0 @@
-cross_chain_gpu_validator
-resources

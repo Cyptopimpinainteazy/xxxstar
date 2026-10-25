@@ -63,7 +63,7 @@ impl CrossoverOperator for UniformCrossover {
 
         // Update metadata
         child.metadata.parents = vec![parent1.metadata.id, parent2.metadata.id];
-        child.metadata.id = rand::random();
+        child.metadata.id = rng.gen();
 
         Ok(child)
     }
@@ -115,7 +115,7 @@ impl CrossoverOperator for SinglePointCrossover {
         }
 
         child.metadata.parents = vec![parent1.metadata.id, parent2.metadata.id];
-        child.metadata.id = rand::random();
+        child.metadata.id = rng.gen();
 
         Ok(child)
     }
@@ -168,7 +168,7 @@ impl CrossoverOperator for TwoPointCrossover {
         }
 
         child.metadata.parents = vec![parent1.metadata.id, parent2.metadata.id];
-        child.metadata.id = rand::random();
+        child.metadata.id = rng.gen();
 
         Ok(child)
     }
@@ -235,7 +235,7 @@ impl CrossoverOperator for ArithmeticCrossover {
         }
 
         child.metadata.parents = vec![parent1.metadata.id, parent2.metadata.id];
-        child.metadata.id = rand::random();
+        child.metadata.id = rng.gen();
 
         Ok(child)
     }

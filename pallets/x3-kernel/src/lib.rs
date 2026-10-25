@@ -117,6 +117,9 @@ pub mod benchmarking;
 /// The compiled artifact the X3 benchmarks execute. Present outside `cfg(test)` because a
 /// benchmark needs it at runtime, and its provenance test runs with the pallet's suite.
 pub mod bench_fixtures;
+#[cfg(test)]
+mod canonical_trading_tests;
+pub mod native_trading;
 
 /// Auto-generated weight information for extrinsics.
 /// Regenerate using frame-benchmarking CLI.
@@ -490,6 +493,8 @@ pub mod pallet {
             + Copy
             + MaxEncodedLen
             + CheckedAdd
+            + TryFrom<u128>
+            + TryInto<u128>
             + From<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
             + Into<<Self::Currency as frame_support::traits::Currency<Self::AccountId>>::Balance>
             // The trading engine's amounts are `u128`; conversions are checked both ways.
@@ -506,6 +511,10 @@ pub mod pallet {
             + MaybeSerializeDeserialize
             // Trading artifacts name assets by `u32` ledger id (checked conversion).
             + TryFrom<u32>;
+
+        /// Canonical ledger identity whose units match the fee currency.
+        #[pallet::constant]
+        type NativeFeeAssetId: Get<Self::AssetId>;
 
         /// Identifier type used to map substrate accounts to X3 IDs.
         type AtlasId: Parameter + Member + Default + Copy + MaxEncodedLen;
@@ -734,6 +743,28 @@ pub mod pallet {
     #[pallet::storage]
     pub type TradeNonces<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
+
+    /// Governance-bound canonical language identity -> existing canonical ledger asset.
+    #[pallet::storage]
+    pub type NativeTradingAssets<T: Config> = StorageMap<_, Blake2_128Concat, H256, T::AssetId>;
+    /// Reverse mapping forbids two language identities from aliasing one ledger asset.
+    #[pallet::storage]
+    pub type NativeTradingAssetIds<T: Config> = StorageMap<_, Blake2_128Concat, T::AssetId, H256>;
+    /// The governance-bound identity of the runtime's native fee denomination.
+    #[pallet::storage]
+    pub type NativeTradingFeeAsset<T: Config> = StorageValue<_, H256>;
+    /// Signed consent to same-dispatch, zero-fee lending; no debt survives a dispatch.
+    #[pallet::storage]
+    pub type NativeTradingProviders<T: Config> =
+        StorageMap<_, Blake2_128Concat, BoundedVec<u8, ConstU32<64>>, T::AccountId>;
+    /// Signed consent to price the account's actual reserves with the native AMM curve.
+    #[pallet::storage]
+    pub type NativeTradingVenues<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        BoundedVec<u8, ConstU32<64>>,
+        (T::AccountId, T::AssetId, T::AssetId),
+    >;
 
     /// Maps accounts to their X3 identifiers.
     #[pallet::storage]
@@ -1141,6 +1172,16 @@ pub mod pallet {
             topic: H256,
             data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>>,
         },
+        NativeTradingAssetRegistered {
+            identity: H256,
+            asset_id: T::AssetId,
+            fee_asset: bool,
+        },
+        NativeTradingCapabilityRegistered {
+            name: Vec<u8>,
+            owner: T::AccountId,
+            venue: bool,
+        },
     }
 
     #[pallet::error]
@@ -1335,6 +1376,107 @@ pub mod pallet {
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
+        /// Bind an X3Lang native asset to an existing canonical ledger asset.
+        #[pallet::call_index(48)]
+        #[pallet::weight(Weight::from_parts(50_000_000, 4096).saturating_add(T::DbWeight::get().reads_writes(4, 3)))]
+        pub fn register_native_trading_asset(
+            origin: OriginFor<T>,
+            identity: Vec<u8>,
+            asset_id: T::AssetId,
+            fee_asset: bool,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+            let asset = crate::native_trading::decode_asset(&identity)?;
+            let hash = crate::native_trading::asset_hash(&asset)?;
+            let registered = AssetRegistry::<T>::get(asset_id).ok_or(Error::<T>::UnknownAsset)?;
+            ensure!(
+                registered.symbol.as_slice() == asset.symbol.as_bytes()
+                    && registered.decimals == asset.decimals,
+                DispatchError::Other("native asset metadata mismatch")
+            );
+            ensure!(
+                !NativeTradingAssets::<T>::contains_key(hash)
+                    && !NativeTradingAssetIds::<T>::contains_key(asset_id),
+                DispatchError::Other("native asset identity already registered")
+            );
+            if fee_asset {
+                ensure!(
+                    asset_id == T::NativeFeeAssetId::get(),
+                    DispatchError::Other("fee identity must match native currency")
+                );
+                ensure!(
+                    !NativeTradingFeeAsset::<T>::exists(),
+                    DispatchError::Other("native fee identity already registered")
+                );
+                NativeTradingFeeAsset::<T>::put(hash);
+            }
+            NativeTradingAssets::<T>::insert(hash, asset_id);
+            NativeTradingAssetIds::<T>::insert(asset_id, hash);
+            Self::deposit_event(Event::NativeTradingAssetRegistered {
+                identity: hash,
+                asset_id,
+                fee_asset,
+            });
+            Ok(())
+        }
+
+        /// Opt this account's ledger balances into repay-or-revert, zero-fee flash lending.
+        #[pallet::call_index(49)]
+        #[pallet::weight(Weight::from_parts(30_000_000, 4096).saturating_add(T::DbWeight::get().reads_writes(1, 1)))]
+        pub fn register_native_trading_provider(
+            origin: OriginFor<T>,
+            name: Vec<u8>,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let key = crate::native_trading::capability_name(name.clone())?;
+            ensure!(
+                !NativeTradingProviders::<T>::contains_key(&key),
+                DispatchError::Other("native lender name already registered")
+            );
+            NativeTradingProviders::<T>::insert(key, &who);
+            Self::deposit_event(Event::NativeTradingCapabilityRegistered {
+                name,
+                owner: who,
+                venue: false,
+            });
+            Ok(())
+        }
+
+        /// Opt this account's two funded reserves into zero-fee constant-product swaps.
+        #[pallet::call_index(50)]
+        #[pallet::weight(Weight::from_parts(50_000_000, 8192).saturating_add(T::DbWeight::get().reads_writes(5, 1)))]
+        pub fn register_native_trading_venue(
+            origin: OriginFor<T>,
+            name: Vec<u8>,
+            asset_a: T::AssetId,
+            asset_b: T::AssetId,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            let key = crate::native_trading::capability_name(name.clone())?;
+            ensure!(
+                asset_a != asset_b
+                    && NativeTradingAssetIds::<T>::contains_key(asset_a)
+                    && NativeTradingAssetIds::<T>::contains_key(asset_b),
+                DispatchError::Other("invalid native pool assets")
+            );
+            ensure!(
+                CanonicalLedger::<T>::get(&who, asset_a) > T::Balance::default()
+                    && CanonicalLedger::<T>::get(&who, asset_b) > T::Balance::default(),
+                DispatchError::Other("native pool must be funded")
+            );
+            ensure!(
+                !NativeTradingVenues::<T>::contains_key(&key),
+                DispatchError::Other("native venue name already registered")
+            );
+            NativeTradingVenues::<T>::insert(key, (&who, asset_a, asset_b));
+            Self::deposit_event(Event::NativeTradingCapabilityRegistered {
+                name,
+                owner: who,
+                venue: true,
+            });
+            Ok(())
+        }
+
         /// Activate emergency pause — halts all user-facing extrinsics.
         /// Only callable by `GovernanceOrigin` (root or council).
         #[pallet::call_index(40)]
@@ -2070,7 +2212,12 @@ pub mod pallet {
                 .saturating_add(if x3_payload.is_empty() {
                     Weight::zero()
                 } else {
-                    Pallet::<T>::x3_execution_weight()
+                    Pallet::<T>::x3_execution_weight().saturating_add(
+                        if x3_x3_integration::canonical::is_canonical_artifact(x3_payload) {
+                            // At most 64 operations: two passes plus quote/identity and commitment reads.
+                            T::DbWeight::get().reads_writes(64 * 64, 64 * 32)
+                        } else { Weight::zero() }
+                    )
                 })
         )]
         pub fn submit_comit_v2(
@@ -2083,318 +2230,33 @@ pub mod pallet {
             fee: T::Balance,
             prepare_root: H256,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // SEC-009: Emergency pause guard
-            ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
-
-            ensure!(
-                !SubmittedComits::<T>::contains_key(comit_id),
-                Error::<T>::DuplicateComitId
-            );
-
-            const MAX_SUBMISSIONS_PER_BLOCK: u32 = 10;
-            let current_block = frame_system::Pallet::<T>::block_number();
-            let current_count = SubmissionsPerBlock::<T>::get(&who, current_block);
-            ensure!(
-                current_count < MAX_SUBMISSIONS_PER_BLOCK,
-                Error::<T>::RateLimitExceeded
-            );
-
-            let operation_context = Self::encode_submit_comit_v2_context(&who, comit_id);
-            Self::auth_check(&who, &operation_context)?;
-
-            Self::verify_payloads_v2(&comit_id, &evm_payload, &svm_payload, &x3_payload)?;
-
-            // Same rule as `submit_comit` above, for the same reason (X3-LANG-004).
-            Self::verify_domain_payloads(&evm_payload, &svm_payload)?;
-
-            if !x3_payload.is_empty() {
-                // The X3 payload is the compiled program, and `T::X3Adapter` is the thing that
-                // verifies and executes it (envelope magic, version gate, checksum). Requiring an
-                // `X3VmPacket` here instead meant the pallet accepted only payloads that no real
-                // adapter can execute — a packet is a semantic operation, not X3BC bytecode — so
-                // every non-empty X3 payload failed with `X3ExecutionFailed` on a chain whose
-                // adapter is real. Validation now asks the component that will do the work.
-                T::X3Adapter::validate(&x3_payload).map_err(|_| Error::<T>::InvalidX3VmPacket)?;
-                // The program's compiled policy comes next, before any state is touched: an
-                // artifact that demands private submission is refused on a chain that cannot
-                // offer it rather than executed in the clear.
-                Self::ensure_private_submission_available(&x3_payload)?;
-            }
-
-            Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
-                if nonce != *current_nonce {
-                    return Err(Self::fail_with_reason(
+            if x3_x3_integration::canonical::is_canonical_artifact(&x3_payload) {
+                return frame_support::storage::with_transaction(
+                    || match Self::submit_comit_v2_inner(
+                        origin,
                         comit_id,
-                        ComitFailureReason::InvalidNonce {
-                            code: 0x05,
-                            expected: *current_nonce,
-                            provided: nonce,
-                        },
-                    ));
-                }
-                *current_nonce = current_nonce
-                    .checked_add(1)
-                    .ok_or(Error::<T>::NonceOverflow)?;
-                Ok(())
-            })?;
-
-            let comit = ComitV2::<T::AccountId, T::Balance> {
+                        evm_payload,
+                        svm_payload,
+                        x3_payload,
+                        nonce,
+                        fee,
+                        prepare_root,
+                    ) {
+                        Ok(()) => frame_support::storage::TransactionOutcome::Commit(Ok(())),
+                        Err(e) => frame_support::storage::TransactionOutcome::Rollback(Err(e)),
+                    },
+                );
+            }
+            Self::submit_comit_v2_inner(
+                origin,
                 comit_id,
-                origin: who.clone(),
-                evm_payload: evm_payload.clone(),
-                svm_payload: svm_payload.clone(),
-                x3_payload: x3_payload.clone(),
+                evm_payload,
+                svm_payload,
+                x3_payload,
                 nonce,
                 fee,
                 prepare_root,
-            };
-
-            let evm_tx = (!evm_payload.is_empty()).then(|| evm_payload.clone());
-            let svm_tx = (!svm_payload.is_empty()).then(|| svm_payload.clone());
-            let x3_tx = (!x3_payload.is_empty()).then(|| x3_payload.clone());
-
-            let execution_start_timestamp =
-                <pallet_timestamp::Pallet<T> as UnixTime>::now().as_secs();
-
-            let evm_gas_limit = T::DefaultEvmGasLimit::get();
-            let svm_compute_limit = T::DefaultSvmComputeLimit::get();
-            let x3_gas_limit = T::DefaultX3GasLimit::get();
-
-            let evm_receipt = if let Some(ref tx) = evm_tx {
-                match T::EvmAdapter::execute_from(
-                    tx,
-                    evm_gas_limit,
-                    crate::adapters::authenticated_evm_address(&who),
-                ) {
-                    Ok(receipt) => Some(receipt),
-                    Err(_e) => {
-                        return Err(Self::fail_with_reason(
-                            comit_id,
-                            ComitFailureReason::EvmExecutionFailed {
-                                code: 0x10,
-                                evm_error: 1,
-                                gas_used: 0,
-                            },
-                        ));
-                    }
-                }
-            } else {
-                None
-            };
-
-            let svm_receipt = if let Some(ref tx) = svm_tx {
-                match T::SvmAdapter::execute(tx, svm_compute_limit) {
-                    Ok(receipt) => Some(receipt),
-                    Err(_e) => {
-                        return Err(Self::fail_with_reason(
-                            comit_id,
-                            ComitFailureReason::SvmExecutionFailed {
-                                code: 0x11,
-                                svm_error: 1,
-                                compute_units_used: 0,
-                            },
-                        ));
-                    }
-                }
-            } else {
-                None
-            };
-
-            let x3_receipt = if let Some(ref tx) = x3_tx {
-                // The chain's own slots, read before execution: a program that reads a slot an
-                // earlier comit persisted must see that value, and a program that writes over one
-                // must report it as the write's `old_value`.
-                let slots = Self::x3_storage_view()?;
-                match T::X3Adapter::execute_with_context(
-                    tx,
-                    x3_gas_limit,
-                    &slots,
-                    T::PrivateSubmissionChannel::get(),
-                    &Self::x3_call_context(Some(&who)),
-                ) {
-                    Ok(receipt) => Some(receipt),
-                    Err(_e) => {
-                        return Err(Self::fail_with_reason(
-                            comit_id,
-                            ComitFailureReason::X3ExecutionFailed {
-                                code: 0x12,
-                                x3_error: 1,
-                                gas_used: 0,
-                            },
-                        ));
-                    }
-                }
-            } else {
-                None
-            };
-
-            if let Some(ref receipt) = evm_receipt {
-                if !receipt.success {
-                    return Err(Self::fail_with_reason(
-                        comit_id,
-                        ComitFailureReason::EvmExecutionFailed {
-                            code: 0x10,
-                            evm_error: 1,
-                            gas_used: receipt.gas_used,
-                        },
-                    ));
-                }
-            }
-
-            if let Some(ref receipt) = svm_receipt {
-                if !receipt.success {
-                    return Err(Self::fail_with_reason(
-                        comit_id,
-                        ComitFailureReason::SvmExecutionFailed {
-                            code: 0x11,
-                            svm_error: 1,
-                            compute_units_used: receipt.gas_used,
-                        },
-                    ));
-                }
-            }
-
-            if let Some(ref receipt) = x3_receipt {
-                if !receipt.success {
-                    return Err(Self::fail_with_reason(
-                        comit_id,
-                        ComitFailureReason::X3ExecutionFailed {
-                            code: 0x12,
-                            x3_error: 1,
-                            gas_used: receipt.gas_used,
-                        },
-                    ));
-                }
-            }
-
-            let evm_gas_used = evm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
-            let svm_compute_units = svm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
-            let x3_gas_used = x3_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
-            let base_fee = T::Balance::default();
-            let required_fee = Self::calculate_execution_fee_v2(
-                evm_gas_used,
-                svm_compute_units,
-                x3_gas_used,
-                base_fee,
-            )?;
-
-            ensure!(fee >= required_fee, Error::<T>::IncorrectFee);
-
-            let free_balance = T::Currency::free_balance(&who);
-            ensure!(
-                free_balance >= required_fee.into(),
-                Error::<T>::InsufficientBalance
-            );
-
-            let imbalance = T::Currency::withdraw(
-                &who,
-                required_fee.into(),
-                frame_support::traits::WithdrawReasons::FEE,
-                frame_support::traits::ExistenceRequirement::KeepAlive,
-            )?;
-            drop(imbalance);
-
-            Self::deposit_event(Event::FeeDeducted {
-                account: who.clone(),
-                amount: required_fee,
-                comit_id,
-            });
-
-            if let Err(reason) = Self::verify_triple_vm_with_receipts(
-                &comit,
-                evm_receipt.as_ref(),
-                svm_receipt.as_ref(),
-                x3_receipt.as_ref(),
-            ) {
-                return Err(Self::fail_with_reason(comit_id, reason));
-            }
-
-            // Only comits that passed every check above reach this point, so a stored receipt is
-            // always a receipt for an accepted comit.
-            //
-            // Its logs are delivered as events, not stored: `Emit` is priced per event, not per
-            // byte, so keeping them in state would let a program write up to
-            // `MAX_EVENTS * MAX_X3_LOG_BYTES` of permanent state for a few fee units.
-            if let Some(ref receipt) = x3_receipt {
-                let mut stored = receipt.clone();
-                let logs = core::mem::take(&mut stored.logs);
-                X3ExecutionReceipts::<T>::insert(comit_id, stored);
-                for (index, log) in logs.into_iter().enumerate() {
-                    let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
-                        log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
-                    Self::deposit_event(Event::X3LogEmitted {
-                        comit_id,
-                        index: index as u32,
-                        topic: log.topics.first().copied().unwrap_or_default(),
-                        data,
-                    });
-                }
-            }
-
-            SubmittedComits::<T>::insert(comit_id, current_block);
-
-            SubmissionsPerBlock::<T>::mutate(&who, current_block, |count| {
-                *count = count.saturating_add(1);
-            });
-
-            AccountRegistry::<T>::mutate(&who, |maybe_id| {
-                if maybe_id.is_none() {
-                    *maybe_id = Some(T::AtlasId::default());
-                }
-            });
-
-            Self::deposit_event(Event::ComitSubmitted {
-                comit_id,
-                origin: who.clone(),
-                nonce,
-                fee,
-            });
-
-            Self::deposit_event(Event::ComitExecutionStarted {
-                comit_id,
-                timestamp: execution_start_timestamp,
-            });
-
-            let total_gas_used = evm_gas_used
-                .saturating_add(svm_compute_units)
-                .saturating_add(x3_gas_used);
-
-            Self::deposit_event(Event::ComitExecutionCompleted {
-                comit_id,
-                success: true,
-                gas_used: total_gas_used,
-            });
-
-            let changes_applied = Self::apply_canonical_ledger_update_v2(
-                comit_id,
-                evm_receipt.as_ref(),
-                svm_receipt.as_ref(),
-                x3_receipt.as_ref(),
-            )?;
-
-            if changes_applied > 0 {
-                Self::deposit_event(Event::CanonicalLedgerUpdated {
-                    comit_id,
-                    changes_applied,
-                });
-            }
-
-            // The X3VM slots are a separate channel from the balance-shaped ledger update above:
-            // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
-            let writes_applied =
-                Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref(), None)?;
-
-            if writes_applied > 0 {
-                Self::deposit_event(Event::X3StorageUpdated {
-                    comit_id,
-                    writes_applied,
-                });
-            }
-
-            Self::deposit_event(Event::ComitFinalized { comit_id });
-            Ok(())
+            )
         }
 
         /// Submit a cross-VM bridge operation for atomic execution (prepare + commit).
@@ -2699,6 +2561,359 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        fn submit_comit_v2_inner(
+            origin: OriginFor<T>,
+            comit_id: H256,
+            evm_payload: Vec<u8>,
+            svm_payload: Vec<u8>,
+            x3_payload: Vec<u8>,
+            nonce: u64,
+            fee: T::Balance,
+            prepare_root: H256,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // SEC-009: Emergency pause guard
+            ensure!(!ProtocolPaused::<T>::get(), Error::<T>::ProtocolIsPaused);
+
+            ensure!(
+                !SubmittedComits::<T>::contains_key(comit_id),
+                Error::<T>::DuplicateComitId
+            );
+
+            const MAX_SUBMISSIONS_PER_BLOCK: u32 = 10;
+            let current_block = frame_system::Pallet::<T>::block_number();
+            let current_count = SubmissionsPerBlock::<T>::get(&who, current_block);
+            ensure!(
+                current_count < MAX_SUBMISSIONS_PER_BLOCK,
+                Error::<T>::RateLimitExceeded
+            );
+
+            let operation_context = Self::encode_submit_comit_v2_context(&who, comit_id);
+            Self::auth_check(&who, &operation_context)?;
+
+            Self::verify_payloads_v2(&comit_id, &evm_payload, &svm_payload, &x3_payload)?;
+
+            // Same rule as `submit_comit` above, for the same reason (X3-LANG-004).
+            Self::verify_domain_payloads(&evm_payload, &svm_payload)?;
+
+            if !x3_payload.is_empty() {
+                // The X3 payload is the compiled program, and `T::X3Adapter` is the thing that
+                // verifies and executes it (envelope magic, version gate, checksum). Requiring an
+                // `X3VmPacket` here instead meant the pallet accepted only payloads that no real
+                // adapter can execute — a packet is a semantic operation, not X3BC bytecode — so
+                // every non-empty X3 payload failed with `X3ExecutionFailed` on a chain whose
+                // adapter is real. Validation now asks the component that will do the work.
+                if x3_x3_integration::canonical::is_canonical_artifact(&x3_payload) {
+                    ensure!(
+                        evm_payload.is_empty() && svm_payload.is_empty(),
+                        DispatchError::Other("canonical trading supports X3-native execution only")
+                    );
+                    x3_x3_integration::X3Executor::verify_on_chain(&x3_payload)
+                        .map_err(|_| Error::<T>::InvalidX3VmPacket)?;
+                } else {
+                    T::X3Adapter::validate(&x3_payload)
+                        .map_err(|_| Error::<T>::InvalidX3VmPacket)?;
+                }
+                // The program's compiled policy comes next, before any state is touched: an
+                // artifact that demands private submission is refused on a chain that cannot
+                // offer it rather than executed in the clear.
+                Self::ensure_private_submission_available(&x3_payload)?;
+            }
+
+            Nonces::<T>::try_mutate(&who, |current_nonce| -> DispatchResult {
+                if nonce != *current_nonce {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::InvalidNonce {
+                            code: 0x05,
+                            expected: *current_nonce,
+                            provided: nonce,
+                        },
+                    ));
+                }
+                *current_nonce = current_nonce
+                    .checked_add(1)
+                    .ok_or(Error::<T>::NonceOverflow)?;
+                Ok(())
+            })?;
+
+            let comit = ComitV2::<T::AccountId, T::Balance> {
+                comit_id,
+                origin: who.clone(),
+                evm_payload: evm_payload.clone(),
+                svm_payload: svm_payload.clone(),
+                x3_payload: x3_payload.clone(),
+                nonce,
+                fee,
+                prepare_root,
+            };
+
+            let evm_tx = (!evm_payload.is_empty()).then(|| evm_payload.clone());
+            let svm_tx = (!svm_payload.is_empty()).then(|| svm_payload.clone());
+            let x3_tx = (!x3_payload.is_empty()).then(|| x3_payload.clone());
+
+            let execution_start_timestamp =
+                <pallet_timestamp::Pallet<T> as UnixTime>::now().as_secs();
+
+            let evm_gas_limit = T::DefaultEvmGasLimit::get();
+            let svm_compute_limit = T::DefaultSvmComputeLimit::get();
+            let x3_gas_limit = T::DefaultX3GasLimit::get();
+
+            let evm_receipt = if let Some(ref tx) = evm_tx {
+                match T::EvmAdapter::execute_from(
+                    tx,
+                    evm_gas_limit,
+                    crate::adapters::authenticated_evm_address(&who),
+                ) {
+                    Ok(receipt) => Some(receipt),
+                    Err(_e) => {
+                        return Err(Self::fail_with_reason(
+                            comit_id,
+                            ComitFailureReason::EvmExecutionFailed {
+                                code: 0x10,
+                                evm_error: 1,
+                                gas_used: 0,
+                            },
+                        ));
+                    }
+                }
+            } else {
+                None
+            };
+
+            let svm_receipt = if let Some(ref tx) = svm_tx {
+                match T::SvmAdapter::execute(tx, svm_compute_limit) {
+                    Ok(receipt) => Some(receipt),
+                    Err(_e) => {
+                        return Err(Self::fail_with_reason(
+                            comit_id,
+                            ComitFailureReason::SvmExecutionFailed {
+                                code: 0x11,
+                                svm_error: 1,
+                                compute_units_used: 0,
+                            },
+                        ));
+                    }
+                }
+            } else {
+                None
+            };
+
+            let x3_receipt = if let Some(ref tx) = x3_tx {
+                // The chain's own slots, read before execution: a program that reads a slot an
+                // earlier comit persisted must see that value, and a program that writes over one
+                // must report it as the write's `old_value`.
+                if x3_x3_integration::canonical::is_canonical_artifact(tx) {
+                    let artifact = x3_lang_execution::artifact::decode_artifact(tx)
+                        .map_err(|_| Error::<T>::InvalidX3VmPacket)?;
+                    let required = Self::calculate_execution_fee_v2(
+                        0,
+                        0,
+                        artifact.gas_used,
+                        T::Balance::default(),
+                    )?;
+                    let fee_units: u128 =
+                        required.try_into().map_err(|_| Error::<T>::FeeOverflow)?;
+                    Some(crate::native_trading::execute::<T>(
+                        &who,
+                        tx,
+                        x3_gas_limit,
+                        fee_units,
+                    )?)
+                } else {
+                    let slots = Self::x3_storage_view()?;
+                    match T::X3Adapter::execute_with_context(
+                        tx,
+                        x3_gas_limit,
+                        &slots,
+                        T::PrivateSubmissionChannel::get(),
+                        &Self::x3_call_context(Some(&who)),
+                    ) {
+                        Ok(receipt) => Some(receipt),
+                        Err(_e) => {
+                            return Err(Self::fail_with_reason(
+                                comit_id,
+                                ComitFailureReason::X3ExecutionFailed {
+                                    code: 0x12,
+                                    x3_error: 1,
+                                    gas_used: 0,
+                                },
+                            ));
+                        }
+                    }
+                }
+            } else {
+                None
+            };
+
+            if let Some(ref receipt) = evm_receipt {
+                if !receipt.success {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::EvmExecutionFailed {
+                            code: 0x10,
+                            evm_error: 1,
+                            gas_used: receipt.gas_used,
+                        },
+                    ));
+                }
+            }
+
+            if let Some(ref receipt) = svm_receipt {
+                if !receipt.success {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::SvmExecutionFailed {
+                            code: 0x11,
+                            svm_error: 1,
+                            compute_units_used: receipt.gas_used,
+                        },
+                    ));
+                }
+            }
+
+            if let Some(ref receipt) = x3_receipt {
+                if !receipt.success {
+                    return Err(Self::fail_with_reason(
+                        comit_id,
+                        ComitFailureReason::X3ExecutionFailed {
+                            code: 0x12,
+                            x3_error: 1,
+                            gas_used: receipt.gas_used,
+                        },
+                    ));
+                }
+            }
+
+            let evm_gas_used = evm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
+            let svm_compute_units = svm_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
+            let x3_gas_used = x3_receipt.as_ref().map(|r| r.gas_used).unwrap_or(0);
+            let base_fee = T::Balance::default();
+            let required_fee = Self::calculate_execution_fee_v2(
+                evm_gas_used,
+                svm_compute_units,
+                x3_gas_used,
+                base_fee,
+            )?;
+
+            ensure!(fee >= required_fee, Error::<T>::IncorrectFee);
+
+            let free_balance = T::Currency::free_balance(&who);
+            ensure!(
+                free_balance >= required_fee.into(),
+                Error::<T>::InsufficientBalance
+            );
+
+            let imbalance = T::Currency::withdraw(
+                &who,
+                required_fee.into(),
+                frame_support::traits::WithdrawReasons::FEE,
+                frame_support::traits::ExistenceRequirement::KeepAlive,
+            )?;
+            drop(imbalance);
+
+            Self::deposit_event(Event::FeeDeducted {
+                account: who.clone(),
+                amount: required_fee,
+                comit_id,
+            });
+
+            if let Err(reason) = Self::verify_triple_vm_with_receipts(
+                &comit,
+                evm_receipt.as_ref(),
+                svm_receipt.as_ref(),
+                x3_receipt.as_ref(),
+            ) {
+                return Err(Self::fail_with_reason(comit_id, reason));
+            }
+
+            // Only comits that passed every check above reach this point, so a stored receipt is
+            // always a receipt for an accepted comit.
+            //
+            // Its logs are delivered as events, not stored: `Emit` is priced per event, not per
+            // byte, so keeping them in state would let a program write up to
+            // `MAX_EVENTS * MAX_X3_LOG_BYTES` of permanent state for a few fee units.
+            if let Some(ref receipt) = x3_receipt {
+                let mut stored = receipt.clone();
+                let logs = core::mem::take(&mut stored.logs);
+                X3ExecutionReceipts::<T>::insert(comit_id, stored);
+                for (index, log) in logs.into_iter().enumerate() {
+                    let data: BoundedVec<u8, ConstU32<MAX_X3_LOG_BYTES>> =
+                        log.data.try_into().map_err(|_| Error::<T>::X3LogTooLarge)?;
+                    Self::deposit_event(Event::X3LogEmitted {
+                        comit_id,
+                        index: index as u32,
+                        topic: log.topics.first().copied().unwrap_or_default(),
+                        data,
+                    });
+                }
+            }
+
+            SubmittedComits::<T>::insert(comit_id, current_block);
+
+            SubmissionsPerBlock::<T>::mutate(&who, current_block, |count| {
+                *count = count.saturating_add(1);
+            });
+
+            AccountRegistry::<T>::mutate(&who, |maybe_id| {
+                if maybe_id.is_none() {
+                    *maybe_id = Some(T::AtlasId::default());
+                }
+            });
+
+            Self::deposit_event(Event::ComitSubmitted {
+                comit_id,
+                origin: who.clone(),
+                nonce,
+                fee,
+            });
+
+            Self::deposit_event(Event::ComitExecutionStarted {
+                comit_id,
+                timestamp: execution_start_timestamp,
+            });
+
+            let total_gas_used = evm_gas_used
+                .saturating_add(svm_compute_units)
+                .saturating_add(x3_gas_used);
+
+            Self::deposit_event(Event::ComitExecutionCompleted {
+                comit_id,
+                success: true,
+                gas_used: total_gas_used,
+            });
+
+            let changes_applied = Self::apply_canonical_ledger_update_v2(
+                comit_id,
+                evm_receipt.as_ref(),
+                svm_receipt.as_ref(),
+                x3_receipt.as_ref(),
+            )?;
+
+            if changes_applied > 0 {
+                Self::deposit_event(Event::CanonicalLedgerUpdated {
+                    comit_id,
+                    changes_applied,
+                });
+            }
+
+            // The X3VM slots are a separate channel from the balance-shaped ledger update above:
+            // applied here so `DecodeFailureCount` stays untouched by a storage-writing comit.
+            let writes_applied =
+                Self::apply_x3_storage_writes(comit_id, x3_receipt.as_ref(), None)?;
+
+            if writes_applied > 0 {
+                Self::deposit_event(Event::X3StorageUpdated {
+                    comit_id,
+                    writes_applied,
+                });
+            }
+
+            Self::deposit_event(Event::ComitFinalized { comit_id });
+            Ok(())
+        }
+
         /// The bounds every path that changes the authority set must satisfy.
         ///
         /// Scheduling checked the count against `MinAuthorities` and
@@ -2823,9 +3038,15 @@ pub mod pallet {
             if x3_payload.is_empty() {
                 return Ok(());
             }
-            if x3_common::bytecode::requires_private_submission(x3_payload)
-                && !T::PrivateSubmissionChannel::get()
-            {
+            let requires_private =
+                if x3_x3_integration::canonical::is_canonical_artifact(x3_payload) {
+                    x3_lang_execution::artifact::decode_artifact(x3_payload)
+                        .map_err(|_| Error::<T>::InvalidX3VmPacket)?
+                        .requires_private_submission
+                } else {
+                    x3_common::bytecode::requires_private_submission(x3_payload)
+                };
+            if requires_private && !T::PrivateSubmissionChannel::get() {
                 return Err(Error::<T>::PrivateSubmissionUnavailable.into());
             }
             Ok(())
@@ -3350,7 +3571,7 @@ pub mod pallet {
             H256::from(value)
         }
 
-        fn build_balance_state_change(
+        pub(crate) fn build_balance_state_change(
             address: &[u8],
             asset_id: T::AssetId,
             new_balance: T::Balance,
@@ -3509,7 +3730,7 @@ pub mod pallet {
 
         /// Maximum number of state changes allowed per Comit execution.
         /// Prevents DoS via excessive storage writes.
-        const MAX_STATE_CHANGES: usize = 1000;
+        pub(crate) const MAX_STATE_CHANGES: usize = 1000;
 
         /// Decode an AccountId from a VM state-change address.
         ///

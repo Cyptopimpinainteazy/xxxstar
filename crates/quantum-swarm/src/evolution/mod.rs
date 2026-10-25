@@ -17,6 +17,8 @@ pub use selection::{Selection, SelectionOperator};
 
 use crate::error::{SwarmError, SwarmResult};
 use crate::types::{StrategyEvaluation, StrategyId};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -41,6 +43,8 @@ pub struct EvolutionConfig {
     pub selection: SelectionOperator,
     /// Mutation operator
     pub mutation: MutationOperator,
+    /// Seed for deterministic initialization, selection, crossover, and mutation.
+    pub seed: u64,
 }
 
 impl Default for EvolutionConfig {
@@ -55,6 +59,7 @@ impl Default for EvolutionConfig {
             max_stagnation: 15,
             selection: SelectionOperator::Tournament { size: 5 },
             mutation: MutationOperator::Adaptive,
+            seed: 0,
         }
     }
 }
@@ -68,6 +73,7 @@ pub struct EvolutionEngine {
     best_genome: Option<Genome>,
     fitness_history: Vec<f64>,
     stagnation_counter: usize,
+    rng: ChaCha20Rng,
 }
 
 impl EvolutionEngine {
@@ -81,13 +87,17 @@ impl EvolutionEngine {
             best_genome: None,
             fitness_history: Vec::new(),
             stagnation_counter: 0,
+            rng: ChaCha20Rng::seed_from_u64(config.seed),
         }
     }
 
     /// Initialize population with random genomes
     pub fn initialize(&mut self, genome_template: &Genome) {
-        self.population
-            .initialize_random(genome_template, self.config.population_size);
+        self.population.initialize_random_with_rng(
+            genome_template,
+            self.config.population_size,
+            &mut self.rng,
+        );
     }
 
     /// Run one generation of evolution
@@ -126,22 +136,22 @@ impl EvolutionEngine {
 
         // Fill rest through crossover and mutation
         while new_pop.len() < self.config.population_size {
-            if rand::random::<f64>() < self.config.crossover_rate && selected.len() >= 2 {
+            if self.rng.gen::<f64>() < self.config.crossover_rate && selected.len() >= 2 {
                 // Crossover
-                let parent1 = &selected[rand::random::<usize>() % selected.len()];
-                let parent2 = &selected[rand::random::<usize>() % selected.len()];
-                let mut child = parent1.crossover(parent2);
+                let parent1 = &selected[self.rng.gen_range(0..selected.len())];
+                let parent2 = &selected[self.rng.gen_range(0..selected.len())];
+                let mut child = parent1.crossover_with_rng(parent2, &mut self.rng);
 
                 // Possibly mutate
-                if rand::random::<f64>() < self.config.mutation_rate {
-                    child.mutate(&self.config.mutation);
+                if self.rng.gen::<f64>() < self.config.mutation_rate {
+                    child.mutate_with_rng(&self.config.mutation, &mut self.rng);
                 }
                 new_pop.push(child);
             } else {
                 // Mutation only
-                let parent = &selected[rand::random::<usize>() % selected.len()];
+                let parent = &selected[self.rng.gen_range(0..selected.len())];
                 let mut child = parent.clone();
-                child.mutate(&self.config.mutation);
+                child.mutate_with_rng(&self.config.mutation, &mut self.rng);
                 new_pop.push(child);
             }
         }
@@ -179,19 +189,23 @@ impl EvolutionEngine {
     }
 
     /// Select parents for next generation
-    fn select_parents(&self) -> Vec<Genome> {
+    fn select_parents(&mut self) -> Vec<Genome> {
         match self.config.selection {
-            SelectionOperator::Tournament { size } => self
-                .population
-                .tournament_select(size, self.config.population_size / 2),
+            SelectionOperator::Tournament { size } => self.population.tournament_select_with_rng(
+                size,
+                self.config.population_size / 2,
+                &mut self.rng,
+            ),
             SelectionOperator::RouletteWheel => self
                 .population
-                .roulette_select(self.config.population_size / 2),
-            SelectionOperator::Rank => self.population.rank_select(self.config.population_size / 2),
+                .roulette_select_with_rng(self.config.population_size / 2, &mut self.rng),
+            SelectionOperator::Rank => self
+                .population
+                .rank_select_with_rng(self.config.population_size / 2, &mut self.rng),
             SelectionOperator::Nsga2 => {
                 // Multi-objective selection
                 self.population
-                    .nsga2_select(self.config.population_size / 2)
+                    .nsga2_select_with_rng(self.config.population_size / 2, &mut self.rng)
             }
         }
     }
@@ -210,7 +224,7 @@ impl EvolutionEngine {
             // Generate random individuals based on template
             while new_pop.len() < self.config.population_size {
                 let mut new_genome = template_genome.clone();
-                new_genome.randomize();
+                new_genome.randomize_with_rng(&mut self.rng);
                 new_pop.push(new_genome);
             }
         }

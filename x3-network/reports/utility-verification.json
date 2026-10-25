@@ -1,0 +1,33 @@
+[
+  {
+    "command": [
+      "/home/linuxbrew/.linuxbrew/opt/python@3.14/bin/python3.14",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "x3-network/tests",
+      "-v"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "test_backup_preserves_bytes_and_private_permissions (test_network_tools.UtilityTests.test_backup_preserves_bytes_and_private_permissions) ... ok\ntest_backup_rejects_empty_source (test_network_tools.UtilityTests.test_backup_rejects_empty_source) ... ok\ntest_backup_rejects_symlink (test_network_tools.UtilityTests.test_backup_rejects_symlink) ... ok\ntest_disjoint_local_address_passes_scoped_check (test_network_tools.UtilityTests.test_disjoint_local_address_passes_scoped_check) ... ok\ntest_failed_discovery_never_reports_pass (test_network_tools.UtilityTests.test_failed_discovery_never_reports_pass) ... ok\ntest_overlap_is_rejected (test_network_tools.UtilityTests.test_overlap_is_rejected) ... ok\ntest_private_state_rejects_symlink (test_network_tools.UtilityTests.test_private_state_rejects_symlink) ... ok\ntest_unreviewed_or_injected_ssh_target_never_executes (test_network_tools.UtilityTests.test_unreviewed_or_injected_ssh_target_never_executes) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.009s\n\nOK\n"
+  },
+  {
+    "command": [
+      "bash",
+      "-n",
+      "x3-network/scripts/backup-switch.sh",
+      "x3-network/scripts/collect-switch-status.sh",
+      "x3-network/scripts/discover-console.sh",
+      "x3-network/scripts/validate-network.sh"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": "Inventory/report JSON, new-file whitespace and generated-credential exclusion checks",
+    "exit_code": 0
+  }
+]

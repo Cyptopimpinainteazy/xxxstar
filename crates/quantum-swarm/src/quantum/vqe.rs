@@ -6,6 +6,8 @@
 use super::backend::QuantumBackend;
 use super::circuit::{CircuitBuilder, Gate, QuantumCircuit};
 use crate::error::{SwarmError, SwarmResult};
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 
@@ -26,6 +28,8 @@ pub struct VqeConfig {
     pub learning_rate: f64,
     /// Optimizer type
     pub optimizer: OptimizerType,
+    /// Seed for parameter initialization and stochastic optimization.
+    pub seed: u64,
 }
 
 impl Default for VqeConfig {
@@ -38,6 +42,7 @@ impl Default for VqeConfig {
             convergence_threshold: 1e-6,
             learning_rate: 0.1,
             optimizer: OptimizerType::Adam,
+            seed: 0,
         }
     }
 }
@@ -318,11 +323,10 @@ impl VqeOptimizer {
         backend: &dyn QuantumBackend,
     ) -> SwarmResult<VqeResult> {
         let num_params = self.num_parameters(hamiltonian.num_qubits);
+        let mut rng = ChaCha20Rng::seed_from_u64(self.config.seed);
 
         // Initialize parameters randomly
-        let mut params: Vec<f64> = (0..num_params)
-            .map(|_| rand::random::<f64>() * PI)
-            .collect();
+        let mut params: Vec<f64> = (0..num_params).map(|_| rng.gen::<f64>() * PI).collect();
 
         let mut history = Vec::new();
         let mut best_energy = f64::MAX;

@@ -168,7 +168,12 @@ impl AMMPool {
         }
 
         let (reserve_in, reserve_out) = (pool.reserve_a, pool.reserve_b);
-        let amount_out = Self::swap_out(amount_in, reserve_in, reserve_out, pool.fee_basis_points)?;
+        let amount_out = Self::constant_product_output(
+            amount_in,
+            reserve_in,
+            reserve_out,
+            pool.fee_basis_points,
+        )?;
 
         if amount_out < min_out {
             return Err("Slippage exceeds limit");
@@ -285,7 +290,12 @@ impl AMMPool {
             return Err("Token not in pool");
         };
 
-        let amount_out = Self::swap_out(amount_in, reserve_in, reserve_out, pool.fee_basis_points)?;
+        let amount_out = Self::constant_product_output(
+            amount_in,
+            reserve_in,
+            reserve_out,
+            pool.fee_basis_points,
+        )?;
 
         if amount_out < min_out {
             return Err("Slippage exceeds limit");
@@ -318,7 +328,7 @@ impl AMMPool {
         if pool.reserve_a == 0 || pool.reserve_b == 0 {
             return 0;
         }
-        Self::swap_out(
+        Self::constant_product_output(
             amount_in,
             pool.reserve_a,
             pool.reserve_b,
@@ -364,7 +374,7 @@ impl AMMPool {
 
     /// The output of a constant-product swap: `in_after_fee * reserve_out / (reserve_in +
     /// in_after_fee)`, all integers.
-    fn swap_out(
+    pub fn constant_product_output(
         amount_in: u128,
         reserve_in: u128,
         reserve_out: u128,

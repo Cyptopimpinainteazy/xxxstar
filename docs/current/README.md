@@ -35,7 +35,7 @@ Current verified status:
 - **Phase 3 (Product Integration)**: All 4 GAP claims verified pre-wired: DEX in construct_runtime, launchpad→TokenFactory bridge, CrossVM Router rate limits enforced, LP Locker pallet exists.
 - **Phase 4 (Test & Code Quality)**: vm_revert expect() fixed, supply O(n) documented, CI gates 12/55 pallets directly, 24 live-chain tests intentionally ignored.
 - **GRANDPA finality cert**: `run_flash_finality_voter()` now derives cert hash from GRANDPA block hash when Flash-Finality is inactive. `build_finalization_request()` accepts cert as parameter. Off-chain storage always populated with non-zero cert.
-- **Registry-scored readiness: ~54%** (53.74% across 19 current entries in `FEATURE_REGISTRY.toml`, recalculated 2026-09-20). This is the canonical aggregate; it is not a mainnet-ready claim or a measurement of every aspirational subsystem.
+- **Registry-scored readiness: 62.74%** across 23 entries in `FEATURE_REGISTRY.toml`. Canonical aggregate; not a mainnet-ready claim or a measurement of every aspirational subsystem. Gated by `scripts/check-readiness-status-current.py`, so this number cannot drift from the registry. For deployment status see `CURRENT_MAINNET_STATUS.md`.
 
 ## Read These First
 
