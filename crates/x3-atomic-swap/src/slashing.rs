@@ -14,8 +14,6 @@
 //! ## Offences
 //!
 //! See [`SlashReason`] for all supported reasons.
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 
 use crate::error::SwapError;
 use alloc::collections::BTreeMap;
@@ -528,6 +526,7 @@ impl Default for SlashingEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     // ------------------------------------------------------------------
     // Helper: build a SlashingEngine with seeded stake and reputation

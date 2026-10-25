@@ -6,8 +6,6 @@
 //! for offline dry-runs and tests; it must never be used as a production
 //! proof source.
 use alloc::format;
-#[cfg(not(feature = "std"))]
-use alloc::string::ToString;
 use alloc::vec;
 
 use crate::adapter::{
@@ -1012,6 +1010,7 @@ mod tests {
         RouteMode,
     };
     use alloc::string::String;
+    use alloc::string::ToString;
 
     /// Helper: create a simple test intent.
     fn make_test_intent(intent_id: IntentId, hashlock: [u8; 32]) -> AtomicIntent {

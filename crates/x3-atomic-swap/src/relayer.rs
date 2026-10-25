@@ -9,17 +9,7 @@
 //! 5. **Submits** claim transaction to the opposite chain
 //! 6. **Writes** proof records to the proof ledger
 //! 7. **Refuses** to mark success without transaction hashes
-#[cfg(not(feature = "std"))]
-use alloc::borrow::ToOwned;
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
-#[cfg(not(feature = "std"))]
-use alloc::collections::BTreeSet;
-#[cfg(not(feature = "std"))]
-use alloc::format;
 use alloc::string::{String, ToString};
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::error::SwapError;
@@ -644,6 +634,7 @@ mod tests {
     use crate::evm_htlc::EvmHtlcContract;
     use crate::intent::{AtomicIntentBuilder, ChainKind, RefundPath};
     use crate::svm_htlc::SvmHtlcProgram;
+    use alloc::vec;
     use sha2::{Digest, Sha256};
 
     fn test_evm_address(n: u8) -> [u8; 20] {

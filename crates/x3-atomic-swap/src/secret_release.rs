@@ -4,8 +4,6 @@
 //! that decides whether the coordinator is allowed to reveal it. Individual
 //! adapter finality flags are necessary but never sufficient on their own.
 use alloc::format;
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 
 use crate::adapter::{ChainId, FinalityProof, LockProof, VmType};
 use crate::error::SwapError;
@@ -411,9 +409,8 @@ impl SecretReleaseFirewall {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::intent::{
-        AtomicSwapStatus, ChainKind, FinalityLevel, FinalityRequirement, RefundPath, RouteMode,
-    };
+    use crate::intent::{AtomicSwapStatus, ChainKind, FinalityRequirement, RefundPath, RouteMode};
+    use alloc::vec;
 
     fn intent(preimage: [u8; 32]) -> AtomicIntent {
         let hashlock = Sha256::digest(preimage);

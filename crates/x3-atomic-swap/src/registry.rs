@@ -10,8 +10,6 @@
 //! - [`RelayerModel`] — A relayer that watches chains and submits proofs
 //! - [`SolverRegistry`] — Collection of solvers with selection helpers
 //! - [`RelayerRegistry`] — Collection of relayers with selection helpers
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 
 use crate::intent::ChainKind;
 use alloc::string::String;
@@ -263,6 +261,7 @@ impl RelayerRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     #[test]
     fn test_solver_reputation() {
