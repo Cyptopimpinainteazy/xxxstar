@@ -60,3 +60,44 @@ any machine with Python 3.10+.
 
 **Do not merge or deploy to rack servers until the unit test, workflow check,
 and hardware/inventory review pass.**
+
+## Advisory reuse inspection (v0.2; no skipping)
+
+Run `python3 -m unittest discover -s scripts/ci -p test_autopilot_reuse.py -v`
+for the evidence identity decision tests. For offline inspection:
+
+```bash
+python3 scripts/ci/verification_reuse.py --target /path/to/target.json --receipts /path/to/receipts.json
+```
+
+A target identifies a single deterministic gate using `gate_id`, `profile`,
+the 40-hex `head_sha` and `base_sha`, and four independently computed 64-hex
+digests: `gate_spec_sha256` (command and policy), `toolchain_sha256`,
+`dependencies_sha256` (including resolved lockfiles), and
+`environment_sha256` (runner, configuration and relevant environment).
+An observed receipt must match **every** identity field, report a completed
+successful zero-exit run, contain a valid log SHA-256 and positive GitHub run
+ID and attempt. The inspector rejects missing, conflicting, malformed,
+cancelled and pending results. Only a short allowlist of deterministic
+non-release fast gates is considered; live consensus, mutation, soak, security,
+mainnet and other release tests always require execution.
+
+`EVIDENCE_CANDIDATE` is **not an attestation**. The JSON is user-supplied
+and its origin, log contents, receipt signatures, timing, test tool and
+GitHub-run status have not been independently authenticated. The tool
+**always** outputs `skip_authorized: false`,
+`trusted_provenance_verified: false` and `production_ready: false`.
+No workflow consumes this output to skip CI. Before implementing real
+deduplication, add authenticated provenance fetches, log-hash checks,
+immutable merge-tree identity, short-lived leases, cross-run race controls,
+and separate unchanged-run verification rules. Keep the full required
+`x3/local-ci` check and release admission unchanged.
+
+### Diagnostic artifact quota behavior
+
+The Autopilot diagnostic workflow may report passing diagnostics even if
+GitHub Actions artifact storage is exhausted, but the upload step is
+**explicitly annotated** as degraded in GitHub's job summary. It does not
+certify production, substitute for full CI, or assert exported evidence.
+Required build, release and testnet gates must still treat unavailable
+required evidence as blocking. Repair GitHub quota to restore transport.
