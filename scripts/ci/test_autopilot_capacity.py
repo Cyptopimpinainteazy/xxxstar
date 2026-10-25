@@ -45,6 +45,12 @@ class CapacityTests(unittest.TestCase):
             del x[field]
             self.assertEqual(capacity.plan([x], "build")["decision"], "DEFER")
 
+    def test_nonfinite_capacity_is_rejected(self):
+        for value in (float('nan'), float('inf'), float('-inf')):
+            for key in ('cpu_threads', 'load_1m', 'disk_free_gb'):
+                with self.subTest(value=value, key=key):
+                    self.assertEqual(capacity.plan([worker(**{key: value})], 'build')['decision'], 'DEFER')
+
     def test_gpu_work_remains_on_gpu_role(self):
         self.assertEqual(capacity.plan([worker()], "inference")["decision"], "DEFER")
         self.assertEqual(capacity.plan([worker(name="x3gpu1", role="gpu")], "inference")["decision"], "RECOMMEND")
