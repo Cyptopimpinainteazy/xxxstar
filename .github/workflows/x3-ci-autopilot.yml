@@ -7,6 +7,8 @@ on:
     paths:
       - 'scripts/ci/autopilot.py'
       - 'scripts/ci/test_autopilot.py'
+      - 'scripts/ci/autopilot_capacity.py'
+      - 'scripts/ci/test_autopilot_capacity.py'
       - '.github/workflows/x3-ci-autopilot.yml'
 
 permissions:
@@ -23,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Test diagnostics
-        run: python3 -m unittest discover -s scripts/ci -p test_autopilot.py -v
+        run: python3 -m unittest discover -s scripts/ci -p 'test_autopilot*.py' -v
       - name: Collect local-only diagnostic evidence
         run: |
           python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
