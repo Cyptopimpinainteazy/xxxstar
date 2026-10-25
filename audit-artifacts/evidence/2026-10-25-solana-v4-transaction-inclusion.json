@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "e98dcec3c",
+  "candidate_commit": "d0274f15b",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "Solana finalized transaction inclusion and bank-state evidence",
@@ -16,7 +16,8 @@
     "Require at least three distinct Solana RPC endpoints for mainnet and a two-thirds provider quorum reporting identical evidence.",
     "Reject a mainnet relayer configuration with fewer than three distinct non-empty RPC endpoints at startup.",
     "Publish a mainnet relayer configuration with three distinct Solana RPC endpoint placeholders.",
-    "Carry the signed transaction evidence through relayer proof hashing, validator quorum verification, settlement verification, and gateway benchmarks."
+    "Carry the signed transaction evidence through relayer proof hashing, validator quorum verification, settlement verification, and gateway benchmarks.",
+    "Require the gateway's SVM proof-summary wire contract to carry raw transaction bytes and derive the transaction evidence before accepting the request."
   ],
   "verification": [
     {
@@ -42,6 +43,26 @@
       "result": "PASS",
       "tests_passed": 79,
       "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check -p x3-gateway --all-targets --locked --offline",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-gateway router_serves_real_http_over_ephemeral_port_without_db --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 1,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-gateway svm_proof_summary_refuses_unverifiable_transaction_bytes --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 1,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-gateway --all-targets --locked --offline -- -D warnings",
+      "result": "PASS"
     },
     {
       "command": "cargo clippy -p x3-verification-router --all-targets -- -D warnings",
@@ -71,6 +92,7 @@
     "Zero transaction signature, commitment, or recent blockhash identities are refused.",
     "A changed serialized-transaction signature or commitment is refused.",
     "An RPC transaction whose slot, blockhash, signature index, execution status, or serialized signature disagrees with the claim is refused.",
+    "The gateway proof-summary endpoint refuses syntactically invalid transaction bytes instead of accepting a shape-only proof.",
     "A mainnet configuration with fewer than three distinct RPC endpoints is refused before any proof can be produced.",
     "Duplicate or empty RPC endpoints cannot inflate the configured mainnet provider count.",
     "The shipped mainnet YAML parses into RelayerConfig with three distinct RPC endpoints and empty validator authorities until governance supplies them.",
