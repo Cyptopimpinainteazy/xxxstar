@@ -1,0 +1,54 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "d2ae2d94b",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "scope": "EVM settlement proof submission from the relayer",
+  "issue_fixed": "The relayer could produce portable EVM receipt proofs but could not bind them to a runtime settlement intent, convert them to the runtime proof type, sign the runtime-monomorphized extrinsic, or submit it.",
+  "implementation": [
+    "Carry the runtime settlement intent id through EVM and SVM proof requests.",
+    "Reject zero runtime intent ids before proof acquisition or network calls.",
+    "Decode the canonical EVM verification payload into the settlement engine's typed SettlementProof.",
+    "Match the decoded block header, block hash, state root, receipt root, confirmations, receipt index, trie path, and DepositLocked event fields.",
+    "Map configured X3 EVM domains to the settlement engine's chain-specific ExternalChainId.",
+    "Build the runtime signer from the configured URI and require its derived SS58 account to equal relayer_account.",
+    "Sign submit_proof with the exact runtime SignedExtra and submit it through author_submitExtrinsic.",
+    "Keep SVM settlement submission fail-closed until independent transaction-inclusion and bank-state evidence exists."
+  ],
+  "verification": [
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 69,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-relayer --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/feature_matrix.py validate",
+      "result": "PASS",
+      "features": 153
+    },
+    {
+      "command": "python3 scripts/x3_audit_matrix.py --check",
+      "result": "PASS"
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "A zero runtime intent is refused before signer lookup or network access.",
+    "A missing local runtime signer is named explicitly.",
+    "An unconfigured X3 EVM domain cannot silently default to Ethereum.",
+    "The runtime signer account must match the configured relayer account.",
+    "Portable proof conversion rejects malformed payloads, mismatched headers, wrong roots, invalid receipt indexes, and event-field mismatches.",
+    "The HTTP submission test verifies the JSON-RPC method and returned transaction hash."
+  ],
+  "limitations": [
+    "No live Sepolia or Ethereum mainnet extrinsic was submitted.",
+    "Custody-service signing still requires a separate custody bridge; only a local sr25519 runtime signer is implemented.",
+    "The standalone x3-relayer binary still uses its legacy monolithic service and has not been replaced by RelayerService.",
+    "SVM settlement remains refused pending independent transaction-inclusion and bank-state evidence."
+  ]
+}
