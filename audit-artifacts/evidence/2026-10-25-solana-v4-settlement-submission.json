@@ -1,0 +1,79 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "98fe1deb7",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "scope": "Settlement-engine submission of verified Solana V4 transaction and bank evidence",
+  "issue_fixed": "The relayer could verify Solana V4 evidence but deliberately refused settlement submission; the settlement engine had no route that consumed the verified transaction-and-bank package.",
+  "implementation": [
+    "Add a bounded portable Solana settlement envelope shared by the relayer and settlement engine.",
+    "Carry proof id, asset id, amount, sender, recipient, beneficiary, and the V4 payload through the settlement proof.",
+    "Derive the transaction commitment, finalized slot, transaction index, and finalized blockhash from the V4 payload and compare each with the surrounding SettlementProof fields.",
+    "Require the V4 cluster to match the settlement chain id.",
+    "Bind the proof to an intent leg with the same external chain, canonical asset id, and amount.",
+    "Construct the governance-configured Solana stake verifier from the gateway committee and persisted finalized-slot floor.",
+    "Persist a newly accepted finalized slot through the runtime provider before settlement submission succeeds.",
+    "Sign submit_proof through the existing runtime signer and serialize nonce acquisition with other settlement submissions.",
+    "Repair the settlement BTC proof benchmark to populate a contiguous best chain with the configured confirmation depth."
+  ],
+  "verification": [
+    {
+      "command": "cargo test -p x3-verification-router --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 71,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 82,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p pallet-x3-settlement-engine --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 238,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p pallet-x3-settlement-engine --features runtime-benchmarks --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 247,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-chain-runtime --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 95,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-verification-router -p x3-relayer -p pallet-x3-settlement-engine -p x3-chain-runtime --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p pallet-x3-settlement-engine --features runtime-benchmarks --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check -p x3-relayer --no-default-features",
+      "result": "PASS"
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "A portable evidence package refuses trailing or truncated bytes.",
+    "A wrong amount, asset id, transaction commitment, or Solana cluster is refused.",
+    "A zero runtime intent is refused before signer lookup.",
+    "SVM settlement refuses when no local runtime signer is configured.",
+    "The runtime returns no V4 verifier before a governance committee is installed.",
+    "The runtime advances the persisted finalized-slot floor only from accepted V4 evidence.",
+    "The live runtime continues to refuse the legacy unbound SVM proof shape."
+  ],
+  "limitations": [
+    "No live Solana transaction or live X3 settlement extrinsic was submitted in this evidence run.",
+    "The relayer still needs a production vote-exchange transport for independent validators.",
+    "The standalone relayer executable still needs to be replaced by RelayerService.",
+    "Generated finality weights and public-chain canaries remain outstanding."
+  ]
+}
