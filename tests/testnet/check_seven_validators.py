@@ -65,6 +65,17 @@ def validate_consensus(before, after, urls, timeout, min_peers, query=rpc):
                 errors.append(f"{url}: previously finalized history rewritten at height {prior['finalized_number']}")
         except (OSError, ValueError, RuntimeError, TypeError, KeyError) as exc:
             errors.append(f"{url}: cannot verify historical finality: {exc}")
+    prior_common_height = min(n["finalized_number"] for n in before)
+    prior_hashes = []
+    for node in before:
+        try:
+            prior_hashes.append(query(node["url"], "chain_getBlockHash", timeout, [prior_common_height]))
+        except (OSError, ValueError, RuntimeError, TypeError, KeyError) as exc:
+            errors.append(f"{node['url']}: cannot verify prior common finality: {exc}")
+    if len(prior_hashes) != len(urls):
+        errors.append("missing prior common-height hashes")
+    elif len(set(prior_hashes)) != 1:
+        errors.append(f"prior finalized divergence at height {prior_common_height}")
     common_height = min(n["finalized_number"] for n in after)
     hashes = []
     for node in after:
