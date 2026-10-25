@@ -8,7 +8,8 @@
         "ssh",
         "x3-ai-router"
       ],
-      "required": true
+      "required": true,
+      "hostkey": "SHA256:uLIm6wM+RUxNfeQlKTJJaBU3QR1pqp3IeHPP2N3BjHw"
     },
     "x3gpu1": {
       "role": "gpu",
@@ -19,7 +20,8 @@
         "ollama-worker-b",
         "x3-ai-router"
       ],
-      "required": true
+      "required": true,
+      "hostkey": "SHA256:LBPwUCBbbm/1J7YrUsgyB5gkGGddcMeM7K6kvSVspdA"
     },
     "x3gpu2": {
       "role": "gpu",
@@ -30,6 +32,16 @@
       ],
       "required": true,
       "mac": "60:45:cb:81:d5:5c"
+    },
+    "x3star2": {
+      "role": "build",
+      "ip": "192.168.0.21",
+      "services": [
+        "ssh",
+        "github-runner"
+      ],
+      "required": true,
+      "hostkey": "SHA256:hNFJ58ls3/+bAlKQjXc5H/sP3ZmaCpTeswjUQ3/UOvg"
     },
     "x3build1": {
       "role": "build",

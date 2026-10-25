@@ -160,6 +160,56 @@ class Discovery(unittest.TestCase):
         self.assertEqual(found, {})
         self.assertIn("inventory.json says 192.168.0.30", conflicts[0])
 
+    def test_multi_homed_node_is_one_node_without_conflict(self):
+        # x3gpu1 answers on wired .30 and Wi-Fi .87 with the same identity: not a conflict.
+        found, _, conflicts = x3cluster.classify_hosts(
+            self.INV, {"192.168.0.87": "x3gpu1", "192.168.0.30": "x3gpu1"})
+        self.assertEqual(found, {"x3gpu1": "192.168.0.30"})
+        self.assertEqual(conflicts, [])
+
+    PINNED = {"nodes": {"x3star2": {"role": "build", "ip": "192.168.0.21", "hostkey": "SHA256:good"}}}
+
+    def test_pinned_node_is_followed_when_dhcp_moves_it(self):
+        found, _, conflicts = x3cluster.classify_hosts(
+            self.PINNED, {"192.168.0.44": "x3star2"}, {"192.168.0.44": "SHA256:good"})
+        self.assertEqual(found, {"x3star2": "192.168.0.44"})
+        self.assertEqual(conflicts, [])
+
+    def test_pinned_node_with_wrong_key_is_never_trusted(self):
+        found, _, conflicts = x3cluster.classify_hosts(
+            self.PINNED, {"192.168.0.44": "x3star2"}, {"192.168.0.44": "SHA256:evil"})
+        self.assertEqual(found, {})
+        self.assertIn("not its pinned SHA256:good", conflicts[0])
+
+    def test_pinned_node_follows_only_a_verified_discovered_ip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old, old_here = x3cluster.DISCOVERED, x3cluster.HERE
+            x3cluster.DISCOVERED = Path(tmp) / "discovered.json"
+            (Path(tmp) / "inventory.json").write_text(json.dumps({"lan": "192.168.0.0/24", "nodes": {
+                "a": {"role": "build", "ip": "192.168.0.21", "hostkey": "SHA256:k"},
+                "b": {"role": "build", "ip": "192.168.0.22", "hostkey": "SHA256:k2"}}}))
+            x3cluster.HERE = Path(tmp)
+            x3cluster.DISCOVERED.write_text(json.dumps({
+                "a": {"ip": "192.168.0.44", "hostkey": "SHA256:k"},
+                "b": {"ip": "192.168.0.45", "hostkey": "SHA256:other"}}))
+            try:
+                inv = x3cluster.load_inventory()
+            finally:
+                x3cluster.DISCOVERED, x3cluster.HERE = old, old_here
+        self.assertEqual(inv["nodes"]["a"]["ip"], "192.168.0.44")
+        self.assertEqual(inv["nodes"]["b"]["ip"], "192.168.0.22")
+
+    def test_ssh_config_pins_by_name_and_overrides_hand_blocks(self):
+        inv = {"nodes": {"x3star1": {"role": "control", "ip": "192.168.0.70"},
+                         "x3star2": {"role": "build", "ip": "192.168.0.44", "hostkey": "SHA256:good"},
+                         "x3gpu2": {"role": "gpu", "ip": "192.168.0.23"}}}
+        text = x3cluster.ssh_config_text(inv, defined={"x3star2", "x3gpu2"}, me="x3star1")
+        self.assertIn("Host x3star2\n    HostName 192.168.0.44", text)
+        self.assertIn("HostKeyAlias x3star2", text)
+        self.assertIn("StrictHostKeyChecking yes", text)
+        self.assertNotIn("Host x3gpu2", text)  # unpinned and hand-defined: left alone
+        self.assertNotIn("Host x3star1", text)
+
     def test_overlay_fills_only_missing_ips(self):
         with tempfile.TemporaryDirectory() as tmp:
             old = x3cluster.DISCOVERED

@@ -120,6 +120,10 @@ fi
 
 echo
 echo "joined as $(hostname) role=$role ip=$(hostname -I | awk '{print $1}')"
+# The control node identifies this machine by its host key, not its address (DHCP moves it).
+# Pin this fingerprint as nodes.$(hostname).hostkey in inventory.json after comparing it with the
+# one `ssh $(hostname)` shows on the control node.
+echo "host key: $(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub 2>/dev/null | awk '{print $2}')"
 if [ "$need_reboot" = 1 ]; then
     echo "REBOOT NEEDED for the NVIDIA driver: sudo reboot. The control node onboards it after it comes back."
 else
