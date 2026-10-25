@@ -697,15 +697,16 @@
       "mainnet_ready": 25,
       "missing_work": [
         "**CLOSED 2026-10-24 \u2014 the relayer emits only Solana V3 evidence.** The earlier evidence labelled the RPC blockhash as a bank hash. V3 now carries the finalized Solana blockhash and validator-attested bank hash as separate commitments, plus finalized/parent slots, the parent bank hash, the complete stake-table digest, the gateway transfer identity/intent, and independently signed votes; `SvmProof` encodes `SOLANA_FINALIZED_FORMAT_V3`. `RpcSubmitter::acquire_svm_proof` verifies every supplied Ed25519 vote over the full V3 message, rejects duplicates/unauthorized keys/tampered blockhashes, bank hashes, parent hashes, and stake digests, adds only this operator's authorized vote, and refuses unless the configured stake supermajority verifies. The verifier rejects zero identities even when a quorum signs them. `SvmHeaderWatcher` durably stores the highest observed finalized slot and the safety pipeline passes that floor into `verify_with_finalized_floor`. Measured: `cargo test -p x3-verification-router --lib` -> 66 passed; `cargo test -p x3-relayer --lib` -> 65 passed; gateway default 66 and runtime-benchmarks 79 passed; strict clippy clean across all affected crates.",
-        "**CLOSED 2026-10-25 \u2014 the EVM authority and typed submission path exist.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` now carries the runtime intent id, decodes the portable proof into the exact settlement `SettlementProof`, signs the runtime-monomorphized extrinsic, and submits it through `author_submitExtrinsic`. The signer account must match the configured relayer account and the X3 domain must map to a configured EVM chain. Pinned by 69 relayer tests. The SVM path still refuses until independent transaction/bank-state evidence exists, and the standalone relayer executable still needs to be replaced by this library service",
+        "**CLOSED 2026-10-25 \u2014 the EVM authority and typed submission path exist.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` now carries the runtime intent id, decodes the portable proof into the exact settlement `SettlementProof`, signs the runtime-monomorphized extrinsic, and submits it through `author_submitExtrinsic`. The signer account must match the configured relayer account and the X3 domain must map to a configured EVM chain. The legacy executable also now refuses EVM deposit and release requests instead of treating event fields as receipt-inclusion evidence. Pinned by 69 library tests and 6 executable tests. The SVM path still refuses until independent transaction/bank-state evidence exists, and the standalone relayer executable still needs to be replaced by this library service",
         "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
         "The V3 proof binds the finalized blockhash, finalized bank hash, parent bank hash, and complete transfer intent under stake-weighted validator signatures, but it does not yet carry a bank-state or transaction-inclusion proof independent of those attestations.",
         "No production vote-exchange transport: the library now accepts and verifies independently signed V2 votes, but there is no deployed relayer/validator message bus that collects them from separate operators.",
         "All nine `pallet-cross-chain-validator` dispatchables now have executable `runtime-benchmarks` cases, including the beacon checkpoint, sync-committee update, and execution proof over the repository's real Ethereum fixtures; the benchmark test suite passes 36/36. Manual storage terms were corrected conservatively for the new per-height EVM header writes. The cross-chain-gateway deposit/release benchmarks now use a real two-validator Solana V3 blockhash-and-bank-hash proof instead of the security-rejected `X3Internal` bypass, and the gateway benchmark suite passes 79/79. Weight regeneration is still blocked on this host by insufficient release-benchmark build capacity.",
-        "`crates/x3-relayer/src/main.rs` is still a separate monolith with its own config and dev-only `x3_submitCrossVmTransaction` wiring; it does not use the V2 `RelayerService`. The `//Alice` proof-signer fallback was removed and the old placeholder SVM submission path now refuses by name, but the executable still needs to be replaced by the library service before mainnet."
+        "`crates/x3-relayer/src/main.rs` is still a separate monolith with its own config and does not use the V2 `RelayerService`. Its legacy EVM deposit/release and SVM settlement paths now fail closed instead of reporting event-only placeholder success, but the executable still needs to be replaced by the library service before mainnet."
       ],
       "name": "Relayer framework",
       "paths": [
+        "crates/x3-relayer/src/main.rs",
         "crates/x3-relayer/src/submitter.rs",
         "crates/x3-relayer/src/relayer.rs",
         "crates/x3-relayer/src/quorum.rs",
@@ -4967,14 +4968,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "549179b59b60e30d783231c6c2d6d9b8f5a48cc5560f029497f60a922273cad8",
+    "source_digest": "5d5cc3a639ee8c93edf303d0aaf9eb632265cef68bd6af3bc31164edf1bc15e1",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "e5d1e21d206411afc111e8d988226e8ffd7d3a240ccd8c18d70b79247f7ee653",
+      "feature-matrix/cross-chain.toml": "50cb0c1a38468013a23c21dc649ecacdca1c51c5f6445a9692af26ef73df109a",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",

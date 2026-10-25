@@ -1,11 +1,11 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "a504a5438",
+  "candidate_commit": "2351ea82a",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "EVM settlement proof submission from the relayer",
-  "issue_fixed": "The relayer could produce portable EVM receipt proofs but could not bind them to a runtime settlement intent, convert them to the runtime proof type, sign the runtime-monomorphized extrinsic, or submit it.",
+  "issue_fixed": "The relayer could produce portable EVM receipt proofs but could not bind them to a runtime settlement intent, convert them to the runtime proof type, sign the runtime-monomorphized extrinsic, or submit it. The legacy standalone executable could also report event fields as successful settlement proofs.",
   "implementation": [
     "Carry the runtime settlement intent id through EVM and SVM proof requests.",
     "Reject zero runtime intent ids before proof acquisition or network calls.",
@@ -15,6 +15,7 @@
     "Build the runtime signer from the configured URI and require its derived SS58 account to equal relayer_account.",
     "Sign submit_proof with the exact runtime SignedExtra and submit it through author_submitExtrinsic.",
     "Serialize the sign-and-submit critical section so concurrent proofs cannot read and spend the same runtime nonce.",
+    "Refuse the legacy EVM deposit and release paths because event fields are not receipt-inclusion evidence.",
     "Keep SVM settlement submission fail-closed until independent transaction-inclusion and bank-state evidence exists."
   ],
   "verification": [
@@ -22,6 +23,12 @@
       "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --lib --no-fail-fast",
       "result": "PASS",
       "tests_passed": 69,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --bin x3-relayer --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 6,
       "tests_failed": 0
     },
     {
@@ -44,12 +51,13 @@
     "An unconfigured X3 EVM domain cannot silently default to Ethereum.",
     "The runtime signer account must match the configured relayer account.",
     "Portable proof conversion rejects malformed payloads, mismatched headers, wrong roots, invalid receipt indexes, and event-field mismatches.",
+    "Both legacy EVM deposit and release paths refuse event-only evidence and name the typed RelayerService path.",
     "The HTTP submission test verifies the JSON-RPC method and returned transaction hash."
   ],
   "limitations": [
     "No live Sepolia or Ethereum mainnet extrinsic was submitted.",
     "Custody-service signing still requires a separate custody bridge; only a local sr25519 runtime signer is implemented.",
-    "The standalone x3-relayer binary still uses its legacy monolithic service and has not been replaced by RelayerService.",
+    "The standalone x3-relayer binary still uses its legacy monolithic service and has not been replaced by RelayerService; its EVM and SVM settlement paths now fail closed.",
     "SVM settlement remains refused pending independent transaction-inclusion and bank-state evidence."
   ]
 }

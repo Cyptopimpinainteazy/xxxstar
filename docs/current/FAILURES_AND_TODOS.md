@@ -124,25 +124,24 @@ Fixes:
 
 ## Current Hard Failure / Blocker
 
-### Production/non-local proof validation is not complete
+### The standalone relayer still bypasses `RelayerService`
 
 Location:
 
-- `node/src/rpc.rs` `x3_submitCrossVmTransaction`
-- `crates/x3-relayer/src/main.rs` `submit_deposit_proof_to_x3`
-- `pallets/x3-kernel/src/lib.rs` `submit_cross_vm_operation`
-- `pallets/x3-wrapped/src/lib.rs` `mint_wrapped`
+- `crates/x3-relayer/src/main.rs`
+- `crates/x3-relayer/src/relayer.rs`
+- `crates/x3-relayer/src/submitter.rs`
 
 Issue:
 
-- The e2e now proves Anvil deposit event detection, relayer-built signed proof envelope submission, runtime kernel extrinsic submission, X3 canonical ledger mutation, and wrapped-asset mint/accounting mutation.
-- The local relay profile still signs the proof envelope with the dev authority seed (`X3_RELAY_PROOF_SIGNER`, default `//Alice`).
-- The runtime verifies the envelope as a normal `LockProof`, but this is not a production/non-local external proof-validation profile.
-- Multi-validator bridge verification, threshold proof aggregation, and production key handling are still not complete.
+- The legacy executable's EVM deposit/release and SVM paths now fail closed: event fields are no longer accepted or reported as receipt-inclusion proofs.
+- The executable still contains its own watcher loop, configuration, and dispatch code rather than running the typed `RelayerService` and `RpcSubmitter` path.
+- Consequently, the standalone service does not yet expose the production receipt-proof submission path, vote-exchange transport, or complete operating configuration.
 
 Next action:
 
-- Replace the dev-authority proof signer with the real verifier-backed proof envelope for non-local networks and add a multi-validator/threshold proof e2e profile.
+- Replace the executable's legacy watcher/dispatch loop with `RelayerService` and its typed EVM proof submission path; retain fail-closed SVM behavior until independent transaction and bank-state evidence exists.
+- Add a multi-validator/threshold proof e2e profile for non-local networks.
 
 ## Passed Bridge-Relevant Checks
 
