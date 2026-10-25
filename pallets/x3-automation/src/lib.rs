@@ -61,6 +61,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
+    use sp_std::vec::Vec;
 
     use x3_automation::{
         Action, ActionOutcome, Condition, ExecutionReceipt, Task, TaskId, TaskStatus,
@@ -624,9 +625,18 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
+                #[cfg(feature = "std")]
                 Condition::Event { topic } => frame_system::Pallet::<T>::events()
                     .iter()
                     .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
+                // `frame_system::Pallet::events()` is deliberately unavailable
+                // in a consensus runtime because reading the unbounded event
+                // buffer would expose block execution to its size. An event
+                // condition therefore cannot be decided on chain and fails
+                // closed; a runtime that needs this trigger must provide a
+                // bounded on-chain event index.
+                #[cfg(not(feature = "std"))]
+                Condition::Event { .. } => false,
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })
