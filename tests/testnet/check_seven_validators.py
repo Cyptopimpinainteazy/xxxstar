@@ -38,6 +38,49 @@ def snapshot(url, timeout):
         "finalized_hash": finalized_hash,
     }
 
+
+def validate_consensus(before, after, urls, timeout, min_peers, query=rpc):
+    """Fail closed on divergent or rewritten finalized history across sampled nodes."""
+    errors = []
+    if len(before) != len(urls) or len(after) != len(urls):
+        return ["not all RPC endpoints responded"]
+    if len({n["genesis_hash"] for n in before + after}) != 1:
+        errors.append("genesis mismatch across samples")
+    for prior, current in zip(before, after):
+        url = current["url"]
+        if prior["url"] != url:
+            errors.append(f"{url}: sample identity mismatch")
+            continue
+        if current["peers"] is None or current["peers"] < min_peers:
+            errors.append(f"{url}: insufficient peers")
+        if current["isSyncing"] is not False:
+            errors.append(f"{url}: syncing")
+        if current["finalized_number"] > current["best_number"]:
+            errors.append(f"{url}: finalized height exceeds best head")
+        if current["finalized_number"] < prior["finalized_number"]:
+            errors.append(f"{url}: finalized height regressed")
+        try:
+            historical = query(url, "chain_getBlockHash", timeout, [prior["finalized_number"]])
+            if historical != prior["finalized_hash"]:
+                errors.append(f"{url}: previously finalized history rewritten at height {prior['finalized_number']}")
+        except (OSError, ValueError, RuntimeError, TypeError, KeyError) as exc:
+            errors.append(f"{url}: cannot verify historical finality: {exc}")
+    common_height = min(n["finalized_number"] for n in after)
+    hashes = []
+    for node in after:
+        try:
+            hashes.append(query(node["url"], "chain_getBlockHash", timeout, [common_height]))
+        except (OSError, ValueError, RuntimeError, TypeError, KeyError) as exc:
+            errors.append(f"{node['url']}: {exc}")
+    if len(hashes) != len(urls):
+        errors.append("missing common-height hashes")
+    elif len(set(hashes)) != 1:
+        errors.append(f"finalized divergence at height {common_height}")
+    if not any(a["finalized_number"] > b["finalized_number"] for b, a in zip(before, after)):
+        errors.append("no finality progress during sampling window")
+    return errors
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--nodes", type=int, default=7)
@@ -63,32 +106,7 @@ def main():
     before = sample("before")
     time.sleep(a.settle_seconds)
     after = sample("after")
-    if len(before) != a.nodes or len(after) != a.nodes:
-        errors.append("not all RPC endpoints responded")
-    if len(after) == a.nodes:
-        if len({node["genesis_hash"] for node in after}) != 1:
-            errors.append("genesis mismatch")
-        for node in after:
-            if node["peers"] is None or node["peers"] < a.min_peers:
-                errors.append(f"{node['url']}: insufficient peers")
-            if node["isSyncing"] is not False:
-                errors.append(f"{node['url']}: syncing")
-        # Different finalized heights are normal in a live network. Compare
-        # hashes at the lowest finalized height rather than latest heads.
-        common_height = min(n["finalized_number"] for n in after)
-        hashes = []
-        for node in after:
-            try:
-                hashes.append(rpc(node["url"], "chain_getBlockHash", a.timeout, [common_height]))
-            except (OSError, ValueError, RuntimeError) as exc:
-                errors.append(f"{node['url']}: {exc}")
-        if len(hashes) != a.nodes:
-            errors.append("missing common-height hashes")
-        elif len(set(hashes)) != 1:
-            errors.append(f"finalized divergence at height {common_height}")
-    if len(before) == a.nodes and len(after) == a.nodes:
-        if max(n["finalized_number"] for n in after) <= max(n["finalized_number"] for n in before):
-            errors.append("no finality progress during sampling window")
+    errors.extend(validate_consensus(before, after, urls, a.timeout, a.min_peers))
     report = {"passed": not errors, "before": before, "after": after, "errors": errors}
     rendered = json.dumps(report, indent=2)
     if a.output:
