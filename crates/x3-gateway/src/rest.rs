@@ -403,6 +403,7 @@ pub enum RelayerProofRequest {
         slot: u64,
         parent_slot: u64,
         blockhash: [u8; 32],
+        bank_hash: [u8; 32],
         parent_bank_hash: [u8; 32],
         stake_table_digest: [u8; 32],
         expected_asset_id: [u8; 32],
@@ -456,6 +457,7 @@ async fn post_relayer_proof_summary(
             slot,
             parent_slot,
             blockhash,
+            bank_hash,
             parent_bank_hash,
             stake_table_digest,
             expected_asset_id,
@@ -483,6 +485,7 @@ async fn post_relayer_proof_summary(
             };
             if proof_id == [0u8; 32]
                 || blockhash == [0u8; 32]
+                || bank_hash == [0u8; 32]
                 || parent_bank_hash == [0u8; 32]
                 || stake_table_digest == [0u8; 32]
             {
@@ -512,6 +515,7 @@ async fn post_relayer_proof_summary(
                 slot,
                 parent_slot,
                 blockhash,
+                bank_hash,
                 parent_bank_hash,
                 stake_table_digest,
                 expected_asset_id,
@@ -2231,6 +2235,7 @@ mod tests {
             "slot": 42,
             "parent_slot": 41,
             "blockhash": vec![7u8; 32],
+            "bank_hash": vec![6u8; 32],
             "parent_bank_hash": vec![6u8; 32],
             "stake_table_digest": vec![5u8; 32],
             "expected_asset_id": vec![4u8; 32],
@@ -2245,7 +2250,7 @@ mod tests {
             "required_signatures": 1u32
         });
         serde_json::from_value::<RelayerProofRequest>(svm_proof.clone())
-            .expect("the documented SVM V2 proof shape must deserialize");
+            .expect("the documented SVM V3 proof shape must deserialize");
         let svm_resp = client
             .post(format!("{base}/api/v1/relayer/proof-summary"))
             .json(&svm_proof)

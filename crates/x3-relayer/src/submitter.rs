@@ -12,7 +12,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use x3_verification_router::{
-    solana_finality_message_v2, solana_stake_table_digest, SolanaCluster,
+    solana_finality_message_v3, solana_stake_table_digest, SolanaCluster,
     SolanaStakeWeightedVerifier, SolanaValidatorStake, Verifier as ProofVerifier,
 };
 
@@ -79,7 +79,7 @@ pub enum SubmitterError {
     #[error("refusing Solana validator vote {index}: {reason}")]
     InvalidSvmVote { index: usize, reason: String },
 
-    /// The V2 evidence is internally inconsistent before any vote is counted.
+    /// The V3 evidence is internally inconsistent before any vote is counted.
     #[error("refusing Solana proof evidence: {0}")]
     InvalidSvmEvidence(String),
 }
@@ -370,6 +370,16 @@ impl RpcSubmitter {
                 "proof id must not be zero".into(),
             ));
         }
+        if request.blockhash == [0u8; 32]
+            || request.bank_hash == [0u8; 32]
+            || request.parent_bank_hash == [0u8; 32]
+            || request.stake_table_digest == [0u8; 32]
+        {
+            return Err(SubmitterError::InvalidSvmEvidence(
+                "blockhash, bank hash, parent bank hash, and stake-table digest must be non-zero"
+                    .into(),
+            ));
+        }
         if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
             return Err(SubmitterError::InvalidSvmEvidence(
                 "beneficiary must be between 1 and 128 bytes".into(),
@@ -390,6 +400,7 @@ impl RpcSubmitter {
             slot: request.slot,
             parent_slot: request.parent_slot,
             blockhash: request.blockhash,
+            bank_hash: request.bank_hash,
             parent_bank_hash: request.parent_bank_hash,
             stake_table_digest: request.stake_table_digest,
             expected_asset_id: request.expected_asset_id,
@@ -401,11 +412,12 @@ impl RpcSubmitter {
             required_signatures,
         };
         let envelope = unsigned.envelope();
-        let message = solana_finality_message_v2(
+        let message = solana_finality_message_v3(
             request.cluster,
             request.slot,
             request.parent_slot,
             &request.blockhash,
+            &request.bank_hash,
             &request.parent_bank_hash,
             &request.stake_table_digest,
             &envelope,
@@ -483,7 +495,7 @@ impl RpcSubmitter {
     // Private Methods
     // ============================================================================
 
-    /// Sign the complete Solana V2 finality message.
+    /// Sign the complete Solana V3 finality message.
     ///
     /// When a custody key ID is configured, this method still signs with the
     /// local `signing_key` (which is zeroed in custody mode). Callers that
@@ -581,6 +593,7 @@ mod tests {
             slot: 42,
             parent_slot: 41,
             blockhash: [0x32u8; 32],
+            bank_hash: [0x36u8; 32],
             parent_bank_hash: [0x33u8; 32],
             stake_table_digest: solana_stake_table_digest(stakes),
             expected_asset_id: [0x34u8; 32],
@@ -600,6 +613,7 @@ mod tests {
             slot: request.slot,
             parent_slot: request.parent_slot,
             blockhash: request.blockhash,
+            bank_hash: request.bank_hash,
             parent_bank_hash: request.parent_bank_hash,
             stake_table_digest: request.stake_table_digest,
             expected_asset_id: request.expected_asset_id,
@@ -610,11 +624,12 @@ mod tests {
             validator_signatures: Vec::new(),
             required_signatures: 1,
         };
-        solana_finality_message_v2(
+        solana_finality_message_v3(
             proof.cluster,
             proof.slot,
             proof.parent_slot,
             &proof.blockhash,
+            &proof.bank_hash,
             &proof.parent_bank_hash,
             &proof.stake_table_digest,
             &proof.envelope(),

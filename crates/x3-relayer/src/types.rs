@@ -11,7 +11,7 @@ use std::vec::Vec;
 use serde::{Deserialize, Serialize};
 pub use x3_verification_router::SolanaCluster;
 use x3_verification_router::{
-    encode_solana_finality_v2, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
+    encode_solana_finality_v3, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
 };
 
 /// Main relayer configuration
@@ -180,7 +180,7 @@ pub struct EvmProofRequest {
     pub expected_amount: u128,
 }
 
-/// A single validator attestation over the complete Solana V2 finality and
+/// A single validator attestation over the complete Solana V3 finality and
 /// transfer intent.
 #[derive(Clone, Debug)]
 pub struct ValidatorSignature {
@@ -198,8 +198,10 @@ pub struct SvmProof {
     pub cluster: SolanaCluster,
     pub slot: u64,
     pub parent_slot: u64,
-    /// Finalized bank hash.
+    /// Finalized Solana blockhash.
     pub blockhash: [u8; 32],
+    /// Finalized validator-attested bank hash for the same slot.
+    pub bank_hash: [u8; 32],
     pub parent_bank_hash: [u8; 32],
     pub stake_table_digest: [u8; 32],
     pub expected_asset_id: [u8; 32],
@@ -213,7 +215,7 @@ pub struct SvmProof {
     pub required_signatures: u32,
 }
 
-/// V2 evidence a relayer must obtain before it can produce a Solana proof.
+/// V3 evidence a relayer must obtain before it can produce a Solana proof.
 ///
 /// The bank hashes, slots, stake-table digest, and transfer intent are signed
 /// by the validators. `existing_signatures` lets independent operators
@@ -225,7 +227,10 @@ pub struct SvmProofRequest {
     pub cluster: SolanaCluster,
     pub slot: u64,
     pub parent_slot: u64,
+    /// Finalized Solana blockhash observed from the block.
     pub blockhash: [u8; 32],
+    /// Finalized bank hash supplied by validator evidence.
+    pub bank_hash: [u8; 32],
     pub parent_bank_hash: [u8; 32],
     pub stake_table_digest: [u8; 32],
     pub expected_asset_id: [u8; 32],
@@ -237,7 +242,7 @@ pub struct SvmProofRequest {
 }
 
 impl SvmProof {
-    /// Build the complete V2 envelope the production verifier receives.
+    /// Build the complete V3 envelope the production verifier receives.
     pub fn envelope(&self) -> ProofEnvelope {
         ProofEnvelope {
             proof_id: self.proof_id,
@@ -253,25 +258,26 @@ impl SvmProof {
         }
     }
 
-    /// Encode the stake-weighted V2 Solana finality payload.
+    /// Encode the stake-weighted V3 Solana finality payload.
     pub fn encode_payload(&self) -> Result<Vec<u8>, VerificationError> {
         let votes = self
             .validator_signatures
             .iter()
             .map(|vote| (vote.validator_pubkey, vote.signature))
             .collect::<Vec<_>>();
-        encode_solana_finality_v2(
+        encode_solana_finality_v3(
             self.cluster,
             self.slot,
             self.parent_slot,
             self.blockhash,
+            self.bank_hash,
             self.parent_bank_hash,
             self.stake_table_digest,
             &votes,
         )
     }
 
-    /// Envelope carrying the encoded V2 payload.
+    /// Envelope carrying the encoded V3 payload.
     pub fn encoded_envelope(&self) -> Result<ProofEnvelope, VerificationError> {
         let mut envelope = self.envelope();
         envelope.payload = self.encode_payload()?;

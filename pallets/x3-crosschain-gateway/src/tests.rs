@@ -60,12 +60,13 @@ fn solana_deposit_proof_v2(
     proof_id: [u8; 32],
     amount: u128,
     nonce: u64,
-    finality: (u64, u64, [u8; 32], [u8; 32]),
+    finality: (u64, u64, [u8; 32], [u8; 32], [u8; 32]),
     keys: &[(&ed25519_dalek::SigningKey, u64)],
 ) -> crate::DepositProof {
     use ed25519_dalek::Signer;
 
-    let (finalized_slot, parent_slot, finalized_bank_hash, parent_bank_hash) = finality;
+    let (finalized_slot, parent_slot, finalized_blockhash, finalized_bank_hash, parent_bank_hash) =
+        finality;
     let mut proof = deposit_proof_with(
         proof_id,
         amount,
@@ -87,10 +88,11 @@ fn solana_deposit_proof_v2(
         .collect::<Vec<_>>();
     stakes.sort_by_key(|entry| entry.pubkey);
     let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
-    let message = x3_verification_router::solana_finality_message_v2(
+    let message = x3_verification_router::solana_finality_message_v3(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
+        &finalized_blockhash,
         &finalized_bank_hash,
         &parent_bank_hash,
         &stake_digest,
@@ -106,10 +108,11 @@ fn solana_deposit_proof_v2(
             )
         })
         .collect::<Vec<_>>();
-    let payload = x3_verification_router::encode_solana_finality_v2(
+    let payload = x3_verification_router::encode_solana_finality_v3(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
+        finalized_blockhash,
         finalized_bank_hash,
         parent_bank_hash,
         stake_digest,
@@ -1620,7 +1623,7 @@ fn stake_weighted_solana_finality_advances_and_enforces_the_slot_floor() {
                 [21u8; 32],
                 100,
                 21,
-                (400, 399, [8u8; 32], [7u8; 32]),
+                (400, 399, [6u8; 32], [8u8; 32], [7u8; 32]),
                 &[(&a, 60), (&b, 40)],
             ),
         ));
@@ -1638,7 +1641,7 @@ fn stake_weighted_solana_finality_advances_and_enforces_the_slot_floor() {
                     [22u8; 32],
                     100,
                     22,
-                    (399, 398, [6u8; 32], [5u8; 32]),
+                    (399, 398, [4u8; 32], [6u8; 32], [5u8; 32]),
                     &[(&a, 60), (&b, 40)],
                 ),
             ),
@@ -1669,7 +1672,7 @@ fn stake_weighted_solana_finality_rejects_less_than_two_thirds_stake() {
                     [23u8; 32],
                     100,
                     23,
-                    (400, 399, [8u8; 32], [7u8; 32]),
+                    (400, 399, [6u8; 32], [8u8; 32], [7u8; 32]),
                     &[(&a, 60)],
                 ),
             ),

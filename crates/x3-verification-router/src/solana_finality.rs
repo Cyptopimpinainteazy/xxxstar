@@ -4,8 +4,8 @@
 //! generic router. A proof is accepted only when:
 //!
 //! - it names the configured Solana cluster;
-//! - it supplies a finalized slot and bank hash, plus its parent slot and parent
-//!   bank hash;
+//! - it supplies a finalized slot, blockhash, and bank hash, plus its parent slot
+//!   and parent bank hash;
 //! - its stake-table digest matches the governance-configured stake table;
 //! - distinct authorized validators holding at least the configured
 //!   supermajority of stake sign the exact X3 transfer intent and finality
@@ -16,12 +16,12 @@
 //! keeps verification deterministic and lets the runtime persist the floor in
 //! consensus storage, where it can survive restarts and reorgs.
 //!
-//! This verifier proves stake-weighted finality of a bank hash and binds that
-//! proof to the transfer fields in [`ProofEnvelope`]. It does not parse a raw
-//! Solana transaction. A production producer must obtain the bank hash and
-//! transfer result from a Solana RPC provider quorum and persist the finalized
-//! slot before accepting value. Raw transaction-entry and instruction decoding
-//! remains a separate adapter boundary.
+//! This verifier proves a stake-weighted finalized blockhash and bank hash, and
+//! binds both to the transfer fields in [`ProofEnvelope`]. It does not parse a
+//! raw Solana transaction. A production producer must obtain the blockhash,
+//! bank hash, and transfer result from a Solana RPC provider quorum and persist
+//! the finalized slot before accepting value. Raw transaction-entry and
+//! instruction decoding remains a separate adapter boundary.
 
 extern crate alloc;
 
@@ -35,10 +35,11 @@ use crate::{
     Verifier,
 };
 
-/// Version byte for a stake-weighted Solana finality proof.
-pub const SOLANA_FINALIZED_FORMAT_V2: u8 = 2;
+/// Version byte for a stake-weighted Solana finality proof that commits to the
+/// finalized blockhash and bank hash separately.
+pub const SOLANA_FINALIZED_FORMAT_V3: u8 = 3;
 
-/// Maximum number of vote records accepted in one V2 proof.
+/// Maximum number of vote records accepted in one V3 proof.
 ///
 /// The bound keeps malformed payloads from forcing unbounded verification work.
 pub const MAX_SOLANA_FINALITY_VOTES: usize = 1_024;
@@ -46,18 +47,19 @@ pub const MAX_SOLANA_FINALITY_VOTES: usize = 1_024;
 /// Fixed length of a V2 vote record: Ed25519 public key plus signature.
 pub const SOLANA_FINALITY_VOTE_LEN: usize = 96;
 
-/// Fixed header length of a V2 proof.
+/// Fixed header length of a V3 proof.
 ///
 /// ```text
 /// version u8 | cluster u8 | finalized_slot u64 | parent_slot u64 |
+/// finalized_blockhash [32] | finalized_bank_hash [32] |
 /// finalized_bank_hash [32] | parent_bank_hash [32] |
 /// stake_table_digest [32] | vote_count u32
 /// ```
-pub const SOLANA_FINALITY_V2_HEADER_LEN: usize = 118;
+pub const SOLANA_FINALITY_V3_HEADER_LEN: usize = 150;
 
 const STAKE_TABLE_DOMAIN: &[u8] = b"X3/SOLANA_STAKE_TABLE/V2";
-const FINALITY_DOMAIN: &[u8] = b"X3/SOLANA_FINALITY/V2";
-const TRANSFER_DOMAIN: &[u8] = b"X3/SOLANA_TRANSFER/V2";
+const FINALITY_DOMAIN: &[u8] = b"X3/SOLANA_FINALITY/V3";
+const TRANSFER_DOMAIN: &[u8] = b"X3/SOLANA_TRANSFER/V3";
 
 /// Solana cluster bound by a finality proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -216,7 +218,7 @@ impl SolanaStakeWeightedVerifier {
             return Err(VerificationError::NoAuthorizedValidators);
         }
 
-        let decoded = decode_v2(proof)?;
+        let decoded = decode_v3(proof)?;
         if decoded.cluster != self.cluster {
             return Err(VerificationError::WrongCluster);
         }
@@ -238,10 +240,11 @@ impl SolanaStakeWeightedVerifier {
             }
         }
 
-        let message = solana_finality_message_v2(
+        let message = solana_finality_message_v3(
             decoded.cluster,
             decoded.finalized_slot,
             decoded.parent_slot,
+            &decoded.finalized_blockhash,
             &decoded.finalized_bank_hash,
             &decoded.parent_bank_hash,
             &decoded.stake_table_digest,
@@ -269,7 +272,7 @@ impl SolanaStakeWeightedVerifier {
 
         Ok(VerificationOutcome {
             accepted: true,
-            reason: "solana_stake_weighted_bank_hash_verified",
+            reason: "solana_stake_weighted_bank_state_verified",
             verified_at_height: Some(decoded.finalized_slot),
         })
     }
@@ -297,11 +300,13 @@ pub fn solana_stake_table_digest(validators: &[SolanaValidatorStake]) -> [u8; 32
     digest(hasher)
 }
 
-/// Encode a V2 proof. Validators must already be sorted by public key.
-pub fn encode_solana_finality_v2(
+/// Encode a V3 proof. Validators must already be sorted by public key.
+#[allow(clippy::too_many_arguments)]
+pub fn encode_solana_finality_v3(
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: [u8; 32],
     finalized_bank_hash: [u8; 32],
     parent_bank_hash: [u8; 32],
     stake_table_digest: [u8; 32],
@@ -314,15 +319,16 @@ pub fn encode_solana_finality_v2(
         .len()
         .checked_mul(SOLANA_FINALITY_VOTE_LEN)
         .ok_or(VerificationError::MalformedProof)?;
-    let payload_len = SOLANA_FINALITY_V2_HEADER_LEN
+    let payload_len = SOLANA_FINALITY_V3_HEADER_LEN
         .checked_add(body_len)
         .ok_or(VerificationError::MalformedProof)?;
 
     let mut payload = Vec::with_capacity(payload_len);
-    payload.push(SOLANA_FINALIZED_FORMAT_V2);
+    payload.push(SOLANA_FINALIZED_FORMAT_V3);
     payload.push(cluster as u8);
     payload.extend_from_slice(&finalized_slot.to_le_bytes());
     payload.extend_from_slice(&parent_slot.to_le_bytes());
+    payload.extend_from_slice(&finalized_blockhash);
     payload.extend_from_slice(&finalized_bank_hash);
     payload.extend_from_slice(&parent_bank_hash);
     payload.extend_from_slice(&stake_table_digest);
@@ -341,22 +347,23 @@ struct SolanaVote {
 }
 
 #[derive(Debug)]
-struct DecodedSolanaFinalityV2<'a> {
+struct DecodedSolanaFinalityV3<'a> {
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: [u8; 32],
     finalized_bank_hash: [u8; 32],
     parent_bank_hash: [u8; 32],
     stake_table_digest: [u8; 32],
     votes: &'a [u8],
 }
 
-fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, VerificationError> {
+fn decode_v3(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV3<'_>, VerificationError> {
     let payload = proof.payload.as_slice();
-    if payload.len() < SOLANA_FINALITY_V2_HEADER_LEN {
+    if payload.len() < SOLANA_FINALITY_V3_HEADER_LEN {
         return Err(VerificationError::MalformedProof);
     }
-    if payload[0] != SOLANA_FINALIZED_FORMAT_V2 {
+    if payload[0] != SOLANA_FINALIZED_FORMAT_V3 {
         return Err(VerificationError::UnsupportedProofFormat);
     }
 
@@ -372,15 +379,17 @@ fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, Verif
             .map_err(|_| VerificationError::MalformedProof)?,
     );
 
+    let mut finalized_blockhash = [0u8; 32];
+    finalized_blockhash.copy_from_slice(&payload[18..50]);
     let mut finalized_bank_hash = [0u8; 32];
-    finalized_bank_hash.copy_from_slice(&payload[18..50]);
+    finalized_bank_hash.copy_from_slice(&payload[50..82]);
     let mut parent_bank_hash = [0u8; 32];
-    parent_bank_hash.copy_from_slice(&payload[50..82]);
+    parent_bank_hash.copy_from_slice(&payload[82..114]);
     let mut stake_table_digest = [0u8; 32];
-    stake_table_digest.copy_from_slice(&payload[82..114]);
+    stake_table_digest.copy_from_slice(&payload[114..146]);
 
     let count = u32::from_le_bytes(
-        payload[114..118]
+        payload[146..150]
             .try_into()
             .map_err(|_| VerificationError::MalformedProof)?,
     ) as usize;
@@ -390,25 +399,26 @@ fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, Verif
     let vote_bytes = count
         .checked_mul(SOLANA_FINALITY_VOTE_LEN)
         .ok_or(VerificationError::MalformedProof)?;
-    let expected_len = SOLANA_FINALITY_V2_HEADER_LEN
+    let expected_len = SOLANA_FINALITY_V3_HEADER_LEN
         .checked_add(vote_bytes)
         .ok_or(VerificationError::MalformedProof)?;
     if payload.len() != expected_len {
         return Err(VerificationError::MalformedProof);
     }
 
-    Ok(DecodedSolanaFinalityV2 {
+    Ok(DecodedSolanaFinalityV3 {
         cluster,
         finalized_slot,
         parent_slot,
+        finalized_blockhash,
         finalized_bank_hash,
         parent_bank_hash,
         stake_table_digest,
-        votes: &payload[SOLANA_FINALITY_V2_HEADER_LEN..],
+        votes: &payload[SOLANA_FINALITY_V3_HEADER_LEN..],
     })
 }
 
-impl DecodedSolanaFinalityV2<'_> {
+impl DecodedSolanaFinalityV3<'_> {
     fn votes(&self) -> impl Iterator<Item = SolanaVote> + '_ {
         self.votes
             .chunks_exact(SOLANA_FINALITY_VOTE_LEN)
@@ -453,10 +463,12 @@ fn verify_ed25519(pubkey: &[u8; 32], signature: &[u8; 64], message: &[u8; 32]) -
         .unwrap_or(false)
 }
 
-pub fn solana_finality_message_v2(
+#[allow(clippy::too_many_arguments)]
+pub fn solana_finality_message_v3(
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: &[u8; 32],
     finalized_bank_hash: &[u8; 32],
     parent_bank_hash: &[u8; 32],
     stake_table_digest: &[u8; 32],
@@ -468,6 +480,7 @@ pub fn solana_finality_message_v2(
     hasher.update([cluster as u8]);
     hasher.update(finalized_slot.to_le_bytes());
     hasher.update(parent_slot.to_le_bytes());
+    hasher.update(finalized_blockhash);
     hasher.update(finalized_bank_hash);
     hasher.update(parent_bank_hash);
     hasher.update(stake_table_digest);
@@ -523,6 +536,7 @@ mod tests {
         cluster: SolanaCluster,
         finalized_slot: u64,
         parent_slot: u64,
+        finalized_blockhash: [u8; 32],
         finalized_bank_hash: [u8; 32],
         parent_bank_hash: [u8; 32],
         stake_table_digest: [u8; 32],
@@ -544,10 +558,11 @@ mod tests {
             expected_recipient: input.recipient.to_vec(),
             expected_beneficiary: vec![9u8; 20],
         };
-        let message = solana_finality_message_v2(
+        let message = solana_finality_message_v3(
             input.cluster,
             input.finalized_slot,
             input.parent_slot,
+            &input.finalized_blockhash,
             &input.finalized_bank_hash,
             &input.parent_bank_hash,
             &input.stake_table_digest,
@@ -564,10 +579,11 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        envelope.payload = encode_solana_finality_v2(
+        envelope.payload = encode_solana_finality_v3(
             input.cluster,
             input.finalized_slot,
             input.parent_slot,
+            input.finalized_blockhash,
             input.finalized_bank_hash,
             input.parent_bank_hash,
             input.stake_table_digest,
@@ -588,6 +604,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -600,7 +617,7 @@ mod tests {
             .verify_with_finalized_floor(&envelope, 390)
             .expect("80 of 100 stake must satisfy two thirds");
         assert_eq!(outcome.verified_at_height, Some(400));
-        assert_eq!(outcome.reason, "solana_stake_weighted_bank_hash_verified");
+        assert_eq!(outcome.reason, "solana_stake_weighted_bank_state_verified");
     }
 
     #[test]
@@ -618,6 +635,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -642,6 +660,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -667,6 +686,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -674,12 +694,13 @@ mod tests {
             sender: b"sender",
             recipient: b"recipient",
         });
-        let decoded = decode_v2(&envelope).expect("well formed proof");
+        let decoded = decode_v3(&envelope).expect("well formed proof");
         let vote = decoded.votes().next().expect("one vote");
-        let duplicated = encode_solana_finality_v2(
+        let duplicated = encode_solana_finality_v3(
             SolanaCluster::MainnetBeta,
             400,
             399,
+            [6u8; 32],
             [8u8; 32],
             [7u8; 32],
             verifier.stake_table_digest(),
@@ -709,6 +730,7 @@ mod tests {
             cluster: SolanaCluster::Devnet,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -737,6 +759,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -751,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn tampered_bank_hash_parent_and_stake_digest_are_rejected() {
+    fn tampered_blockhash_bank_hash_parent_and_stake_digest_are_rejected() {
         let (a, b) = (signing_key(1), signing_key(2));
         let verifier = SolanaStakeWeightedVerifier::new(
             SolanaCluster::MainnetBeta,
@@ -765,6 +788,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -773,22 +797,29 @@ mod tests {
             recipient: b"recipient",
         });
 
+        let mut blockhash_tampered = valid.clone();
+        blockhash_tampered.payload[18] ^= 1;
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&blockhash_tampered, 0),
+            Err(VerificationError::InsufficientStake)
+        );
+
         let mut bank_hash_tampered = valid.clone();
-        bank_hash_tampered.payload[18] ^= 1;
+        bank_hash_tampered.payload[50] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&bank_hash_tampered, 0),
             Err(VerificationError::InsufficientStake)
         );
 
         let mut parent_tampered = valid.clone();
-        parent_tampered.payload[50] ^= 1;
+        parent_tampered.payload[82] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&parent_tampered, 0),
             Err(VerificationError::InsufficientStake)
         );
 
         let mut digest_tampered = valid;
-        digest_tampered.payload[82] ^= 1;
+        digest_tampered.payload[114] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&digest_tampered, 0),
             Err(VerificationError::StakeTableMismatch)
@@ -810,6 +841,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -834,6 +866,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -852,6 +885,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -874,6 +908,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: [0u8; 32],

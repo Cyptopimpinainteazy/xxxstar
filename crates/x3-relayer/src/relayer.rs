@@ -278,7 +278,7 @@ impl RelayerService {
         Ok(())
     }
 
-    /// Queue complete Solana V2 evidence. The proof is not produced until the
+    /// Queue complete Solana V3 evidence. The proof is not produced until the
     /// watcher has observed that finalized slot, and no bank hash or transfer
     /// field is derived from a caller-chosen conclusion.
     pub async fn queue_svm_proof_request(&self, request: SvmProofRequest) -> Result<()> {
@@ -295,6 +295,7 @@ impl RelayerService {
         }
         if request.proof_id == [0u8; 32]
             || request.blockhash == [0u8; 32]
+            || request.bank_hash == [0u8; 32]
             || request.parent_bank_hash == [0u8; 32]
             || request.stake_table_digest == [0u8; 32]
         {
@@ -725,7 +726,7 @@ impl RelayerService {
                     }
                     None => {
                         debug!(
-                            "No V2 stake-weighted evidence queued for finalized SVM domain {}",
+                            "No V3 stake-weighted evidence queued for finalized SVM domain {}",
                             domain_id
                         );
                         continue;
@@ -829,13 +830,14 @@ impl RelayerService {
             .encoded_envelope()
             .expect("SVM proofs are encoded before deduplication");
         let mut hasher = Sha256::new();
-        hasher.update(b"x3-relayer-svm-proof-v2");
+        hasher.update(b"x3-relayer-svm-proof-v3");
         hasher.update(proof.source_domain.to_le_bytes());
         hasher.update(proof.proof_id);
         hasher.update([proof.cluster as u8]);
         hasher.update(proof.slot.to_le_bytes());
         hasher.update(proof.parent_slot.to_le_bytes());
         hasher.update(proof.blockhash);
+        hasher.update(proof.bank_hash);
         hasher.update(proof.parent_bank_hash);
         hasher.update(proof.stake_table_digest);
         hasher.update(proof.expected_asset_id);
@@ -896,7 +898,7 @@ impl RelayerSafetyPipeline {
             }
         };
 
-        // Production uses only V2 stake-weighted evidence. If the stake table is
+        // Production uses only V3 stake-weighted evidence. If the stake table is
         // absent, malformed or disagrees with the authorized signer list, register
         // the empty verifier so every SVM proof fails closed rather than falling
         // back to the legacy signer-count V1 path.
@@ -909,7 +911,7 @@ impl RelayerSafetyPipeline {
         let svm_verifier = match stake_result {
             Ok(verifier) => Arc::new(verifier),
             Err(error) => {
-                warn!("refusing every SVM proof: no valid V2 stake table: {error}");
+                warn!("refusing every SVM proof: no valid V3 stake table: {error}");
                 Arc::new(SolanaStakeWeightedVerifier::empty(
                     configured_solana_cluster(&config.svm_clusters)
                         .unwrap_or(SolanaCluster::MainnetBeta),
@@ -1655,6 +1657,7 @@ mod tests {
     const SVM_CLUSTER: SolanaCluster = SolanaCluster::Devnet;
     const SVM_SLOT: u64 = 42;
     const SVM_PARENT_SLOT: u64 = 41;
+    const SVM_BLOCKHASH: [u8; 32] = [6u8; 32];
     const SVM_BANK_HASH: [u8; 32] = [8u8; 32];
     const SVM_PARENT_BANK_HASH: [u8; 32] = [7u8; 32];
 
@@ -1677,7 +1680,8 @@ mod tests {
             cluster: SVM_CLUSTER,
             slot: SVM_SLOT,
             parent_slot: SVM_PARENT_SLOT,
-            blockhash: SVM_BANK_HASH,
+            blockhash: SVM_BLOCKHASH,
+            bank_hash: SVM_BANK_HASH,
             parent_bank_hash: SVM_PARENT_BANK_HASH,
             stake_table_digest: x3_verification_router::solana_stake_table_digest(stake_table),
             expected_asset_id: [4u8; 32],
@@ -1699,11 +1703,12 @@ mod tests {
         use ed25519_dalek::Signer;
 
         let envelope = proof.envelope();
-        let message = x3_verification_router::solana_finality_message_v2(
+        let message = x3_verification_router::solana_finality_message_v3(
             proof.cluster,
             proof.slot,
             proof.parent_slot,
             &proof.blockhash,
+            &proof.bank_hash,
             &proof.parent_bank_hash,
             &proof.stake_table_digest,
             &envelope,

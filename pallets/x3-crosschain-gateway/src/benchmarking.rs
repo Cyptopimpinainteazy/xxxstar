@@ -135,7 +135,7 @@ mod benchmarks {
         envelope: &ProofEnvelope,
     ) -> Result<BoundedVec<u8, ConstU32<4096>>, BenchmarkError> {
         use x3_verification_router::{
-            encode_solana_finality_v2, solana_finality_message_v2, solana_stake_table_digest,
+            encode_solana_finality_v3, solana_finality_message_v3, solana_stake_table_digest,
             SolanaCluster, SolanaValidatorStake,
         };
 
@@ -152,10 +152,11 @@ mod benchmarks {
             })
             .collect::<Vec<_>>();
         let digest = solana_stake_table_digest(&stakes);
-        let message = solana_finality_message_v2(
+        let message = solana_finality_message_v3(
             SolanaCluster::Devnet,
             42,
             41,
+            &[6u8; 32],
             &[8u8; 32],
             &[7u8; 32],
             &digest,
@@ -166,10 +167,11 @@ mod benchmarks {
             .iter()
             .map(|pair| (pair.public().0, pair.sign(&message).0))
             .collect::<Vec<_>>();
-        let payload = encode_solana_finality_v2(
+        let payload = encode_solana_finality_v3(
             SolanaCluster::Devnet,
             42,
             41,
+            [6u8; 32],
             [8u8; 32],
             [7u8; 32],
             digest,

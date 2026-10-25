@@ -36,10 +36,10 @@ pub use gateway_types::{
     ExternalAssetRef, ExternalChainId, VerificationRequest, VerificationResult,
 };
 pub use solana_finality::{
-    encode_solana_finality_v2, solana_finality_message_v2, solana_stake_table_digest,
+    encode_solana_finality_v3, solana_finality_message_v3, solana_stake_table_digest,
     SolanaCluster, SolanaStakeWeightedVerifier, SolanaValidatorStake, SolanaVerifierConfigError,
-    MAX_SOLANA_FINALITY_VOTES, SOLANA_FINALITY_V2_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
-    SOLANA_FINALIZED_FORMAT_V2,
+    MAX_SOLANA_FINALITY_VOTES, SOLANA_FINALITY_V3_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
+    SOLANA_FINALIZED_FORMAT_V3,
 };
 
 use alloc::collections::btree_map::BTreeMap;
