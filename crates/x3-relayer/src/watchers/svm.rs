@@ -59,12 +59,12 @@ impl SvmHeaderWatcher {
                         );
                         slot
                     }
-                    Err(_) => Self::get_slot(&client, &config.rpc_endpoint).await?,
+                    Err(_) => Self::get_finalized_slot(&client, &config.rpc_endpoint).await?,
                 },
-                Err(_) => Self::get_slot(&client, &config.rpc_endpoint).await?,
+                Err(_) => Self::get_finalized_slot(&client, &config.rpc_endpoint).await?,
             }
         } else {
-            Self::get_slot(&client, &config.rpc_endpoint).await?
+            Self::get_finalized_slot(&client, &config.rpc_endpoint).await?
         };
 
         info!(
@@ -93,7 +93,7 @@ impl SvmHeaderWatcher {
 
     pub async fn poll(&self) -> Result<Vec<HeaderInfo>> {
         let current_slot = retry_rpc_call(
-            || Self::get_slot(&self.rpc_client, &self.config.rpc_endpoint),
+            || Self::get_finalized_slot(&self.rpc_client, &self.config.rpc_endpoint),
             3,
             1000,
         )
@@ -156,14 +156,13 @@ impl SvmHeaderWatcher {
     }
 
     pub async fn check_finality(&self, slot: u64) -> Result<bool> {
-        let current_slot = retry_rpc_call(
-            || Self::get_slot(&self.rpc_client, &self.config.rpc_endpoint),
+        let finalized_slot = retry_rpc_call(
+            || Self::get_finalized_slot(&self.rpc_client, &self.config.rpc_endpoint),
             3,
             1000,
         )
         .await?;
-        let slot_age = current_slot.saturating_sub(slot);
-        let finalized = slot_age >= self.config.finality_threshold as u64;
+        let finalized = slot <= finalized_slot;
         if finalized {
             let mut floor = self.finalized_floor.write().await;
             if slot > *floor {
@@ -291,13 +290,13 @@ impl SvmHeaderWatcher {
     // JSON-RPC Methods
     // ============================================================================
 
-    async fn get_slot(client: &reqwest::Client, rpc_url: &str) -> Result<u64> {
+    async fn get_finalized_slot(client: &reqwest::Client, rpc_url: &str) -> Result<u64> {
         let response = client
             .post(rpc_url)
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "method": "getSlot",
-                "params": [],
+                "params": [{ "commitment": "finalized" }],
                 "id": 1,
             }))
             .send()
@@ -322,7 +321,14 @@ impl SvmHeaderWatcher {
             .json(&serde_json::json!({
                 "jsonrpc": "2.0",
                 "method": "getBlock",
-                "params": [slot, { "encoding": "json" }],
+                "params": [
+                    slot,
+                    {
+                        "encoding": "json",
+                        "commitment": "finalized",
+                        "maxSupportedTransactionVersion": 0
+                    }
+                ],
                 "id": 1,
             }))
             .send()
@@ -787,6 +793,59 @@ mod tests {
         assert_eq!(evidence.slot, 42);
         assert_eq!(evidence.raw_transaction, raw_transaction);
         assert_eq!(evidence.recent_blockhash, recent_blockhash);
+        server.join().expect("RPC fixture thread");
+    }
+
+    #[tokio::test]
+    async fn finality_uses_the_rpc_finalized_commitment_not_slot_age() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind RPC fixture");
+        let address = listener.local_addr().expect("RPC fixture address");
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept RPC request");
+            let mut request = [0u8; 8192];
+            let read = stream.read(&mut request).expect("read RPC request");
+            let request = String::from_utf8_lossy(&request[..read]);
+            assert!(request.contains("\"method\":\"getSlot\""), "{request}");
+            assert!(
+                request.contains("\"commitment\":\"finalized\""),
+                "{request}"
+            );
+            let body = r#"{"jsonrpc":"2.0","id":1,"result":500}"#;
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            )
+            .expect("write RPC response");
+        });
+        let watcher = SvmHeaderWatcher {
+            config: SvmClusterConfig {
+                name: "devnet".into(),
+                cluster_name: "devnet".into(),
+                x3_domain_id: 200,
+                rpc_endpoint: format!("http://{address}"),
+                rpc_quorum_endpoints: Vec::new(),
+                finality_threshold: 1_000,
+                slot_poll_interval_ms: 1,
+                max_concurrent_requests: 1,
+            },
+            rpc_client: reqwest::Client::new(),
+            last_polled_slot: Arc::new(RwLock::new(0)),
+            checkpoint_path: None,
+            finalized_floor_path: None,
+            finalized_floor: Arc::new(RwLock::new(0)),
+            stale_cycles: Arc::new(RwLock::new(0)),
+        };
+
+        assert!(
+            watcher.check_finality(450).await.expect("finality query"),
+            "a slot returned at finalized commitment is final regardless of configured age"
+        );
+        assert_eq!(watcher.finalized_floor().await, 450);
         server.join().expect("RPC fixture thread");
     }
 }
