@@ -1243,9 +1243,7 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
             Action::TransferNative { recipient, amount } => {
                 let destination = AccountId::decode(&mut &recipient[..])
                     .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
-                let value: Balance = (*amount)
-                    .try_into()
-                    .map_err(|_| DispatchError::Other("AutomationAmountOutOfRange"))?;
+                let value: Balance = *amount;
                 Balances::transfer_keep_alive(
                     RuntimeOrigin::signed(owner.clone()),
                     sp_runtime::MultiAddress::Id(destination),
@@ -3023,10 +3021,9 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = RouterSupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
-    // Refuses every external root: nothing in this runtime can bind a foreign chain's block
-    // root to that chain's consensus, and `register_external_root` writes a value the bridge
-    // surface later trusts. Wire a per-chain light client here and the extrinsic becomes usable;
-    // until then it fails closed with `ExternalRootVerificationUnavailable`.
+    // Binds external roots to finalized headers this runtime already verified.
+    // Ethereum requires the native beacon-sync-committee source; Solana and
+    // Bitcoin use their finalized header stores. Missing evidence fails closed.
     type ExternalRootVerifier = RuntimeExternalRootVerifier;
     type VmAdapterOrigin = EnsureX3LangGateway;
     type X3LangOrigin = EnsureX3LangGateway;
@@ -3129,8 +3126,10 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
                         "ExternalRootEvmNativeFinalityUnavailable",
                     ));
                 }
-                let header = pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::get()
-                    .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
+                let header = pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::get(
+                    u64::from(block_number),
+                )
+                .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
                 verify_evm_root(
                     block_number as u64,
                     root_hash.0,
@@ -3144,8 +3143,10 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
                 )
             }
             EXTERNAL_ROOT_SOLANA => {
-                let header = pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::get()
-                    .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
+                let header = pallet_cross_chain_validator::FinalizedSvmHeaders::<Runtime>::get(
+                    u64::from(block_number),
+                )
+                .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
                 verify_svm_root(
                     block_number as u64,
                     root_hash.0,

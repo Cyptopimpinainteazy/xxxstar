@@ -461,6 +461,15 @@ fn finalized_evm_and_svm_headers_require_distinct_attester_quorum() {
             Some((7, svm_block, svm_state))
         );
         assert_eq!(
+            crate::FinalizedSvmHeaders::<MockRuntime>::get(7).map(|header| (
+                header.slot,
+                header.block_hash,
+                header.state_root
+            )),
+            Some((7, svm_block, svm_state)),
+            "the finalized slot must remain available after newer slots finalize"
+        );
+        assert_eq!(
             crate::SvmValidatorSets::<MockRuntime>::get(7),
             Some(svm_validators)
         );

@@ -183,6 +183,16 @@ pub mod pallet {
     pub type FinalizedEvmHeaders<T: Config> =
         StorageMap<_, frame_support::Blake2_128Concat, u64, EvmHeaderInfo, OptionQuery>;
 
+    /// Full finalized SVM header evidence retained per slot.
+    ///
+    /// Settlement and external-root verification need the exact bank/state
+    /// commitment that was certified for the proof's slot. Keeping only the
+    /// newest finalized slot would make an older finalized transfer
+    /// unprovable as soon as another slot finalizes.
+    #[pallet::storage]
+    pub type FinalizedSvmHeaders<T: Config> =
+        StorageMap<_, frame_support::Blake2_128Concat, u64, SvmHeaderInfo, OptionQuery>;
+
     /// Validator set cache for SVM slots (slot -> validator_set_hash)
     #[pallet::storage]
     pub type SvmValidatorSets<T: Config> =
@@ -759,7 +769,7 @@ pub mod pallet {
             if let Some(last) = LastFinalizedSvmHeader::<T>::get() {
                 ensure!(slot > last.slot, Error::<T>::InvalidSvmHeader);
             }
-            LastFinalizedSvmHeader::<T>::put(SvmHeaderInfo {
+            let header_info = SvmHeaderInfo {
                 slot,
                 block_hash,
                 state_root,
@@ -768,7 +778,9 @@ pub mod pallet {
                     .saturated_into::<u32>(),
                 validation_proof: certificate,
                 parent_slot_hashes: Vec::new(),
-            });
+            };
+            LastFinalizedSvmHeader::<T>::put(header_info.clone());
+            FinalizedSvmHeaders::<T>::insert(slot, header_info);
             SvmValidatorSets::<T>::insert(slot, validator_set_hash);
             ValidationStats::<T>::mutate(|stats| {
                 stats.svm_headers_validated = stats.svm_headers_validated.saturating_add(1);
@@ -1154,7 +1166,7 @@ pub mod pallet {
             {
                 return false;
             }
-            LastFinalizedEvmHeader::<T>::get().is_some_and(|stored_header| {
+            FinalizedEvmHeaders::<T>::get(block_number).is_some_and(|stored_header| {
                 stored_header.block_number == block_number
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
@@ -1171,7 +1183,7 @@ pub mod pallet {
             validator_set_hash: H256,
         ) -> bool {
             // Check if header exists and all fields match
-            if let Some(stored_header) = LastFinalizedSvmHeader::<T>::get() {
+            if let Some(stored_header) = FinalizedSvmHeaders::<T>::get(slot) {
                 stored_header.slot == slot
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
