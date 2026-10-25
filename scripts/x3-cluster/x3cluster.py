@@ -44,6 +44,21 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import x3jobs  # noqa: E402
 
+def user_toolchain_path(home=None, path=None):
+    """PATH with the per-user toolchains a login shell would add (rustup, pipx, nvm).
+
+    The control node runs this tool over non-interactive SSH, whose PATH has none of them, so a
+    node with cargo in ~/.cargo/bin was reported as missing cargo."""
+    home = Path(home or Path.home())
+    path = (path if path is not None else os.environ.get("PATH", "")).split(os.pathsep)
+    nvm = sorted((home / ".nvm" / "versions" / "node").glob("v*/bin"),
+                 key=lambda p: tuple(int(x) for x in re.findall(r"\d+", p.parent.name)))
+    extra = [home / ".cargo" / "bin", home / ".local" / "bin"] + nvm[-1:]
+    return os.pathsep.join([str(d) for d in extra if d.is_dir() and str(d) not in path] + path)
+
+
+os.environ["PATH"] = user_toolchain_path()
+
 HERE = Path(__file__).resolve().parent
 # X3_REPO lets the tooling run from a copy outside the checkout (as onboarded nodes do).
 REPO = Path(os.environ["X3_REPO"]).expanduser() if os.environ.get("X3_REPO") else HERE.parents[1]

@@ -3,6 +3,7 @@
     python3 -m unittest scripts/x3-cluster/test_x3jobs.py
 """
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -222,6 +223,18 @@ class Discovery(unittest.TestCase):
         self.assertEqual(inv["nodes"]["x3build1"]["ip"], "192.168.0.41")
         self.assertTrue(inv["nodes"]["x3build1"]["discovered"])
         self.assertEqual(inv["nodes"]["x3gpu1"]["ip"], "192.168.0.30")
+
+
+class ToolchainPath(unittest.TestCase):
+    def test_user_toolchains_are_added_for_non_login_ssh(self):
+        with tempfile.TemporaryDirectory() as home:
+            for d in (".cargo/bin", ".nvm/versions/node/v9.1.0/bin", ".nvm/versions/node/v24.22.0/bin"):
+                (Path(home) / d).mkdir(parents=True)
+            path = x3cluster.user_toolchain_path(home, "/usr/bin").split(os.pathsep)
+        self.assertEqual(path[0], f"{home}/.cargo/bin")
+        self.assertIn(f"{home}/.nvm/versions/node/v24.22.0/bin", path)
+        self.assertNotIn(f"{home}/.nvm/versions/node/v9.1.0/bin", path)
+        self.assertEqual(path[-1], "/usr/bin")
 
 
 class JoinScript(unittest.TestCase):
