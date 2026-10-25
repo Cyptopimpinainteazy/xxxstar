@@ -75,6 +75,17 @@ class ConsensusInvariantTests(unittest.TestCase):
         self.assertTrue(any("prior finalized divergence" in e for e in checker.validate_consensus(
             before, after, ["node0", "node1"], 1, 1, split_history)))
 
+    def test_one_stalled_validator_fails_even_when_other_validators_advance(self):
+        before, after = self.records()
+        # node0 moves forward while node1 remains stuck on the old finalized head.
+        after[1]["finalized_number"] = before[1]["finalized_number"]
+        after[1]["finalized_hash"] = before[1]["finalized_hash"]
+        errors = checker.validate_consensus(before, after, ["node0", "node1"], 1, 1, self.query)
+        self.assertTrue(
+            any("node1: no finality progress" in message for message in errors),
+            f"a stalled validator must not pass because another node advanced: {errors}",
+        )
+
     def test_individual_finality_regression_is_rejected(self):
         before, after = self.records()
         after[0]["finalized_number"] = 9
