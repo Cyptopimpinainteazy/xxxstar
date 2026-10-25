@@ -721,3 +721,36 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         );
     });
 }
+
+#[test]
+fn legacy_event_task_refusal_never_dispatches_or_charges_fees() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Manual,
+            Action::NoChange,
+            1000,
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+        // Simulate the storage state of a task registered by a previous runtime.
+        Tasks::<Test>::mutate(task_id, |entry| {
+            entry.as_mut().expect("existing task").condition =
+                Condition::Event { topic: [0u8; 32] };
+        });
+
+        let owner_before = free(1);
+        let keeper_before = free(2);
+        let reserved_before = reserved(1);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            sp_runtime::DispatchError::Other("EventConditionUnsupported")
+        );
+        assert_eq!(free(1), owner_before);
+        assert_eq!(free(2), keeper_before);
+        assert_eq!(reserved(1), reserved_before);
+        assert_eq!(Automation::last_attempt(task_id), 0);
+        assert!(Automation::receipt(task_id, 1).is_none());
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
+    });
+}
