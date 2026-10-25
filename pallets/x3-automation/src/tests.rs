@@ -30,6 +30,23 @@ fn register_task_works() {
 }
 
 #[test]
+fn event_task_requires_bounded_indexed_support() {
+    new_test_ext().execute_with(|| {
+        // Do not reserve fees for a condition that cannot be evaluated safely.
+        assert_noop!(
+            Automation::register_task(
+                RuntimeOrigin::signed(1),
+                Condition::Event { topic: [7u8; 32] },
+                Action::NoChange,
+                1000
+            ),
+            Error::<Test>::InvalidTask
+        );
+        assert!(Automation::account_tasks(1).is_empty());
+    });
+}
+
+#[test]
 fn register_task_requires_signed_origin() {
     new_test_ext().execute_with(|| {
         let condition = Condition::BlockNumber(100);
