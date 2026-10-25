@@ -1086,20 +1086,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 79,
+      "composite": 86,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/persistence.rs",
-        "note: PR #166 tests exact persistence crash window",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "crates/cross-vm-coordinator/src/state_machine.rs",
+        "note: 2026-10-25 injected a panic between secret-ownership writes and the session write, reconstructed the coordinator from durable state, and completed the retry without duplicate journal entries"
       ],
       "id": "X3-XCHAIN-015",
-      "implemented": 88,
+      "implemented": 90,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 70,
+      "mainnet_ready": 76,
       "missing_work": [
-        "Needs merge plus long-running persistence fault injection"
+        "A deterministic in-process split-write failure now recovers correctly, but the path still needs long-running filesystem/database fault injection and an independently operated process restart before mainnet."
       ],
       "name": "Split-write crash recovery",
       "paths": [
@@ -1110,8 +1110,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 82,
-      "tests": "tested score 82% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4982,14 +4982,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "f70b57f3c9cbc8d39ea5b2a1ef13c439f94dd508e4c2ff75156593eb9659aaac",
+    "source_digest": "fcf69b85d312dc2bfcb24b20354999cd531b264e46b3a0fff761e6b4bde33596",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "dd85dea2334ca04666d38c9d954809960b8354d275c494b8e2f4e59d81a2360e",
+      "feature-matrix/cross-chain.toml": "880ae98763f6d5e91b3914a8f261df40e9619cedca2db037c86e1b2aa5aebc43",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "3372208e7303dec49be29187c0deea75bd064400c8f6edf040aada4370b57e35",

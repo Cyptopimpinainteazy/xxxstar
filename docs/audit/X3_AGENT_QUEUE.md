@@ -5,7 +5,7 @@ evidence behind it: either a blocker recorded against a registry feature, or a g
 matrix row that has not reached `COMPLETE`. Regenerate after closing work; the queue is
 not a plan, it is the list of things the repository itself says are not done.
 
-Source digest: `f70b57f3c9cbc8d3…` — the artifacts move when
+Source digest: `fcf69b85d312dc2b…` — the artifacts move when
 `FEATURE_REGISTRY.toml` or the matrix fragments move, and `scripts/x3_audit_matrix.py --check`
 fails when they do not match.
 
@@ -101,7 +101,7 @@ fails when they do not match.
 | MTX-X3-XCHAIN-012 | cross_chain | RPC disagreement fail-closed behavior: Needs live heterogeneous provider evidence; **CLOSED 2026-09-27 — the only consumer of quorum evidence no longer lets the evidence set its own bar, and a disagreement cannot be padded into agreement.** The secret-release firewall compared `… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 70% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-013 | cross_chain | Secret-release firewall: **CLOSED 2026-10-25 — provider identities and the quorum bar are authenticated policy inputs.** `SecretReleaseRequirement` now owns both `min_providers` and the authorized Ed25519 provider keys. Each `RpcProviderObservation` carries its key… (full text in audit-artifacts/current/feature-status.json) | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 95% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-014 | cross_chain | Coordinator restart recovery: Needs real process/network restart drill | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 88% (no named test list on this row) | open |
-| MTX-X3-XCHAIN-015 | cross_chain | Split-write crash recovery: Needs merge plus long-running persistence fault injection | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
+| MTX-X3-XCHAIN-015 | cross_chain | Split-write crash recovery: A deterministic in-process split-write failure now recovers correctly, but the path still needs long-running filesystem/database fault injection and an independently operated process restart before mainnet. | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 95% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-018 | cross_chain | Secret-release domain binding: No live external-chain proof of the binding (TICKET-095): the chain-id and VM checks are exercised against constructed evidence only | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-020 | cross_chain | Secret-release refund rejection: Pending merge/exact-head proof | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |
 | MTX-X3-XCHAIN-021 | cross_chain | Secret-release tx/block binding: No live external-chain proof of the binding (TICKET-095): the tx/block checks are exercised against constructed evidence only | unassigned | — | — | P0/high | `bash scripts/local-ci.sh` | FUNCTIONAL BUT UNHARDENED · tested score 82% (no named test list on this row) | open |

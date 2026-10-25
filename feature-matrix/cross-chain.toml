@@ -420,16 +420,22 @@ name = "Split-write crash recovery"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/cross-vm-coordinator/src/persistence.rs"]
-implemented = 88
-tested = 82
-mainnet_ready = 70
+implemented = 90
+tested = 95
+mainnet_ready = 76
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
 claim_risk = false
-blockers = ["Needs merge plus long-running persistence fault injection"]
-evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "note: PR #166 tests exact persistence crash window", "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"]
-test_evidence = ["note: persistence round-trip tests exist (inmemory_persistence_roundtrip, inmemory_persistence_load_all, inmemory_used_secrets_roundtrip, inmemory_secret_claim_ownership_roundtrip, offchain_save_load_roundtrip in crates/cross-vm-coordinator/src/persistence.rs), but none injects a fault mid-write — which is what this row is named for, so the blocker stands"]
+blockers = ["A deterministic in-process split-write failure now recovers correctly, but the path still needs long-running filesystem/database fault injection and an independently operated process restart before mainnet."]
+required_tests = [
+  "fast_claim_recovers_after_a_real_split_write_failure",
+  "fast_claim_recovers_when_secret_ownership_persisted_before_session",
+  "fast_claim_retry_survives_coordinator_restart",
+]
+test_paths = ["crates/cross-vm-coordinator/src/state_machine.rs"]
+evidence = ["crates/cross-vm-coordinator/src/persistence.rs", "crates/cross-vm-coordinator/src/state_machine.rs", "note: 2026-10-25 injected a panic between secret-ownership writes and the session write, reconstructed the coordinator from durable state, and completed the retry without duplicate journal entries"]
+test_evidence = ["note: exact tests run on 2026-10-25: fast_claim_recovers_after_a_real_split_write_failure, fast_claim_recovers_when_secret_ownership_persisted_before_session, and fast_claim_retry_survives_coordinator_restart"]
 
 [[feature]]
 # Provenance corrected 2026-09-22: PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22

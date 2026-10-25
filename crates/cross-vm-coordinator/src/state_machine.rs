@@ -1184,6 +1184,63 @@ mod state_machine_regression_tests {
         }
     }
 
+    #[derive(Default)]
+    struct SplitWritePersistence {
+        inner: InMemoryPersistence,
+        fail_next_session_save: std::sync::atomic::AtomicBool,
+    }
+
+    impl SplitWritePersistence {
+        fn arm_session_write_failure(&self) {
+            self.fail_next_session_save
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    impl SessionPersistence for SplitWritePersistence {
+        fn save(&self, session: &SwapSession) {
+            if self
+                .fail_next_session_save
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                panic!("injected crash after secret ownership writes");
+            }
+            self.inner.save(session);
+        }
+
+        fn load(&self, session_id: &str) -> Option<SwapSession> {
+            self.inner.load(session_id)
+        }
+
+        fn remove(&self, session_id: &str) {
+            self.inner.remove(session_id);
+        }
+
+        fn load_all(&self) -> HashMap<String, SwapSession> {
+            self.inner.load_all()
+        }
+
+        fn count(&self) -> usize {
+            self.inner.count()
+        }
+
+        fn save_used_secrets(&self, secrets: &[[u8; 32]]) {
+            self.inner.save_used_secrets(secrets);
+        }
+
+        fn load_used_secrets(&self) -> Vec<[u8; 32]> {
+            self.inner.load_used_secrets()
+        }
+
+        fn save_used_secret_claims(&self, claims: &[([u8; 32], String)]) {
+            self.inner.save_used_secret_claims(claims);
+        }
+
+        fn load_used_secret_claims(&self) -> Vec<([u8; 32], String)> {
+            self.inner.load_used_secret_claims()
+        }
+    }
+
     #[test]
     fn identical_fast_lock_replay_is_successful_noop_but_conflict_fails() {
         let now = 1_700_000_000;
@@ -1307,6 +1364,79 @@ mod state_machine_regression_tests {
         );
         assert_eq!(
             session.htlc_fast.as_ref().unwrap().status,
+            HtlcStatus::Claimed
+        );
+    }
+
+    #[test]
+    fn fast_claim_recovers_after_a_real_split_write_failure() {
+        let now = 1_700_000_000;
+        let secret = HtlcSecret([0x45; 32]);
+        let secret_fingerprint = *blake3::hash(secret.as_bytes()).as_bytes();
+        let persistence = Arc::new(SplitWritePersistence::default());
+
+        let mut session = idempotency_test_session(
+            "idem-injected-split-write",
+            SwapPhase::ClaimingFast,
+            secret.hash(),
+            now,
+        );
+        session.htlc_fast = Some(idempotency_htlc(8, secret.hash(), now));
+        persistence.save(&session);
+
+        // Let the coordinator write secret ownership, then fail the session write.
+        // The panic unwinds the in-memory coordinator exactly at the split-write
+        // boundary; only durable state remains for recovery.
+        persistence.arm_session_write_failure();
+        let interrupted = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut coordinator = SwapCoordinator::with_persistence(
+                CoordinatorConfig::default(),
+                persistence.clone(),
+            );
+            coordinator.record_fast_claim("idem-injected-split-write", secret.clone(), now + 1)
+        }));
+        assert!(interrupted.is_err(), "the injected session write must fail");
+
+        assert_eq!(
+            persistence.load_used_secret_claims(),
+            vec![(
+                secret_fingerprint,
+                "idem-injected-split-write".to_string()
+            )]
+        );
+        assert_eq!(
+            persistence.load_used_secrets(),
+            vec![secret_fingerprint]
+        );
+        let interrupted_session = persistence
+            .load("idem-injected-split-write")
+            .expect("pre-failure session snapshot remains");
+        assert_eq!(interrupted_session.phase, SwapPhase::ClaimingFast);
+        assert!(!interrupted_session
+            .operation_journal
+            .iter()
+            .any(|receipt| receipt.operation == CoordinatorOperation::FastClaim));
+
+        let mut recovered = SwapCoordinator::with_persistence(
+            CoordinatorConfig::default(),
+            persistence,
+        );
+        recovered
+            .record_fast_claim("idem-injected-split-write", secret, now + 2)
+            .expect("same-session retry completes the interrupted mutation");
+
+        let recovered_session = recovered.get_session("idem-injected-split-write").unwrap();
+        assert_eq!(recovered_session.phase, SwapPhase::ClaimingSlow);
+        assert_eq!(
+            recovered_session
+                .operation_journal
+                .iter()
+                .filter(|receipt| receipt.operation == CoordinatorOperation::FastClaim)
+                .count(),
+            1
+        );
+        assert_eq!(
+            recovered_session.htlc_fast.as_ref().unwrap().status,
             HtlcStatus::Claimed
         );
     }
