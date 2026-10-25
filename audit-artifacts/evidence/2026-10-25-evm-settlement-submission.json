@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-25",
-  "candidate_commit": "d2ae2d94b",
+  "candidate_commit": "a504a5438",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-candidate-20261024",
   "scope": "EVM settlement proof submission from the relayer",
@@ -14,6 +14,7 @@
     "Map configured X3 EVM domains to the settlement engine's chain-specific ExternalChainId.",
     "Build the runtime signer from the configured URI and require its derived SS58 account to equal relayer_account.",
     "Sign submit_proof with the exact runtime SignedExtra and submit it through author_submitExtrinsic.",
+    "Serialize the sign-and-submit critical section so concurrent proofs cannot read and spend the same runtime nonce.",
     "Keep SVM settlement submission fail-closed until independent transaction-inclusion and bank-state evidence exists."
   ],
   "verification": [
