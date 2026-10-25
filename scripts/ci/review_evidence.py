@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 
 SHA = re.compile(r"^[a-f0-9]{40}$")
-LOC = re.compile(r"(?<![\\w/.])([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\\.[A-Za-z0-9]+):(\\d{1,7})(?!\\d)")
+LOC = re.compile(r"(?<![\w/.])([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+\.[A-Za-z0-9]+):(\d{1,7})(?!\d)")
 
 
 def bridge(pr_number, head_sha, artifact, exit_code):
