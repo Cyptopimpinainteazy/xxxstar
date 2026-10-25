@@ -100,7 +100,7 @@ blockers = [
   "**CLOSED 2026-10-25 — proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
   "No external audit of the SVM program or of this route",
 ]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: network-level external execution proof added 2026-09-22 — solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: network-level external execution proof added 2026-09-22 — solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"]
 test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "programs/svm/x3_atomic_swap/test-live-lifecycle.sh", "note: real_x3vm_svm_lock_claim_atomic_lifecycle and real_x3vm_svm_timeout_refund_atomic_lifecycle run against the booted validator; test-live-lifecycle.sh is 15 assertions, 0 failed on 2026-09-22, reading PDA state over raw JSON-RPC — wrong-preimage claim, double-claim, refund-before-timeout and refund-by-wrong-authority all rejected, claim and refund move the locked lamports"]
 
 [[feature]]
@@ -186,7 +186,7 @@ blockers = [
   "**CLOSED 2026-10-25 — proof submission has a configured authority.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. Pinned by `a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody`. The relayer executable still lacks the runtime intent id and typed-extrinsic submission path needed to use it",
   "No external audit of the SVM program or of this route",
 ]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: network-level external execution proof added 2026-09-22 — the same validator-backed lifecycle that covers EVM → SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: network-level external execution proof added 2026-09-22 — the same validator-backed lifecycle that covers EVM → SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"]
 test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "programs/svm/x3_atomic_swap/test-live-lifecycle.sh", "note: the reverse direction of the same validator-backed lifecycle (15 assertions, 0 failed on 2026-09-22)"]
 
 [[feature]]
@@ -334,7 +334,7 @@ blockers = [
   "**CLOSED 2026-10-25 — proof submission has a configured authority.** The settlement engine now admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer executable has not yet bound the runtime intent id or implemented typed-extrinsic submission, so live relayer use remains open",
   "No external audit",
 ]
-evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "note: the external boundary this row called separate is now exercised — X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"]
+evidence = ["pallets/x3-cross-vm-router/src/lib.rs", "programs/svm/x3_atomic_swap/src/lib.rs", "scripts/cross-domain-svm-gate.sh", "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json", "note: the external boundary this row called separate is now exercised — X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"]
 test_evidence = ["node/tests/x3vm_svm_live.rs", "scripts/cross-domain-svm-gate.sh", "scripts/local-ci.sh", "note: gates cross-domain-svm and cross-domain-svm-(strict-posture) both PASS on 2026-09-22"]
 
 [[feature]]
