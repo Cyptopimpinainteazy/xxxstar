@@ -420,6 +420,54 @@ impl ValkeySettlementOutboxStore {
         )
     }
 
+    fn index_key(&self) -> String {
+        format!("{}:settlement-outbox-index", self.namespace)
+    }
+
+    fn decode_submission_id_key(&self, key: &str) -> Result<[u8; 32], CoordinatorError> {
+        let prefix = format!("{}:settlement-outbox:", self.namespace);
+        let encoded = key.strip_prefix(&prefix).ok_or_else(|| {
+            CoordinatorError::Internal(format!("unexpected settlement outbox key in scan: {key}"))
+        })?;
+        let bytes = hex::decode(encoded).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "invalid settlement outbox submission id in key {key}: {e}"
+            ))
+        })?;
+        bytes.try_into().map_err(|bytes: Vec<u8>| {
+            CoordinatorError::Internal(format!(
+                "settlement outbox submission id in key {key} is {} bytes, expected 32",
+                bytes.len()
+            ))
+        })
+    }
+
+    /// Backfill compatibility for outboxes written before the explicit index.
+    fn scan_submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError> {
+        let pattern = format!("{}:settlement-outbox:*", self.namespace);
+        let mut conn = self.connection()?;
+        let mut cursor = 0u64;
+        let mut submission_ids = Vec::new();
+        loop {
+            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(&pattern)
+                .arg("COUNT")
+                .arg(1000)
+                .query(&mut conn)
+                .map_err(|e| backend_error("settlement outbox key scan", e))?;
+            for key in keys {
+                submission_ids.push(self.decode_submission_id_key(&key)?);
+            }
+            cursor = next_cursor;
+            if cursor == 0 {
+                break;
+            }
+        }
+        Ok(submission_ids)
+    }
+
     fn connection(&self) -> Result<redis::Connection, CoordinatorError> {
         self.client
             .get_connection()
@@ -464,6 +512,7 @@ local expected = ARGV[2]
 local next = ARGV[3]
 
 if current == next then
+  redis.call('SADD', KEYS[2], ARGV[4])
   return 1
 end
 
@@ -474,6 +523,7 @@ else
 end
 
 redis.call('RPUSH', KEYS[1], next)
+redis.call('SADD', KEYS[2], ARGV[4])
 return 1
 "#,
         );
@@ -481,9 +531,11 @@ return 1
         let mut conn = self.connection()?;
         let accepted: i64 = script
             .key(self.key(submission_id))
+            .key(self.index_key())
             .arg(if expected.is_none() { "1" } else { "0" })
             .arg(expected_payload)
             .arg(next_payload)
+            .arg(hex::encode(submission_id))
             .invoke(&mut conn)
             .map_err(|e| backend_error("settlement outbox transition script", e))?;
 
@@ -517,6 +569,33 @@ return 1
                 })
             })
             .collect()
+    }
+
+    fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let indexed: Vec<String> = redis::cmd("SMEMBERS")
+            .arg(self.index_key())
+            .query(&mut conn)
+            .map_err(|e| backend_error("settlement outbox index lookup", e))?;
+        let mut submission_ids = if indexed.is_empty() {
+            self.scan_submission_ids()?
+        } else {
+            let prefix = format!("{}:settlement-outbox:", self.namespace);
+            indexed
+                .into_iter()
+                .map(|encoded| self.decode_submission_id_key(&format!("{prefix}{encoded}")))
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        for submission_id in &submission_ids {
+            let _: i64 = redis::cmd("SADD")
+                .arg(self.index_key())
+                .arg(hex::encode(submission_id))
+                .query(&mut conn)
+                .map_err(|e| backend_error("settlement outbox index backfill", e))?;
+        }
+        submission_ids.sort();
+        submission_ids.dedup();
+        Ok(submission_ids)
     }
 }
 
@@ -1225,6 +1304,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         intent: &x3_atomic_swap::AtomicIntent,
         runtime_intent_id: [u8; 32],
         required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        finality: &crate::SettlementFinalityPolicy,
         now_unix: u64,
     ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
         let envelope = self.claim_submission_envelope(
@@ -1232,6 +1312,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             intent,
             runtime_intent_id,
             required_domains,
+            finality,
         )?;
         crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
             .prepare(session_id, &envelope, now_unix)
@@ -1244,6 +1325,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
         intent: &x3_atomic_swap::AtomicIntent,
         runtime_intent_id: [u8; 32],
         required_domains: &[(x3_atomic_swap::ChainId, x3_atomic_swap::VmType)],
+        finality: &crate::SettlementFinalityPolicy,
         now_unix: u64,
     ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
         let envelope = self.refund_submission_envelope(
@@ -1251,6 +1333,7 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
             intent,
             runtime_intent_id,
             required_domains,
+            finality,
         )?;
         crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
             .prepare(session_id, &envelope, now_unix)
@@ -1299,10 +1382,11 @@ impl<P: crate::SessionPersistence> ValkeyDistributedCoordinator<P> {
     pub fn record_settlement_submission_broadcast(
         &self,
         signed: &crate::SettlementOutboxRecord,
+        x3_block_hash: [u8; 32],
         now_unix: u64,
     ) -> Result<crate::SettlementOutboxRecord, CoordinatorError> {
         crate::SettlementSubmissionOutbox::new(self.settlement_outbox.clone())
-            .record_broadcast(signed, now_unix)
+            .record_broadcast_ordered(signed, x3_block_hash, now_unix)
     }
 
     #[cfg(feature = "canonical-proofs")]

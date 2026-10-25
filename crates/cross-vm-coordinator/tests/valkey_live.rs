@@ -11,15 +11,17 @@ use std::sync::{Arc, Barrier};
 #[cfg(feature = "canonical-proofs")]
 use std::thread;
 #[cfg(feature = "canonical-proofs")]
-use x3_cross_vm_coordinator::{
-    ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
-    SessionPersistence, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
-};
-#[cfg(feature = "canonical-proofs")]
 use x3_atomic_swap::{
     adapter::{FinalityProof, VmType},
     intent::{AtomicIntentBuilder, ChainKind, RefundPath},
     CrossDomainOperation, CrossDomainProofBundle,
+};
+#[cfg(feature = "canonical-proofs")]
+use x3_cross_vm_coordinator::{
+    ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
+    SessionPersistence, SettlementOutboxRecord, SettlementOutboxStatus, SettlementOutboxStore,
+    SettlementSubmissionOutbox, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
+    ValkeySettlementOutboxStore,
 };
 
 fn test_url() -> Option<String> {
@@ -313,6 +315,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             &intent,
             runtime_intent_id,
             &[("eth-mainnet".into(), VmType::Evm)],
+            &Default::default(),
         )
         .unwrap();
     assert_eq!(envelope.call_index(), 33);
@@ -325,6 +328,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             &intent,
             runtime_intent_id,
             &[("eth-mainnet".into(), VmType::Evm)],
+            &Default::default(),
             106,
         )
         .unwrap();
@@ -387,7 +391,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
     // Network send uses exactly signed.signed_extrinsic. Only after the RPC
     // send returns do we move durable state to Broadcast.
     let broadcast = coordinator
-        .record_settlement_submission_broadcast(&signed, 108)
+        .record_settlement_submission_broadcast(&signed, [0x91; 32], 108)
         .unwrap();
     assert_eq!(
         coordinator
@@ -415,4 +419,97 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             .unwrap(),
         Some(x3_cross_vm_coordinator::SettlementOutboxRecovery::Done)
     );
+}
+
+#[cfg(feature = "canonical-proofs")]
+fn settlement_record(
+    submission_id: [u8; 32],
+    runtime_intent_id: [u8; 32],
+    now: u64,
+) -> SettlementOutboxRecord {
+    SettlementOutboxRecord {
+        submission_id,
+        session_id: "swap-release-order".into(),
+        runtime_intent_id,
+        purpose: 0,
+        call_index: 33,
+        call_args_hash: [3u8; 32],
+        proof_hashes: vec![[4u8; 32]],
+        status: SettlementOutboxStatus::Prepared,
+        tx_id: None,
+        signed_extrinsic: None,
+        block_number: None,
+        owner_id: None,
+        fence: None,
+        prepared_at: now,
+        updated_at: now,
+        error: None,
+    }
+}
+
+#[cfg(feature = "canonical-proofs")]
+#[test]
+fn live_valkey_cross_domain_release_order_survives_restart() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("settlement-release-order");
+    let first = settlement_record([0x11; 32], [0x21; 32], 100);
+    let second = settlement_record([0x12; 32], [0x22; 32], 101);
+
+    {
+        let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+        store
+            .compare_and_append(first.submission_id, None, &first)
+            .unwrap();
+        store
+            .compare_and_append(second.submission_id, None, &second)
+            .unwrap();
+        let outbox = SettlementSubmissionOutbox::new(store);
+        outbox
+            .record_signed(&first, "0xfirst", vec![1, 2, 3], "worker-a", 7, 102)
+            .unwrap();
+        outbox
+            .record_signed(&second, "0xsecond", vec![4, 5, 6], "worker-a", 7, 103)
+            .unwrap();
+    }
+
+    let restarted = SettlementSubmissionOutbox::new(
+        ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap(),
+    );
+    let beacon = [0x91; 32];
+    let order = restarted.canonical_release_order(beacon).unwrap();
+    assert_eq!(order.len(), 2);
+
+    let second_signed = restarted
+        .latest(second.submission_id)
+        .unwrap()
+        .expect("second signed submission survives restart");
+    let later = if order[1] == second.submission_id {
+        second_signed
+    } else {
+        restarted
+            .latest(first.submission_id)
+            .unwrap()
+            .expect("first signed submission survives restart")
+    };
+    let error = restarted
+        .record_broadcast_ordered(&later, beacon, 104)
+        .expect_err("a later release must remain refused after restart");
+    assert!(error
+        .to_string()
+        .contains("out-of-order settlement release"));
+
+    let canonical_first = restarted
+        .latest(order[0])
+        .unwrap()
+        .expect("canonical first submission survives restart");
+    restarted
+        .record_broadcast_ordered(&canonical_first, beacon, 105)
+        .unwrap();
+    let canonical_second = restarted
+        .latest(order[1])
+        .unwrap()
+        .expect("canonical second submission survives restart");
+    restarted
+        .record_broadcast_ordered(&canonical_second, beacon, 106)
+        .unwrap();
 }

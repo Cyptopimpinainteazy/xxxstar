@@ -73,6 +73,10 @@ pub trait SettlementOutboxStore: Send + Sync + 'static {
         &self,
         submission_id: [u8; 32],
     ) -> Result<Vec<SettlementOutboxRecord>, CoordinatorError>;
+
+    /// Enumerate every submission held by this outbox so release ordering can
+    /// be derived from the complete pending set rather than a caller's subset.
+    fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError>;
 }
 
 #[derive(Default)]
@@ -123,6 +127,14 @@ impl SettlementOutboxStore for InMemorySettlementOutboxStore {
             .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
         Ok(guard.get(&submission_id).cloned().unwrap_or_default())
     }
+
+    fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError> {
+        let guard = self
+            .entries
+            .read()
+            .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
+        Ok(guard.keys().copied().collect())
+    }
 }
 
 pub struct SettlementSubmissionOutbox<S: SettlementOutboxStore> {
@@ -132,6 +144,72 @@ pub struct SettlementSubmissionOutbox<S: SettlementOutboxStore> {
 impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
     pub fn new(store: S) -> Self {
         Self { store }
+    }
+
+    /// Canonical release key for one submission under a finalized X3 block hash.
+    ///
+    /// The block hash is the cross-domain ordering beacon. Binding it before the
+    /// submission id makes the key unpredictable before finality and independent
+    /// of relayer arrival order.
+    pub fn release_order_key(x3_block_hash: [u8; 32], submission_id: [u8; 32]) -> [u8; 32] {
+        let mut preimage = Vec::with_capacity(64);
+        preimage.extend_from_slice(b"X3:CROSS_DOMAIN_RELEASE_ORDER:V1");
+        preimage.extend_from_slice(&x3_block_hash);
+        preimage.extend_from_slice(&submission_id);
+        sha256(&preimage)
+    }
+
+    /// Every submission that still needs a release decision, in canonical order.
+    ///
+    /// Prepared records participate so a relayer cannot let a later submission
+    /// overtake one it has already accepted but not yet signed. Broadcast and
+    /// terminal records have had their decision and no longer block the next.
+    pub fn canonical_release_order(
+        &self,
+        x3_block_hash: [u8; 32],
+    ) -> Result<Vec<[u8; 32]>, CoordinatorError> {
+        let mut candidates = Vec::new();
+        for submission_id in self.store.submission_ids()? {
+            let Some(latest) = self.latest(submission_id)? else {
+                continue;
+            };
+            if matches!(
+                latest.status,
+                SettlementOutboxStatus::Prepared | SettlementOutboxStatus::Signed
+            ) {
+                candidates.push((
+                    Self::release_order_key(x3_block_hash, submission_id),
+                    submission_id,
+                ));
+            }
+        }
+        candidates.sort();
+        Ok(candidates
+            .into_iter()
+            .map(|(_, submission_id)| submission_id)
+            .collect())
+    }
+
+    /// Broadcast only the canonical next settlement for this finalized X3 block.
+    pub fn record_broadcast_ordered(
+        &self,
+        signed: &SettlementOutboxRecord,
+        x3_block_hash: [u8; 32],
+        now: u64,
+    ) -> Result<SettlementOutboxRecord, CoordinatorError> {
+        let order = self.canonical_release_order(x3_block_hash)?;
+        let next = order.first().copied().ok_or_else(|| {
+            CoordinatorError::Internal("settlement release order is empty at broadcast time".into())
+        })?;
+        if next != signed.submission_id {
+            return Err(CoordinatorError::Internal(format!(
+                "refusing out-of-order settlement release: canonical next submission is {}, \
+                 attempted {}",
+                hex::encode(next),
+                hex::encode(signed.submission_id)
+            )));
+        }
+        self.record_broadcast(signed, now)
     }
 
     #[cfg(feature = "canonical-proofs")]
@@ -452,10 +530,17 @@ mod tests {
     use super::*;
 
     fn prepared() -> SettlementOutboxRecord {
+        prepared_with([1u8; 32], [2u8; 32])
+    }
+
+    fn prepared_with(
+        submission_id: [u8; 32],
+        runtime_intent_id: [u8; 32],
+    ) -> SettlementOutboxRecord {
         SettlementOutboxRecord {
-            submission_id: [1u8; 32],
+            submission_id,
             session_id: "swap-a".into(),
-            runtime_intent_id: [2u8; 32],
+            runtime_intent_id,
             purpose: 0,
             call_index: 33,
             call_args_hash: [3u8; 32],
@@ -525,5 +610,70 @@ mod tests {
         let i = outbox.record_included(&b, 55, 103).unwrap();
 
         assert!(outbox.record_failed(&i, "late timeout", 103).is_err());
+    }
+
+    #[test]
+    fn cross_domain_release_order_refuses_a_later_relayer_choice() {
+        let outbox =
+            SettlementSubmissionOutbox::new(InMemorySettlementOutboxStore::default());
+        let first = prepared_with([1u8; 32], [11u8; 32]);
+        let second = prepared_with([2u8; 32], [22u8; 32]);
+        outbox
+            .store
+            .compare_and_append(first.submission_id, None, &first)
+            .unwrap();
+        outbox
+            .store
+            .compare_and_append(second.submission_id, None, &second)
+            .unwrap();
+        let first_signed = outbox
+            .record_signed(&first, "0xfirst", vec![1, 2, 3], "worker-a", 7, 101)
+            .unwrap();
+        let second_signed = outbox
+            .record_signed(&second, "0xsecond", vec![4, 5, 6], "worker-a", 7, 102)
+            .unwrap();
+
+        let beacon = [0x91; 32];
+        let order = outbox.canonical_release_order(beacon).unwrap();
+        assert_eq!(order.len(), 2);
+        let canonical_first = if order[0] == first.submission_id {
+            &first_signed
+        } else {
+            &second_signed
+        };
+        let canonical_second = if order[1] == second.submission_id {
+            &second_signed
+        } else {
+            &first_signed
+        };
+
+        let error = outbox
+            .record_broadcast_ordered(canonical_second, beacon, 103)
+            .expect_err("the later release must be refused");
+        assert!(error
+            .to_string()
+            .contains("out-of-order settlement release"));
+
+        outbox
+            .record_broadcast_ordered(canonical_first, beacon, 104)
+            .expect("the canonical first release");
+        outbox
+            .record_broadcast_ordered(canonical_second, beacon, 105)
+            .expect("the second release becomes canonical after the first");
+    }
+
+    #[test]
+    fn release_order_key_changes_with_the_finalized_beacon() {
+        let submission_id = [7u8; 32];
+        assert_ne!(
+            SettlementSubmissionOutbox::<InMemorySettlementOutboxStore>::release_order_key(
+                [1u8; 32],
+                submission_id
+            ),
+            SettlementSubmissionOutbox::<InMemorySettlementOutboxStore>::release_order_key(
+                [2u8; 32],
+                submission_id
+            )
+        );
     }
 }

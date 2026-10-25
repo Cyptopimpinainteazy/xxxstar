@@ -82,17 +82,20 @@ path.
 Tests: `a_domain_the_policy_never_sized_is_refused_instead_of_defaulted`,
 `the_policy_uses_the_depths_the_operator_configured`.
 
-### S4 — Ordering: a relayer picks which settlement lands first — **OPEN**
+### S4 — Ordering: a relayer picks which settlement lands first — **NARROWED**
 
-The outbox decides release order. `crates/x3-order-window` implements a
-commit-reveal ordering lane for the X3 side, and `settlement_outbox` records the
-attempts it makes, but nothing binds the *cross-domain* release order to an
-ordering beacon: a relayer can still hold settlement A and deliver B first. An
-intent settles either way; what the relayer gains is time on the external leg.
+The settlement outbox now derives a canonical cross-domain release key from
+`SHA-256("X3:CROSS_DOMAIN_RELEASE_ORDER:V1" || finalized X3 block hash ||
+submission id)`. Prepared and signed submissions form the complete pending set;
+the in-memory and Valkey stores sort that set and refuse any broadcast that is
+not canonical next. Valkey persists an explicit submission index, so a relayer
+cannot hide a pending settlement by racing a weak key scan, and the order exists
+only after a block hash is fixed.
 
-What would close it: derive a release order key from the ordering beacon (X3
-block hash) for the intent and refuse an out-of-order release, the way
-`x3-order-window` does inside the X3 domain. Not attempted here.
+Still open: the X3 node's finality-notification watcher must authenticate the
+finalized block hash it supplies to the coordinator. Until that producer is
+wired, the ordering rule is deterministic but its beacon is an input the caller
+must trust.
 
 ### S5 — Withholding — **OPEN, and unavoidable at this layer**
 
@@ -114,10 +117,10 @@ lying adapter". Real adapter evidence is covered by the matrix rows X3-XVM-* and
 
 ## What this does not claim
 
-* No claim of MEV *elimination*. S4–S6 remain open, and the ordering lane that
-  exists lives inside the X3 domain, not across domains.
-* Nothing here has run against a live multi-node network; the evidence is
-  crate-level with the repo's own typed proof structures.
+* No claim of MEV *elimination*. S4 is narrowed but still depends on an
+  authenticated finality-notification source; S5–S6 remain open.
+* Release ordering and restart behavior have run against a real local Valkey
+  service, but not against an independently operated multi-node network.
 * `crates/cross-vm-coordinator` is not in the runtime dependency graph: this
   changes what the coordinator will *ask* the runtime to release, not what the
   runtime enforces. The runtime's own checks are unchanged.
