@@ -75,8 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv "${RUNNER_TEMP}/x3-python-tests"
-          "${RUNNER_TEMP}/x3-python-tests/bin/python" -m pip install \\
-            --disable-pip-version-check -r requirements-dev.txt
+          "${RUNNER_TEMP}/x3-python-tests/bin/python" -m pip install --disable-pip-version-check -r requirements-dev.txt
           "${RUNNER_TEMP}/x3-python-tests/bin/python" -m pytest --version
           echo "${RUNNER_TEMP}/x3-python-tests/bin" >> "${GITHUB_PATH}"
 
