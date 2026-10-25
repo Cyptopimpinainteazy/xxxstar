@@ -1,0 +1,53 @@
+name: X3 Atomic Trade Engine Exact-Head
+
+on:
+  pull_request:
+    paths:
+      - 'pallets/atomic-trade-engine/**'
+      - '.github/workflows/x3-atomic-trade-engine.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'pallets/atomic-trade-engine/**'
+      - '.github/workflows/x3-atomic-trade-engine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  atomic-trade-engine:
+    name: Validate atomic trade engine at exact commit
+    # A fork PR must not execute arbitrary code on our private validator runners.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 90
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: '0'
+      CARGO_BUILD_JOBS: '6'
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Select pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
+          components: rustfmt, clippy
+          targets: wasm32v1-none
+      - name: Check workspace formatting
+        run: cargo fmt --all -- --check
+      - name: Compile atomic trade engine and tests
+        run: cargo check --locked -p pallet-atomic-trade-engine --all-targets
+      - name: Deny Clippy warnings on atomic trade engine
+        run: cargo clippy --locked -p pallet-atomic-trade-engine --all-targets -- -D warnings
+      - name: Run all atomic trade engine tests
+        run: cargo test --locked -p pallet-atomic-trade-engine --all-targets
+      - name: Check no_std WASM integration
+        run: cargo check --locked -p pallet-atomic-trade-engine --no-default-features --target wasm32v1-none
