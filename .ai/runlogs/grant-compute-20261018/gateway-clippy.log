@@ -1,0 +1,567 @@
+warning: /home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/x3-grant-compute-20261018/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/x3-grant-compute-20261018/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+    Checking getrandom v0.2.17 (/home/lojak/x3-grant-compute-20261018/patches/getrandom)
+    Checking typenum v1.20.1
+    Checking serde v1.0.229
+    Checking zeroize v1.9.0
+    Checking portable-atomic v1.15.0
+    Checking errno v0.3.14 (/home/lojak/x3-grant-compute-20261018/patches/errno)
+    Checking futures-task v0.3.34
+    Checking mio v1.2.3
+    Checking rand_core v0.6.4
+    Checking byteorder v1.5.0
+    Checking futures-util v0.3.34
+    Checking signal-hook-registry v1.4.8
+    Checking rand_chacha v0.3.1
+    Checking thiserror v2.0.20
+    Checking thiserror v1.0.69
+    Checking const_format v0.2.36
+    Checking serde_json v1.0.151
+    Checking derive_more v1.0.0
+    Checking once_cell v1.21.4
+    Checking bs58 v0.5.1
+    Checking bytes v1.12.1
+    Checking smallvec v1.16.1
+    Checking generic-array v0.14.7
+    Checking tracing-core v0.1.36
+    Checking either v1.18.0
+    Checking rand v0.8.8
+    Checking parking_lot_core v0.9.12
+    Checking der v0.7.10
+    Checking tracing v0.1.44
+    Checking parking_lot v0.12.5
+    Checking parity-scale-codec v3.7.5
+    Checking serdect v0.2.0
+    Checking tokio v1.53.1
+    Checking crypto-common v0.1.7 (/home/lojak/x3-grant-compute-20261018/patches/crypto-common)
+    Checking block-buffer v0.10.4
+    Checking impl-serde v0.5.0
+    Checking uint v0.10.1
+    Checking ff v0.13.1
+    Checking digest v0.10.7 (/home/lojak/x3-grant-compute-20261018/patches/digest)
+    Checking rlp v0.6.1
+    Checking group v0.13.0
+    Checking crypto-bigint v0.5.5
+    Checking uuid v1.21.0 (/home/lojak/x3-grant-compute-20261018/patches/uuid)
+    Checking scale-info v2.11.6
+    Checking impl-rlp v0.4.0
+    Checking sha2 v0.10.9
+    Checking hmac v0.12.1
+    Checking signature v2.2.0
+    Checking curve25519-dalek v4.1.3
+    Checking ed25519 v2.2.3
+    Checking sha3 v0.10.9
+    Checking spki v0.7.3
+    Checking sec1 v0.7.3
+    Checking pkcs8 v0.10.2
+    Checking rfc6979 v0.4.0
+    Checking impl-codec v0.7.1
+    Checking fixed-hash v0.8.0
+    Checking rustix v1.1.4
+    Checking impl-num-traits v0.2.0
+    Checking cranelift-bitset v0.123.16
+    Checking aho-corasick v1.1.5
+    Checking environmental v1.1.4 (/home/lojak/x3-grant-compute-20261018/patches/environmental)
+    Checking primitive-types v0.13.1
+    Checking cranelift-entity v0.123.16
+    Checking ed25519-dalek v2.2.0
+    Checking elliptic-curve v0.13.8
+    Checking blake2 v0.10.6
+    Checking deranged v0.5.8 (/home/lojak/x3-grant-compute-20261018/patches/deranged)
+    Checking futures-executor v0.3.34
+    Checking ahash v0.8.12 (/home/lojak/x3-grant-compute-20261018/patches/ahash)
+    Checking futures v0.3.34
+    Checking ecdsa v0.16.9
+    Checking ref-cast v1.0.27
+    Checking regex-automata v0.4.18
+    Checking digest v0.9.0
+    Checking zstd-sys v2.1.0+zstd.1.5.7
+    Checking password-hash v0.5.0
+    Checking k256 v0.13.4
+    Checking regalloc2 v0.12.2
+    Checking pulley-interpreter v36.0.16
+    Checking jam-codec v0.1.1
+    Checking sp-storage v22.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking cranelift-bforest v0.123.16
+    Checking getrandom_or_panic v0.0.3
+    Checking time v0.3.55
+    Checking block-buffer v0.9.0
+    Checking merlin v3.0.0
+    Checking serde_bytes v0.11.19
+    Checking foldhash v0.2.0
+    Checking schnorrkel v0.11.5
+    Checking hashbrown v0.16.1
+    Checking sp-externalities v0.31.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sha2 v0.9.9
+    Checking bounded-collections v0.3.2
+    Checking pbkdf2 v0.12.2
+    Checking secp256k1-sys v0.9.2
+    Checking libsecp256k1-core v0.3.0
+    Checking twox-hash v1.6.3
+    Checking toml_datetime v0.6.11
+    Checking serde_spanned v0.6.9
+    Checking cobs v0.3.0
+    Checking semver v1.0.28
+    Checking toml_edit v0.22.27
+    Checking postcard v1.1.3
+    Checking wasmparser v0.236.1
+    Checking ss58-registry v1.51.0
+    Checking libsecp256k1 v0.7.2
+    Checking sp-crypto-hashing v0.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking secp256k1 v0.28.2
+    Checking ed25519-zebra v4.2.0
+    Checking substrate-bip39 v0.6.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking bip39 v2.2.2
+    Checking itertools v0.11.0
+    Checking itertools v0.14.0
+    Checking fxhash v0.2.1
+    Checking secrecy v0.8.0
+    Checking zstd-safe v7.3.0
+    Checking regex v1.13.1
+    Checking zstd v0.13.3
+    Checking ittapi-sys v0.4.0
+    Checking toml v0.8.23
+    Checking debugid v0.8.0
+    Checking ittapi v0.4.0
+    Checking fxprof-processed-profile v0.6.0
+    Checking rayon v1.12.0
+    Checking wasmtime-internal-jit-debug v36.0.16
+    Checking wasmtime-internal-cache v36.0.16
+    Checking memfd v0.6.5 (/home/lojak/x3-grant-compute-20261018/patches/memfd)
+    Checking matchers v0.2.0
+    Checking tracing-log v0.2.0
+    Checking tracing-serde v0.2.0
+    Checking prometheus v0.13.4
+    Checking http v0.2.12
+    Checking docify v0.2.9
+    Checking tracing-subscriber v0.3.23
+    Checking schnellru v0.2.4
+    Checking trie-db v0.30.1
+    Checking sp-panic-handler v13.0.2 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-arithmetic v28.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking http-body v0.4.6
+    Checking hyper v0.14.32
+    Checking sp-core v39.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-tracing v19.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking strum v0.26.3
+    Checking binary-merkle-tree v16.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking parity-wasm v0.45.0 (/home/lojak/x3-grant-compute-20261018/patches/parity-wasm)
+    Checking cranelift-codegen v0.123.16
+    Checking frame-metadata v23.0.1
+    Checking substrate-prometheus-endpoint v0.10.0-dev (/home/lojak/x3-grant-compute-20261018/patches/substrate-prometheus-endpoint)
+    Checking macro_magic v0.5.1
+    Checking zerofrom v0.1.8
+    Checking tokio-util v0.7.19
+    Checking yoke v0.8.3
+    Checking http v1.5.0
+    Checking zerovec v0.11.8
+    Checking zerotrie v0.2.5
+    Checking wasmprinter v0.236.1
+    Checking sp-weights v33.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pin-project v1.1.13
+    Checking rustls-pki-types v1.15.1
+    Checking tinystr v0.8.4
+    Checking sp-metadata-ir v0.12.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking potential_utf v0.1.6
+    Checking icu_collections v2.3.0
+    Checking icu_locale_core v2.3.0
+    Checking ring v0.17.14
+    Checking http-body v1.1.0
+    Checking hkdf v0.12.4
+    Checking unsigned-varint v0.8.0
+    Checking sp-trie v42.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-keystore v0.45.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking icu_provider v2.3.1
+    Checking wasmtime-environ v36.0.16
+    Checking sha1 v0.10.7
+    Checking icu_properties v2.3.0
+    Checking icu_normalizer v2.3.0
+    Checking base256emoji v1.0.2
+    Checking rustls-webpki v0.103.15
+    Checking data-encoding-macro v0.1.21
+    Checking asynchronous-codec v0.6.2
+    Checking multibase v0.9.3
+    Checking unsigned-varint v0.7.2
+    Checking multihash v0.19.5
+    Checking rustls v0.23.45
+    Checking tokio-stream v0.1.19
+    Checking http-body-util v0.1.5
+    Checking prost v0.14.4
+    Checking quick-protobuf v0.8.1
+    Checking libp2p-identity v0.2.14
+    Checking idna_adapter v1.2.1 (/home/lojak/x3-grant-compute-20261018/patches/idna_adapter)
+    Checking rand_core v0.9.5 (/home/lojak/x3-grant-compute-20261018/patches/rand_core)
+    Checking h2 v0.4.19
+    Checking idna v1.1.0
+    Checking multistream-select v0.13.0
+    Checking rw-stream-sink v0.4.0
+    Checking url v2.5.8
+    Checking chrono v0.4.45
+    Checking rand_chacha v0.9.0
+    Checking rand v0.9.5
+    Checking rustls-native-certs v0.8.4
+    Checking multiaddr v0.18.2
+    Checking soketto v0.8.1
+    Checking libp2p-core v0.42.0
+    Checking webpki-roots v1.0.9
+    Checking ripemd v0.1.3
+    Checking sp-state-machine v0.49.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking ark-std v0.6.0
+    Checking ark-serialize v0.6.0
+    Checking multiversion v0.8.0
+    Checking encoding_rs v0.8.40
+    Checking ark-ff v0.6.0
+    Checking ethbloom v0.14.1
+    Checking evm-core v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking combine v3.8.1
+    Checking libp2p-swarm v0.45.1
+    Checking evm-runtime v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking tokio-rustls v0.26.5
+    Checking ethereum-types v0.15.1
+    Checking tower v0.5.3
+    Checking openssl-sys v0.9.117
+    Checking serde_urlencoded v0.7.1
+    Checking jsonrpsee-types v0.24.11
+    Checking hash32 v0.2.1
+    Checking openssl v0.10.81
+    Checking ethereum v0.18.2
+    Checking jsonrpsee-core v0.24.11
+    Checking evm-gasometer v0.43.0 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking hyper v1.11.1
+    Checking parking_lot_core v0.8.6
+    Checking evm v0.43.4 (https://github.com/rust-ethereum/evm.git?branch=v0.x#a656db90)
+    Checking rustls-platform-verifier v0.5.3
+    Checking parking_lot v0.11.2
+    Checking async-compression v0.4.45
+    Checking zstd-safe v6.0.6
+    Checking tower v0.4.13
+    Checking netlink-sys v0.8.8
+    Checking asynchronous-codec v0.7.0
+    Checking serde_yaml v0.9.34+deprecated
+    Checking hyper-util v0.1.20
+    Checking netlink-proto v0.12.2
+    Checking jsonrpsee-client-transport v0.24.11
+    Checking tower-http v0.6.11
+    Checking solana_rbpf v0.8.5
+    Checking zstd v0.12.4
+    Checking futures-bounded v0.2.4
+    Checking blake3 v1.8.7
+    Checking asn1-rs v0.7.2
+    Checking sp-maybe-compressed-blob v11.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking rtnetlink v0.20.0
+    Checking jsonrpsee-ws-client v0.24.11
+    Checking snow v0.9.6
+    Checking hyper-rustls v0.27.9
+    Checking native-tls v0.2.18
+    Checking jsonrpsee-http-client v0.24.11
+    Checking tokio-native-tls v0.3.1
+    Checking jsonrpsee-server v0.24.11
+    Checking quick-protobuf-codec v0.3.1
+    Checking hickory-proto v0.24.4
+    Checking hyper-tls v0.6.0
+    Checking yamux v0.13.10
+    Checking wasm-instrument v0.4.0 (/home/lojak/x3-grant-compute-20261018/patches/wasm-instrument)
+    Checking x25519-dalek v2.0.1
+    Checking reqwest v0.12.28
+    Checking if-watch v3.2.2
+    Checking ark-poly v0.6.0
+    Checking hashbrown v0.14.5
+    Checking x3-security-events v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-security-events)
+    Checking x3-btc-spv v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-btc-spv)
+    Checking rlp v0.5.2
+    Checking jsonrpsee v0.24.11
+    Checking kvdb v0.13.0
+    Checking uint v0.9.5
+    Checking core2 v0.4.0 (/home/lojak/x3-grant-compute-20261018/patches/core2)
+    Checking moka v0.12.16
+    Checking sp-database v10.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking libp2p-kad v0.46.2
+    Checking ark-ec v0.6.0
+    Checking tungstenite v0.27.0
+    Checking multihash v0.17.0
+    Checking blst v0.3.17
+    Checking oid-registry v0.8.1
+    Checking der-parser v10.0.0
+    Checking hickory-proto v0.25.2
+    Checking futures-rustls v0.26.0
+    Checking x3-bitcoin-vault v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-bitcoin-vault)
+    Checking yamux v0.12.1
+    Checking inout v0.1.4
+    Checking generic-array v0.12.4
+    Checking clap_builder v4.6.7
+    Checking libp2p-yamux v0.46.0
+    Checking hickory-resolver v0.24.4
+    Checking libp2p-mdns v0.46.0
+    Checking mockall v0.13.1
+    Checking libp2p-websocket v0.44.0
+    Checking minicbor v2.3.0
+    Checking x3-verification-router v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-verification-router)
+    Checking libp2p-dns v0.42.0
+    Checking cipher v0.4.4
+    Checking ark-bn254 v0.6.0
+    Checking x509-parser v0.17.0
+    Checking tokio-tungstenite v0.27.0
+    Checking enum-display v0.1.4
+    Checking multiaddr v0.17.1
+    Checking network-interface v2.0.5
+    Checking sc-utils v20.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking libp2p-tcp v0.42.0
+    Checking libp2p-noise v0.45.0
+    Checking libp2p-identify v0.45.0
+    Checking libp2p-request-response v0.27.0
+    Checking hickory-resolver v0.25.2
+    Checking prost v0.13.5
+    Checking libp2p-ping v0.45.0
+    Checking libp2p-connection-limits v0.4.0
+    Checking libp2p-allow-block-list v0.4.0
+    Checking cid v0.11.3
+    Checking universal-hash v0.5.1
+    Checking crypto-mac v0.7.0
+    Checking wasm-timer v0.2.5
+    Checking clap v4.6.7
+    Checking libp2p v0.54.1
+    Checking polyval v0.6.2
+    Checking serde_with v3.21.0
+    Checking digest v0.8.1
+    Checking hashlink v0.8.4
+    Checking webpki-roots v0.26.11
+    Checking blake2 v0.8.1
+    Checking chacha v0.3.0
+    Checking ureq v2.12.1
+    Checking ghash v0.5.1
+    Checking litep2p v0.13.3
+    Checking prost v0.12.6
+    Checking aes v0.8.4
+    Checking ctr v0.9.2
+    Checking finality-grandpa v0.16.3
+    Checking aead v0.5.2
+    Checking cipher v0.2.5
+    Checking tempfile v3.26.0 (/home/lojak/x3-grant-compute-20261018/patches/tempfile)
+    Checking x3-atomic-swap v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-atomic-swap)
+    Checking aes-gcm v0.10.3
+    Checking c2-chacha v0.3.3
+    Checking lioness v0.1.2
+    Checking x3-proof v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-proof)
+    Checking x3-crosschain-intent v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-crosschain-intent)
+    Checking const-random v0.1.18
+    Checking jsonrpc-core v18.0.0
+    Checking rand_distr v0.4.3
+    Checking futures-intrusive v0.5.0
+    Checking dlv-list v0.5.2
+    Checking x3-slash v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-slash)
+    Checking mixnet v0.7.0
+    Checking sqlx-core v0.8.6
+    Checking jsonrpc-pubsub v18.0.0
+    Checking cranelift-frontend v0.123.16
+    Checking cranelift-native v0.123.16
+    Checking wasmtime-internal-unwinder v36.0.16
+    Checking wasmtime-internal-cranelift v36.0.16
+    Checking derive_builder v0.20.2
+    Checking x3-threshold-core v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-threshold-core)
+   Compiling x3-chain-runtime v0.1.0 (/home/lojak/x3-grant-compute-20261018/runtime)
+    Checking sc-telemetry v30.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking tungstenite v0.29.0
+    Checking x3-order-window v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-order-window)
+    Checking polling v3.11.0
+    Checking x3-revenue-sharing v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-revenue-sharing)
+    Checking md-5 v0.10.6
+    Checking async-graphql-value v7.2.1
+    Checking spin v0.9.9
+    Checking home v0.5.12 (/home/lojak/x3-grant-compute-20261018/patches/home)
+    Checking multer v3.1.0
+    Checking sp-rpc v37.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking async-io v2.6.0
+    Checking async-graphql-parser v7.2.1
+    Checking tokio-tungstenite v0.29.0
+    Checking wasmtime v36.0.16
+    Checking handlebars v6.4.4
+    Checking jsonrpc-client-transports v18.0.0
+    Checking sqlx-postgres v0.8.6
+    Checking ordered-multimap v0.7.3
+    Checking axum-core v0.5.6
+    Checking axum-core v0.4.5
+    Checking env_filter v2.0.0
+    Checking ron v0.8.1
+    Checking env_logger v0.11.11
+    Checking axum v0.7.9
+    Checking axum v0.8.9
+    Checking yaml-rust2 v0.8.1
+    Checking sqlx v0.8.6
+    Checking async-graphql v7.2.1
+    Checking sled v0.34.7
+    Checking rust-ini v0.20.0
+    Checking jsonrpc-core-client v18.0.0
+    Checking json5 v0.4.1
+    Checking sc-network-types v0.20.2 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking tps-tracker v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/tps-tracker)
+    Checking x3-staking-analytics v1.0.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-staking-analytics)
+    Checking combine v4.6.8
+    Checking sp-wasm-interface v24.0.0 (/home/lojak/x3-grant-compute-20261018/patches/sp-wasm-interface)
+    Checking x3-validator-attestation v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-validator-attestation)
+    Checking x3-metrics-tracker v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-metrics-tracker)
+    Checking sp-runtime-interface v33.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-allocator v35.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-finality-oracle v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-finality-oracle)
+    Checking sp-io v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-proof-dispute v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-proof-dispute)
+    Checking sc-executor-common v0.43.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+   Compiling x3-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway)
+    Checking config v0.14.1
+    Checking rusty-fork v0.3.1
+    Checking x3-orchestra-control-plane v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-orchestra-control-plane)
+    Checking generator v0.8.9
+    Checking sc-executor-polkavm v0.40.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-executor-wasmtime v0.43.0 (/home/lojak/x3-grant-compute-20261018/patches/sc-executor-wasmtime)
+    Checking rand_xorshift v0.4.0
+    Checking scoped-tls v1.0.1
+    Checking proptest v1.11.0
+    Checking loom v0.7.2
+    Checking tokio-test v0.4.5
+    Checking async-graphql-axum v7.2.1
+    Checking redis v1.7.0
+    Checking sp-application-crypto v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-wallet v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-wallet)
+    Checking sp-runtime v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-version v43.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-inherents v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-staking v42.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-common v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-common)
+    Checking x3-svm-integration v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/svm-integration)
+    Checking x3-evm-integration v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/evm-integration)
+    Checking x3-dex v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-dex)
+    Checking sc-network-common v0.52.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-ast v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-ast)
+    Checking x3-lexer v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-lexer)
+    Checking sp-npos-elections v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-packet-standard v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-packet-standard)
+    Checking x3-accounting-events v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-accounting-events)
+    Checking x3-ixl v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-ixl)
+    Checking sp-api v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-vrf v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-vrf)
+    Checking x3-semantics v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-semantics)
+    Checking x3-parser v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-parser)
+    Checking x3-liquidity-core v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-liquidity-core)
+    Checking x3-automation v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-automation)
+    Checking x3-gateway-risk-engine v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-gateway-risk-engine)
+    Checking x3-typeck v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-typeck)
+    Checking sp-genesis-builder v0.21.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-session v42.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-executor v0.47.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-consensus-grandpa v27.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-mixnet v0.18.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-transaction-pool v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking frame-system-rpc-runtime-api v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-hir v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-hir)
+    Checking sp-offchain v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking frame-support v45.1.3 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-timestamp v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-consensus v0.46.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-block-builder v40.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-blockchain v43.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-consensus-slots v0.46.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-mir v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-mir)
+    Checking x3-bridge v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-bridge)
+    Checking x3-backend v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-backend)
+    Checking sc-transaction-pool-api v43.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-client-api v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-network v0.55.2 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sp-consensus-aura v0.46.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-vm v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-vm)
+    Checking x3-verifier v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-verifier)
+    Checking x3-opt v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-opt)
+    Checking sc-chain-spec v48.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking sc-mixnet v0.25.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-compiler v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-compiler)
+    Checking sc-rpc-api v0.54.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking frame-system v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking x3-asset-kernel-types v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-asset-kernel-types)
+    Checking x3-packet-schema v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-packet-schema)
+    Checking x3-x3-integration v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-integration)
+    Checking frame-try-runtime v0.51.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-balances v46.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-timestamp v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-invariants v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-invariants)
+    Checking x3-cross-vm-bridge v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/cross-vm-bridge)
+    Checking pallet-x3-inventory v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-inventory)
+    Checking pallet-authorship v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking frame-election-provider-support v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-app-registry v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-app-registry)
+    Checking pallet-x3-atomic-kernel v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-atomic-kernel)
+    Checking pallet-transaction-payment v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-offences v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-trust-gate v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-trust-gate)
+    Checking pallet-aura v44.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-oracle v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-oracle)
+    Checking pallet-x3-reservation v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-reservation)
+    Checking pallet-x3-treasury-policy v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-treasury-policy)
+    Checking pallet-x3-rebalance v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-rebalance)
+    Checking pallet-x3-partner v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-partner)
+    Checking pallet-session v45.2.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-kernel v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-kernel)
+    Checking pallet-x3-solvency v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-solvency)
+    Checking pallet-x3-agent-registry v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-agent-registry)
+    Checking pallet-transaction-payment-rpc-runtime-api v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-agent-accounts v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/agent-accounts)
+    Checking pallet-private-execution v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/private-execution)
+    Checking pallet-x3-vrf v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-vrf)
+    Checking pallet-treasury v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/treasury)
+    Checking pallet-governance v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/governance)
+    Checking pallet-swarm v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/swarm)
+    Checking pallet-x3-proof-carrying-agent v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/pallet-x3-proof-carrying-agent)
+    Checking pallet-depin-marketplace v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/depin-marketplace)
+    Checking pallet-agent-memory v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/agent-memory)
+    Checking pallet-atomic-trade-engine v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/atomic-trade-engine)
+    Checking pallet-x3-coin v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-coin)
+    Checking pallet-x3-automation v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-automation)
+    Checking pallet-x3-jury-anchor v1.0.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-jury-anchor)
+    Checking pallet-x3-security-gate v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-security-gate)
+    Checking pallet-x3-verifier v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-verifier)
+    Checking pallet-x3-asset-registry v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-asset-registry)
+    Checking pallet-collective v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-scheduler v46.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-northern-swarm v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/northern-swarm)
+    Checking pallet-grandpa v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-staking v45.1.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-domain-registry v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-domain-registry)
+    Checking pallet-x3-settlement-engine v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-settlement-engine)
+    Checking pallet-x3-agent-law v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-agent-law)
+    Checking frame-executive v45.0.1 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-custody v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-custody)
+    Checking pallet-evolution-core v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/evolution-core)
+    Checking pallet-x3-cross-vm-router v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-cross-vm-router)
+    Checking pallet-x3-consensus v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-consensus)
+    Checking pallet-x3-token-factory v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-token-factory)
+    Checking pallet-x3-sentinel v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-sentinel)
+    Checking pallet-meme-overlord v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/meme-overlord)
+    Checking pallet-x3-flashloan v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-flashloan)
+    Checking pallet-x3-wrapped v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-wrapped)
+    Checking pallet-x3-dapp-hub v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-dapp-hub)
+    Checking pallet-x3-dex v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-dex)
+    Checking pallet-x3-lp-locker v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-lp-locker)
+    Checking pallet-sudo v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-auction v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-auction)
+    Checking pallet-x3-slash v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-slash)
+    Checking pallet-x3-supply-ledger v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-supply-ledger)
+    Checking pallet-preimage v45.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)
+    Checking pallet-x3-launchpad v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-launchpad)
+    Checking pallet-svm v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/svm-runtime)
+    Checking pallet-x3-wallet v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-wallet-pallet)
+    Checking pallet-x3-da v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-da)
+    Checking pallet-x3-compute-market v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-compute-market)
+    Checking pallet-x3-reconciliation v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-reconciliation)
+    Checking pallet-x3-account-registry v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-account-registry)
+    Checking pallet-x3-crosschain-gateway v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-crosschain-gateway)
+    Checking pallet-cross-chain-validator v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/cross-chain-validator)
+    Checking pallet-x3-sequencer v0.1.0 (/home/lojak/x3-grant-compute-20261018/pallets/x3-sequencer)
+    Checking x3-relayer v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-relayer)
+    Checking x3-rpc v0.1.0 (/home/lojak/x3-grant-compute-20261018/crates/x3-rpc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 58s
