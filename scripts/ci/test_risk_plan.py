@@ -62,6 +62,14 @@ class RiskPlanTests(unittest.TestCase):
             )
             self.assertEqual(run.stdout.strip(), "full")
 
+    def test_unresolvable_diff_base_defaults_to_full(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = subprocess.run(
+                [sys.executable, str(Path(__file__).parent / "risk_plan.py"), "--base", "missing-ref"],
+                cwd=tmp, check=True, text=True, capture_output=True
+            )
+            self.assertEqual(run.stdout.strip(), "full")
+
     def test_mixed_safe_docs_and_ui_remains_scoped(self):
         mode, gates = choose_profile(["README.md", "apps/x3-desktop/src/styles.css"])
         self.assertEqual(mode, "focused")
