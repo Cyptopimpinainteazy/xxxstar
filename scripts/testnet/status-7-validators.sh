@@ -92,7 +92,7 @@ for i in $(seq 0 $((COUNT - 1))); do
     -d '{"jsonrpc":"2.0","id":1,"method":"chain_getBlockHash","params":[]}' \
     "$url" || true)
 
-  NODE="$node" PORT="$port" HEALTH="$health" HEADER="$header" HASH="$hash" python - <<'PY'
+  NODE="$node" PORT="$port" HEALTH="$health" HEADER="$header" HASH="$hash" python3 - <<'PY'
 import json
 import os
 import sys
@@ -174,7 +174,7 @@ peer_check() {
         ok=0
         continue
       fi
-      MIN_PEERS="$MIN_PEERS" HEALTH="$health" python - <<'PY'
+      MIN_PEERS="$MIN_PEERS" HEALTH="$health" python3 - <<'PY'
 import json
 import os
 import sys
@@ -203,112 +203,93 @@ PY
 }
 
 finality_check() {
-  local max_lag_blocks
-  max_lag_blocks="$MAX_FINALITY_LAG_MULT"
-
-  local sample1=()
-  local sample2=()
-  for i in $(seq 0 $((COUNT - 1))); do
-    local port=$((BASE_RPC_PORT + i))
-    local url="http://127.0.0.1:${port}"
-    local finalized_hash
-    finalized_hash="$(jsonrpc "$url" "chain_getFinalizedHead")"
-    local header
-    header="$(jsonrpc "$url" "chain_getHeader")"
-    sample1+=("${finalized_hash}|||${header}")
-  done
-
-  sleep "$FINALITY_WINDOW_SEC"
-
-  for i in $(seq 0 $((COUNT - 1))); do
-    local port=$((BASE_RPC_PORT + i))
-    local url="http://127.0.0.1:${port}"
-    local finalized_hash
-    finalized_hash="$(jsonrpc "$url" "chain_getFinalizedHead")"
-    local header
-    header="$(jsonrpc "$url" "chain_getHeader")"
-    sample2+=("${finalized_hash}|||${header}")
-  done
-
-  SAMPLE1="${sample1[*]}" SAMPLE2="${sample2[*]}" MAX_LAG="$max_lag_blocks" BASE_RPC_PORT="$BASE_RPC_PORT" python - <<'PY'
+  COUNT="$COUNT" FINALITY_WINDOW_SEC="$FINALITY_WINDOW_SEC" \
+    MAX_LAG="$MAX_FINALITY_LAG_MULT" BASE_RPC_PORT="$BASE_RPC_PORT" python3 - <<'PY'
 import json
+import math
 import os
+import re
 import sys
+import time
+import urllib.request
 
-def parse_num(header_json: str) -> int:
-    try:
-        obj = json.loads(header_json)
-        num = obj.get("result", {}).get("number")
-        if isinstance(num, str) and num.startswith("0x"):
-            return int(num, 16)
-        return int(num)
-    except Exception:
-        return -1
 
-def parse_finalized(finalized_json: str) -> str:
-    try:
-        obj = json.loads(finalized_json)
-        return obj.get("result", "")
-    except Exception:
-        return ""
+def rpc(port, method, params=None):
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}",
+        data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": method,
+                         "params": params or []}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(request, timeout=2) as response:
+        obj = json.load(response)
+    if (not isinstance(obj, dict) or obj.get("jsonrpc") != "2.0"
+            or type(obj.get("id")) is not int or obj["id"] != 1
+            or "error" in obj or "result" not in obj):
+        raise ValueError(f"RPC {port} {method}: invalid or failed response")
+    return obj["result"]
 
-def finalized_number(rpc_url: str, finalized_hash: str) -> int:
-    if not finalized_hash:
-        return -1
-    try:
-        import urllib.request
-        req = json.dumps({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "chain_getHeader",
-            "params": [finalized_hash],
-        }).encode()
-        resp = urllib.request.urlopen(rpc_url, data=req, timeout=1)
-        obj = json.loads(resp.read().decode())
-        num = obj.get("result", {}).get("number")
-        if isinstance(num, str) and num.startswith("0x"):
-            return int(num, 16)
-        return int(num)
-    except Exception:
-        return -1
 
-sample1 = os.environ["SAMPLE1"].split()
-sample2 = os.environ["SAMPLE2"].split()
-max_lag = int(os.environ["MAX_LAG"])
+def block_hash(port, method, params=None):
+    value = rpc(port, method, params)
+    if not isinstance(value, str) or not re.fullmatch(r"0x[0-9a-fA-F]{64}", value):
+        raise ValueError(f"RPC {port} {method}: invalid block hash")
+    return value.lower()
 
-if len(sample1) != len(sample2):
-    sys.exit(2)
 
-ok = True
-for idx, (row1, row2) in enumerate(zip(sample1, sample2)):
-    try:
-        f1_raw, h1_raw = row1.split("|||", 1)
-        f2_raw, h2_raw = row2.split("|||", 1)
-    except ValueError:
-        ok = False
-        continue
-    best_2 = parse_num(h2_raw)
-    finalized_hash_1 = parse_finalized(f1_raw)
-    finalized_hash_2 = parse_finalized(f2_raw)
-    if best_2 < 0 or not finalized_hash_2:
-        ok = False
-        continue
-    base_port = int(os.environ.get("BASE_RPC_PORT", "9944"))
-    port = base_port + idx
-    rpc_url = f"http://127.0.0.1:{port}"
-    fin_1 = finalized_number(rpc_url, finalized_hash_1)
-    fin_2 = finalized_number(rpc_url, finalized_hash_2)
-    if fin_1 < 0 or fin_2 < 0:
-        ok = False
-        continue
-    if fin_2 <= fin_1:
-        ok = False
-        continue
-    lag = best_2 - fin_2
-    if lag > max_lag:
-        ok = False
+def number(port, params=None):
+    header = rpc(port, "chain_getHeader", params)
+    value = header.get("number") if isinstance(header, dict) else None
+    if not isinstance(value, str) or not re.fullmatch(r"0x[0-9a-fA-F]+", value):
+        raise ValueError(f"RPC {port}: invalid header number")
+    return int(value, 16)
 
-sys.exit(0 if ok else 3)
+
+def sample(ports):
+    rows = []
+    for port in ports:
+        genesis = block_hash(port, "chain_getBlockHash", [0])
+        finalized = block_hash(port, "chain_getFinalizedHead")
+        height = number(port, [finalized])
+        best = number(port)
+        if height <= 0 or height > best:
+            raise ValueError(f"RPC {port}: finalized height {height} inconsistent with best {best}")
+        if block_hash(port, "chain_getBlockHash", [height]) != finalized:
+            raise ValueError(f"RPC {port}: finalized head is not canonical at height {height}")
+        rows.append((genesis, finalized, height, best))
+    return rows
+
+
+try:
+    count = int(os.environ["COUNT"])
+    base = int(os.environ["BASE_RPC_PORT"])
+    window = float(os.environ["FINALITY_WINDOW_SEC"])
+    max_lag = int(os.environ["MAX_LAG"])
+    if count < 1 or base < 1 or base + count - 1 > 65535 or not math.isfinite(window) or window < 0 or max_lag < 0:
+        raise ValueError("invalid finality configuration")
+    ports = list(range(base, base + count))
+    before = sample(ports)
+    time.sleep(window)
+    after = sample(ports)
+    if len({row[0] for row in before + after}) != 1:
+        raise ValueError("validators do not share a stable genesis hash")
+    common_height = min(row[2] for row in after)
+    common_hashes = set()
+    for port, previous, current in zip(ports, before, after):
+        if current[2] <= previous[2]:
+            raise ValueError(f"RPC {port}: finalized height did not progress")
+        if current[3] - current[2] > max_lag:
+            raise ValueError(f"RPC {port}: finality lag exceeds {max_lag} blocks")
+        # Progress must extend the previously finalized block, not replace it.
+        if block_hash(port, "chain_getBlockHash", [previous[2]]) != previous[1]:
+            raise ValueError(f"RPC {port}: previously finalized block changed")
+        common_hashes.add(block_hash(port, "chain_getBlockHash", [common_height]))
+    if len(common_hashes) != 1:
+        raise ValueError(f"validators disagree at finalized height {common_height}")
+    print(f"Shared finalized block {common_height}: {next(iter(common_hashes))}")
+except (ValueError, OSError, TypeError, KeyError) as error:
+    print(f"Finality evidence rejected: {error}", file=sys.stderr)
+    sys.exit(3)
 PY
 }
 
