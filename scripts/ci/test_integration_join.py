@@ -19,7 +19,7 @@ def fixtures():
                           "status": "completed", "conclusion": "success",
                           "evidence_state": "OBSERVED"}]}
     review = {"source": "PR_AGENT", "pr_number": 683, "head_sha": SHA,
-              "review_completed": True, "findings": []}
+              "review_completed": True, "review_coverage_complete": True, "findings": []}
     return github, review
 
 
@@ -30,6 +30,11 @@ class IntegrationJoinTests(unittest.TestCase):
         self.assertFalse(result["release_authorized"])
         self.assertFalse(result["live_integration_verified"])
         self.assertFalse(result["review_correctness_verified"])
+
+    def test_heuristic_review_does_not_prove_coverage(self):
+        github, review = fixtures()
+        review["review_coverage_complete"] = False
+        self.assertEqual(mod.join(github, review)["integration"], "FAIL")
 
     def test_stale_review_is_rejected(self):
         github, review = fixtures()
