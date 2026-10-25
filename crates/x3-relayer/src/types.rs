@@ -9,6 +9,10 @@ use alloc::vec::Vec;
 use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
+pub use x3_verification_router::SolanaCluster;
+use x3_verification_router::{
+    encode_solana_finality_v2, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
+};
 
 /// Main relayer configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -176,8 +180,8 @@ pub struct EvmProofRequest {
     pub expected_amount: u128,
 }
 
-/// A single validator attestation: identity key and its Ed25519 signature
-/// over the SVM proof payload (BLAKE2b-256 hash of `slot || blockhash`).
+/// A single validator attestation over the complete Solana V2 finality and
+/// transfer intent.
 #[derive(Clone, Debug)]
 pub struct ValidatorSignature {
     /// Compressed Ed25519 public key of the signing validator (32 bytes).
@@ -189,12 +193,90 @@ pub struct ValidatorSignature {
 #[derive(Clone, Debug)]
 pub struct SvmProof {
     pub source_domain: u32,
+    /// Gateway transfer identity bound into the validator-signed message.
+    pub proof_id: [u8; 32],
+    pub cluster: SolanaCluster,
     pub slot: u64,
+    pub parent_slot: u64,
+    /// Finalized bank hash.
     pub blockhash: [u8; 32],
+    pub parent_bank_hash: [u8; 32],
+    pub stake_table_digest: [u8; 32],
+    pub expected_asset_id: [u8; 32],
+    pub expected_amount: u128,
+    pub expected_sender: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_beneficiary: Vec<u8>,
     /// Individual validator attestations (each carries a real 64-byte Ed25519 sig).
     pub validator_signatures: Vec<ValidatorSignature>,
     /// Number of distinct validators required for quorum (derived from runtime config).
     pub required_signatures: u32,
+}
+
+/// V2 evidence a relayer must obtain before it can produce a Solana proof.
+///
+/// The bank hashes, slots, stake-table digest, and transfer intent are signed
+/// by the validators. `existing_signatures` lets independent operators
+/// aggregate before the configured threshold is reachable.
+#[derive(Clone, Debug)]
+pub struct SvmProofRequest {
+    pub source_domain: u32,
+    pub proof_id: [u8; 32],
+    pub cluster: SolanaCluster,
+    pub slot: u64,
+    pub parent_slot: u64,
+    pub blockhash: [u8; 32],
+    pub parent_bank_hash: [u8; 32],
+    pub stake_table_digest: [u8; 32],
+    pub expected_asset_id: [u8; 32],
+    pub expected_amount: u128,
+    pub expected_sender: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_beneficiary: Vec<u8>,
+    pub existing_signatures: Vec<ValidatorSignature>,
+}
+
+impl SvmProof {
+    /// Build the complete V2 envelope the production verifier receives.
+    pub fn envelope(&self) -> ProofEnvelope {
+        ProofEnvelope {
+            proof_id: self.proof_id,
+            strategy: VerificationStrategy::SolanaFinalizedProof,
+            source_chain: ChainKind::Solana,
+            destination_chain: ChainKind::X3,
+            payload: Vec::new(),
+            expected_asset_id: self.expected_asset_id,
+            expected_amount: self.expected_amount,
+            expected_sender: self.expected_sender.clone(),
+            expected_recipient: self.expected_recipient.clone(),
+            expected_beneficiary: self.expected_beneficiary.clone(),
+        }
+    }
+
+    /// Encode the stake-weighted V2 Solana finality payload.
+    pub fn encode_payload(&self) -> Result<Vec<u8>, VerificationError> {
+        let votes = self
+            .validator_signatures
+            .iter()
+            .map(|vote| (vote.validator_pubkey, vote.signature))
+            .collect::<Vec<_>>();
+        encode_solana_finality_v2(
+            self.cluster,
+            self.slot,
+            self.parent_slot,
+            self.blockhash,
+            self.parent_bank_hash,
+            self.stake_table_digest,
+            &votes,
+        )
+    }
+
+    /// Envelope carrying the encoded V2 payload.
+    pub fn encoded_envelope(&self) -> Result<ProofEnvelope, VerificationError> {
+        let mut envelope = self.envelope();
+        envelope.payload = self.encode_payload()?;
+        Ok(envelope)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

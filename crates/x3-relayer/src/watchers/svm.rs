@@ -13,6 +13,9 @@ pub struct SvmHeaderWatcher {
     last_polled_slot: Arc<RwLock<u64>>,
     /// Checkpoint file path for persisting last_polled_slot across restarts
     checkpoint_path: Option<PathBuf>,
+    /// Durable highest slot observed as finalized.
+    finalized_floor_path: Option<PathBuf>,
+    finalized_floor: Arc<RwLock<u64>>,
     /// Consecutive empty-poll counter for watchdog alerts
     stale_cycles: Arc<RwLock<u64>>,
 }
@@ -29,6 +32,20 @@ impl SvmHeaderWatcher {
             p.push(format!("svm_checkpoint_{}.txt", config.x3_domain_id));
             p
         });
+        let finalized_floor_path = std::env::var("X3_RELAYER_CHECKPOINT_DIR").ok().map(|dir| {
+            let mut p = PathBuf::from(dir);
+            p.push(format!("svm_finalized_floor_{}.txt", config.x3_domain_id));
+            p
+        });
+        let finalized_floor = if let Some(path) = &finalized_floor_path {
+            tokio::fs::read_to_string(path)
+                .await
+                .ok()
+                .and_then(|value| value.trim().parse::<u64>().ok())
+                .unwrap_or(0)
+        } else {
+            0
+        };
 
         let start_slot = if let Some(ref cp) = checkpoint_path {
             match tokio::fs::read_to_string(cp).await {
@@ -58,8 +75,18 @@ impl SvmHeaderWatcher {
             rpc_client: client,
             last_polled_slot: Arc::new(RwLock::new(start_slot)),
             checkpoint_path,
+            finalized_floor_path,
+            finalized_floor: Arc::new(RwLock::new(finalized_floor)),
             stale_cycles: Arc::new(RwLock::new(0)),
         })
+    }
+
+    pub fn domain_id(&self) -> u32 {
+        self.config.x3_domain_id
+    }
+
+    pub async fn finalized_floor(&self) -> u64 {
+        *self.finalized_floor.read().await
     }
 
     pub async fn poll(&self) -> Result<Vec<HeaderInfo>> {
@@ -134,7 +161,16 @@ impl SvmHeaderWatcher {
         )
         .await?;
         let slot_age = current_slot.saturating_sub(slot);
-        Ok(slot_age >= self.config.finality_threshold as u64)
+        let finalized = slot_age >= self.config.finality_threshold as u64;
+        if finalized {
+            let mut floor = self.finalized_floor.write().await;
+            if slot > *floor {
+                *floor = slot;
+                drop(floor);
+                self.persist_finalized_floor(slot).await;
+            }
+        }
+        Ok(finalized)
     }
 
     /// Persist the last polled slot to a checkpoint file.
@@ -146,6 +182,26 @@ impl SvmHeaderWatcher {
                     self.config.name, e
                 );
             }
+        }
+    }
+
+    async fn persist_finalized_floor(&self, slot: u64) {
+        let Some(path) = &self.finalized_floor_path else {
+            return;
+        };
+        let temporary = path.with_extension("tmp");
+        if let Err(error) = tokio::fs::write(&temporary, slot.to_string()).await {
+            warn!(
+                "Failed to write SVM finalized floor for {}: {}",
+                self.config.name, error
+            );
+            return;
+        }
+        if let Err(error) = tokio::fs::rename(&temporary, path).await {
+            warn!(
+                "Failed to install SVM finalized floor for {}: {}",
+                self.config.name, error
+            );
         }
     }
 
@@ -391,5 +447,36 @@ mod tests {
         // Verify that the retry wrapper works correctly for sync functions
         let value = 42u32;
         assert_eq!(value, 42);
+    }
+
+    #[tokio::test]
+    async fn finalized_floor_is_installed_atomically() {
+        let path = std::env::temp_dir().join(format!(
+            "x3-svm-finalized-floor-{}-{}.txt",
+            std::process::id(),
+            42
+        ));
+        let watcher = SvmHeaderWatcher {
+            config: SvmClusterConfig {
+                name: "test".into(),
+                cluster_name: "devnet".into(),
+                x3_domain_id: 200,
+                rpc_endpoint: "http://127.0.0.1:1".into(),
+                finality_threshold: 1,
+                slot_poll_interval_ms: 1,
+                max_concurrent_requests: 1,
+            },
+            rpc_client: reqwest::Client::new(),
+            last_polled_slot: Arc::new(RwLock::new(0)),
+            checkpoint_path: None,
+            finalized_floor_path: Some(path.clone()),
+            finalized_floor: Arc::new(RwLock::new(0)),
+            stale_cycles: Arc::new(RwLock::new(0)),
+        };
+
+        watcher.persist_finalized_floor(123).await;
+        assert_eq!(tokio::fs::read_to_string(&path).await.unwrap(), "123");
+        assert!(!path.with_extension("tmp").exists());
+        tokio::fs::remove_file(path).await.unwrap();
     }
 }

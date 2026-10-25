@@ -1,6 +1,9 @@
 /// Proof Submitter - Submits proofs to X3 runtime via RPC
 use crate::quorum::AuthorizedValidatorSet;
-use crate::types::{EvmProof, EvmProofRequest, SvmProof, ValidatorSignature};
+use crate::types::{
+    EvmProof, EvmProofRequest, SvmProof, SvmProofRequest, SvmValidatorStakeConfig,
+    ValidatorSignature,
+};
 use anyhow::{anyhow, Result};
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use log::{debug, info};
@@ -8,6 +11,10 @@ use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
+use x3_verification_router::{
+    solana_finality_message_v2, solana_stake_table_digest, SolanaCluster,
+    SolanaStakeWeightedVerifier, SolanaValidatorStake, Verifier as ProofVerifier,
+};
 
 /// A refusal this pipeline makes on purpose, named rather than reported as an
 /// opaque string.
@@ -62,6 +69,53 @@ pub enum SubmitterError {
          can attest external-chain finality and a proof produced here would be unbacked."
     )]
     NoAuthorizedValidatorSet,
+
+    /// The configured Solana stake table is absent or inconsistent.
+    #[error("refusing to produce an SVM proof: {0}")]
+    InvalidSvmStakeTable(String),
+
+    /// A supplied validator vote is malformed, duplicated, unauthorized, or
+    /// does not verify over the complete V2 finality statement.
+    #[error("refusing Solana validator vote {index}: {reason}")]
+    InvalidSvmVote { index: usize, reason: String },
+
+    /// The V2 evidence is internally inconsistent before any vote is counted.
+    #[error("refusing Solana proof evidence: {0}")]
+    InvalidSvmEvidence(String),
+}
+
+fn parse_stake_table(
+    entries: &[SvmValidatorStakeConfig],
+    authorized: &AuthorizedValidatorSet,
+) -> Result<Vec<SolanaValidatorStake>> {
+    if entries.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut stakes = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let trimmed = entry.pubkey.trim();
+        let trimmed = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+        let bytes = hex::decode(trimmed).map_err(|error| {
+            anyhow!("invalid Solana validator pubkey {}: {error}", entry.pubkey)
+        })?;
+        let pubkey: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| anyhow!("Solana validator pubkey {} is not 32 bytes", entry.pubkey))?;
+        stakes.push(SolanaValidatorStake {
+            pubkey,
+            stake: entry.stake,
+        });
+    }
+    stakes.sort_by_key(|entry| entry.pubkey);
+    let mut expected = authorized.keys().to_vec();
+    expected.sort();
+    let actual = stakes.iter().map(|entry| entry.pubkey).collect::<Vec<_>>();
+    if actual != expected {
+        return Err(anyhow!(
+            "Solana stake table keys do not match the authorized validator set"
+        ));
+    }
+    Ok(stakes)
 }
 
 pub struct RpcSubmitter {
@@ -83,23 +137,40 @@ pub struct RpcSubmitter {
     /// meet. `required_signatures` is derived from this set through the
     /// workspace's single supermajority rule — never a literal.
     svm_validators: AuthorizedValidatorSet,
+    svm_stakes: Vec<SolanaValidatorStake>,
+    svm_cluster: SolanaCluster,
     /// Signing key derived from the relayer seed phrase (if provided).
     /// When custody is enabled, this field holds a zeroed placeholder and
     /// `sign_proof_payload` is not called (custody signer is used externally).
     signing_key: SigningKey,
 }
 
+pub struct RpcSubmitterConfig {
+    pub x3_rpc_url: String,
+    pub relayer_account: String,
+    pub relayer_custody_key_id: Option<String>,
+    pub relayer_seed_phrase: Option<String>,
+    pub svm_validator_pubkeys: Vec<String>,
+    pub svm_validator_stakes: Vec<SvmValidatorStakeConfig>,
+    pub svm_cluster: SolanaCluster,
+    pub max_retries: u32,
+    pub retry_backoff_ms: u64,
+}
+
 impl RpcSubmitter {
-    pub async fn new_with_retry_config(
-        x3_rpc_url: String,
-        relayer_account: String,
-        relayer_custody_key_id: Option<String>,
-        relayer_seed_phrase: Option<&str>,
-        svm_validator_pubkeys: &[String],
-        max_retries: u32,
-        retry_backoff_ms: u64,
-    ) -> Result<Self> {
+    pub async fn new_with_retry_config(config: RpcSubmitterConfig) -> Result<Self> {
         let client = reqwest::Client::new();
+        let RpcSubmitterConfig {
+            x3_rpc_url,
+            relayer_account,
+            relayer_custody_key_id,
+            relayer_seed_phrase,
+            svm_validator_pubkeys,
+            svm_validator_stakes,
+            svm_cluster,
+            max_retries,
+            retry_backoff_ms,
+        } = config;
 
         // Initialize nonce from X3 runtime
         let initial_nonce = Self::get_account_nonce(&client, &x3_rpc_url, &relayer_account).await?;
@@ -111,7 +182,7 @@ impl RpcSubmitter {
 
         // Derive signing key from seed phrase when available.
         // Production MUST have a seed or custody key — fail fast, no random key.
-        let signing_key = match relayer_seed_phrase {
+        let signing_key = match relayer_seed_phrase.as_deref() {
             Some(phrase) => Self::key_from_seed(phrase),
             None => {
                 if relayer_custody_key_id.is_some() {
@@ -129,8 +200,18 @@ impl RpcSubmitter {
 
         // A malformed, wrongly sized or repeated key is refused at startup: a
         // set the operator did not mean must not size the quorum.
-        let svm_validators = AuthorizedValidatorSet::from_hex_keys(svm_validator_pubkeys)
+        let svm_validators = AuthorizedValidatorSet::from_hex_keys(&svm_validator_pubkeys)
             .map_err(|err| anyhow!("invalid configured validator set: {err}"))?;
+        let svm_stakes = parse_stake_table(&svm_validator_stakes, &svm_validators)?;
+        if !svm_validators.is_empty() && svm_stakes.is_empty() {
+            return Err(anyhow!(
+                "Solana validators are configured without a stake table"
+            ));
+        }
+        if !svm_stakes.is_empty() {
+            SolanaStakeWeightedVerifier::new(svm_cluster, svm_stakes.clone(), 2, 3, 0)
+                .map_err(|error| anyhow!("invalid Solana stake table: {error:?}"))?;
+        }
 
         Ok(Self {
             x3_rpc_url,
@@ -140,6 +221,8 @@ impl RpcSubmitter {
             retry_backoff_ms,
             relayer_custody_key_id,
             svm_validators,
+            svm_stakes,
+            svm_cluster,
             signing_key,
         })
     }
@@ -261,75 +344,159 @@ impl RpcSubmitter {
     /// workspace yet.
     pub async fn acquire_svm_proof(
         &self,
-        domain_id: u32,
-        slot: u64,
-        blockhash: [u8; 32],
+        request: SvmProofRequest,
     ) -> Result<SvmProof, SubmitterError> {
         debug!(
-            "Acquiring SVM proof for domain {}, slot {}",
-            domain_id, slot
+            "Acquiring V2 SVM proof for domain {}, slot {}",
+            request.source_domain, request.slot
         );
 
         if self.svm_validators.is_empty() {
             return Err(SubmitterError::NoAuthorizedValidatorSet);
         }
-
-        let mut validator_signatures = Vec::new();
-        let own_key = self.signing_key.verifying_key().to_bytes();
-        if self.svm_validators.is_authorized(&own_key) {
-            validator_signatures.push(self.sign_proof_payload(slot, &blockhash));
+        if self.svm_stakes.is_empty() {
+            return Err(SubmitterError::InvalidSvmStakeTable(
+                "no stake table is configured".into(),
+            ));
+        }
+        if request.cluster != self.svm_cluster {
+            return Err(SubmitterError::InvalidSvmEvidence(format!(
+                "request cluster {:?} does not match configured cluster {:?}",
+                request.cluster, self.svm_cluster
+            )));
+        }
+        if request.proof_id == [0u8; 32] {
+            return Err(SubmitterError::InvalidSvmEvidence(
+                "proof id must not be zero".into(),
+            ));
+        }
+        if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
+            return Err(SubmitterError::InvalidSvmEvidence(
+                "beneficiary must be between 1 and 128 bytes".into(),
+            ));
+        }
+        let expected_stake_digest = solana_stake_table_digest(&self.svm_stakes);
+        if request.stake_table_digest != expected_stake_digest {
+            return Err(SubmitterError::InvalidSvmEvidence(
+                "stake-table digest does not match the configured table".into(),
+            ));
         }
 
         let required_signatures = self.svm_validators.required_signatures();
-        let available = self.svm_validators.distinct_signers(&validator_signatures) as u32;
-        if available < required_signatures {
+        let unsigned = SvmProof {
+            source_domain: request.source_domain,
+            proof_id: request.proof_id,
+            cluster: request.cluster,
+            slot: request.slot,
+            parent_slot: request.parent_slot,
+            blockhash: request.blockhash,
+            parent_bank_hash: request.parent_bank_hash,
+            stake_table_digest: request.stake_table_digest,
+            expected_asset_id: request.expected_asset_id,
+            expected_amount: request.expected_amount,
+            expected_sender: request.expected_sender,
+            expected_recipient: request.expected_recipient,
+            expected_beneficiary: request.expected_beneficiary,
+            validator_signatures: Vec::new(),
+            required_signatures,
+        };
+        let envelope = unsigned.envelope();
+        let message = solana_finality_message_v2(
+            request.cluster,
+            request.slot,
+            request.parent_slot,
+            &request.blockhash,
+            &request.parent_bank_hash,
+            &request.stake_table_digest,
+            &envelope,
+        )
+        .map_err(|error| SubmitterError::InvalidSvmEvidence(error.to_string()))?;
+
+        let mut validator_signatures = Vec::with_capacity(request.existing_signatures.len() + 1);
+        for (index, vote) in request.existing_signatures.iter().enumerate() {
+            if !self.svm_validators.is_authorized(&vote.validator_pubkey) {
+                return Err(SubmitterError::InvalidSvmVote {
+                    index,
+                    reason: "validator is not in the authorized set".into(),
+                });
+            }
+            if validator_signatures
+                .iter()
+                .any(|known: &ValidatorSignature| known.validator_pubkey == vote.validator_pubkey)
+            {
+                return Err(SubmitterError::InvalidSvmVote {
+                    index,
+                    reason: "validator vote is duplicated".into(),
+                });
+            }
+            let key = VerifyingKey::from_bytes(&vote.validator_pubkey).map_err(|error| {
+                SubmitterError::InvalidSvmVote {
+                    index,
+                    reason: format!("invalid validator public key: {error}"),
+                }
+            })?;
+            let signature = Signature::from_bytes(&vote.signature);
+            key.verify_strict(&message, &signature).map_err(|error| {
+                SubmitterError::InvalidSvmVote {
+                    index,
+                    reason: format!("signature does not verify: {error}"),
+                }
+            })?;
+            validator_signatures.push(vote.clone());
+        }
+
+        let own_key = self.signing_key.verifying_key().to_bytes();
+        if self.svm_validators.is_authorized(&own_key)
+            && !validator_signatures
+                .iter()
+                .any(|vote| vote.validator_pubkey == own_key)
+        {
+            validator_signatures.push(self.sign_v2_vote(&message));
+        }
+        validator_signatures.sort_by_key(|vote| vote.validator_pubkey);
+
+        let proof = SvmProof {
+            validator_signatures,
+            ..unsigned
+        };
+        let envelope = proof
+            .encoded_envelope()
+            .map_err(|error| SubmitterError::InvalidSvmEvidence(error.to_string()))?;
+        let verifier =
+            SolanaStakeWeightedVerifier::new(self.svm_cluster, self.svm_stakes.clone(), 2, 3, 0)
+                .map_err(|error| SubmitterError::InvalidSvmStakeTable(format!("{error:?}")))?;
+        if ProofVerifier::verify(&verifier, &envelope).is_err() {
             return Err(SubmitterError::SvmQuorumUnreachable {
                 required: required_signatures,
-                available,
+                available: self
+                    .svm_validators
+                    .distinct_signers(&proof.validator_signatures)
+                    as u32,
                 validator_set: self.svm_validators.len(),
             });
         }
 
-        Ok(SvmProof {
-            source_domain: domain_id,
-            slot,
-            blockhash,
-            validator_signatures,
-            required_signatures,
-        })
+        Ok(proof)
     }
 
     // ============================================================================
     // Private Methods
     // ============================================================================
 
-    /// Sign the SVM proof payload (slot || blockhash).
+    /// Sign the complete Solana V2 finality message.
     ///
     /// When a custody key ID is configured, this method still signs with the
-    /// local `signing_key` (which is zeroed in custody mode).  Callers that
+    /// local `signing_key` (which is zeroed in custody mode). Callers that
     /// require custody-backed signing MUST replace the signature via the
     /// custody bridge before submission.
-    fn sign_proof_payload(&self, slot: u64, blockhash: &[u8; 32]) -> ValidatorSignature {
-        let mut preimage = Vec::with_capacity(40);
-        preimage.extend_from_slice(&slot.to_le_bytes());
-        preimage.extend_from_slice(blockhash);
-        let payload_hash = Self::blake2b_256(&preimage);
-
-        let sig: Signature = self.signing_key.sign(&payload_hash);
+    fn sign_v2_vote(&self, message: &[u8; 32]) -> ValidatorSignature {
+        let sig: Signature = self.signing_key.sign(message);
         let vk: VerifyingKey = self.signing_key.verifying_key();
 
         ValidatorSignature {
             validator_pubkey: vk.to_bytes(),
             signature: sig.to_bytes(),
         }
-    }
-
-    /// BLAKE2b-256 hash of the input data.
-    fn blake2b_256(data: &[u8]) -> [u8; 32] {
-        let hash = blake2b_simd::Params::new().hash_length(32).hash(data);
-        let mut out = [0u8; 32];
-        out.copy_from_slice(hash.as_bytes());
-        out
     }
 
     /// Report which signer produced `validator_pubkey`.
@@ -392,6 +559,95 @@ mod tests {
     use super::*;
     use ed25519_dalek::Verifier;
 
+    const TEST_CLUSTER: SolanaCluster = SolanaCluster::Devnet;
+
+    fn test_stakes(pubkeys: &[[u8; 32]]) -> Vec<SolanaValidatorStake> {
+        let mut stakes = pubkeys
+            .iter()
+            .map(|pubkey| SolanaValidatorStake {
+                pubkey: *pubkey,
+                stake: 100,
+            })
+            .collect::<Vec<_>>();
+        stakes.sort_by_key(|entry| entry.pubkey);
+        stakes
+    }
+
+    fn test_request(stakes: &[SolanaValidatorStake]) -> SvmProofRequest {
+        SvmProofRequest {
+            source_domain: 200,
+            proof_id: [0x31u8; 32],
+            cluster: TEST_CLUSTER,
+            slot: 42,
+            parent_slot: 41,
+            blockhash: [0x32u8; 32],
+            parent_bank_hash: [0x33u8; 32],
+            stake_table_digest: solana_stake_table_digest(stakes),
+            expected_asset_id: [0x34u8; 32],
+            expected_amount: 5_000,
+            expected_sender: b"sender".to_vec(),
+            expected_recipient: b"recipient".to_vec(),
+            expected_beneficiary: vec![0x35u8; 32],
+            existing_signatures: Vec::new(),
+        }
+    }
+
+    fn request_message(request: &SvmProofRequest) -> [u8; 32] {
+        let proof = SvmProof {
+            source_domain: request.source_domain,
+            proof_id: request.proof_id,
+            cluster: request.cluster,
+            slot: request.slot,
+            parent_slot: request.parent_slot,
+            blockhash: request.blockhash,
+            parent_bank_hash: request.parent_bank_hash,
+            stake_table_digest: request.stake_table_digest,
+            expected_asset_id: request.expected_asset_id,
+            expected_amount: request.expected_amount,
+            expected_sender: request.expected_sender.clone(),
+            expected_recipient: request.expected_recipient.clone(),
+            expected_beneficiary: request.expected_beneficiary.clone(),
+            validator_signatures: Vec::new(),
+            required_signatures: 1,
+        };
+        solana_finality_message_v2(
+            proof.cluster,
+            proof.slot,
+            proof.parent_slot,
+            &proof.blockhash,
+            &proof.parent_bank_hash,
+            &proof.stake_table_digest,
+            &proof.envelope(),
+        )
+        .expect("request intent")
+    }
+
+    fn request_vote(request: &SvmProofRequest, key: &SigningKey) -> ValidatorSignature {
+        ValidatorSignature {
+            validator_pubkey: key.verifying_key().to_bytes(),
+            signature: key.sign(&request_message(request)).to_bytes(),
+        }
+    }
+
+    fn test_submitter(
+        signing_key: SigningKey,
+        pubkeys: Vec<[u8; 32]>,
+        stakes: Vec<SolanaValidatorStake>,
+    ) -> RpcSubmitter {
+        RpcSubmitter {
+            x3_rpc_url: "http://localhost:9933".to_string(),
+            nonce: Arc::new(RwLock::new(0)),
+            rpc_client: reqwest::Client::new(),
+            max_retries: 3,
+            retry_backoff_ms: 1000,
+            relayer_custody_key_id: None,
+            svm_validators: AuthorizedValidatorSet::from_keys(pubkeys),
+            svm_stakes: stakes,
+            svm_cluster: TEST_CLUSTER,
+            signing_key,
+        }
+    }
+
     #[test]
     fn test_signing_key_derived_from_seed() {
         let key = RpcSubmitter::key_from_seed("test seed phrase for svm proof");
@@ -431,19 +687,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_acquire_svm_proof() {
-        let blockhash = [0x56u8; 32];
+        let key = RpcSubmitter::key_from_seed("acquire SVM test seed");
+        let pubkeys = vec![key.verifying_key().to_bytes()];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
+        let proof = submitter
+            .acquire_svm_proof(test_request(&stakes))
+            .await
+            .expect("one authorized validator can meet its stake threshold");
 
-        let proof = SvmProof {
-            source_domain: 501,
-            slot: 250000,
-            blockhash,
-            validator_signatures: vec![],
-            required_signatures: 2,
-        };
-
-        assert_eq!(proof.source_domain, 501);
-        assert_eq!(proof.slot, 250000);
-        assert_eq!(proof.blockhash, blockhash);
+        assert_eq!(proof.source_domain, 200);
+        assert_eq!(proof.slot, 42);
+        assert_eq!(proof.blockhash, [0x32u8; 32]);
+        assert_eq!(proof.validator_signatures.len(), 1);
     }
 
     #[test]
@@ -484,6 +740,8 @@ mod tests {
             retry_backoff_ms: 1000,
             relayer_custody_key_id: None,
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
+            svm_stakes: Vec::new(),
+            svm_cluster: TEST_CLUSTER,
             signing_key,
         };
         let proof = EvmProof {
@@ -544,25 +802,21 @@ mod tests {
             retry_backoff_ms: 1000,
             relayer_custody_key_id: None,
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
+            svm_stakes: Vec::new(),
+            svm_cluster: TEST_CLUSTER,
             signing_key: key,
         };
 
-        let slot = 42u64;
-        let blockhash = [0xABu8; 32];
-        let vs = submitter.sign_proof_payload(slot, &blockhash);
+        let message = [0xABu8; 32];
+        let vs = submitter.sign_v2_vote(&message);
 
         // Signature must not be all zeros
         assert_ne!(vs.signature, [0u8; 64]);
         // Public key must not be all zeros
         assert_ne!(vs.validator_pubkey, [0u8; 32]);
-        // Verify the signature against the payload
-        let mut preimage = Vec::with_capacity(40);
-        preimage.extend_from_slice(&slot.to_le_bytes());
-        preimage.extend_from_slice(&blockhash);
-        let payload_hash = RpcSubmitter::blake2b_256(&preimage);
         let vk = VerifyingKey::from_bytes(&vs.validator_pubkey).unwrap();
         let sig = Signature::from_bytes(&vs.signature);
-        assert!(vk.verify(&payload_hash, &sig).is_ok());
+        assert!(vk.verify(&message, &sig).is_ok());
     }
 
     /// The golden path: when this submitter *is* the whole configured validator
@@ -571,23 +825,12 @@ mod tests {
     #[test]
     fn test_acquired_svm_proof_passes_quorum_check() {
         let key = RpcSubmitter::key_from_seed("quorum test seed");
-        let key_hex = hex::encode(key.verifying_key().to_bytes());
-        let submitter = RpcSubmitter {
-            x3_rpc_url: "http://localhost:9933".to_string(),
-            nonce: Arc::new(RwLock::new(0)),
-            rpc_client: reqwest::Client::new(),
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            relayer_custody_key_id: None,
-            svm_validators: AuthorizedValidatorSet::from_hex_keys(&[key_hex]).unwrap(),
-            signing_key: key,
-        };
-
-        let slot = 100u64;
-        let blockhash = [0xDEu8; 32];
+        let pubkeys = vec![key.verifying_key().to_bytes()];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
         let rt = tokio::runtime::Runtime::new().unwrap();
         let proof = rt
-            .block_on(submitter.acquire_svm_proof(200, slot, blockhash))
+            .block_on(submitter.acquire_svm_proof(test_request(&stakes)))
             .unwrap();
 
         // The count comes from the rule on the configured set, not from a
@@ -609,6 +852,54 @@ mod tests {
         // required_signatures must be >= 1 and count > 0.
         assert!(proof.required_signatures >= 1);
         assert!(!proof.validator_signatures.is_empty());
+        assert!(proof.encoded_envelope().is_ok());
+    }
+
+    #[test]
+    fn acquire_svm_proof_accepts_an_independently_signed_vote() {
+        let own = RpcSubmitter::key_from_seed("aggregating relayer");
+        let peer = RpcSubmitter::key_from_seed("independent validator");
+        let pubkeys = vec![
+            own.verifying_key().to_bytes(),
+            peer.verifying_key().to_bytes(),
+        ];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(own, pubkeys, stakes.clone());
+        let mut request = test_request(&stakes);
+        request.existing_signatures = vec![request_vote(&request, &peer)];
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let proof = rt
+            .block_on(submitter.acquire_svm_proof(request))
+            .expect("two independent votes meet a two-thirds stake threshold");
+        assert_eq!(proof.validator_signatures.len(), 2);
+        assert!(proof.encoded_envelope().is_ok());
+    }
+
+    #[test]
+    fn acquire_svm_proof_refuses_a_vote_over_different_evidence() {
+        let own = RpcSubmitter::key_from_seed("evidence mismatch relayer");
+        let peer = RpcSubmitter::key_from_seed("evidence mismatch validator");
+        let pubkeys = vec![
+            own.verifying_key().to_bytes(),
+            peer.verifying_key().to_bytes(),
+        ];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(own, pubkeys, stakes.clone());
+        let request = test_request(&stakes);
+        let mut vote = request_vote(&request, &peer);
+        vote.signature[0] ^= 1;
+        let mut tampered_request = request;
+        tampered_request.existing_signatures = vec![vote];
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let error = rt
+            .block_on(submitter.acquire_svm_proof(tampered_request))
+            .expect_err("a vote for different evidence must be refused");
+        assert!(matches!(
+            error,
+            SubmitterError::InvalidSvmVote { index: 0, .. }
+        ));
     }
 
     /// The ugly path this workstream exists for: with three authorized
@@ -619,25 +910,13 @@ mod tests {
     #[test]
     fn acquire_svm_proof_refuses_a_set_it_cannot_back() {
         let key = RpcSubmitter::key_from_seed("under-quorum submitter seed");
-        let submitter = RpcSubmitter {
-            x3_rpc_url: "http://localhost:9933".to_string(),
-            nonce: Arc::new(RwLock::new(0)),
-            rpc_client: reqwest::Client::new(),
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            relayer_custody_key_id: None,
-            // Three validators: this key plus two this process cannot sign for.
-            svm_validators: AuthorizedValidatorSet::from_keys(vec![
-                key.verifying_key().to_bytes(),
-                [0x11u8; 32],
-                [0x22u8; 32],
-            ]),
-            signing_key: key,
-        };
+        let pubkeys = vec![key.verifying_key().to_bytes(), [0x11u8; 32], [0x22u8; 32]];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let error = rt
-            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .block_on(submitter.acquire_svm_proof(test_request(&stakes)))
             .expect_err("one key cannot back a three-of-three quorum");
 
         assert_eq!(
@@ -658,20 +937,13 @@ mod tests {
     #[test]
     fn acquire_svm_proof_refuses_when_its_key_is_not_authorized() {
         let key = RpcSubmitter::key_from_seed("unauthorized submitter seed");
-        let submitter = RpcSubmitter {
-            x3_rpc_url: "http://localhost:9933".to_string(),
-            nonce: Arc::new(RwLock::new(0)),
-            rpc_client: reqwest::Client::new(),
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            relayer_custody_key_id: None,
-            svm_validators: AuthorizedValidatorSet::from_keys(vec![[0x33u8; 32]]),
-            signing_key: key,
-        };
+        let pubkeys = vec![[0x33u8; 32]];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let error = rt
-            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .block_on(submitter.acquire_svm_proof(test_request(&stakes)))
             .expect_err("an unauthorized key must not produce a proof");
         assert_eq!(
             error,
@@ -687,20 +959,15 @@ mod tests {
     /// producing an unbacked proof.
     #[test]
     fn acquire_svm_proof_refuses_with_no_validator_set() {
-        let submitter = RpcSubmitter {
-            x3_rpc_url: "http://localhost:9933".to_string(),
-            nonce: Arc::new(RwLock::new(0)),
-            rpc_client: reqwest::Client::new(),
-            max_retries: 3,
-            retry_backoff_ms: 1000,
-            relayer_custody_key_id: None,
-            svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
-            signing_key: RpcSubmitter::key_from_seed("no set configured"),
-        };
+        let submitter = test_submitter(
+            RpcSubmitter::key_from_seed("no set configured"),
+            Vec::new(),
+            Vec::new(),
+        );
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         let error = rt
-            .block_on(submitter.acquire_svm_proof(200, 42, [0xDEu8; 32]))
+            .block_on(submitter.acquire_svm_proof(test_request(&[])))
             .expect_err("no authorized validator set must fail closed");
         assert_eq!(error, SubmitterError::NoAuthorizedValidatorSet);
     }
@@ -716,6 +983,8 @@ mod tests {
             retry_backoff_ms: 1000,
             relayer_custody_key_id: Some("custody-key-001".to_string()),
             svm_validators: AuthorizedValidatorSet::from_keys(Vec::new()),
+            svm_stakes: Vec::new(),
+            svm_cluster: TEST_CLUSTER,
             signing_key: RpcSubmitter::key_from_seed("custody authority test"),
         };
 

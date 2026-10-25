@@ -26,7 +26,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use x3_bridge::bitcoin_htlc::{HTLCContract, HTLCState, Preimage};
 use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
-use x3_relayer::types::{EvmProof, SvmProof, ValidatorSignature};
+use x3_relayer::types::{EvmProof, SolanaCluster, SvmProof, ValidatorSignature};
 use x3_rpc::benchmark::{BenchmarkProfile, BenchmarkReport};
 
 /// Application state.
@@ -398,8 +398,18 @@ fn into_validator_signatures(
 pub enum RelayerProofRequest {
     Svm {
         source_domain: u32,
+        proof_id: [u8; 32],
+        cluster: String,
         slot: u64,
+        parent_slot: u64,
         blockhash: [u8; 32],
+        parent_bank_hash: [u8; 32],
+        stake_table_digest: [u8; 32],
+        expected_asset_id: [u8; 32],
+        expected_amount: String,
+        expected_sender: Vec<u8>,
+        expected_recipient: Vec<u8>,
+        expected_beneficiary: Vec<u8>,
         validator_signatures: Vec<ValidatorAttestationWire>,
         required_signatures: u32,
     },
@@ -441,27 +451,80 @@ async fn post_relayer_proof_summary(
     match req {
         RelayerProofRequest::Svm {
             source_domain,
+            proof_id,
+            cluster,
             slot,
+            parent_slot,
             blockhash,
+            parent_bank_hash,
+            stake_table_digest,
+            expected_asset_id,
+            expected_amount,
+            expected_sender,
+            expected_recipient,
+            expected_beneficiary,
             validator_signatures,
             required_signatures,
         } => {
             let attestations = validator_signatures.len();
             let validators = into_validator_signatures(&validator_signatures)?;
-            let meets_quorum = (attestations as u32) >= required_signatures;
+            let expected_amount = expected_amount.parse::<u128>().map_err(|error| {
+                GatewayError::BadRequest(format!("invalid SVM proof amount: {error}"))
+            })?;
+            let cluster = match cluster.to_ascii_lowercase().as_str() {
+                "mainnet-beta" | "mainnet_beta" | "mainnet" => SolanaCluster::MainnetBeta,
+                "testnet" => SolanaCluster::Testnet,
+                "devnet" => SolanaCluster::Devnet,
+                _ => {
+                    return Err(GatewayError::BadRequest(
+                        "unknown Solana cluster in proof".into(),
+                    ))
+                }
+            };
+            if proof_id == [0u8; 32]
+                || blockhash == [0u8; 32]
+                || parent_bank_hash == [0u8; 32]
+                || stake_table_digest == [0u8; 32]
+            {
+                return Err(GatewayError::BadRequest(
+                    "SVM proof contains a zero identity".into(),
+                ));
+            }
+            if parent_slot >= slot {
+                return Err(GatewayError::BadRequest(
+                    "SVM parent slot must precede the finalized slot".into(),
+                ));
+            }
+            if expected_beneficiary.is_empty() || expected_beneficiary.len() > 128 {
+                return Err(GatewayError::BadRequest(
+                    "SVM beneficiary must be between 1 and 128 bytes".into(),
+                ));
+            }
+            let meets_quorum =
+                proof_id != [0u8; 32] && (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
             // this deserialization would have failed already.
             let _proof = SvmProof {
                 source_domain,
+                proof_id,
+                cluster,
                 slot,
+                parent_slot,
                 blockhash,
+                parent_bank_hash,
+                stake_table_digest,
+                expected_asset_id,
+                expected_amount,
+                expected_sender,
+                expected_recipient,
+                expected_beneficiary,
                 validator_signatures: validators,
                 required_signatures,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "svm",
-                proof_id_hex: hex::encode(blockhash),
+                proof_id_hex: hex::encode(proof_id),
                 validator_attestations: attestations,
                 required_signatures,
                 meets_quorum,
@@ -2159,6 +2222,41 @@ mod tests {
         let proof: Value = proof_resp.json().await.expect("proof-summary json");
         assert_eq!(proof["kind"], json!("evm"));
         assert_eq!(proof["meets_quorum"], json!(true));
+
+        let svm_proof = json!({
+            "kind": "svm",
+            "source_domain": 200,
+            "proof_id": vec![8u8; 32],
+            "cluster": "devnet",
+            "slot": 42,
+            "parent_slot": 41,
+            "blockhash": vec![7u8; 32],
+            "parent_bank_hash": vec![6u8; 32],
+            "stake_table_digest": vec![5u8; 32],
+            "expected_asset_id": vec![4u8; 32],
+            "expected_amount": "5000",
+            "expected_sender": vec![3u8; 32],
+            "expected_recipient": vec![2u8; 32],
+            "expected_beneficiary": vec![1u8; 32],
+            "validator_signatures": [{
+                "validator_pubkey": vec![9u8; 32],
+                "signature": vec![10u8; 64]
+            }],
+            "required_signatures": 1u32
+        });
+        serde_json::from_value::<RelayerProofRequest>(svm_proof.clone())
+            .expect("the documented SVM V2 proof shape must deserialize");
+        let svm_resp = client
+            .post(format!("{base}/api/v1/relayer/proof-summary"))
+            .json(&svm_proof)
+            .send()
+            .await
+            .expect("SVM proof-summary request");
+        assert_eq!(svm_resp.status().as_u16(), 200);
+        let svm_summary: Value = svm_resp.json().await.expect("SVM proof-summary json");
+        assert_eq!(svm_summary["kind"], json!("svm"));
+        assert_eq!(svm_summary["proof_id_hex"], json!(hex::encode([8u8; 32])));
+        assert_eq!(svm_summary["meets_quorum"], json!(true));
 
         // The GraphQL endpoint is served and answers a real query.
         let gql = client

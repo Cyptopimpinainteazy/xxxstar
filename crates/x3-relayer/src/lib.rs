@@ -23,7 +23,7 @@ pub use quorum::{AuthorizedValidatorSet, ValidatorSetError};
 #[cfg(feature = "std")]
 pub use relayer::{EvmReceiptProofRequest, RelayerService};
 #[cfg(feature = "std")]
-pub use submitter::RpcSubmitter;
+pub use submitter::{RpcSubmitter, RpcSubmitterConfig};
 pub use types::*;
 #[cfg(feature = "std")]
 pub use watchers::{EvmHeaderWatcher, SvmHeaderWatcher};
