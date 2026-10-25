@@ -572,7 +572,10 @@ pub mod pallet {
                     // than storing a task that is dead on arrival.
                     ensure!(lower <= upper, Error::<T>::InvalidTask);
                 }
-                Condition::Event { .. } | Condition::Manual => {}
+                // Event records have no bounded, consensus-safe index yet. Do
+                // not reserve funds for an unexecutable event-triggered task.
+                Condition::Event { .. } => return Err(Error::<T>::InvalidTask.into()),
+                Condition::Manual => {}
                 Condition::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -625,10 +628,11 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                // The collecting `events()` helper is only available with std.
-                // Stream the same records on both native and WASM execution.
-                Condition::Event { topic } => frame_system::Pallet::<T>::read_events_no_consensus()
-                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
+                // Existing event tasks also fail closed. Scanning the full
+                // System event stream in runtime execution is unbounded PoV.
+                Condition::Event { .. } => {
+                    return Err(DispatchError::Other("EventConditionUnsupported"));
+                },
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })

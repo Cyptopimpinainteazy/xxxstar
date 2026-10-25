@@ -705,61 +705,19 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
     });
 }
 
-// Exercise the actual event-content commitment used by the runtime condition.
+// Event matching needs a bounded on-chain index before it is consensus-admissible.
 #[test]
-fn event_condition_requires_the_exact_current_block_payload() {
-    use parity_scale_codec::Encode;
+fn event_registration_fails_closed_without_bounded_index() {
     new_test_ext().execute_with(|| {
-        let event = RuntimeEvent::Automation(Event::TaskExpired {
-            task_id: sp_core::H256::repeat_byte(7),
-        });
-        let topic = sp_io::hashing::blake2_256(&event.encode());
-        let mut recipient = [0u8; 32];
-        recipient[..8].copy_from_slice(&3u64.to_le_bytes());
-        let amount = 25;
-        assert_ok!(Automation::register_task(
-            RuntimeOrigin::signed(1),
-            Condition::Event { topic },
-            Action::TransferNative { recipient, amount },
-            1000,
-        ));
-        let task_id = AccountTasks::<Test>::get(1)[0];
-        let owner_before = Balances::free_balance(1);
-        let keeper_before = Balances::free_balance(2);
-        let recipient_before = Balances::free_balance(3);
         assert_noop!(
-            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
-            Error::<Test>::ConditionNotMet
+            Automation::register_task(
+                RuntimeOrigin::signed(1),
+                Condition::Event { topic: [7u8; 32] },
+                Action::NoChange,
+                1000,
+            ),
+            Error::<Test>::InvalidTask
         );
-        System::deposit_event(RuntimeEvent::Automation(Event::TaskExpired {
-            task_id: sp_core::H256::repeat_byte(8),
-        }));
-        assert_noop!(
-            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
-            Error::<Test>::ConditionNotMet
-        );
-        assert_eq!(Balances::free_balance(1), owner_before);
-        assert_eq!(Balances::free_balance(2), keeper_before);
-        assert_eq!(Balances::free_balance(3), recipient_before);
-        assert_eq!(Tasks::<Test>::get(task_id).unwrap().attempts, 0);
-        // A matching payload from the previous block must not authorize work.
-        System::deposit_event(event.clone());
-        System::reset_events();
-        System::set_block_number(System::block_number() + 1);
-        assert_noop!(
-            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
-            Error::<Test>::ConditionNotMet
-        );
-        System::deposit_event(event);
-        assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
-        assert_eq!(Balances::free_balance(3), recipient_before + 25);
-        assert_eq!(
-            Balances::free_balance(2),
-            keeper_before + ExecutionFee::get()
-        );
-        assert_eq!(
-            Tasks::<Test>::get(task_id).unwrap().status,
-            x3_automation::TaskStatus::Executed
-        );
+        assert!(Automation::account_tasks(1).is_empty());
     });
 }
