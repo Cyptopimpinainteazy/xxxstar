@@ -59,6 +59,8 @@ def validate_consensus(before, after, urls, timeout, min_peers, query=rpc):
             errors.append(f"{url}: finalized height exceeds best head")
         if current["finalized_number"] < prior["finalized_number"]:
             errors.append(f"{url}: finalized height regressed")
+        elif current["finalized_number"] == prior["finalized_number"]:
+            errors.append(f"{url}: no finality progress during sampling window")
         try:
             historical = query(url, "chain_getBlockHash", timeout, [prior["finalized_number"]])
             if historical != prior["finalized_hash"]:
@@ -87,8 +89,6 @@ def validate_consensus(before, after, urls, timeout, min_peers, query=rpc):
         errors.append("missing common-height hashes")
     elif len(set(hashes)) != 1:
         errors.append(f"finalized divergence at height {common_height}")
-    if not any(a["finalized_number"] > b["finalized_number"] for b, a in zip(before, after)):
-        errors.append("no finality progress during sampling window")
     return errors
 
 
