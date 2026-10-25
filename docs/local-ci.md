@@ -169,8 +169,11 @@ PASS.
 
 ### Publishing the verdict
 
-Every workflow in this repository is `workflow_dispatch` on a local runner, so no
-GitHub check runs automatically against a pull request. `--publish-status` posts
+The trusted `.github/workflows/local-ci.yml` runs automatically on
+same-repository pull requests targeting `master`/`main` and pushes to those branches (fork PRs are excluded).
+Draft PRs receive only a non-signoff preflight, and `ready_for_review`
+triggers full exact-head CI. Other workflows may run automatically under their own triggers; heavyweight release/deployment gates retain separate authorization.
+`--publish-status` posts
 the run's verdict as the commit status `x3/local-ci` on the exact SHA the run
 tested (`scripts/x3-publish-status.sh` wraps the API call). `success` is posted
 only when every gate passed, the tree was clean, **and** the run was the
@@ -179,6 +182,24 @@ unscoped default set. A dirty tree or a scoped run (`--only`/`--skip`/
 of record passed for this SHA" and neither case is evidence of that. That is the
 status branch protection requires, so a red gate cannot merge and a green local
 run is attributable to exactly one commit.
+
+### Risk-aware development pre-push
+
+`.githooks/pre-push` calls `scripts/ci/risk_plan.py` for feature-branch
+pushes. It uses a fail-closed file diff against `origin/master` (or
+`X3_LOCAL_CI_BASE`), including uncommitted, untracked, and renamed source
+paths. A docs-only change or a restricted desktop `src/` UI change can use
+an advisory `--only` subset; all other changes use `--pre-push`. The
+master/main push path always retains its release and variant gates.
+The unit suite `python3 -m unittest discover -s scripts/ci -p
+test_risk_plan.py -v` runs before choosing a scope.
+
+Focused checks **never** publish success for `x3/local-ci`. The self-hosted
+PR workflow runs the full unscoped gate set and publishes that exact-head
+status when the PR is ready for review. Draft PRs run only a focused
+non-signoff preflight, conserving runner capacity while work changes.
+This stage is not a substitute for risk-specific security, consensus,
+cross-domain, testnet, or mainnet release certification.
 
 ### Scheduling and scoping
 
@@ -321,8 +342,9 @@ configuration) or in a build script must be verified with the whole fast set —
 `--pre-push`, or a plain run — before merging. #235 shipped a `clippy::ptr_arg`
 error in `runtime/build.rs` precisely because it was verified with a light
 `--only` subset; the next full run caught it (`15 PASS / 3 FAIL`, all three
-failures the same line). The pre-push hook always runs the full fast set, which
-is the intended safety net.
+failures the same line). The pre-push hook runs the full fast set for critical, unknown, and
+policy changes; low-risk documentation and desktop UI changes use a focused
+advisory subset. Full exact-head PR CI remains the merge safety net.
 
 ## The pre-push hook
 
@@ -346,12 +368,12 @@ queue slot:
 inspection. The batch branch is never merged automatically — review its runner
 verdict and merge whichever branches it proves.
 
-`.githooks/pre-push` delegates to `scripts/local-ci.sh --pre-push`:
+`.githooks/pre-push` selects verification using the pushed ref and a fail-closed risk plan:
 
-1. the fast gate set above, always;
-2. `--live` when the diff touches `X3-contracts/evm/**` or `X3-contracts/svm/**`;
-3. `--variants` when the diff touches `runtime/**`;
-4. `--release` and `--variants` when the push targets `master`/`main`.
+1. pushes targeting protected `master`/`main` run full `--pre-push` release and variant gates;
+2. runtime, contracts, consensus, CI policy, unknown paths, unresolvable history, or pushes whose target commit is not checked-out `HEAD` run full `--pre-push`;
+3. positively allowlisted informational docs and presentation-only desktop changes may run focused advisory checks after passing the risk-selector self-tests;
+4. all ready-for-review PRs still require full exact-head `x3/local-ci` before merge. Focused checks never publish that status.
 
 Escape hatches, both deliberately loud:
 

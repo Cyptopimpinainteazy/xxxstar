@@ -6,9 +6,10 @@ name: Local CI
 # that runs without someone starting it by hand.
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
-    branches: [master]
+    branches: [master, main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
       mode:
@@ -27,6 +28,8 @@ concurrency:
 
 jobs:
   local-ci:
+    # A green draft preflight must not resemble the full required CI gate.
+    name: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && 'draft-preflight (not merge evidence)' || 'local-ci (full verification)' }}
     # The repository is public and the runners are our own machines: never run
     # code from a fork's pull request on them.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -75,7 +78,18 @@ jobs:
           done
           python3 --version; cargo --version
 
-      - name: Local CI
+      - name: Verify fail-closed risk selector
+        run: python3 -m unittest discover -s scripts/ci -p test_risk_plan.py -v
+
+      # A draft cannot merge. Avoid spending a multi-hour runner slot on every
+      # exploratory push. This deliberately does NOT post x3/local-ci success.
+      # The ready_for_review event triggers the full suite on this exact SHA.
+      - name: Draft PR preflight (not merge evidence)
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft
+        run: bash scripts/local-ci.sh --only agent-guards,workflow-schema,script-syntax,test-integrity-diff
+
+      - name: Local CI (required full gate)
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         env:
           MODE: ${{ github.event.inputs.mode }}
         # Full gate set: a scoped run (--changed-from/--only) publishes no verdict.
