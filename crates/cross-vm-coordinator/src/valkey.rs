@@ -424,6 +424,10 @@ impl ValkeySettlementOutboxStore {
         format!("{}:settlement-outbox-index", self.namespace)
     }
 
+    fn release_beacon_floor_key(&self) -> String {
+        format!("{}:settlement-outbox-release-beacon-floor", self.namespace)
+    }
+
     fn decode_submission_id_key(&self, key: &str) -> Result<[u8; 32], CoordinatorError> {
         let prefix = format!("{}:settlement-outbox:", self.namespace);
         let encoded = key.strip_prefix(&prefix).ok_or_else(|| {
@@ -569,6 +573,132 @@ return 1
                 })
             })
             .collect()
+    }
+
+    fn release_beacon_floor(&self) -> Result<Option<(u64, [u8; 32])>, CoordinatorError> {
+        let mut conn = self.connection()?;
+        let (number, hash): (Option<String>, Option<String>) = redis::cmd("HMGET")
+            .arg(self.release_beacon_floor_key())
+            .arg(&["number", "hash"])
+            .query(&mut conn)
+            .map_err(|e| backend_error("release beacon floor lookup", e))?;
+
+        match (number, hash) {
+            (None, None) => Ok(None),
+            (Some(number), Some(hash)) => {
+                let number = u64::from_str_radix(&number, 16).map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "invalid release beacon floor number in Valkey: {e}"
+                    ))
+                })?;
+                let hash = hex::decode(hash).map_err(|e| {
+                    CoordinatorError::Internal(format!(
+                        "invalid release beacon floor hash in Valkey: {e}"
+                    ))
+                })?;
+                let hash = hash.try_into().map_err(|hash: Vec<u8>| {
+                    CoordinatorError::Internal(format!(
+                        "release beacon floor hash in Valkey is {} bytes, expected 32",
+                        hash.len()
+                    ))
+                })?;
+                Ok(Some((number, hash)))
+            }
+            _ => Err(CoordinatorError::Internal(
+                "release beacon floor in Valkey is incomplete".into(),
+            )),
+        }
+    }
+
+    fn compare_and_append_release(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&crate::SettlementOutboxRecord>,
+        next: &crate::SettlementOutboxRecord,
+        release_beacon_number: u64,
+        release_beacon_hash: [u8; 32],
+    ) -> Result<(), CoordinatorError> {
+        if next.submission_id != submission_id {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox key does not match record submission id".into(),
+            ));
+        }
+
+        let expected_payload = expected
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                CoordinatorError::Internal(format!(
+                    "settlement outbox expected snapshot serialize failed: {e}"
+                ))
+            })?
+            .unwrap_or_default();
+        let next_payload = serde_json::to_string(next).map_err(|e| {
+            CoordinatorError::Internal(format!(
+                "settlement outbox snapshot serialize failed: {e}"
+            ))
+        })?;
+
+        let script = Script::new(
+            r#"
+local floor_number = redis.call('HGET', KEYS[3], 'number')
+local floor_hash = redis.call('HGET', KEYS[3], 'hash')
+local candidate_number = ARGV[5]
+local candidate_hash = ARGV[6]
+
+if floor_number then
+  if candidate_number < floor_number then return -1 end
+  if candidate_number == floor_number and candidate_hash ~= floor_hash then
+    return -2
+  end
+end
+
+local current = redis.call('LINDEX', KEYS[1], -1)
+local expect_none = ARGV[1] == '1'
+local expected = ARGV[2]
+local next = ARGV[3]
+
+if current ~= next then
+  if expect_none then
+    if current then return 0 end
+  else
+    if not current or current ~= expected then return 0 end
+  end
+  redis.call('RPUSH', KEYS[1], next)
+end
+
+redis.call('SADD', KEYS[2], ARGV[4])
+redis.call('HSET', KEYS[3], 'number', candidate_number, 'hash', candidate_hash)
+return 1
+"#,
+        );
+
+        let mut conn = self.connection()?;
+        let accepted: i64 = script
+            .key(self.key(submission_id))
+            .key(self.index_key())
+            .key(self.release_beacon_floor_key())
+            .arg(if expected.is_none() { "1" } else { "0" })
+            .arg(expected_payload)
+            .arg(next_payload)
+            .arg(hex::encode(submission_id))
+            .arg(format!("{release_beacon_number:016x}"))
+            .arg(hex::encode(release_beacon_hash))
+            .invoke(&mut conn)
+            .map_err(|e| backend_error("settlement outbox release transition script", e))?;
+
+        match accepted {
+            1 => Ok(()),
+            -1 => Err(CoordinatorError::Internal(
+                "refusing stale release beacon at the atomic Valkey floor".into(),
+            )),
+            -2 => Err(CoordinatorError::Internal(
+                "refusing conflicting release beacon at the atomic Valkey floor".into(),
+            )),
+            _ => Err(CoordinatorError::Internal(
+                "settlement outbox concurrent transition conflict".into(),
+            )),
+        }
     }
 
     fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError> {

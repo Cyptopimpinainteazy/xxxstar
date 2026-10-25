@@ -42,21 +42,19 @@ fn namespace(suffix: &str) -> String {
 }
 
 #[cfg(feature = "canonical-proofs")]
-fn verified_release_beacon() -> VerifiedReleaseBeacon {
-    const BLOCK_NUMBER: u64 = 77;
-    const BLOCK_HASH: [u8; 32] = [0x91; 32];
+fn verified_release_beacon(block_number: u64, block_hash: [u8; 32]) -> VerifiedReleaseBeacon {
     let key = SigningKey::from_bytes(&[1u8; 32]);
     let statement = x3_cross_vm_coordinator::settlement_outbox::release_beacon_statement_hash(
         "validator-a",
-        BLOCK_NUMBER,
-        BLOCK_HASH,
+        block_number,
+        block_hash,
     );
     let policy =
         ReleaseBeaconPolicy::new(1, vec![key.verifying_key().to_bytes()]).unwrap();
     policy
         .verify(&ReleaseBeaconEvidence {
-            block_number: BLOCK_NUMBER,
-            block_hash: BLOCK_HASH,
+            block_number,
+            block_hash,
             attestations: vec![ReleaseBeaconAttestation {
                 attestor_id: "validator-a".into(),
                 public_key: key.verifying_key().to_bytes(),
@@ -418,7 +416,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
 
     // Network send uses exactly signed.signed_extrinsic. Only after the RPC
     // send returns do we move durable state to Broadcast.
-    let beacon = verified_release_beacon();
+    let beacon = verified_release_beacon(77, [0x91; 32]);
     let broadcast = coordinator
         .record_settlement_submission_broadcast(&signed, &beacon, 108)
         .unwrap();
@@ -470,6 +468,8 @@ fn settlement_record(
         block_number: None,
         owner_id: None,
         fence: None,
+        release_beacon_number: None,
+        release_beacon_hash: None,
         prepared_at: now,
         updated_at: now,
         error: None,
@@ -504,7 +504,7 @@ fn live_valkey_cross_domain_release_order_survives_restart() {
     let restarted = SettlementSubmissionOutbox::new(
         ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap(),
     );
-    let beacon = verified_release_beacon();
+    let beacon = verified_release_beacon(77, [0x91; 32]);
     let order = restarted.canonical_release_order(&beacon).unwrap();
     assert_eq!(order.len(), 2);
 
@@ -538,7 +538,51 @@ fn live_valkey_cross_domain_release_order_survives_restart() {
         .latest(order[1])
         .unwrap()
         .expect("canonical second submission survives restart");
+    let stale = verified_release_beacon(76, [0x90; 32]);
+    assert!(restarted
+        .record_broadcast_ordered(&canonical_second, &stale, 106)
+        .is_err());
     restarted
-        .record_broadcast_ordered(&canonical_second, &beacon, 106)
+        .record_broadcast_ordered(&canonical_second, &beacon, 107)
         .unwrap();
+}
+
+#[cfg(feature = "canonical-proofs")]
+#[test]
+fn live_valkey_release_floor_claim_is_atomic() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("settlement-release-floor-race");
+    let first = settlement_record([0x31; 32], [0x41; 32], 100);
+    let second = settlement_record([0x32; 32], [0x42; 32], 101);
+    let barrier = Arc::new(Barrier::new(3));
+
+    let contenders = [
+        (first.clone(), [0x91; 32]),
+        (second.clone(), [0x92; 32]),
+    ]
+    .into_iter()
+    .map(|(record, hash)| {
+        let url = url.clone();
+        let ns = ns.clone();
+        let barrier = Arc::clone(&barrier);
+        thread::spawn(move || {
+            let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+            barrier.wait();
+            store.compare_and_append_release(record.submission_id, None, &record, 77, hash)
+        })
+    })
+    .collect::<Vec<_>>();
+    barrier.wait();
+
+    let accepted = contenders
+        .into_iter()
+        .map(|worker| worker.join().unwrap().is_ok())
+        .filter(|accepted| *accepted)
+        .count();
+    assert_eq!(accepted, 1, "one conflicting Valkey beacon must win");
+
+    let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+    let floor = store.release_beacon_floor().unwrap().unwrap();
+    assert_eq!(floor.0, 77);
+    assert!(floor.1 == [0x91; 32] || floor.1 == [0x92; 32]);
 }

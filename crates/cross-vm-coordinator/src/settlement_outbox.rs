@@ -198,6 +198,11 @@ pub struct SettlementOutboxRecord {
     pub block_number: Option<u64>,
     pub owner_id: Option<String>,
     pub fence: Option<u64>,
+    /// Monotonic verified X3 beacon floor attached at broadcast time.
+    #[serde(default)]
+    pub release_beacon_number: Option<u64>,
+    #[serde(default)]
+    pub release_beacon_hash: Option<[u8; 32]>,
     pub prepared_at: u64,
     pub updated_at: u64,
     pub error: Option<String>,
@@ -219,6 +224,33 @@ pub trait SettlementOutboxStore: Send + Sync + 'static {
         submission_id: [u8; 32],
     ) -> Result<Vec<SettlementOutboxRecord>, CoordinatorError>;
 
+    /// Read the atomically advanced X3 release beacon floor.
+    fn release_beacon_floor(&self) -> Result<Option<(u64, [u8; 32])>, CoordinatorError> {
+        Err(CoordinatorError::Internal(
+            "settlement outbox store does not expose an atomic release beacon floor".into(),
+        ))
+    }
+
+    /// Atomically enforce the monotonic beacon floor and append `next` only
+    /// when the current latest record equals `expected`.
+    ///
+    /// Stores must fail closed when they cannot make the floor check and append
+    /// one atomic decision. A separate check followed by `compare_and_append`
+    /// lets two submissions race different beacons.
+    fn compare_and_append_release(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&SettlementOutboxRecord>,
+        next: &SettlementOutboxRecord,
+        _release_beacon_number: u64,
+        _release_beacon_hash: [u8; 32],
+    ) -> Result<(), CoordinatorError> {
+        let _ = (submission_id, expected, next);
+        Err(CoordinatorError::Internal(
+            "settlement outbox store cannot atomically append a release beacon".into(),
+        ))
+    }
+
     /// Enumerate every submission held by this outbox so release ordering can
     /// be derived from the complete pending set rather than a caller's subset.
     fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError>;
@@ -227,6 +259,7 @@ pub trait SettlementOutboxStore: Send + Sync + 'static {
 #[derive(Default)]
 pub struct InMemorySettlementOutboxStore {
     entries: RwLock<HashMap<[u8; 32], Vec<SettlementOutboxRecord>>>,
+    release_beacon_floor: RwLock<Option<(u64, [u8; 32])>>,
 }
 
 impl SettlementOutboxStore for InMemorySettlementOutboxStore {
@@ -273,6 +306,55 @@ impl SettlementOutboxStore for InMemorySettlementOutboxStore {
         Ok(guard.get(&submission_id).cloned().unwrap_or_default())
     }
 
+    fn release_beacon_floor(&self) -> Result<Option<(u64, [u8; 32])>, CoordinatorError> {
+        self.release_beacon_floor
+            .read()
+            .map(|floor| *floor)
+            .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))
+    }
+
+    fn compare_and_append_release(
+        &self,
+        submission_id: [u8; 32],
+        expected: Option<&SettlementOutboxRecord>,
+        next: &SettlementOutboxRecord,
+        release_beacon_number: u64,
+        release_beacon_hash: [u8; 32],
+    ) -> Result<(), CoordinatorError> {
+        if next.submission_id != submission_id {
+            return Err(CoordinatorError::Internal(
+                "settlement outbox key does not match record submission id".into(),
+            ));
+        }
+
+        // The floor lock is always acquired before the entries lock. No other
+        // path acquires them in reverse order.
+        let mut floor = self
+            .release_beacon_floor
+            .write()
+            .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
+        let mut entries = self
+            .entries
+            .write()
+            .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
+
+        enforce_release_beacon_floor(*floor, release_beacon_number, release_beacon_hash)?;
+
+        let history = entries.entry(submission_id).or_default();
+        let current = history.last();
+        if current != Some(next) {
+            if current != expected {
+                return Err(CoordinatorError::Internal(
+                    "settlement outbox concurrent transition conflict".into(),
+                ));
+            }
+            history.push(next.clone());
+        }
+
+        *floor = Some((release_beacon_number, release_beacon_hash));
+        Ok(())
+    }
+
     fn submission_ids(&self) -> Result<Vec<[u8; 32]>, CoordinatorError> {
         let guard = self
             .entries
@@ -280,6 +362,32 @@ impl SettlementOutboxStore for InMemorySettlementOutboxStore {
             .map_err(|_| CoordinatorError::Internal("settlement outbox poisoned".into()))?;
         Ok(guard.keys().copied().collect())
     }
+}
+
+fn enforce_release_beacon_floor(
+    floor: Option<(u64, [u8; 32])>,
+    block_number: u64,
+    block_hash: [u8; 32],
+) -> Result<(), CoordinatorError> {
+    if let Some((number, hash)) = floor {
+        if block_number < number {
+            return Err(CoordinatorError::Internal(format!(
+                "refusing stale release beacon {}:{}; persisted beacon floor is {number}:{}",
+                block_number,
+                hex::encode(block_hash),
+                hex::encode(hash)
+            )));
+        }
+        if block_number == number && block_hash != hash {
+            return Err(CoordinatorError::Internal(format!(
+                "refusing conflicting release beacon {}:{}; persisted beacon is {}:{number}",
+                block_number,
+                hex::encode(block_hash),
+                hex::encode(hash)
+            )));
+        }
+    }
+    Ok(())
 }
 
 pub struct SettlementSubmissionOutbox<S: SettlementOutboxStore> {
@@ -342,6 +450,11 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
         beacon: &VerifiedReleaseBeacon,
         now: u64,
     ) -> Result<SettlementOutboxRecord, CoordinatorError> {
+        enforce_release_beacon_floor(
+            self.store.release_beacon_floor()?,
+            beacon.block_number(),
+            beacon.block_hash(),
+        )?;
         let order = self.canonical_release_order(beacon)?;
         let next = order.first().copied().ok_or_else(|| {
             CoordinatorError::Internal("settlement release order is empty at broadcast time".into())
@@ -354,7 +467,18 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
                 hex::encode(signed.submission_id)
             )));
         }
-        self.record_broadcast(signed, now)
+        let result = self.record_broadcast_transition(signed, Some(beacon), now);
+        if result.is_err() {
+            // Map a concurrent floor winner to the same explicit refusal a
+            // sequential caller receives. The store still makes the final,
+            // atomic decision; this only improves the surfaced error.
+            enforce_release_beacon_floor(
+                self.store.release_beacon_floor()?,
+                beacon.block_number(),
+                beacon.block_hash(),
+            )?;
+        }
+        result
     }
 
     #[cfg(feature = "canonical-proofs")]
@@ -390,6 +514,8 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
             block_number: None,
             owner_id: None,
             fence: None,
+            release_beacon_number: None,
+            release_beacon_hash: None,
             prepared_at: now,
             updated_at: now,
             error: None,
@@ -475,9 +601,18 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
     /// Record that the exact persisted signed extrinsic was submitted to RPC.
     /// This transition happens after send; a crash before it leaves status
     /// Signed, which recovery handles by querying/rebroadcasting the SAME bytes.
-    pub fn record_broadcast(
+    pub(crate) fn record_broadcast(
         &self,
         signed: &SettlementOutboxRecord,
+        now: u64,
+    ) -> Result<SettlementOutboxRecord, CoordinatorError> {
+        self.record_broadcast_transition(signed, None, now)
+    }
+
+    fn record_broadcast_transition(
+        &self,
+        signed: &SettlementOutboxRecord,
+        beacon: Option<&VerifiedReleaseBeacon>,
         now: u64,
     ) -> Result<SettlementOutboxRecord, CoordinatorError> {
         let latest = self.require_latest(signed.submission_id)?;
@@ -505,11 +640,23 @@ impl<S: SettlementOutboxStore> SettlementSubmissionOutbox<S> {
 
         let next = SettlementOutboxRecord {
             status: SettlementOutboxStatus::Broadcast,
+            release_beacon_number: beacon.map(VerifiedReleaseBeacon::block_number),
+            release_beacon_hash: beacon.map(VerifiedReleaseBeacon::block_hash),
             updated_at: now,
             ..latest.clone()
         };
-        self.store
-            .compare_and_append(next.submission_id, Some(&latest), &next)?;
+        if let Some(beacon) = beacon {
+            self.store.compare_and_append_release(
+                next.submission_id,
+                Some(&latest),
+                &next,
+                beacon.block_number(),
+                beacon.block_hash(),
+            )?;
+        } else {
+            self.store
+                .compare_and_append(next.submission_id, Some(&latest), &next)?;
+        }
         Ok(next)
     }
 
@@ -674,6 +821,8 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
 mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
+    use std::sync::{Arc, Barrier};
+    use std::thread;
 
     fn attestor_key(seed: u8) -> SigningKey {
         SigningKey::from_bytes(&[seed; RELEASE_BEACON_PUBLIC_KEY_LEN])
@@ -746,6 +895,8 @@ mod tests {
             block_number: None,
             owner_id: None,
             fence: None,
+            release_beacon_number: None,
+            release_beacon_hash: None,
             prepared_at: 100,
             updated_at: 100,
             error: None,
@@ -849,12 +1000,65 @@ mod tests {
             .to_string()
             .contains("out-of-order settlement release"));
 
-        outbox
+        let first_broadcast = outbox
             .record_broadcast_ordered(canonical_first, &beacon, 104)
             .expect("the canonical first release");
+        assert_eq!(first_broadcast.release_beacon_number, Some(77));
+        assert_eq!(first_broadcast.release_beacon_hash, Some([0x91; 32]));
+
+        let stale = verified_beacon(76, [0x90; 32], 2);
+        let error = outbox
+            .record_broadcast_ordered(canonical_second, &stale, 105)
+            .expect_err("an older validly signed beacon must not reorder releases");
+        assert!(error.to_string().contains("stale release beacon"));
+
+        let conflicting = verified_beacon(77, [0x92; 32], 2);
+        let error = outbox
+            .record_broadcast_ordered(canonical_second, &conflicting, 105)
+            .expect_err("two hashes at one height must not be interchangeable");
+        assert!(error.to_string().contains("conflicting release beacon"));
+
         outbox
-            .record_broadcast_ordered(canonical_second, &beacon, 105)
+            .record_broadcast_ordered(canonical_second, &beacon, 106)
             .expect("the second release becomes canonical after the first");
+    }
+
+    #[test]
+    fn concurrent_release_floor_claim_is_atomic() {
+        let first = prepared_with([1u8; 32], [11u8; 32]);
+        let second = prepared_with([2u8; 32], [22u8; 32]);
+        let store = Arc::new(InMemorySettlementOutboxStore::default());
+        let barrier = Arc::new(Barrier::new(3));
+
+        let contenders = [
+            (first.clone(), [0x91; 32]),
+            (second.clone(), [0x92; 32]),
+        ]
+        .into_iter()
+        .map(|(record, hash)| {
+            let store = Arc::clone(&store);
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                store.compare_and_append_release(
+                    record.submission_id,
+                    None,
+                    &record,
+                    77,
+                    hash,
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+        barrier.wait();
+
+        let accepted = contenders
+            .into_iter()
+            .map(|worker| worker.join().unwrap().is_ok())
+            .filter(|accepted| *accepted)
+            .count();
+        assert_eq!(accepted, 1, "one conflicting beacon must win atomically");
+        assert!(store.release_beacon_floor().unwrap().is_some());
     }
 
     #[test]

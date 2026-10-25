@@ -18,15 +18,15 @@ name = "Cross-domain MEV protection"
 subsystem = "mev_privacy"
 source = "master"
 paths = ["crates/cross-vm-coordinator"]
-implemented = 85
+implemented = 88
 tested = 95
-mainnet_ready = 50
+mainnet_ready = 55
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "**NARROWED 2026-10-25 — raw caller-chosen ordering beacons are closed.** `VerifiedReleaseBeacon` has private fields and no public constructor. Callers must pass a `ReleaseBeaconPolicy` with policy-owned Ed25519 keys and threshold; every counted attestation signs a statement binding block height, block hash, and attestor identity. Prepared/signed settlements receive `SHA-256(\"X3:CROSS_DOMAIN_RELEASE_ORDER:V1\" || verified X3 block hash || submission id)`, and both in-memory and Valkey outboxes refuse any broadcast that is not canonical next. Still open: the seven-validator authority set must publish these beacon attestations through a production node/service path, and policy key rotation must be governed.",
+  "**NARROWED 2026-10-25 — raw caller-chosen and replayed ordering beacons are closed.** `VerifiedReleaseBeacon` has private fields and no public constructor. Callers must pass a `ReleaseBeaconPolicy` with policy-owned Ed25519 keys and threshold; every counted attestation signs a statement binding block height, block hash, and attestor identity. Broadcast records persist a monotonic beacon floor, and the in-memory and Valkey stores atomically combine the floor check with the record append, so concurrent submissions cannot race older or same-height-conflicting beacons. Prepared/signed settlements receive `SHA-256(\"X3:CROSS_DOMAIN_RELEASE_ORDER:V1\" || verified X3 block hash || submission id)`, and both stores refuse any broadcast that is not canonical next. Still open: the seven-validator authority set must publish these beacon attestations through a production node/service path, and policy key rotation must be governed.",
   "**Withholding is undetectable at this layer (S5).** A relayer who never delivers a settlement cannot be caught by a release gate; the intent runs to its timeout/refund path, so the attacker's gain is the delay itself. `recovery`/`settlement_reconcile` bound the damage; nothing removes the attack.",
   "**The gate enforces the policy against the evidence it is handed, not the adapter's honesty (S6).** `confirmations` and `safe_to_reveal_secret` are fields of the bundle. What is proven is that the coordinator cannot be talked into releasing *too early by evidence that says it is too early* — a fabricated deep-enough proof is the adapter's and the runtime's problem (`verify_runtime_binding`, `verify_claim_set`, matrix rows X3-XVM-*).",
   "**No multi-node chain evidence.** The release ordering and restart behavior now pass against a real local Valkey service, but no independently operated coordinator set has raced settlements against a live X3 validator network. `crates/cross-vm-coordinator` is not in the runtime dependency graph, so this changes what the coordinator submits, not what the runtime enforces.",
@@ -53,6 +53,7 @@ test_evidence = [
   "note: docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md names the assets, the attacker capabilities and the six surfaces, with the closed/open split and the file:line of each refusal",
   "note: Atomicity/replay/idempotency reduce classes of attacks but do not eliminate MEV; this row now closes three named surfaces rather than claiming the category",
   "note: 2026-10-25 — cargo test --features canonical-proofs -> 142 library tests plus 41 security regressions; cargo test --features valkey,canonical-proofs -> 142 library, 6 distributed chaos, 41 security and 7 live Valkey tests. Strict clippy passes for default, canonical-proofs and valkey,canonical-proofs configurations.",
+  "note: the ordered-release tests include atomic concurrent floor claims, stale signed-beacon refusal, same-height conflicting-hash refusal, forged/unauthorized signatures, unique-key counting, and real Valkey restart persistence.",
 ]
 evidence = [
   "crates/cross-vm-coordinator/src/settlement_finality.rs",

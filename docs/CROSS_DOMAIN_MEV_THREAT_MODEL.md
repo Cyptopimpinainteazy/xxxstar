@@ -92,7 +92,11 @@ attestor id. The outbox then derives a canonical release key from
 submission id)`. Prepared and signed submissions form the complete pending set;
 the in-memory and Valkey stores sort that set and refuse any broadcast that is
 not canonical next. Valkey persists an explicit submission index, so a relayer
-cannot hide a pending settlement by racing a weak key scan.
+cannot hide a pending settlement by racing a weak key scan. Broadcast records
+also persist a monotonic beacon floor. The in-memory and Valkey stores combine
+the floor check with the record append atomically, so concurrent submissions
+also cannot install an older validly signed beacon or interchangeable hashes at
+one height.
 
 Still open: the seven authority validators must publish these attestations
 through a production node/service path, and the policy keys and threshold must
