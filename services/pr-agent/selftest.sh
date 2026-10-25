@@ -187,21 +187,21 @@ expect_entry() { # <label> <expected entry: dry_run.py|pr-agent> [wrapper args..
 expect_entry "a PR dry run prints the unpublished result via dry_run.py" dry_run.py --dry-run 672 review
 expect_entry "a plain-diff dry run calls pr-agent directly (it already prints)" pr-agent --dry-run --diff /tmp/x.diff
 expect_entry "a publishing run calls pr-agent directly" pr-agent 672
-# ── dry_run.py itself, against a stub pr_agent package ────────────────────
+# ── dry_run.py itself, against a fixture pr_agent package ────────────────
 # The shim above replaces the interpreter, so this runs the real dry_run.py:
 # the handle_request wrapper, the artifact/answer lookup and the exit codes.
-stub="$tmp/stub/pr_agent"
-mkdir -p "$stub/agent"
-: > "$stub/__init__.py"
-: > "$stub/agent/__init__.py"
-cat > "$stub/config_loader.py" <<'PY'
+fixture="$tmp/fixture/pr_agent"
+mkdir -p "$fixture/agent"
+: > "$fixture/__init__.py"
+: > "$fixture/agent/__init__.py"
+cat > "$fixture/config_loader.py" <<'PY'
 class _Settings:
     pass
 _settings = _Settings()
 def get_settings():
     return _settings
 PY
-cat > "$stub/agent/pr_agent.py" <<'PY'
+cat > "$fixture/agent/pr_agent.py" <<'PY'
 import json, os
 from pr_agent.config_loader import get_settings
 class PRAgent:
@@ -210,7 +210,7 @@ class PRAgent:
             get_settings().data = json.loads(os.environ["STUB_DATA"])
         return True
 PY
-cat > "$stub/cli.py" <<'PY'
+cat > "$fixture/cli.py" <<'PY'
 import asyncio, os
 from pr_agent.agent.pr_agent import PRAgent
 def run():
@@ -221,7 +221,7 @@ PY
 expect_dry_run() { # <label> <expected exit> <expected stdout substring> [env...]
   local label="$1" want_status="$2" want_out="$3"; shift 3
   local status=0
-  env "$@" PYTHONPATH="$tmp/stub" python3 "$ROOT_DIR/services/pr-agent/dry_run.py" \
+env "$@" PYTHONPATH="$tmp/fixture" python3 "$ROOT_DIR/services/pr-agent/dry_run.py" \
     >"$tmp/dry.out" 2>"$tmp/dry.err" || status=$?
   if [ "$status" = "$want_status" ] && { [ -z "$want_out" ] || grep -qF -- "$want_out" "$tmp/dry.out" "$tmp/dry.err"; }; then
     pass "$label"

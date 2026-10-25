@@ -103,6 +103,10 @@ PRUNE_DIR_NAMES = {
     "libproto_lib",
     "__pycache__",
     "coverage",
+    # BMAD is a tracked agent-tool installation with its own tests, not X3
+    # runtime/bridge/application source. Its migration prose describes template
+    # placeholders and should not consume the product fake-code ratchet.
+    "_bmad",
 }
 PRUNE_DIR_PREFIXES = (".wt-",)
 PRUNE_FILE_SUFFIXES = (".tar.gz", ".tgz", ".zip")
@@ -455,6 +459,10 @@ def marker_text(rel: str, text: str) -> str:
     Only the quoted phrase in the BOILERPLATE tuple is vocabulary. Comments,
     other entries and explicit implementation macros remain subject to scanning.
     """
+    if Path(rel).suffix in {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}:
+        # JSX/HTML `placeholder=` is a user-interface attribute, not a
+        # placeholder implementation.
+        text = re.sub(r"(?i)\bplaceholder\s*=", "", text)
     if rel == "services/x3-ai-router/router.py" and re.match(
         r'^\s*"BOILERPLATE"\s*:\s*\(', text
     ):
