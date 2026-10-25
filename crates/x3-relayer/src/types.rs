@@ -9,10 +9,10 @@ use alloc::vec::Vec;
 use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
-pub use x3_verification_router::SolanaCluster;
 use x3_verification_router::{
-    encode_solana_finality_v3, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
+    encode_solana_finality_v4, ChainKind, ProofEnvelope, VerificationError, VerificationStrategy,
 };
+pub use x3_verification_router::{SolanaCluster, SolanaTransactionEvidence};
 
 /// Main relayer configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -59,6 +59,11 @@ pub struct SvmClusterConfig {
     pub cluster_name: String,
     pub x3_domain_id: u32,
     pub rpc_endpoint: String,
+    /// Additional independently operated RPC endpoints used as a provider
+    /// quorum when acquiring Solana transaction evidence. Mainnet requires at
+    /// least three distinct configured endpoints in total.
+    #[serde(default)]
+    pub rpc_quorum_endpoints: Vec<String>,
     pub finality_threshold: u32,
     pub slot_poll_interval_ms: u64,
     #[serde(default = "default_max_concurrent")]
@@ -182,8 +187,8 @@ pub struct EvmProofRequest {
     pub expected_amount: u128,
 }
 
-/// A single validator attestation over the complete Solana V3 finality and
-/// transfer intent.
+/// A single validator attestation over the complete Solana V4 transaction,
+/// finality, and transfer intent.
 #[derive(Clone, Debug)]
 pub struct ValidatorSignature {
     /// Compressed Ed25519 public key of the signing validator (32 bytes).
@@ -206,6 +211,7 @@ pub struct SvmProof {
     pub bank_hash: [u8; 32],
     pub parent_bank_hash: [u8; 32],
     pub stake_table_digest: [u8; 32],
+    pub transaction: SolanaTransactionEvidence,
     pub expected_asset_id: [u8; 32],
     pub expected_amount: u128,
     pub expected_sender: Vec<u8>,
@@ -217,7 +223,7 @@ pub struct SvmProof {
     pub required_signatures: u32,
 }
 
-/// V3 evidence a relayer must obtain before it can produce a Solana proof.
+/// V4 evidence a relayer must obtain before it can produce a Solana proof.
 ///
 /// The bank hashes, slots, stake-table digest, and transfer intent are signed
 /// by the validators. `existing_signatures` lets independent operators
@@ -237,6 +243,7 @@ pub struct SvmProofRequest {
     pub bank_hash: [u8; 32],
     pub parent_bank_hash: [u8; 32],
     pub stake_table_digest: [u8; 32],
+    pub transaction: SolanaTransactionEvidence,
     pub expected_asset_id: [u8; 32],
     pub expected_amount: u128,
     pub expected_sender: Vec<u8>,
@@ -246,7 +253,7 @@ pub struct SvmProofRequest {
 }
 
 impl SvmProof {
-    /// Build the complete V3 envelope the production verifier receives.
+    /// Build the complete V4 envelope the production verifier receives.
     pub fn envelope(&self) -> ProofEnvelope {
         ProofEnvelope {
             proof_id: self.proof_id,
@@ -262,14 +269,14 @@ impl SvmProof {
         }
     }
 
-    /// Encode the stake-weighted V3 Solana finality payload.
+    /// Encode the stake-weighted V4 Solana finality and transaction payload.
     pub fn encode_payload(&self) -> Result<Vec<u8>, VerificationError> {
         let votes = self
             .validator_signatures
             .iter()
             .map(|vote| (vote.validator_pubkey, vote.signature))
             .collect::<Vec<_>>();
-        encode_solana_finality_v3(
+        encode_solana_finality_v4(
             self.cluster,
             self.slot,
             self.parent_slot,
@@ -277,11 +284,12 @@ impl SvmProof {
             self.bank_hash,
             self.parent_bank_hash,
             self.stake_table_digest,
+            self.transaction.clone(),
             &votes,
         )
     }
 
-    /// Envelope carrying the encoded V3 payload.
+    /// Envelope carrying the encoded V4 payload.
     pub fn encoded_envelope(&self) -> Result<ProofEnvelope, VerificationError> {
         let mut envelope = self.envelope();
         envelope.payload = self.encode_payload()?;

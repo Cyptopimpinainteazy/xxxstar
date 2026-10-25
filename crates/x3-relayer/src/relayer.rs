@@ -289,7 +289,7 @@ impl RelayerService {
         Ok(())
     }
 
-    /// Queue complete Solana V3 evidence. The proof is not produced until the
+    /// Queue complete Solana V4 evidence. The proof is not produced until the
     /// watcher has observed that finalized slot, and no bank hash or transfer
     /// field is derived from a caller-chosen conclusion.
     pub async fn queue_svm_proof_request(&self, request: SvmProofRequest) -> Result<()> {
@@ -312,14 +312,37 @@ impl RelayerService {
             || request.bank_hash == [0u8; 32]
             || request.parent_bank_hash == [0u8; 32]
             || request.stake_table_digest == [0u8; 32]
+            || request.transaction.signature == [0u8; 64]
+            || request.transaction.commitment == [0u8; 32]
+            || request.transaction.recent_blockhash == [0u8; 32]
         {
             anyhow::bail!("SVM finality evidence contains a zero identity");
+        }
+        if request.transaction.slot != request.slot {
+            anyhow::bail!("SVM transaction slot does not match the finalized slot");
+        }
+        if !request.transaction.succeeded {
+            anyhow::bail!("SVM transaction evidence reports a failed transaction");
         }
         if request.parent_slot >= request.slot {
             anyhow::bail!("SVM parent slot must precede the finalized slot");
         }
         if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
             anyhow::bail!("SVM beneficiary must be between 1 and 128 bytes");
+        }
+        let watcher = self
+            .svm_watchers
+            .iter()
+            .find(|watcher| watcher.domain_id() == request.source_domain)
+            .ok_or_else(|| anyhow::anyhow!("SVM watcher for the proof domain is unavailable"))?;
+        let signature = bs58::encode(request.transaction.signature).into_string();
+        let observed = watcher
+            .finalized_transaction_evidence(&signature, request.slot, request.blockhash)
+            .await?;
+        if observed != request.transaction {
+            anyhow::bail!(
+                "SVM transaction evidence does not match the finalized RPC quorum observation"
+            );
         }
         self.state
             .write()
@@ -745,7 +768,7 @@ impl RelayerService {
                     }
                     None => {
                         debug!(
-                            "No V3 stake-weighted evidence queued for finalized SVM domain {}",
+                            "No V4 stake-weighted evidence queued for finalized SVM domain {}",
                             domain_id
                         );
                         continue;
@@ -859,6 +882,12 @@ impl RelayerService {
         hasher.update(proof.bank_hash);
         hasher.update(proof.parent_bank_hash);
         hasher.update(proof.stake_table_digest);
+        hasher.update(proof.transaction.slot.to_le_bytes());
+        hasher.update(proof.transaction.index.to_le_bytes());
+        hasher.update([u8::from(proof.transaction.succeeded)]);
+        hasher.update(proof.transaction.signature);
+        hasher.update(proof.transaction.commitment);
+        hasher.update(proof.transaction.recent_blockhash);
         hasher.update(proof.expected_asset_id);
         hasher.update(proof.expected_amount.to_le_bytes());
         for value in [
@@ -917,7 +946,7 @@ impl RelayerSafetyPipeline {
             }
         };
 
-        // Production uses only V3 stake-weighted evidence. If the stake table is
+        // Production uses only V4 stake-weighted evidence. If the stake table is
         // absent, malformed or disagrees with the authorized signer list, register
         // the empty verifier so every SVM proof fails closed rather than falling
         // back to the legacy signer-count V1 path.
@@ -930,7 +959,7 @@ impl RelayerSafetyPipeline {
         let svm_verifier = match stake_result {
             Ok(verifier) => Arc::new(verifier),
             Err(error) => {
-                warn!("refusing every SVM proof: no valid V3 stake table: {error}");
+                warn!("refusing every SVM proof: no valid V4 stake table: {error}");
                 Arc::new(SolanaStakeWeightedVerifier::empty(
                     configured_solana_cluster(&config.svm_clusters)
                         .unwrap_or(SolanaCluster::MainnetBeta),
@@ -1369,6 +1398,7 @@ mod tests {
                 cluster_name: "devnet".to_string(),
                 x3_domain_id: 200,
                 rpc_endpoint: "http://localhost:8899".to_string(),
+                rpc_quorum_endpoints: Vec::new(),
                 finality_threshold: 32,
                 slot_poll_interval_ms: 400,
                 max_concurrent_requests: 5,
@@ -1680,6 +1710,28 @@ mod tests {
     const SVM_BANK_HASH: [u8; 32] = [8u8; 32];
     const SVM_PARENT_BANK_HASH: [u8; 32] = [7u8; 32];
 
+    fn svm_transaction() -> x3_verification_router::SolanaTransactionEvidence {
+        use ed25519_dalek::Signer;
+
+        let key = ed25519_dalek::SigningKey::from_bytes(&[0x5au8; 32]);
+        let recent_blockhash = [5u8; 32];
+        let mut message = vec![1, 0, 0, 1];
+        message.extend_from_slice(&key.verifying_key().to_bytes());
+        message.extend_from_slice(&recent_blockhash);
+        message.push(0);
+        let signature = key.sign(&message).to_bytes();
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&signature);
+        raw_transaction.extend_from_slice(&message);
+        x3_verification_router::SolanaTransactionEvidence::from_raw(
+            SVM_SLOT,
+            2,
+            true,
+            raw_transaction,
+        )
+        .expect("signed SVM transaction fixture")
+    }
+
     fn solana_stakes(keys: &[ed25519_dalek::SigningKey], stake: u64) -> Vec<SolanaValidatorStake> {
         let mut stakes = keys
             .iter()
@@ -1703,6 +1755,7 @@ mod tests {
             bank_hash: SVM_BANK_HASH,
             parent_bank_hash: SVM_PARENT_BANK_HASH,
             stake_table_digest: x3_verification_router::solana_stake_table_digest(stake_table),
+            transaction: svm_transaction(),
             expected_asset_id: [4u8; 32],
             expected_amount: 5_000,
             expected_sender: b"sender".to_vec(),
@@ -1722,7 +1775,7 @@ mod tests {
         use ed25519_dalek::Signer;
 
         let envelope = proof.envelope();
-        let message = x3_verification_router::solana_finality_message_v3(
+        let message = x3_verification_router::solana_finality_message_v4(
             proof.cluster,
             proof.slot,
             proof.parent_slot,
@@ -1730,6 +1783,7 @@ mod tests {
             &proof.bank_hash,
             &proof.parent_bank_hash,
             &proof.stake_table_digest,
+            &proof.transaction,
             &envelope,
         )
         .expect("fixture intent");

@@ -88,7 +88,23 @@ fn solana_deposit_proof_v2(
         .collect::<Vec<_>>();
     stakes.sort_by_key(|entry| entry.pubkey);
     let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
-    let message = x3_verification_router::solana_finality_message_v3(
+    let transaction_key = keys.first().expect("at least one signing key").0;
+    let recent_blockhash = [0x33u8; 32];
+    let mut transaction_message = vec![1, 0, 0, 1];
+    transaction_message.extend_from_slice(&transaction_key.verifying_key().to_bytes());
+    transaction_message.extend_from_slice(&recent_blockhash);
+    transaction_message.push(0);
+    let mut raw_transaction = vec![1];
+    raw_transaction.extend_from_slice(&transaction_key.sign(&transaction_message).to_bytes());
+    raw_transaction.extend_from_slice(&transaction_message);
+    let transaction = x3_verification_router::SolanaTransactionEvidence::from_raw(
+        finalized_slot,
+        1,
+        true,
+        raw_transaction,
+    )
+    .expect("signed transaction evidence");
+    let message = x3_verification_router::solana_finality_message_v4(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
@@ -96,6 +112,7 @@ fn solana_deposit_proof_v2(
         &finalized_bank_hash,
         &parent_bank_hash,
         &stake_digest,
+        &transaction,
         &envelope,
     )
     .expect("test proof intent fits");
@@ -108,7 +125,7 @@ fn solana_deposit_proof_v2(
             )
         })
         .collect::<Vec<_>>();
-    let payload = x3_verification_router::encode_solana_finality_v3(
+    let payload = x3_verification_router::encode_solana_finality_v4(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
@@ -116,6 +133,7 @@ fn solana_deposit_proof_v2(
         finalized_bank_hash,
         parent_bank_hash,
         stake_digest,
+        transaction,
         &votes,
     )
     .expect("test proof fits");

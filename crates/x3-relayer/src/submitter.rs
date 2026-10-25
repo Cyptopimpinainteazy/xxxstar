@@ -15,8 +15,10 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use x3_runtime_signer::X3RuntimeSigner;
+#[cfg(test)]
+use x3_verification_router::SolanaTransactionEvidence;
 use x3_verification_router::{
-    solana_finality_message_v3, solana_stake_table_digest, SolanaCluster,
+    solana_finality_message_v4, solana_stake_table_digest, SolanaCluster,
     SolanaStakeWeightedVerifier, SolanaValidatorStake, Verifier as ProofVerifier,
 };
 
@@ -46,12 +48,11 @@ pub enum SubmitterError {
     #[error("failed to submit the {leg} proof: {reason}")]
     SubmissionFailed { leg: &'static str, reason: String },
 
-    /// The SVM V3 evidence is not yet a settlement-engine proof bound to a
-    /// transaction in the finalized slot. The runtime correctly refuses it.
+    /// The SVM settlement adapter is intentionally withheld until the runtime
+    /// consumes the V4 transaction-and-bank evidence.
     #[error(
-        "refusing to submit the SVM settlement proof: the V3 evidence binds validator \
-         attestations but the settlement runtime still requires independent transaction \
-         inclusion and bank-state evidence"
+        "refusing to submit the SVM settlement proof: V4 transaction-and-bank evidence is \
+         verified, but the settlement runtime adapter has not been enabled"
     )]
     UnsupportedSvmSettlementProof,
 
@@ -81,11 +82,11 @@ pub enum SubmitterError {
     InvalidSvmStakeTable(String),
 
     /// A supplied validator vote is malformed, duplicated, unauthorized, or
-    /// does not verify over the complete V2 finality statement.
+    /// does not verify over the complete V4 transaction and finality statement.
     #[error("refusing Solana validator vote {index}: {reason}")]
     InvalidSvmVote { index: usize, reason: String },
 
-    /// The V3 evidence is internally inconsistent before any vote is counted.
+    /// The V4 evidence is internally inconsistent before any vote is counted.
     #[error("refusing Solana proof evidence: {0}")]
     InvalidSvmEvidence(String),
 }
@@ -351,9 +352,8 @@ impl RpcSubmitter {
         Ok(tx_hash)
     }
 
-    /// The SVM V3 evidence does not yet include the independent transaction and
-    /// bank-state proof the settlement runtime requires. Refuse rather than
-    /// sending evidence the chain will reject.
+    /// The SVM V4 evidence is verified, but the settlement-engine adapter is not
+    /// enabled yet. Refuse rather than sending evidence the chain will reject.
     pub async fn submit_svm_proof(&self, proof: SvmProof) -> Result<String, SubmitterError> {
         let _ = proof;
         Err(SubmitterError::UnsupportedSvmSettlementProof)
@@ -530,9 +530,15 @@ impl RpcSubmitter {
             || request.bank_hash == [0u8; 32]
             || request.parent_bank_hash == [0u8; 32]
             || request.stake_table_digest == [0u8; 32]
+            || request.transaction.slot != request.slot
+            || !request.transaction.succeeded
+            || request.transaction.signature == [0u8; 64]
+            || request.transaction.commitment == [0u8; 32]
+            || request.transaction.recent_blockhash == [0u8; 32]
         {
             return Err(SubmitterError::InvalidSvmEvidence(
-                "blockhash, bank hash, parent bank hash, and stake-table digest must be non-zero"
+                "transaction must be successful in the finalized slot and all finality, \
+                 transaction, and stake-table identities must be non-zero"
                     .into(),
             ));
         }
@@ -559,6 +565,7 @@ impl RpcSubmitter {
             bank_hash: request.bank_hash,
             parent_bank_hash: request.parent_bank_hash,
             stake_table_digest: request.stake_table_digest,
+            transaction: request.transaction.clone(),
             expected_asset_id: request.expected_asset_id,
             expected_amount: request.expected_amount,
             expected_sender: request.expected_sender,
@@ -568,7 +575,7 @@ impl RpcSubmitter {
             required_signatures,
         };
         let envelope = unsigned.envelope();
-        let message = solana_finality_message_v3(
+        let message = solana_finality_message_v4(
             request.cluster,
             request.slot,
             request.parent_slot,
@@ -576,6 +583,7 @@ impl RpcSubmitter {
             &request.bank_hash,
             &request.parent_bank_hash,
             &request.stake_table_digest,
+            &request.transaction,
             &envelope,
         )
         .map_err(|error| SubmitterError::InvalidSvmEvidence(error.to_string()))?;
@@ -651,7 +659,7 @@ impl RpcSubmitter {
     // Private Methods
     // ============================================================================
 
-    /// Sign the complete Solana V3 finality message.
+    /// Sign the complete Solana V4 transaction and finality message.
     ///
     /// When a custody key ID is configured, this method still signs with the
     /// local `signing_key` (which is zeroed in custody mode). Callers that
@@ -741,6 +749,21 @@ mod tests {
         stakes
     }
 
+    fn test_transaction(slot: u64) -> SolanaTransactionEvidence {
+        let key = SigningKey::from_bytes(&[0x44u8; 32]);
+        let recent_blockhash = [0x39u8; 32];
+        let mut message = vec![1, 0, 0, 1];
+        message.extend_from_slice(&key.verifying_key().to_bytes());
+        message.extend_from_slice(&recent_blockhash);
+        message.push(0);
+        let signature = key.sign(&message).to_bytes();
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&signature);
+        raw_transaction.extend_from_slice(&message);
+        SolanaTransactionEvidence::from_raw(slot, 3, true, raw_transaction)
+            .expect("signed transaction fixture")
+    }
+
     fn test_request(stakes: &[SolanaValidatorStake]) -> SvmProofRequest {
         SvmProofRequest {
             runtime_intent_id: [0x30u8; 32],
@@ -753,6 +776,7 @@ mod tests {
             bank_hash: [0x36u8; 32],
             parent_bank_hash: [0x33u8; 32],
             stake_table_digest: solana_stake_table_digest(stakes),
+            transaction: test_transaction(42),
             expected_asset_id: [0x34u8; 32],
             expected_amount: 5_000,
             expected_sender: b"sender".to_vec(),
@@ -773,6 +797,7 @@ mod tests {
             bank_hash: request.bank_hash,
             parent_bank_hash: request.parent_bank_hash,
             stake_table_digest: request.stake_table_digest,
+            transaction: request.transaction.clone(),
             expected_asset_id: request.expected_asset_id,
             expected_amount: request.expected_amount,
             expected_sender: request.expected_sender.clone(),
@@ -781,7 +806,7 @@ mod tests {
             validator_signatures: Vec::new(),
             required_signatures: 1,
         };
-        solana_finality_message_v3(
+        solana_finality_message_v4(
             proof.cluster,
             proof.slot,
             proof.parent_slot,
@@ -789,6 +814,7 @@ mod tests {
             &proof.bank_hash,
             &proof.parent_bank_hash,
             &proof.stake_table_digest,
+            &proof.transaction,
             &proof.envelope(),
         )
         .expect("request intent")
@@ -875,6 +901,29 @@ mod tests {
         assert_eq!(proof.slot, 42);
         assert_eq!(proof.blockhash, [0x32u8; 32]);
         assert_eq!(proof.validator_signatures.len(), 1);
+    }
+
+    #[test]
+    fn acquire_svm_proof_refuses_failed_or_misplaced_transaction_evidence() {
+        let key = RpcSubmitter::key_from_seed("transaction evidence test seed");
+        let pubkeys = vec![key.verifying_key().to_bytes()];
+        let stakes = test_stakes(&pubkeys);
+        let submitter = test_submitter(key, pubkeys, stakes.clone());
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+
+        let mut failed = test_request(&stakes);
+        failed.transaction.succeeded = false;
+        let error = runtime
+            .block_on(submitter.acquire_svm_proof(failed))
+            .expect_err("a failed transaction cannot become settlement evidence");
+        assert!(matches!(error, SubmitterError::InvalidSvmEvidence(_)));
+
+        let mut misplaced = test_request(&stakes);
+        misplaced.transaction.slot = misplaced.slot - 1;
+        let error = runtime
+            .block_on(submitter.acquire_svm_proof(misplaced))
+            .expect_err("transaction evidence from another slot is refused");
+        assert!(matches!(error, SubmitterError::InvalidSvmEvidence(_)));
     }
 
     #[test]

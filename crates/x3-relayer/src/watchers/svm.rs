@@ -1,11 +1,13 @@
 /// SVM Header Watcher - Polls Solana-compatible clusters (Solana testnet)
 use crate::types::{HeaderInfo, SvmClusterConfig};
 use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use log::{debug, info, warn};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
+use x3_verification_router::SolanaTransactionEvidence;
 
 pub struct SvmHeaderWatcher {
     config: SvmClusterConfig,
@@ -173,6 +175,80 @@ impl SvmHeaderWatcher {
         Ok(finalized)
     }
 
+    /// Acquire transaction-inclusion evidence from the configured Solana RPC
+    /// set. Mainnet requires three distinct endpoints and a two-thirds provider
+    /// quorum reporting identical finalized transaction and block evidence.
+    pub async fn finalized_transaction_evidence(
+        &self,
+        signature: &str,
+        slot: u64,
+        expected_blockhash: [u8; 32],
+    ) -> Result<SolanaTransactionEvidence> {
+        let mut endpoints = Vec::new();
+        for endpoint in std::iter::once(&self.config.rpc_endpoint)
+            .chain(self.config.rpc_quorum_endpoints.iter())
+        {
+            if !endpoint.trim().is_empty() && !endpoints.contains(endpoint) {
+                endpoints.push(endpoint.clone());
+            }
+        }
+        if self
+            .config
+            .cluster_name
+            .to_ascii_lowercase()
+            .contains("mainnet")
+            && endpoints.len() < 3
+        {
+            return Err(anyhow!(
+                "mainnet Solana transaction evidence requires at least three distinct RPC endpoints"
+            ));
+        }
+
+        let mut observations = Vec::new();
+        for endpoint in &endpoints {
+            match self
+                .query_finalized_transaction(endpoint, signature, slot, expected_blockhash)
+                .await
+            {
+                Ok(evidence) => observations.push(evidence),
+                Err(error) => warn!(
+                    "SVM transaction evidence from {} was refused: {}",
+                    endpoint, error
+                ),
+            }
+        }
+        if observations.is_empty() {
+            return Err(anyhow!(
+                "no Solana RPC provider produced usable transaction evidence"
+            ));
+        }
+
+        let required = if endpoints.len() == 1 {
+            1
+        } else {
+            (endpoints.len() * 2).div_ceil(3)
+        };
+        let mut best_count = 0usize;
+        let mut agreed = None;
+        for candidate in &observations {
+            let count = observations
+                .iter()
+                .filter(|observation| *observation == candidate)
+                .count();
+            if count > best_count {
+                best_count = count;
+                agreed = Some(candidate.clone());
+            }
+        }
+        if best_count < required {
+            return Err(anyhow!(
+                "Solana RPC providers disagree or too few agree: strongest observation {best_count} of {} configured, {required} required",
+                endpoints.len()
+            ));
+        }
+        agreed.ok_or_else(|| anyhow!("no Solana transaction evidence consensus"))
+    }
+
     /// Persist the last polled slot to a checkpoint file.
     async fn persist_checkpoint(&self, slot: u64) {
         if let Some(ref cp) = self.checkpoint_path {
@@ -270,6 +346,122 @@ impl SvmHeaderWatcher {
 
         // Convert Solana base58 blockhash to [u8; 32]
         base58_decode_to_array32(hash_str)
+    }
+
+    async fn query_finalized_transaction(
+        &self,
+        endpoint: &str,
+        signature: &str,
+        slot: u64,
+        expected_blockhash: [u8; 32],
+    ) -> Result<SolanaTransactionEvidence> {
+        let transaction_response = self
+            .rpc_client
+            .post(endpoint)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "getTransaction",
+                "params": [
+                    signature,
+                    {
+                        "encoding": "base64",
+                        "commitment": "finalized",
+                        "maxSupportedTransactionVersion": 0
+                    }
+                ],
+                "id": 1,
+            }))
+            .send()
+            .await
+            .map_err(|error| anyhow!("getTransaction connection error: {error}"))?
+            .json::<serde_json::Value>()
+            .await?;
+        if let Some(error) = transaction_response.get("error") {
+            return Err(anyhow!("getTransaction RPC error: {error}"));
+        }
+        let transaction_result = &transaction_response["result"];
+        if transaction_result.is_null() {
+            return Err(anyhow!("transaction is not present in a finalized bank"));
+        }
+        if transaction_result["slot"].as_u64() != Some(slot) {
+            return Err(anyhow!("RPC reported a different transaction slot"));
+        }
+        let meta = transaction_result["meta"]
+            .as_object()
+            .ok_or_else(|| anyhow!("finalized transaction has no execution metadata"))?;
+        if !meta.get("err").is_some_and(serde_json::Value::is_null) {
+            return Err(anyhow!(
+                "finalized transaction did not execute successfully"
+            ));
+        }
+        let encoded = transaction_result["transaction"]
+            .as_array()
+            .and_then(|parts| parts.first())
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| anyhow!("getTransaction returned no base64 transaction"))?;
+        let raw_transaction = BASE64
+            .decode(encoded)
+            .map_err(|error| anyhow!("invalid base64 transaction: {error}"))?;
+
+        let block_response = self
+            .rpc_client
+            .post(endpoint)
+            .json(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "getBlock",
+                "params": [
+                    slot,
+                    {
+                        "commitment": "finalized",
+                        "transactionDetails": "signatures",
+                        "rewards": false,
+                        "maxSupportedTransactionVersion": 0
+                    }
+                ],
+                "id": 2,
+            }))
+            .send()
+            .await
+            .map_err(|error| anyhow!("getBlock connection error: {error}"))?
+            .json::<serde_json::Value>()
+            .await?;
+        if let Some(error) = block_response.get("error") {
+            return Err(anyhow!("getBlock RPC error: {error}"));
+        }
+        let block = &block_response["result"];
+        if block.is_null() {
+            return Err(anyhow!("finalized slot is unavailable"));
+        }
+        let blockhash = block["blockhash"]
+            .as_str()
+            .ok_or_else(|| anyhow!("getBlock returned no blockhash"))?;
+        if base58_decode_to_array32(blockhash)? != expected_blockhash {
+            return Err(anyhow!(
+                "transaction blockhash does not match the finality claim"
+            ));
+        }
+        let index = block["signatures"]
+            .as_array()
+            .ok_or_else(|| anyhow!("getBlock returned no signature index"))?
+            .iter()
+            .position(|candidate| candidate.as_str() == Some(signature))
+            .ok_or_else(|| anyhow!("transaction signature is absent from the finalized block"))?
+            as u32;
+
+        let decoded_signature = bs58::decode(signature)
+            .into_vec()
+            .map_err(|error| anyhow!("invalid base58 transaction signature: {error}"))?;
+        let signature_bytes: [u8; 64] = decoded_signature
+            .try_into()
+            .map_err(|_| anyhow!("transaction signature is not 64 bytes"))?;
+        let evidence = SolanaTransactionEvidence::from_raw(slot, index, true, raw_transaction)
+            .map_err(|error| anyhow!("invalid signed Solana transaction: {error}"))?;
+        if evidence.signature != signature_bytes {
+            return Err(anyhow!(
+                "requested signature does not match the serialized transaction"
+            ));
+        }
+        Ok(evidence)
     }
 
     async fn get_slot_timestamp(&self, slot: u64) -> Result<u64> {
@@ -462,6 +654,7 @@ mod tests {
                 cluster_name: "devnet".into(),
                 x3_domain_id: 200,
                 rpc_endpoint: "http://127.0.0.1:1".into(),
+                rpc_quorum_endpoints: Vec::new(),
                 finality_threshold: 1,
                 slot_poll_interval_ms: 1,
                 max_concurrent_requests: 1,
@@ -478,5 +671,122 @@ mod tests {
         assert_eq!(tokio::fs::read_to_string(&path).await.unwrap(), "123");
         assert!(!path.with_extension("tmp").exists());
         tokio::fs::remove_file(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn mainnet_transaction_evidence_requires_three_rpc_providers() {
+        let watcher = SvmHeaderWatcher {
+            config: SvmClusterConfig {
+                name: "mainnet".into(),
+                cluster_name: "mainnet-beta".into(),
+                x3_domain_id: 200,
+                rpc_endpoint: "http://127.0.0.1:1".into(),
+                rpc_quorum_endpoints: Vec::new(),
+                finality_threshold: 1,
+                slot_poll_interval_ms: 1,
+                max_concurrent_requests: 1,
+            },
+            rpc_client: reqwest::Client::new(),
+            last_polled_slot: Arc::new(RwLock::new(0)),
+            checkpoint_path: None,
+            finalized_floor_path: None,
+            finalized_floor: Arc::new(RwLock::new(0)),
+            stale_cycles: Arc::new(RwLock::new(0)),
+        };
+
+        let error = watcher
+            .finalized_transaction_evidence(
+                "1111111111111111111111111111111111111111111111111111111111111111",
+                42,
+                [7u8; 32],
+            )
+            .await
+            .expect_err("mainnet cannot use a single RPC provider");
+        assert!(error.to_string().contains("three distinct RPC endpoints"));
+    }
+
+    #[tokio::test]
+    async fn finalized_transaction_is_bound_to_the_rpc_block_and_bank_result() {
+        use ed25519_dalek::Signer;
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        let key = ed25519_dalek::SigningKey::from_bytes(&[0x61u8; 32]);
+        let recent_blockhash = [0x21u8; 32];
+        let mut transaction_message = vec![1, 0, 0, 1];
+        transaction_message.extend_from_slice(&key.verifying_key().to_bytes());
+        transaction_message.extend_from_slice(&recent_blockhash);
+        transaction_message.push(0);
+        let transaction_signature = key.sign(&transaction_message).to_bytes();
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&transaction_signature);
+        raw_transaction.extend_from_slice(&transaction_message);
+        let signature = bs58::encode(transaction_signature).into_string();
+        let blockhash_bytes = [0x19u8; 32];
+        let blockhash = bs58::encode(blockhash_bytes).into_string();
+
+        let transaction_body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+                "slot": 42,
+                "meta": { "err": null },
+                "transaction": [BASE64.encode(&raw_transaction), "base64"]
+            }
+        })
+        .to_string();
+        let block_body = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+                "blockhash": blockhash,
+                "signatures": [signature]
+            }
+        })
+        .to_string();
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind RPC fixture");
+        let address = listener.local_addr().expect("RPC fixture address");
+        let server = std::thread::spawn(move || {
+            for body in [transaction_body, block_body] {
+                let (mut stream, _) = listener.accept().expect("accept RPC request");
+                let mut request = [0u8; 8192];
+                let _ = stream.read(&mut request);
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .expect("write RPC response");
+            }
+        });
+
+        let watcher = SvmHeaderWatcher {
+            config: SvmClusterConfig {
+                name: "devnet".into(),
+                cluster_name: "devnet".into(),
+                x3_domain_id: 200,
+                rpc_endpoint: format!("http://{address}"),
+                rpc_quorum_endpoints: Vec::new(),
+                finality_threshold: 1,
+                slot_poll_interval_ms: 1,
+                max_concurrent_requests: 1,
+            },
+            rpc_client: reqwest::Client::new(),
+            last_polled_slot: Arc::new(RwLock::new(0)),
+            checkpoint_path: None,
+            finalized_floor_path: None,
+            finalized_floor: Arc::new(RwLock::new(0)),
+            stale_cycles: Arc::new(RwLock::new(0)),
+        };
+        let evidence = watcher
+            .finalized_transaction_evidence(&signature, 42, blockhash_bytes)
+            .await
+            .expect("quorum evidence");
+        assert_eq!(evidence.slot, 42);
+        assert_eq!(evidence.raw_transaction, raw_transaction);
+        assert_eq!(evidence.recent_blockhash, recent_blockhash);
+        server.join().expect("RPC fixture thread");
     }
 }

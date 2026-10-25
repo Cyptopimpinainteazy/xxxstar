@@ -27403,6 +27403,8 @@ name = "x3-relayer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
+ "bs58",
  "ed25519-dalek 2.2.0",
  "env_logger 0.11.11",
  "frame-support",

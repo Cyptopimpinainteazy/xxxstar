@@ -135,8 +135,8 @@ mod benchmarks {
         envelope: &ProofEnvelope,
     ) -> Result<BoundedVec<u8, ConstU32<4096>>, BenchmarkError> {
         use x3_verification_router::{
-            encode_solana_finality_v3, solana_finality_message_v3, solana_stake_table_digest,
-            SolanaCluster, SolanaValidatorStake,
+            encode_solana_finality_v4, solana_finality_message_v4, solana_stake_table_digest,
+            SolanaCluster, SolanaTransactionEvidence, SolanaValidatorStake,
         };
 
         let mut pairs = vec![
@@ -152,7 +152,18 @@ mod benchmarks {
             })
             .collect::<Vec<_>>();
         let digest = solana_stake_table_digest(&stakes);
-        let message = solana_finality_message_v3(
+        let transaction_key = &pairs[0];
+        let recent_blockhash = [5u8; 32];
+        let mut transaction_message = vec![1, 0, 0, 1];
+        transaction_message.extend_from_slice(&transaction_key.public().0);
+        transaction_message.extend_from_slice(&recent_blockhash);
+        transaction_message.push(0);
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&transaction_key.sign(&transaction_message).0);
+        raw_transaction.extend_from_slice(&transaction_message);
+        let transaction = SolanaTransactionEvidence::from_raw(42, 1, true, raw_transaction)
+            .map_err(|_| BenchmarkError::Weightless)?;
+        let message = solana_finality_message_v4(
             SolanaCluster::Devnet,
             42,
             41,
@@ -160,6 +171,7 @@ mod benchmarks {
             &[8u8; 32],
             &[7u8; 32],
             &digest,
+            &transaction,
             envelope,
         )
         .map_err(|_| BenchmarkError::Weightless)?;
@@ -167,7 +179,7 @@ mod benchmarks {
             .iter()
             .map(|pair| (pair.public().0, pair.sign(&message).0))
             .collect::<Vec<_>>();
-        let payload = encode_solana_finality_v3(
+        let payload = encode_solana_finality_v4(
             SolanaCluster::Devnet,
             42,
             41,
@@ -175,6 +187,7 @@ mod benchmarks {
             [8u8; 32],
             [7u8; 32],
             digest,
+            transaction,
             &votes,
         )
         .map_err(|_| BenchmarkError::Weightless)?;
