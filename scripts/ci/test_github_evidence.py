@@ -98,5 +98,15 @@ class EvidenceTests(unittest.TestCase):
 
 
 
+    def test_event_head_is_immutable(self):
+        with self.assertRaisesRegex(ValueError, "requested head"):
+            module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", fake,
+                          expected_head="b" * 40)
+        packet = module.gather("Cyptopimpinainteazy/xxxstar", 683, "fake", fake,
+                               expected_head=SHA)
+        self.assertEqual(packet["pr"]["head_sha"], SHA)
+
+
+
 if __name__ == "__main__":
     unittest.main()
