@@ -726,3 +726,37 @@ fn event_trigger_registration_is_refused_without_a_bounded_event_index() {
         );
     });
 }
+
+#[test]
+fn existing_event_trigger_is_refused_without_dispatch_or_fee() {
+    // A pre-upgrade chain could already contain an Event-conditioned task.
+    // Reject its execution even though new registrations are now refused.
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Manual,
+            Action::NoChange,
+            1000,
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+        Tasks::<Test>::mutate(task_id, |entry| {
+            entry.as_mut().expect("existing task").condition =
+                Condition::Event { topic: [0u8; 32] };
+        });
+
+        let owner_before = free(1);
+        let keeper_before = free(2);
+        let reserved_before = reserved(1);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            Error::<Test>::EventConditionUnavailable
+        );
+        assert_eq!(free(1), owner_before);
+        assert_eq!(free(2), keeper_before);
+        assert_eq!(reserved(1), reserved_before);
+        assert_eq!(Automation::last_attempt(task_id), 0);
+        assert!(Automation::receipt(task_id, 1).is_none());
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
+    });
+}
