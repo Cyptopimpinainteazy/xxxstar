@@ -12,6 +12,24 @@
 //     at this layer; the cross-chain gateway will plug in later with its own
 //     proof-verification path.
 //
+// Factory-issued tokens (`pallet-x3-token-factory`) are **intentionally
+// restricted** in the current network configuration. Their supply lives in two
+// layers: the supply ledger's per-domain buckets (`native + evm + svm +
+// external_locked + pending == canonical`) and the kernel's canonical
+// per-account balances. This router's `Ledger` interface only moves the first
+// layer, so a routed factory token would leave the sender's *spendable*
+// account balance intact while its represented supply moved to pending — a
+// double-spend of the same units. The runtime therefore wires
+// `RouterSupplyLedger`, which refuses `debit_source_to_pending` and
+// `credit_destination_from_pending` for any asset registered in
+// `pallet_x3_token_factory::Tokens` with
+// `FactoryTokenCrossVmAccountingUnavailable`. A successful cross-VM transfer
+// of a factory token is consequently **not possible today**: it requires an
+// atomic destination *account* credit, which the current ledger interface does
+// not provide. Refunds of supply-only transfers persisted by older runtimes
+// stay available through `refund_pending_to_source`, which does not touch
+// account balances. See `runtime/tests/factory_router_accounting.rs`.
+//
 // Guarantees enforced here:
 //
 //   1. **Replay protection (two layers).**

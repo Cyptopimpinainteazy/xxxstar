@@ -91,7 +91,17 @@ def scan(base: str | None = None):
             continue
         txt = p.read_text(encoding="utf-8", errors="ignore")
         for i, line in enumerate(txt.splitlines(), 1):
-            if any(re.search(rx, line) for rx in SKIP_PATTERNS + WEAK_PATTERNS):
+            # Rust's standard iterator advancement is not a disabled test.
+            # Keep scanning the rest of the line, including any ignore attribute
+            # or separate skip call; JavaScript/Python skip calls are unchanged.
+            scanned_line = line
+            if p.suffix.lower() == ".rs":
+                scanned_line = re.sub(
+                    r"\b(?:iter|iter_mut|into_iter)\(\)\.skip\(",
+                    "iterator_advance(",
+                    line,
+                )
+            if any(re.search(rx, scanned_line) for rx in SKIP_PATTERNS + WEAK_PATTERNS):
                 issues.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()}")
     return issues
 

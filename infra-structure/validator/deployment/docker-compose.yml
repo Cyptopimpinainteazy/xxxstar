@@ -13,6 +13,7 @@ services:
     environment:
       - CCGV_REDIS_URL=redis://redis:6379/0
       - CCGV_REQUIRE_GPU=true
+      - CCGV_BYPASS_CUDA=false
     depends_on:
       - redis
 

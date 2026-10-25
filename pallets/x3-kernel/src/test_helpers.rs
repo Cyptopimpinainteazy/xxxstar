@@ -16,9 +16,7 @@
 //! feed the **wrapped** bytes to `compute_prepare_root` so the
 //! prepare_root matches what the kernel computes internally.
 
-use parity_scale_codec::Encode;
 use sp_std::vec::Vec;
-use x3_packet_schema::{Packet, X3VmPacket};
 
 /// `MOV64_IMM` — write a 32-bit immediate into a 64-bit register; opcode class 0x07 (`BPF_ALU64`).
 const SVM_MOV64_IMM: u8 = 0xb7;
@@ -76,8 +74,11 @@ pub fn wrap_svm_payload(intent: &[u8]) -> Vec<u8> {
 ///
 /// The recipient field is padded with zero bytes so the encoded form
 /// is at least 30 bytes — the kernel's `deserialize_packet` rejects
-/// anything shorter as `PayloadTooSmall`.
+/// anything shorter as `PayloadTooSmall`. Tests only: no benchmark submits an X3 packet.
+#[cfg(test)]
 pub fn wrap_x3_payload(intent: &[u8]) -> Vec<u8> {
+    use parity_scale_codec::Encode;
+    use x3_packet_schema::{Packet, X3VmPacket};
     if intent.is_empty() {
         return Vec::new();
     }

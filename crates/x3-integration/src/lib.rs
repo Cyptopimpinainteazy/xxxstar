@@ -53,7 +53,15 @@ extern crate alloc;
 pub mod error;
 pub mod executor;
 pub mod hostcalls;
+/// The interpreter the runtime ran before `x3-vm` built without `std`.
+///
+/// No chain path reaches it any more: `X3Executor::execute_on_chain` runs `x3-vm` in every build.
+/// It stays for now as the reference the differential and agreement tests hold the new engine to,
+/// so the switch is checked against the behaviour it replaced; it is removed when the old engines
+/// are retired.
 pub mod mini_x3;
+/// The production trading path: execution, attestor signing and independent replay.
+pub mod trading;
 pub mod types;
 
 #[cfg(feature = "compile")]
@@ -68,6 +76,8 @@ pub mod compiler_bridge;
 pub use error::{X3IntegrationError, X3Result};
 pub use executor::{X3Executor, X3ExecutorConfig};
 pub use types::{X3ExecutionReceipt, X3StateChange, X3StorageWrite};
+/// What the host knows about a call, read by the context opcodes (see `x3_vm::BlockContext`).
+pub use x3_vm::BlockContext as X3BlockContext;
 
 #[cfg(all(feature = "std", feature = "compile"))]
 pub use compiler_bridge::CompilationPolicy;

@@ -2,7 +2,7 @@
 //!
 //! `WasmEvmAdapter`  — uses `x3_evm_integration::mini_evm`
 //! `WasmSvmAdapter`  — uses `x3_svm_integration::interp_execute_bpf`
-//! `WasmX3Adapter`   — uses `x3_x3_integration::X3Executor` (mini_x3 in no-std)
+//! `WasmX3Adapter`   — uses `x3_x3_integration::X3Executor::execute_on_chain` (`x3-vm`, every build)
 //!
 //! These are available in both std and no-std builds; the underlying
 //! integration crates choose their fast (native) or mini (WASM) path
@@ -287,10 +287,10 @@ impl SvmExecutorAdapter for WasmSvmAdapter {
 
 /// The runtime's X3 adapter: `X3Executor`'s on-chain engine, the same code in every build.
 ///
-/// This used to call `X3Executor::execute`, which is `mini_x3` in the wasm build and `x3-vm` in a
-/// `std` one, so the chain ran one engine and the native runtime — its tests and its benchmarks —
-/// ran another (see `X3Executor::execute_on_chain`). `X3VmAdapter`, the native runtime's adapter,
-/// now delegates here as well.
+/// `execute_on_chain` runs `x3-vm` in the wasm runtime and the native one alike, so blocks, the
+/// native runtime's tests and benchmarks, and every off-chain simulation execute the same engine.
+/// (It used to run `mini_x3`, a separate interpreter, because `x3-vm` needed `std`.)
+/// `X3VmAdapter`, the native runtime's adapter, delegates here as well.
 pub struct WasmX3Adapter;
 
 impl X3ExecutorAdapter for WasmX3Adapter {
@@ -314,6 +314,23 @@ impl X3ExecutorAdapter for WasmX3Adapter {
         slots: &[(sp_core::H256, [u8; 32])],
         private_channel_available: bool,
     ) -> Result<ExecutionReceipt, DispatchError> {
+        // No context supplied: every context opcode refuses (fail closed).
+        Self::execute_with_context(
+            payload,
+            gas_limit,
+            slots,
+            private_channel_available,
+            &x3_x3_integration::X3BlockContext::unknown(),
+        )
+    }
+
+    fn execute_with_context(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(sp_core::H256, [u8; 32])],
+        private_channel_available: bool,
+        context: &x3_x3_integration::X3BlockContext,
+    ) -> Result<ExecutionReceipt, DispatchError> {
         if payload.is_empty() {
             return Err(DispatchError::Other("Empty X3 payload"));
         }
@@ -326,23 +343,36 @@ impl X3ExecutorAdapter for WasmX3Adapter {
             .collect();
         // The engine refuses an artifact that demands private submission unless the pallet, which
         // holds `Config::PrivateSubmissionChannel`, says a private channel exists.
-        x3_x3_integration::X3Executor::execute_on_chain(
+        x3_x3_integration::X3Executor::execute_on_chain_with_context(
             payload,
             gas_limit,
             &seeds,
             private_channel_available,
+            context,
         )
         .map(|rec| ExecutionReceipt {
             version: crate::EXECUTION_RECEIPT_VERSION,
             success: rec.success,
             gas_used: rec.gas_used,
             return_data: rec.return_data,
-            logs: Vec::new(),
+            // The engine's committed events, in order (a rolled-back window's are not here).
+            // They used to be dropped here, so an X3 program's `emit` never reached the chain.
+            // An X3 execution is a module, not a deployed account, so there is no emitter address.
+            logs: rec
+                .logs
+                .into_iter()
+                .map(|log| crate::ExecutionLog {
+                    address: Vec::new(),
+                    topics: alloc::vec![log.topic],
+                    data: log.data,
+                    block_number: context.block_height.unwrap_or_default(),
+                })
+                .collect(),
             state_changes: Vec::new(),
-            // Carry the executor's slot channel through unchanged. Both engines journal the
-            // slot writes they made (`mini_x3` on a block, `x3-vm` in std builds), and they
-            // must not be dropped on the way to the pallet or a contract's state would
-            // silently vanish between execution and the receipt the chain stores.
+            // Carry the executor's slot channel through unchanged. The engine journals the slot
+            // writes it made, and they must not be dropped on the way to the pallet or a
+            // contract's state would silently vanish between execution and the receipt the
+            // chain stores.
             storage_writes: rec
                 .storage_writes
                 .into_iter()

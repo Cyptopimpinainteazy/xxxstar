@@ -16,7 +16,7 @@ default = ["std"]
 # no_std)]` and is in the runtime's wasm graph through `pallet-x3-settlement-engine`, which
 # depends on it with `default-features = false`, so "off" is a configuration that has to
 # build.
-std = ["serde/std", "sha2/std", "x3-verification-router/std"]
+std = ["serde/std", "sha2/std", "x3-verification-router/std", "x3-btc-spv/std"]
 
 [dependencies]
 # `alloc` is not optional: `serde`'s `String`/`Vec` impls live behind it, and this crate
@@ -24,6 +24,8 @@ std = ["serde/std", "sha2/std", "x3-verification-router/std"]
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 thiserror = { version = "2.0", default-features = false }
 sha2 = { version = "0.10", default-features = false }
+# Bitcoin proof of work, targets and Merkle inclusion, shared with the gateway and the settlement engine.
+x3-btc-spv = { path = "../x3-btc-spv", default-features = false }
 sha3 = { version = "0.10", default-features = false }
 # `hex::encode` is an `alloc` API and this crate calls it unconditionally, so the feature
 # is declared here rather than hung off `std` — which is what made it unreachable in the

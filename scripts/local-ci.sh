@@ -19,6 +19,7 @@
 #   scripts/local-ci.sh --soak          # + a 10-minute consensus soak (MINUTES= to change it)
 #   scripts/local-ci.sh --rotation      # + the validator key rotation drill
 #   scripts/local-ci.sh --deep          # + the whole workspace test suite (slow, ~5-15 min)
+#   scripts/local-ci.sh --pr-agent      # + the PR-Agent wiring self-test (offline, no LLM call)
 #   scripts/local-ci.sh --all           # everything
 #   scripts/local-ci.sh --list          # show the gate list without running it
 #
@@ -52,6 +53,9 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+# Keep nested workspace caches inside the caller's target directory. Runner
+# Cargo homes use different source paths and must not overwrite one shared cache.
+printf -v NESTED_TARGET_BASE_Q '%q' "${CARGO_TARGET_DIR:-$ROOT/target}/nested"
 
 # Resolve the Rust toolchain defensively. This box has repeatedly lost
 # `~/.cargo/bin` (the rustup shims) *during* a session — once it took `srtool`
@@ -127,6 +131,7 @@ RUN_FAILURE=0
 RUN_TESTNET=0
 RUN_SOAK=0
 RUN_ROTATION=0
+RUN_PR_AGENT=0
 RUN_PREPUSH=0
 LIST_ONLY=0
 DRY_RUN=0
@@ -150,8 +155,9 @@ while [ "$#" -gt 0 ]; do
     --testnet) RUN_TESTNET=1 ;;
     --soak) RUN_SOAK=1 ;;
     --rotation) RUN_ROTATION=1 ;;
+    --pr-agent) RUN_PR_AGENT=1 ;;
     --deep) RUN_DEEP=1 ;;
-    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1 ;;
+    --all) RUN_LIVE=1; RUN_CROSS=1; RUN_RELEASE=1; RUN_VARIANTS=1; RUN_DEEP=1; RUN_LOOM=1; RUN_FUZZ=1; RUN_MUTANTS=1; RUN_FAILURE=1; RUN_TESTNET=1; RUN_SOAK=1; RUN_ROTATION=1; RUN_PR_AGENT=1 ;;
     --loom) RUN_LOOM=1 ;;
     --fuzz) RUN_FUZZ=1 ;;
     --mutants) RUN_MUTANTS=1 ;;
@@ -181,7 +187,7 @@ if [ "${X3_LOCAL_CI_SKIP_ALL:-0}" = "1" ]; then
 fi
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-LOG_DIR="$ROOT/.ai/runlogs"
+LOG_DIR="${X3_LOCAL_CI_LOG_DIR:-$ROOT/.ai/runlogs}"
 mkdir -p "$LOG_DIR"
 LOG="$LOG_DIR/local-ci-$STAMP.log"
 PROGRESS="$LOG_DIR/local-ci-$STAMP-progress.log"
@@ -196,9 +202,13 @@ declare -A SEEN_SLUG=()
 GATES_FAST=(
   "format check:cargo fmt --all -- --check"
   "agent guards:make guard"
+  "guard pattern regressions:pytest -q tests/test_agent_guard.py tests/test_cheat_guard_patterns.py"
+  "workflow schema:bash scripts/ci/check-local-ci-workflow.sh"
   "make gate exit codes:make check-make-gates"
   "RC6 release sequence:python3 tests/test_rc6_release_sequence.py"
   "release artifact provenance:python3 tests/test_release_artifact_provenance.py"
+  "local CI evidence directory:python3 tests/test_local_ci_evidence_directory.py"
+  "push gate Git isolation:python3 tests/test_pre_push_environment.py"
   "script syntax:bash scripts/check-script-syntax.sh"
   # A script or unit on the bring-up path that hardcodes /home/<user>/Desktop/ only works on the
   # machine it was written on — one such script mkdir'd the missing root and then reported a
@@ -572,12 +582,12 @@ GATES_FAST=(
   # (`.github/workflows/svm-htlc.yml`) that is not in this tree at all. Its own target dir is named
   # for the same reason `nested workspaces` names one: a second workspace sharing the root target
   # walks cargo through rebuilds it does not need.
-  "test x3-htlc:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
+  "test x3-htlc:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-htlc cargo test --manifest-path X3-contracts/svm/Cargo.toml -p x3_htlc"
   # The nested `x3_htlc` tree did have *one* thing the root never ran even after the line above: the
   # live broadcaster client in `programs/x3_htlc/client`. It is its own workspace (like the
   # `x3_atomic_swap` client) and it holds the instruction layout that both the validator gate and the
   # program-test expiry suite drive, so its tests are gated explicitly rather than implied.
-  "test x3-htlc client:env CARGO_TARGET_DIR=/tmp/x3-htlc-client cargo test --locked --manifest-path X3-contracts/svm/programs/x3_htlc/client/Cargo.toml"
+  "test x3-htlc client:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-htlc-client cargo test --locked --manifest-path X3-contracts/svm/programs/x3_htlc/client/Cargo.toml"
   # `scripts/swarm/swarm_scan.sh` dumped every `TODO|FIXME|unwrap(` line and a list of filenames whose
   # name contained a subsystem word: no severity, no symbol, no fix, no gate — and the registry cited a
   # test for it (`swarm_scan_generates_report`) that existed nowhere, which the readiness gate never
@@ -607,31 +617,31 @@ GATES_FAST=(
   # workspace failed on a `chrono` feature that does not exist at any 0.4 version. With that,
   # the SCALE import, five bogus `no_std` attributes and the pallet types repaired, the
   # workspace's 15 tests run here — so the next break is visible instead of silent.
-  "test autonomic core:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-autonomic cargo test --locked --workspace --manifest-path x3-autonomic-core/Cargo.toml"
+  "test autonomic core:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-autonomic cargo test --locked --workspace --manifest-path x3-autonomic-core/Cargo.toml"
   # The rest of the `X3-contracts/svm` workspace. `test x3-htlc` above selects one package out of it,
   # so these five carried 79 test attributes that nothing ran — the census in
   # `scripts/check-crate-tests-are-gated.py` is what found them, and all five pass in seconds:
   # `x3-core` 12, `x3-vm-erc20` 11, `x3-receipt-verifier` 15, `x3-kernel-bridge` 21,
   # `x3-external-gateway` 20. Each package is named here rather than left to a wildcard so a failure
   # says which one, and so a reader can tell what the gate covers.
-  "test x3 svm programs:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-programs cargo test --locked --manifest-path X3-contracts/svm/Cargo.toml -p x3-core -p x3-vm-erc20 -p x3-receipt-verifier -p x3-kernel-bridge -p x3-external-gateway"
+  "test x3 svm programs:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-svm-programs cargo test --locked --manifest-path X3-contracts/svm/Cargo.toml -p x3-core -p x3-vm-erc20 -p x3-receipt-verifier -p x3-kernel-bridge -p x3-external-gateway"
   # Three more nested workspaces with suites that pass in seconds and nothing ran. `parity-core` and
   # `gpu-parity-core` are the GPU/CPU agreement tests — the ones that would catch an accelerator
   # returning a different verdict from the canonical verifier — and `adapters` is the chain-adapter
   # workspace. The census found all three; `tests/loom-concurrency` is the one in this group that
   # cannot be gated yet, because `cargo test --locked` there fails on a stale `Cargo.lock`.
-  "test x3 parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/parity-core/Cargo.toml"
-  "test x3 gpu-parity-core:env CARGO_TARGET_DIR=/tmp/x3-nested-gpu-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml"
-  "test x3-adapters:env CARGO_TARGET_DIR=/tmp/x3-nested-adapters cargo test --locked --all-targets --manifest-path adapters/Cargo.toml"
+  "test x3 parity-core:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/parity-core/Cargo.toml"
+  "test x3 gpu-parity-core:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-gpu-parity-core cargo test --locked --all-targets --manifest-path X3-contracts/shared/gpu-parity-core/Cargo.toml"
+  "test x3-adapters:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-adapters cargo test --locked --all-targets --manifest-path adapters/Cargo.toml"
   # `tools/tool-validation` is the known-good / known-bad fixture pair external testing tools are
   # validated against (crash_if_magic.rs fuzz target + FORBIDDEN_TAG helpers). It has two unit
   # tests that no gate ran, which the repo scanner ratchets as `ungated-crate` — the whole point
   # of the fixture is that it is itself exercised, so gate it rather than baseline the debt.
-  "test x3-tool-validation:env CARGO_TARGET_DIR=/tmp/x3-nested-tool-validation cargo test --locked --manifest-path tools/tool-validation/Cargo.toml -p x3-tool-validation"
+  "test x3-tool-validation:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-tool-validation cargo test --locked --manifest-path tools/tool-validation/Cargo.toml -p x3-tool-validation"
   # `programs/svm/x3_atomic_swap` — the on-chain half of the SVM swap — covers both packages in its
   # workspace. Ten tests pass; the three "ignored" a reader will see in the output are ```` ```ignore ````
   # documentation examples, not disabled tests.
-  "test svm atomic swap:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-atomic cargo test --locked --manifest-path programs/svm/x3_atomic_swap/Cargo.toml"
+  "test svm atomic swap:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-svm-atomic cargo test --locked --manifest-path programs/svm/x3_atomic_swap/Cargo.toml"
   # The other two pallets of the same atomic path. `pallet-x3-cross-vm-router` owns the round trip
   # the whole kernel exists for — the headline test is literally
   # `test_x3_native_evm_svm_roundtrip_preserves_supply` — and, like the supply ledger and the kernel
@@ -644,7 +654,7 @@ GATES_FAST=(
   # this gate to exist before it will pass.
   "test x3-external-chains:cargo test -p x3-external-chains"
   "test x3-asset-registry:cargo test -p pallet-x3-asset-registry"
-  # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`mini_x3` and the
+  # `x3-x3-integration` is the crate the chain executes X3 bytecode through (`x3-vm` and the
   # adapters `pallets/x3-kernel` calls). Its suite — the compiler bridge, the cross-decoder body
   # parity test, and the bytecode version-compatibility matrix — needs the `compile` feature to
   # build at all, which is why the feature is named here rather than left to unification.
@@ -704,6 +714,16 @@ GATES_FAST=(
   # redden them, a missing one must fail rather than skip, and no check may
   # discard its status. Cheap: 18 checks, no build.
   "rc gate scripts:python3 tests/test_rc_gates.py"
+  # The one X3VM engine the runtime is meant to embed (x3-lang unification, PR 1): the
+  # interpreter, verifier and bytecode decoder must build for the runtime's wasm target with
+  # std off. `check-no-default-features.sh` covers the host target only, and std leaks
+  # (println!, HashMap, a std-only dependency) show up only on wasm.
+  "x3-vm no_std wasm:cargo check -p x3-vm --no-default-features --target wasm32v1-none"
+  # The chain's X3 engine and its verifier. Nothing ran this suite: it holds the interpreter, the
+  # verifier, journaled storage and nested rollback, the one gas table, and `tests/robustness.rs`,
+  # whose properties (no panic on any input, gas bounds, determinism) are the engine's safety
+  # claims. (`test x3-integration` above runs the chain entry point over the same engine.)
+  "test x3-vm:cargo test -p x3-vm"
   # Gate 7 of the public testnet gate is the one criterion that decides a launch
   # from a forced-restart proof the operator supplies, and until 2026-09-30 the
   # rule that reads that proof was inline in a script that cannot run without a
@@ -750,6 +770,7 @@ GATES_FAST=(
   "test x3-ai-router:python3 -m unittest discover -s services/x3-ai-router -p 'test_*.py'"
   "test validator launcher:python3 tests/test_validator_launcher.py"
   "test source scan:python3 tests/test_fake_code_scan.py"
+  "test atomic evidence runner:python3 -m unittest discover -s tests -p test_atomic_evidence_runner.py"
   # x3-gateway is Postgres-backed in production, but its normal unit/concurrency tests never
   # connect to a server. This gate owns a disposable Postgres container, runs the crate's
   # migrations through Database::connect(), and proves a Funding Swarm write/read/scoreboard
@@ -765,7 +786,7 @@ GATES_FAST=(
   # checker actually fires, and that the refund-after-claim regression it found
   # stays fixed. `--locked` against the committed lock, and its own target dir
   # because it resolves the coordinator's dependency graph.
-  "test x3-sim:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
+  "test x3-sim:export CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-sim; cargo fetch --locked --manifest-path crates/x3-sim/Cargo.toml || echo 'local-ci: x3-sim dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-sim/Cargo.toml"
   # `x3-mc` is the Monte Carlo search layer over `x3-sim`: it samples scenario
   # parameters, drives `x3_sim::run_with`, and judges the result with the
   # coordinator's invariants. It is a third standalone workspace root on the
@@ -775,7 +796,7 @@ GATES_FAST=(
   # replays from its recorded seed, and that minimization shrinks a reproducer
   # without drifting onto a different violation. Without a gate it would rot
   # exactly the way the nested workspaces above did.
-  "test x3-mc:export CARGO_TARGET_DIR=/tmp/x3-nested-x3-mc; cargo fetch --locked --manifest-path crates/x3-mc/Cargo.toml || echo 'local-ci: x3-mc dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-mc/Cargo.toml"
+  "test x3-mc:export CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-mc; cargo fetch --locked --manifest-path crates/x3-mc/Cargo.toml || echo 'local-ci: x3-mc dependency fetch failed (offline?); running against the existing cache'; cargo test --offline --locked --manifest-path crates/x3-mc/Cargo.toml"
   # A failing simulation now produces a failure packet and hands it to a root-cause
   # agent. The dispatcher's own contract (fail closed when the router is down,
   # never store a non-conforming answer as a cause) is not covered by the Rust
@@ -826,17 +847,17 @@ GATES_FAST=(
   # `x3-sidecar` and `x3-swarm-core` (below) have suites that pass in seconds and are tested for real.
   # `x3-swarm-api` moved from `check` to `test` because it now has those tests: it stores every task
   # in the crate's scheduler rather than a private map, and four tests drive the handlers to prove it.
-  "test x3-swarm-api:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-api cargo test --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
-  "check x3-swarm-worker:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-worker cargo check --locked --all-targets --manifest-path services/x3-swarm-worker/Cargo.toml"
-  "check x3-solvency-sidecar:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-solvency-sidecar cargo check --locked --all-targets --manifest-path services/x3-solvency-sidecar/Cargo.toml"
-  "test x3-sidecar:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=/tmp/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml"
+  "test x3-swarm-api:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-swarm-api cargo test --locked --all-targets --manifest-path services/x3-swarm-api/Cargo.toml"
+  "check x3-swarm-worker:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-swarm-worker cargo check --locked --all-targets --manifest-path services/x3-swarm-worker/Cargo.toml"
+  "check x3-solvency-sidecar:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-solvency-sidecar cargo check --locked --all-targets --manifest-path services/x3-solvency-sidecar/Cargo.toml"
+  "test x3-sidecar:env SKIP_WASM_BUILD=1 CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-sidecar cargo test --locked --all-targets --manifest-path crates/x3-sidecar/Cargo.toml"
   # `x3-swarm-core` was in the loop above, where it was `cargo check --all-targets` — which compiles
   # a crate's tests and runs none of them. Measured 2026-09-25: 69 test attributes, all passing, in
   # about eight seconds. It gets a `cargo test` of its own. The other three stay on `check`: the API
   # and worker have no tests at all, and the solvency sidecar's suite contains a test
   # (`state::tests::record_fill_time_ema_after_window`) that runs for minutes, which is a finding in
   # its own right rather than something to put in the fast set.
-  "test x3-swarm-core:env CARGO_TARGET_DIR=/tmp/x3-nested-x3-swarm-core cargo test --locked --all-targets --manifest-path crates/x3-swarm-core/Cargo.toml"
+  "test x3-swarm-core:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-x3-swarm-core cargo test --locked --all-targets --manifest-path crates/x3-swarm-core/Cargo.toml"
   # `AGENTS.md` asks for `pnpm test`, `pnpm build` and `npm test` before any
   # task is called complete. Nothing in this harness ran any of them, and
   # nothing else did either: **412 tests across twelve JS projects** had never
@@ -886,8 +907,8 @@ GATES_FAST=(
   # the point of adding them is that nothing ran them before, so a regression in either would have
   # shipped silently. The scanner proposes this exact gate line as a patch; applying it dropped its
   # `ungated-crate` count and the ratchet was re-baselined in the same commit.
-  "test x3-svm-client:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-client cargo test --locked --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml -p x3-svm-client"
-  "test svm counter:env CARGO_TARGET_DIR=/tmp/x3-nested-svm-counter cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml"
+  "test x3-svm-client:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-svm-client cargo test --locked --manifest-path programs/svm/x3_atomic_swap/client/Cargo.toml -p x3-svm-client"
+  "test svm counter:env CARGO_TARGET_DIR=$NESTED_TARGET_BASE_Q/x3-nested-svm-counter cargo test --locked --manifest-path integration-tests/svm-counter-test/Cargo.toml"
   # The Tauri operator console is its own cargo workspace and had never been built, let alone tested:
   # measured 2026-09-27, no test attribute existed anywhere under apps/tauri-os, and the crate did not
   # compile (tauri.conf.json was in the wrong directory and there were no icons). The wrapper carries
@@ -1127,6 +1148,16 @@ GATES_ROTATION=(
   "validator rotation drill:bash scripts/testnet/validator-rotation-drill.sh"
 )
 
+# The PR-Agent review wrapper is used on real PRs, so its argv contract, the
+# repo config that feeds it, and the cost reporter need a check that does not
+# depend on a model, a network call or a key. This runs offline: it parses
+# .pr_agent.toml, checks the scripts, drives review.sh against a recording shim,
+# and feeds a saved router snapshot through usage.sh. What it cannot cover —
+# review quality and provider auth — is what check.sh reports.
+GATES_PR_AGENT=(
+  "pr-agent wiring:bash services/pr-agent/selftest.sh"
+)
+
 # The broadest automated signal the repository has: every test target in every
 # workspace member. SLOW (thousands of tests), so it is opt-in rather than part
 # of the default set. No SKIP_WASM_BUILD: x3-chain-node's service tests boot a
@@ -1212,6 +1243,8 @@ describe_all() {
   echo
   echo "validator key rotation (--rotation, also implied by --all):"
   printf '  - %s\n' "${GATES_ROTATION[@]%%:*}"
+  echo "PR-Agent wiring (--pr-agent, also implied by --all; offline, no model call):"
+  printf '  - %s\n' "${GATES_PR_AGENT[@]%%:*}"
   echo "deep gates (--deep, also implied by --all):"
   printf '  - %s\n' "${GATES_DEEP[@]%%:*}"
   echo "scheduling: --jobs N --cargo-jobs N --only a,b --skip a,b --changed-from R --pre-push --dry-run --fail-fast --publish-status"
@@ -1277,6 +1310,7 @@ for spec in "${GATES_FAST[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_TESTNET" = 1 ] && for spec in "${GATES_TESTNET[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_SOAK" = 1 ] && for spec in "${GATES_SOAK[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_ROTATION" = 1 ] && for spec in "${GATES_ROTATION[@]}"; do SELECTED+=("$spec"); done
+[ "$RUN_PR_AGENT" = 1 ] && for spec in "${GATES_PR_AGENT[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_LOOM" = 1 ] && for spec in "${GATES_LOOM[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_FUZZ" = 1 ] && for spec in "${GATES_FUZZ[@]}"; do SELECTED+=("$spec"); done
 [ "$RUN_MUTANTS" = 1 ] && for spec in "${GATES_MUTANTS[@]}"; do SELECTED+=("$spec"); done
@@ -1701,7 +1735,7 @@ fi
   printf '  ]\n}\n'
 } >"$LOG_DIR/local-ci-$STAMP-summary.json"
 
-echo "local-ci: summary json -> .ai/runlogs/local-ci-$STAMP-summary.json"
+echo "local-ci: summary json -> $LOG_DIR/local-ci-$STAMP-summary.json"
 
 # Opt-in: post the verdict for the exact commit this run tested. `success` means
 # "the gate of record passed for this SHA", so it is only posted when every gate
@@ -1742,6 +1776,17 @@ fi
 
 if [ "$FAILED" = 1 ]; then
   echo ""
+  # Artifact upload can fail independently (for example, account quota). Keep
+  # bounded diagnostics in the job console after parallel gates have finished.
+  for spec in "${SELECTED[@]}"; do
+    name="${spec%%:*}"
+    slug="$(slugify "$name")"
+    status="$(cat "$LOG_DIR/local-ci-$STAMP-$slug.status" 2>/dev/null || echo FAIL)"
+    if [ "$status" != PASS ]; then
+      printf '\n--- %s: last 80 diagnostic lines ---\n' "$name"
+      tail -n 80 "$LOG_DIR/local-ci-$STAMP-$slug.log" 2>/dev/null || true
+    fi
+  done
   echo "local-ci: FAILED — see the per-gate logs listed above"
   exit 1
 fi

@@ -9,14 +9,20 @@ use alloc::{format, vec};
 use sp_core::H256;
 
 use crate::error::{X3IntegrationError, X3Result};
-use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
-// The `std` path names the type to build each entry from the VM's journal. The `no_std` path takes
-// an already-typed `res.storage_writes` from `mini_x3`, so the import is only needed under `std`.
-#[cfg(feature = "std")]
 use crate::types::{X3ExecutionLog, X3StorageWrite};
+use crate::types::{X3ExecutionReceipt, X3GasConfig, X3Value};
 
 #[cfg(feature = "std")]
 use x3_vm::{BytecodeModule, VMConfig, Verifier, VerifyOptions, VM};
+
+/// Call depth the chain allows one execution (the figure the runtime has always enforced).
+const ON_CHAIN_MAX_CALL_DEPTH: usize = 64;
+/// Operand stack bound the chain allows one execution.
+const ON_CHAIN_MAX_STACK_SIZE: usize = 1024;
+/// Fixed part of the pre-execution gas estimate.
+const ON_CHAIN_BASE_GAS: u64 = 21_000;
+/// Per-byte part of the pre-execution gas estimate.
+const ON_CHAIN_GAS_PER_BYTE: u64 = 10;
 
 /// Configuration for X3 executor
 #[derive(Clone, Debug)]
@@ -230,16 +236,12 @@ impl X3Executor {
 
         match result {
             Ok(exec_result) => {
-                let return_data = match exec_result.value {
-                    Some(x3_vm::Value::I64(v)) => v.to_le_bytes().to_vec(),
-                    Some(x3_vm::Value::F64(v)) => v.to_bits().to_le_bytes().to_vec(),
-                    Some(x3_vm::Value::Bool(v)) => vec![v as u8],
-                    Some(x3_vm::Value::Bytes(v)) => v,
-                    Some(x3_vm::Value::String(s)) => s.into_bytes(),
-                    Some(x3_vm::Value::Unit) => vec![],
-                    Some(x3_vm::Value::Addr(a)) => a.to_le_bytes().to_vec(),
-                    None => vec![],
-                };
+                // One encoding for a returned value, the engine's own, shared with the chain path.
+                let return_data = exec_result
+                    .value
+                    .as_ref()
+                    .map(x3_vm::Value::return_bytes)
+                    .unwrap_or_default();
 
                 // Drain the slot journal into the receipt's storage channel.
                 //
@@ -318,7 +320,7 @@ impl X3Executor {
         }
     }
 
-    /// Execute X3BC bytecode (no_std — uses mini_x3 interpreter)
+    /// Execute X3BC bytecode (no_std: the chain's engine, see `execute_on_chain`)
     #[cfg(not(feature = "std"))]
     pub fn execute(
         bytecode: &[u8],
@@ -350,89 +352,176 @@ impl X3Executor {
 
     /// Execute a program the way the chain does, in **every** build.
     ///
-    /// The runtime's X3 adapters called `execute`, which is `x3-vm` behind a `std` feature and
-    /// `mini_x3` without it — so the native runtime (its unit tests and its FRAME benchmarks) ran
-    /// one engine and every node, executing the wasm runtime, ran another, with different gas
-    /// schedules (`x3-vm` prices opcodes, `mini_x3` charges one per instruction), different
-    /// validation (the full verifier against a header parse) and a different split of failures
-    /// between `Err` and an unsuccessful receipt. A test of the native runtime was a test of an
-    /// engine no block ever runs. This function is the one engine, whichever way the crate is built.
+    /// This is the one engine: `x3-vm`, built without `std` inside the wasm runtime and with it in
+    /// the native runtime, tests and tools. It used to be `mini_x3`, a second, smaller interpreter
+    /// that existed only because `x3-vm` needed `std`; the two had different gas schedules and
+    /// disagreed on opcodes, so a simulation was a prediction about a different engine. With
+    /// `x3-vm` building `no_std` there is nothing left for a second engine to do.
     ///
-    /// `seeds` are the chain's contract slots, loaded as inherited state, and
-    /// `private_channel_available` is whether the caller can honour an artifact that demands
-    /// private submission (see `mini_x3::execute_x3bc_with_slots_and_policy`).
+    /// `seeds` are the chain's contract slots, loaded as inherited state (not journaled, so the
+    /// receipt does not report them), and `private_channel_available` is whether the caller can
+    /// honour an artifact that demands private submission.
     ///
-    /// The module is validated first (`verify_on_chain`); a refusal there is `VerificationFailed`.
-    /// Running out of gas is an unsuccessful receipt charged the whole limit; any other runtime
-    /// fault is `ExecutionFailed`, naming it.
+    /// Contract, unchanged from the engine it replaces:
+    /// - a module the on-chain verifier refuses is `VerificationFailed`, and nothing runs;
+    /// - an artifact demanding private submission where none is offered is `ExecutionFailed`;
+    /// - running out of gas is an unsuccessful receipt charged the whole limit;
+    /// - any other fault is an unsuccessful receipt naming it, with no slot writes and no events,
+    ///   however many the program journaled before the fault.
     pub fn execute_on_chain(
         bytecode: &[u8],
         gas_limit: u64,
         seeds: &[([u8; 32], [u8; 32])],
         private_channel_available: bool,
     ) -> X3Result<X3ExecutionReceipt> {
-        use crate::mini_x3;
-        Self::verify_on_chain(bytecode)?;
-        match mini_x3::execute_x3bc_with_slots_and_policy(
+        Self::execute_on_chain_with_context(
             bytecode,
             gas_limit,
             seeds,
             private_channel_available,
-        ) {
-            Ok(res) => Ok(X3ExecutionReceipt {
-                success: true,
-                gas_used: res.gas_used,
-                return_data: res.return_val.to_bytes(),
-                // What the program emitted, journalled by the interpreter a block runs.
-                logs: res.events,
-                state_changes: vec![],
-                // The interpreter journals its slot writes in the key and payload encoding
-                // `crates/x3-vm` uses (`mini_x3::evm_slot_key`): this is the line that carries a
-                // write made by a program running on a block to the kernel.
-                storage_writes: res.storage_writes,
-                function_index: 0,
-                instructions_executed: res.instructions_executed,
-            }),
-            Err(mini_x3::X3Error::GasExhausted) => Ok(X3ExecutionReceipt {
-                success: false,
-                gas_used: gas_limit,
-                return_data: b"gas exhausted".to_vec(),
-                logs: vec![],
-                state_changes: vec![],
-                storage_writes: vec![],
-                function_index: 0,
-                // Not a stand-in: this interpreter charges exactly one gas per instruction
-                // (`mini_x3::Vm::run`), so at exhaustion the count is the limit.
-                instructions_executed: gas_limit,
-            }),
+            &x3_vm::BlockContext::unknown(),
+        )
+    }
+
+    /// `execute_on_chain`, with what the host knows about the call.
+    ///
+    /// The context is what `ctx_sender`, `ctx_block_height`, `ctx_timestamp`, `ctx_value` and
+    /// `ctx_chain_id` read. A field left `None` is refused by the opcode that reads it, so a caller
+    /// supplies only what it actually knows; `execute_on_chain` supplies nothing.
+    pub fn execute_on_chain_with_context(
+        bytecode: &[u8],
+        gas_limit: u64,
+        seeds: &[([u8; 32], [u8; 32])],
+        private_channel_available: bool,
+        context: &x3_vm::BlockContext,
+    ) -> X3Result<X3ExecutionReceipt> {
+        use x3_vm::{BytecodeModule as Module, VMConfig as Config, VMErrorKind, Value, VM as Vm};
+
+        Self::verify_on_chain(bytecode)?;
+        let module = Module::from_bytes(bytecode)
+            .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
+
+        // The artifact's compiled policy, before anything runs. A program that asked not to be
+        // public must not be executed in the clear, whichever route brought it here.
+        if module
+            .features
+            .has(x3_backend::bc_format::FeatureFlags::PRIVATE_SUBMISSION_REQUIRED)
+            && !private_channel_available
+        {
+            return Err(X3IntegrationError::ExecutionFailed(
+                "private submission required by the compiled policy, but this context offers no \
+                 private channel"
+                    .into(),
+            ));
+        }
+
+        let mut vm = Vm::with_config_and_seeds(
+            module,
+            Config {
+                gas_limit,
+                max_call_depth: ON_CHAIN_MAX_CALL_DEPTH,
+                max_stack_size: ON_CHAIN_MAX_STACK_SIZE,
+                trace: false,
+            },
+            seeds,
+        )
+        .map_err(|e| X3IntegrationError::ExecutionFailed(format!("{:?}", e)))?;
+
+        vm.set_context(*context);
+        // The runtime calls the entry function with no arguments; the verifier has already
+        // refused an entry that declares any.
+        let result = vm.call_function(0, &[]);
+        let instructions_executed = vm.instruction_count();
+
+        match result {
+            Ok(exec) => {
+                let return_data = exec
+                    .value
+                    .as_ref()
+                    .map(Value::return_bytes)
+                    .unwrap_or_default();
+                // A write a rolled-back window abandoned is already gone from the journal, so
+                // this is exactly the state change the execution made.
+                let storage_writes = vm
+                    .drain_storage_journal()
+                    .into_iter()
+                    .map(|write| X3StorageWrite {
+                        key: H256::from(write.key),
+                        old_value: write.old_value,
+                        new_value: write.new_value,
+                    })
+                    .collect();
+                // Committed events only, in order: a rolled-back window's events are not here.
+                let logs = vm
+                    .drain_events()
+                    .into_iter()
+                    .map(|event| X3ExecutionLog {
+                        topic: event
+                            .topics
+                            .first()
+                            .map(|topic| H256::from(*topic))
+                            .unwrap_or_default(),
+                        data: event.data,
+                    })
+                    .collect();
+                Ok(X3ExecutionReceipt {
+                    success: true,
+                    gas_used: vm.gas_used(),
+                    return_data,
+                    logs,
+                    state_changes: vec![],
+                    storage_writes,
+                    function_index: 0,
+                    instructions_executed,
+                })
+            }
+            Err(error) if matches!(error.kind, VMErrorKind::GasLimitExceeded) => {
+                Ok(X3ExecutionReceipt {
+                    success: false,
+                    gas_used: gas_limit,
+                    return_data: b"gas exhausted".to_vec(),
+                    logs: vec![],
+                    state_changes: vec![],
+                    storage_writes: vec![],
+                    function_index: 0,
+                    instructions_executed,
+                })
+            }
             // A validated program that faults while running (a division by zero, a rolled-back
-            // atomic window, an unsupported opcode reached at run time) is an unsuccessful
-            // receipt naming the fault, the convention `x3-vm` and the kernel's storage channel
-            // use: the caller learns *that* the program ran and failed, and the receipt carries
-            // no slot writes, however many the program journaled before the fault. The
-            // interpreter does not report the gas a faulted run consumed, so none is claimed.
-            Err(e) => Ok(X3ExecutionReceipt {
+            // atomic window, an assertion) is an unsuccessful receipt naming the fault, charged
+            // the gas it consumed up to the fault. Fail closed: it carries no slot writes and no
+            // events, so nothing a failed execution journaled can reach chain state.
+            Err(error) => Ok(X3ExecutionReceipt {
                 success: false,
-                gas_used: 0,
-                return_data: format!("{:?}", e).into_bytes(),
+                gas_used: vm.gas_used().min(gas_limit),
+                return_data: format!("{:?}", error).into_bytes(),
                 logs: vec![],
                 state_changes: vec![],
                 storage_writes: vec![],
                 function_index: 0,
-                instructions_executed: 0,
+                instructions_executed,
             }),
         }
     }
 
     /// Validate a program the way the chain does, in every build (see `execute_on_chain`).
+    ///
+    /// `x3-vm`'s verifier with on-chain options: structure, linkage, control flow, atomic balance,
+    /// the gas budget, no debug, GPU or floating-point opcodes, no opcode the engine cannot run,
+    /// and an entry function that takes no arguments.
     pub fn verify_on_chain(bytecode: &[u8]) -> X3Result<()> {
-        crate::mini_x3::validate_x3bc(bytecode)
+        x3_vm::Verifier::verify_module_bytes(bytecode, &x3_vm::VerifyOptions::on_chain())
+            .map(|_| ())
             .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))
     }
 
-    /// The chain's gas estimate for a program, in every build (see `execute_on_chain`).
+    /// The chain's up-front gas estimate for a program, in every build (see `execute_on_chain`).
+    ///
+    /// A size-based bound (EIP-2028 style), unchanged from the engine this replaced, so the
+    /// weight a call is pre-charged does not move with this change.
     pub fn estimate_gas_on_chain(bytecode: &[u8]) -> u64 {
-        crate::mini_x3::estimate_gas_x3bc(bytecode)
+        ON_CHAIN_BASE_GAS
+            .saturating_add((bytecode.len() as u64).saturating_mul(ON_CHAIN_GAS_PER_BYTE))
     }
 
     /// Verify bytecode without execution
@@ -448,30 +537,25 @@ impl X3Executor {
         Ok(())
     }
 
-    /// Verify bytecode (no_std — uses mini_x3 validator)
+    /// Verify bytecode (no_std: the chain's verifier, see `verify_on_chain`)
     #[cfg(not(feature = "std"))]
     pub fn verify(bytecode: &[u8], _allow_debug_ops: bool) -> X3Result<()> {
         Self::verify_on_chain(bytecode)
     }
 
-    /// Estimate gas for bytecode execution
+    /// Estimate gas for bytecode execution: the chain's own estimate, for a module the chain's
+    /// verifier admits.
+    ///
+    /// This used to ask `x3_verifier::Verifier::verify_bytecode`, which verified nothing and
+    /// reported no gas, so every module passed and the estimate fell back to `len * 10`: a
+    /// native caller and the chain (`estimate_gas_on_chain`) priced the same bytes differently.
     #[cfg(feature = "std")]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
-        // Use verifier's gas estimation
-        let report = x3_verifier::Verifier::new(x3_verifier::SafetyRules::default())
-            .verify_bytecode(bytecode)
-            .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))?;
-
-        // Get gas estimate from report, or use conservative fallback
-        let gas_estimate = report
-            .gas_report
-            .map(|gr| gr.total_gas)
-            .unwrap_or_else(|| (bytecode.len() as u64) * 10);
-
-        Ok(gas_estimate)
+        Self::verify(bytecode, false)?;
+        Ok(Self::estimate_gas_on_chain(bytecode))
     }
 
-    /// Estimate gas (no_std — uses mini_x3 estimator)
+    /// Estimate gas (no_std: the chain's estimate, see `estimate_gas_on_chain`)
     #[cfg(not(feature = "std"))]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
         Ok(Self::estimate_gas_on_chain(bytecode))
@@ -486,6 +570,33 @@ impl X3Executor {
 #[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_native_estimate_is_the_chains_and_refuses_what_the_chain_refuses() {
+        // `fn main() -> i64 { 1 }`: `r0 = 1; ret r0`.
+        let mut module = x3_backend::BytecodeModule::new();
+        module.functions = vec![x3_backend::FunctionEntry {
+            name: "main".into(),
+            entry_point: 0,
+            param_count: 0,
+            local_count: 1,
+            max_stack: 1,
+            return_type_tag: 1,
+        }];
+        module.code = vec![
+            x3_backend::opcode::Opcode::LoadImm as u8,
+            0,
+            1,
+            x3_backend::opcode::Opcode::Ret as u8,
+            0,
+        ];
+        let module = module.to_bytes();
+        assert_eq!(
+            X3Executor::estimate_gas(&module).expect("a valid module verifies"),
+            X3Executor::estimate_gas_on_chain(&module)
+        );
+        assert!(X3Executor::estimate_gas(b"not a module").is_err());
+    }
 
     #[test]
     fn test_executor_config_defaults() {

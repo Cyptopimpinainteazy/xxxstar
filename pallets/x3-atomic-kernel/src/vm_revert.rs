@@ -34,10 +34,10 @@
 //! key = twox_128(PalletName) ++ twox_128(StorageName) ++ blake2_128_concat(key)
 //! ```
 //!
-//! Known pallet prefixes:
-//! - EVM: `pallet_evm` / `AccountCodes`, `AccountStorages`
-//! - SVM: `pallet_svm_runtime` / `AccountData`
-//! - X3VM: `x3_vm` / `VmStorage`
+//! The per-VM reverters below derive their keys from `pallet_evm` / `AccountCodes`,
+//! `AccountStorages`; `pallet_svm_runtime` / `AccountData`; `x3_vm` / `VmStorage`. Those are not the
+//! keys the runtime's pallets use, and the diffs they would apply are not authenticated, so the
+//! runtime's [`CompositeReverter`] applies none of them; see its documentation.
 
 use crate::proof::VmType;
 use frame_support::{traits::Get, BoundedVec};
@@ -117,6 +117,9 @@ pub enum RevertError {
     VmNotAvailable(VmType),
     /// The revert operation itself failed.
     RevertFailed { reason: Vec<u8> },
+    /// The diff came from outside the chain and nothing proves it describes what the leg did, so
+    /// applying it would write storage on a submitter's say-so. See [`CompositeReverter`].
+    UnauthenticatedStateDiff,
 }
 
 /// Trait for reverting VM state changes from a single leg.
@@ -833,26 +836,31 @@ impl OverlayReverter {
 /// | X3VM | `x3_vm::VmStorage` | twox_128("x3_vm") ++ twox_128("VmStorage") ++ blake2_128(key) ++ key |
 pub struct CompositeReverter;
 
+/// The runtime's reverter. It applies no diff: every non-empty one is refused with
+/// [`RevertError::UnauthenticatedStateDiff`], so a rollback reports `IncompleteVmRevert` instead
+/// of claiming a revert that did not happen.
+///
+/// Two defects made the per-VM reverters unsafe to apply here:
+///
+/// * **The diff is not the chain's.** It arrives through `record_leg_execution_receipt`, an
+///   unsigned, gossiped call whose only checks are that the bundle is executing and the leg index
+///   is in range. Applying it writes each entry's "old value" into storage, so whoever records a
+///   leg first chooses what a rollback writes.
+/// * **The keys addressed nothing.** They were derived from crate names (`pallet_evm`,
+///   `pallet_svm_runtime`, `x3_vm`, `x3-atomic-kernel`) rather than the names the runtime gives its
+///   pallets (`Evm`, `SvmRuntime`, `AtlasKernel`, `X3AtomicKernel`); `VmStorage` and `OverlayLedger`
+///   exist in no pallet; and the EVM slot key hashed the address with `twox_64` where
+///   `pallet_evm::AccountStorages` uses `Blake2_128Concat`. Every revert wrote dead keys and
+///   returned `Reverted`.
+///
+/// Correcting the keys alone would have turned the second defect into the first one's exploit, so
+/// the reverters stay unwired until a leg's diff is something the chain produced or can verify.
 impl VmReverter for CompositeReverter {
-    fn revert_leg(vm_type: VmType, state_diff: &StateDiff) -> Result<RevertOutcome, RevertError> {
+    fn revert_leg(_vm_type: VmType, state_diff: &StateDiff) -> Result<RevertOutcome, RevertError> {
         if state_diff.is_empty() {
             return Ok(RevertOutcome::NoSideEffects);
         }
-        if state_diff.as_bytes().len() >= 8 && state_diff.as_bytes()[..8] == OVERLAY_DIFF_MAGIC {
-            return OverlayReverter::revert(state_diff);
-        }
-        match vm_type {
-            VmType::Evm => EvmReverter::revert(state_diff),
-            VmType::Svm => SvmReverter::revert(state_diff),
-            VmType::X3 => X3VmReverter::revert(state_diff),
-            VmType::Cross => {
-                // Cross-VM legs are composites of individual VM executions.
-                // Revert each constituent VM in reverse order.
-                EvmReverter::revert(state_diff).or_else(|_| {
-                    SvmReverter::revert(state_diff).or_else(|_| X3VmReverter::revert(state_diff))
-                })
-            }
-        }
+        Err(RevertError::UnauthenticatedStateDiff)
     }
 }
 
@@ -1099,25 +1107,31 @@ mod tests {
 
     // ── Composite Reverter ─────────────────────────────────────────────────
 
+    // The runtime's reverter refuses every non-empty diff (`UnauthenticatedStateDiff`): these
+    // tests used to assert that it applied EVM and SVM diffs, which is the behaviour that let an
+    // unsigned leg receipt choose what a rollback writes (see `CompositeReverter`).
+
     #[test]
-    fn test_composite_reverter_dispatches_to_evm() {
+    fn test_composite_reverter_refuses_an_evm_diff() {
         run(|| {
             let changes = vec![make_evm_storage_change(0x01, &[0xAA; 32], &[0xBB; 32])];
             let diff = encode_evm_state_diff(&changes, Some([0xCA; 20]));
-            let result = CompositeReverter::revert_leg(VmType::Evm, &diff);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+            assert_eq!(
+                CompositeReverter::revert_leg(VmType::Evm, &diff),
+                Err(RevertError::UnauthenticatedStateDiff)
+            );
         });
     }
 
     #[test]
-    fn test_composite_reverter_dispatches_to_svm() {
+    fn test_composite_reverter_refuses_an_svm_diff() {
         run(|| {
             let changes = vec![make_svm_storage_change(0x01, b"balance", &[0x00, 0x01])];
             let diff = encode_svm_state_diff(&changes);
-            let result = CompositeReverter::revert_leg(VmType::Svm, &diff);
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+            assert_eq!(
+                CompositeReverter::revert_leg(VmType::Svm, &diff),
+                Err(RevertError::UnauthenticatedStateDiff)
+            );
         });
     }
 
@@ -1129,10 +1143,12 @@ mod tests {
     }
 
     #[test]
-    fn test_composite_reverter_invalid_diff_returns_error() {
+    fn test_composite_reverter_refuses_a_malformed_diff_without_decoding_it() {
         let diff = StateDiff::from(vec![0xFF; 3]);
-        let result = CompositeReverter::revert_leg(VmType::Svm, &diff);
-        assert_eq!(result.unwrap_err(), RevertError::InvalidStateDiff);
+        assert_eq!(
+            CompositeReverter::revert_leg(VmType::Svm, &diff),
+            Err(RevertError::UnauthenticatedStateDiff)
+        );
     }
 
     // ── Overlay Ledger Reverter ───────────────────────────────────────────
@@ -1205,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn composite_reverter_dispatches_overlay_diff_before_vm_decoder() {
+    fn composite_reverter_refuses_an_overlay_diff() {
         run(|| {
             let change = OverlayLegChange {
                 domain: OverlayDomain::Evm,
@@ -1215,13 +1231,18 @@ mod tests {
                 new_value: Some(H256([0xFF; 32])),
             };
             let diff = encode_overlay_state_diff(&[change]);
-            let result = CompositeReverter::revert_leg(VmType::Evm, &diff);
-            assert_eq!(result.unwrap(), RevertOutcome::Reverted);
+            assert_eq!(
+                CompositeReverter::revert_leg(VmType::Evm, &diff),
+                Err(RevertError::UnauthenticatedStateDiff)
+            );
         });
     }
 
+    /// A stored leg receipt's diff is not applied on rollback: the value the execution wrote stays,
+    /// and the reverter says so (the pallet then reports `IncompleteVmRevert`) instead of writing
+    /// the receipt's "old value" into storage on the submitter's word.
     #[test]
-    fn rollback_restores_overlay_ledger_from_stored_leg_receipt() {
+    fn rollback_does_not_apply_a_stored_leg_receipts_diff() {
         run(|| {
             let change = OverlayLegChange {
                 domain: OverlayDomain::X3,
@@ -1242,12 +1263,12 @@ mod tests {
             );
 
             let outcome = CompositeReverter::revert_leg(VmType::X3, &receipt.state_diff);
-            assert_eq!(outcome.unwrap(), RevertOutcome::Reverted);
+            assert_eq!(outcome, Err(RevertError::UnauthenticatedStateDiff));
 
-            let restored = sp_io::storage::get(&key).expect("overlay ledger value restored");
+            let untouched = sp_io::storage::get(&key).expect("the written value is still there");
             assert_eq!(
-                restored,
-                change.old_value.expect("old value present").as_bytes()
+                untouched,
+                change.new_value.expect("new value present").as_bytes()
             );
         });
     }

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import os
 import ctypes
+import os
+from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from .cuda_loader import CudaRuntime
@@ -14,25 +14,18 @@ def _keccak256(data: bytes) -> bytes:
     """Compute real Keccak-256 (NOT SHA3-256 which uses different padding)."""
     try:
         from Crypto.Hash import keccak
+
         return keccak.new(digest_bits=256, data=data).digest()
     except ImportError:
         pass
     try:
         import sha3  # pysha3
+
         return sha3.keccak_256(data).digest()
-    except ImportError:
-        pass
-    # Last resort: pycryptodome not installed, warn and use sha3_256
-    # This will produce WRONG results for parity checks!
-    import hashlib
-    import warnings
-    warnings.warn(
-        "Neither pycryptodome nor pysha3 installed — falling back to SHA3-256 "
-        "which differs from Keccak-256. Install pycryptodome for correctness.",
-        RuntimeWarning,
-        stacklevel=3,
-    )
-    return hashlib.sha3_256(data).digest()
+    except ImportError as exc:
+        raise RuntimeError(
+            "a real Keccak-256 provider is required (pycryptodome or pysha3)"
+        ) from exc
 
 
 @dataclass
@@ -56,6 +49,7 @@ class KeccakBatchHasher:
         self.parity_check = parity_check
         self.allow_failover = allow_failover
         self._lib = None
+        self._gpu_ok = True
         if self.runtime.available:
             lib_path = os.path.join(self.kernel_dir, "build", "libkeccak256_batch.so")
             if os.path.exists(lib_path):
@@ -67,7 +61,20 @@ class KeccakBatchHasher:
                 ]
                 self._lib.keccak256_batch_host.restype = ctypes.c_int
             elif not self.allow_failover:
-                raise RuntimeError("Missing libkeccak256_batch.so for required GPU mode")
+                raise RuntimeError(
+                    "Missing libkeccak256_batch.so for required GPU mode"
+                )
+        elif not self.allow_failover:
+            raise RuntimeError("CUDA runtime unavailable for required GPU mode")
+
+    def _disable_gpu(self, reason: str) -> None:
+        """Stop using a GPU path that failed validation."""
+        if not self._gpu_ok:
+            return
+        self._gpu_ok = False
+        message = f"GPU keccak256 disabled (reason={reason}) -> using CPU fallback"
+        if not self.allow_failover:
+            raise RuntimeError(message)
 
     def hash_batch(self, payloads: Iterable[bytes]) -> list[bytes]:
         # Materialize once so we can replay for GPU + parity check
@@ -75,19 +82,25 @@ class KeccakBatchHasher:
             payloads if isinstance(payloads, (list, tuple)) else list(payloads)
         )
         try:
-            if self.runtime.available and self._lib is not None:
+            if self.runtime.available and self._lib is not None and self._gpu_ok:
                 return self._hash_gpu(payloads_list)
         except Exception:
+            self._disable_gpu("runtime_failure")
             if self.allow_failover:
                 return self._hash_cpu(payloads_list)
             raise
+        if not self.allow_failover:
+            raise RuntimeError("GPU execution unavailable and CPU failover is disabled")
         return self._hash_cpu(payloads_list)
 
     def _hash_gpu(self, payloads: Sequence[bytes]) -> list[bytes]:
+        lib = self._lib
+        if lib is None:
+            raise RuntimeError("GPU keccak256 library is not loaded")
         packed_payloads = self._pack_bytes(payloads, 32, "payloads")
         count = len(packed_payloads) // 32
         digests = (ctypes.c_ubyte * (count * 32))()
-        status = self._lib.keccak256_batch_host(
+        status = lib.keccak256_batch_host(
             ctypes.c_char_p(packed_payloads),
             ctypes.c_int(count),
             ctypes.byref(digests),
@@ -98,6 +111,7 @@ class KeccakBatchHasher:
         if self.parity_check:
             cpu_hashes = self._hash_cpu(payloads)
             if gpu_hashes != cpu_hashes:
+                self._disable_gpu("parity_mismatch")
                 raise RuntimeError("GPU keccak256 results diverged from CPU")
         return gpu_hashes
 

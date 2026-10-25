@@ -1,5 +1,10 @@
 //! The two interpreters must refuse the same opcodes.
 //!
+//! **Since the runtime switched engines:** blocks execute `crates/x3-vm` through
+//! `X3Executor::execute_on_chain` in every build (`tests/chain_engine.rs`). `mini_x3` is no longer
+//! on any chain path; it stays as the reference this file holds the new engine to, until the old
+//! engines are retired. Where the text below says a block runs `mini_x3`, read "used to run".
+//!
 //! `crates/x3-vm` (reached by tests, tools and simulation) and
 //! `crates/x3-integration::mini_x3` (reached by a block — the node builds a `WasmExecutor`, so the
 //! runtime executes the `no_std` one) are two implementations of one ISA. `compiler_bridge.rs`
@@ -47,17 +52,12 @@ fn module_with(instruction: &[u8]) -> Vec<u8> {
 /// Opcodes the compiler can emit and neither interpreter implements, with one reasoning note each.
 /// Kept as a table so a divergence shows up as a changed refusal rather than as a silent success.
 fn agreed_refusals() -> Vec<(u8, &'static str)> {
+    // The aggregates (`load_index` .. `store_field`, `new_array` .. `tuple_get`) left this table
+    // when `x3-vm`, the chain's engine, implemented them. `mini_x3`, retired from every chain path,
+    // still refuses them; `x3-vm`'s own tests and `tests/chain_engine.rs` hold the implementation.
     let mut table: Vec<(u8, &'static str)> = vec![
-        (0x14, "load_index"),
-        (0x15, "store_index"),
-        (0x16, "load_field"),
-        (0x17, "store_field"),
-        (0x70, "new_array"),
-        (0x71, "array_len"),
-        (0x72, "array_push"),
-        (0x73, "array_pop"),
-        (0x74, "new_tuple"),
-        (0x75, "tuple_get"),
+        // The context reads below are implemented by `x3-vm` now, and still refused here because
+        // `VM::from_bytes` is given no context: with nothing supplied, neither engine answers.
         (0x80, "ctx_sender"),
         (0x81, "ctx_block_height"),
         (0x82, "ctx_timestamp"),

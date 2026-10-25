@@ -2,14 +2,16 @@
 
 use super::*;
 use crate as pallet_x3_automation;
-use frame_support::{derive_impl, parameter_types};
+use frame_support::{derive_impl, parameter_types, traits::Currency, weights::Weight};
 use frame_system as system;
 use sp_core::H256;
+use sp_runtime::DispatchError;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 use std::collections::HashMap;
+use x3_automation::{Action, ActionOutcome};
 
 /// Test oracle that returns a static price map.
 /// Use `set_price` to configure expected values before each test.
@@ -121,15 +123,94 @@ impl pallet_balances::Config for Test {
     type DoneSlashHandler = ();
 }
 
+/// What the mock dispatcher does with an `Action::Custom` payload.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DispatchMode {
+    /// Report the action applied.
+    Apply,
+    /// Refuse the action, as an unwired runtime would.
+    Refuse,
+}
+
+std::thread_local! {
+    static DISPATCH_MODE: std::cell::Cell<DispatchMode> =
+        const { std::cell::Cell::new(DispatchMode::Apply) };
+}
+
+/// Run a closure with the mock dispatcher in `mode`.
+pub fn with_dispatch_mode<R>(mode: DispatchMode, f: impl FnOnce() -> R) -> R {
+    let previous = DISPATCH_MODE.with(|cell| cell.replace(mode));
+    let out = f();
+    DISPATCH_MODE.with(|cell| cell.set(previous));
+    out
+}
+
+/// Test dispatcher.
+///
+/// `Noop` and `TransferNative` are real: the latter moves balances. `Custom`
+/// follows the thread-local mode so a test can assert both the applied and the
+/// refused path without a second runtime.
+pub struct TestDispatcher;
+
+impl pallet::ActionDispatcher<u64> for TestDispatcher {
+    fn dispatch(
+        owner: &u64,
+        action: &Action,
+    ) -> Result<(ActionOutcome, Weight, [u8; 64]), DispatchError> {
+        match action {
+            Action::Noop => Ok((ActionOutcome::Noop, Weight::from_parts(1_000, 0), [0u8; 64])),
+            Action::TransferNative { recipient, amount } => {
+                let mut key = [0u8; 8];
+                key.copy_from_slice(&recipient[..8]);
+                let to = u64::from_le_bytes(key);
+                let value = u64::try_from(*amount)
+                    .map_err(|_| DispatchError::Other("mock: amount out of range"))?;
+                <Balances as Currency<u64>>::transfer(
+                    owner,
+                    &to,
+                    value,
+                    frame_support::traits::ExistenceRequirement::KeepAlive,
+                )
+                .map_err(|_| DispatchError::Other("mock: transfer refused"))?;
+                let mut out = [0u8; 64];
+                out[..8].copy_from_slice(&value.to_le_bytes());
+                Ok((ActionOutcome::Applied, Weight::from_parts(10_000, 100), out))
+            }
+            Action::TransferLedgerAsset { .. } => {
+                Err(DispatchError::Other("mock: no ledger asset backend"))
+            }
+            Action::Custom(_) => match DISPATCH_MODE.with(|cell| cell.get()) {
+                DispatchMode::Apply => Ok((
+                    ActionOutcome::Applied,
+                    Weight::from_parts(5_000, 50),
+                    [0u8; 64],
+                )),
+                DispatchMode::Refuse => Err(DispatchError::Other("mock: custom refused")),
+            },
+        }
+    }
+}
+
+/// Fixed wall clock for the mock: 1_700_000_000_000 ms.
+pub const MOCK_NOW_MS: u64 = 1_700_000_000_000;
+
 impl Config for Test {
     type Currency = Balances;
     type MaxTasksPerAccount = MaxTasksPerAccount;
     type BaseRegistrationFee = BaseRegistrationFee;
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
+    type MaxAttempts = MaxAttempts;
+    type Now = MockNow;
     type WeightInfo = ();
     type Oracle = TestOracle;
     type CustomEvaluator = NoopCustomEvaluator;
+    type Dispatcher = TestDispatcher;
+}
+
+parameter_types! {
+    pub const MaxAttempts: u32 = 3;
+    pub const MockNow: u64 = MOCK_NOW_MS;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

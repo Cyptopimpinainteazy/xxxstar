@@ -2,7 +2,7 @@
 mod audit_tests {
  use x3_verification_router::*;
  fn envelope(chain: ChainKind, strategy: VerificationStrategy) -> ProofEnvelope {
-  ProofEnvelope { proof_id:[1;32], strategy, source_chain:chain, destination_chain:ChainKind::X3, payload:vec![1], expected_asset_id:[2;32], expected_amount:100, expected_sender:vec![3;20], expected_recipient:vec![4;20] }
+  ProofEnvelope { proof_id:[1;32], strategy, source_chain:chain, destination_chain:ChainKind::X3, payload:vec![1], expected_asset_id:[2;32], expected_amount:100, expected_sender:vec![3;20], expected_recipient:vec![4;20], expected_beneficiary:vec![5;32] }
  }
  #[test]
  fn reject_unsigned_one_byte_quorum_proof_in_production() {

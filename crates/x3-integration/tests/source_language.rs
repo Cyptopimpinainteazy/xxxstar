@@ -275,3 +275,275 @@ fn nested_function_calls_and_arithmetic_agree() {
         42
     );
 }
+
+// ─── Block context ──────────────────────────────────────────────────────────────────────────────
+
+/// Source reads the block it runs in. `ctx_*` are host calls (`x3_common::intrinsics`), resolved
+/// and typed like `evm_sload`, so a program that declares its own `ctx_chain_id` still wins.
+#[test]
+fn source_reads_the_block_context_it_is_given() {
+    let bytes = compile_source(
+        "fn main() -> i64 { \
+           let lease_ends = ctx_timestamp() + 30000; \
+           if ctx_chain_id() != 650000 { return 0 - 1; } \
+           return ctx_block_height() * 1000000 + (lease_ends - ctx_timestamp()) + ctx_value(); \
+         }",
+    )
+    .unwrap_or_else(|e| panic!("must compile: {e}"));
+    let context = x3_x3_integration::X3BlockContext {
+        sender: None,
+        block_height: Some(42),
+        timestamp_ms: Some(1_760_000_000_000),
+        value: Some(0),
+        chain_id: Some(650_000),
+    };
+    let receipt =
+        X3Executor::execute_on_chain_with_context(&bytes, 1_000_000, &[], false, &context).unwrap();
+    assert!(
+        receipt.success,
+        "{}",
+        String::from_utf8_lossy(&receipt.return_data)
+    );
+    assert_eq!(
+        receipt.return_data,
+        (42i64 * 1_000_000 + 30_000).to_le_bytes().to_vec()
+    );
+
+    // With no context the same program is refused by the first read, not answered with zeros.
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    assert!(!receipt.success);
+    assert!(String::from_utf8_lossy(&receipt.return_data).contains("ContextUnavailable"));
+}
+
+#[test]
+fn a_programs_own_function_named_like_a_context_read_still_wins() {
+    let bytes = compile_source(
+        "fn ctx_chain_id() -> i64 { return 7; } fn main() -> i64 { return ctx_chain_id(); }",
+    )
+    .unwrap_or_else(|e| panic!("must compile: {e}"));
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    assert!(receipt.success);
+    assert_eq!(receipt.return_data, 7i64.to_le_bytes().to_vec());
+}
+
+// ─── Arrays and tuples ──────────────────────────────────────────────────────────────────────────
+
+fn on_chain(source: &str) -> X3ExecutionReceiptView {
+    let bytes = compile_source(source).unwrap_or_else(|e| panic!("must compile: {e}\n{source}"));
+    let receipt = X3Executor::execute_on_chain(&bytes, 1_000_000, &[], false).unwrap();
+    X3ExecutionReceiptView {
+        success: receipt.success,
+        data: receipt.return_data,
+    }
+}
+
+struct X3ExecutionReceiptView {
+    success: bool,
+    data: Vec<u8>,
+}
+
+fn returns(source: &str, expected: i64) {
+    let view = on_chain(source);
+    assert!(
+        view.success,
+        "{}\n{source}",
+        String::from_utf8_lossy(&view.data)
+    );
+    assert_eq!(view.data, expected.to_le_bytes().to_vec(), "{source}");
+}
+
+#[test]
+fn an_array_literal_is_indexed_measured_and_summed_in_a_loop() {
+    returns(
+        "fn main() -> i64 { let xs = [3, 5, 8, 13]; let mut i = 0; let mut sum = 0; \
+         while i < xs.len() { sum = sum + xs[i]; i = i + 1; } return sum * 10 + xs.len(); }",
+        294,
+    );
+}
+
+/// `a[i] = v` rebinds `a`; a copy taken before the write keeps its old element (value semantics,
+/// which is what lets MIR stay in SSA form and is what the engine does with `mov`).
+#[test]
+fn element_assignment_has_value_semantics() {
+    returns(
+        "fn main() -> i64 { let mut a = [1, 2, 3]; let before = a; a[1] = 20; \
+         return a[1] * 100 + before[1]; }",
+        2002,
+    );
+}
+
+#[test]
+fn an_array_built_in_a_loop_and_passed_to_a_function() {
+    returns(
+        "fn total(xs: [i64; 4]) -> i64 { let mut i = 0; let mut s = 0; \
+         while i < xs.len() { s = s + xs[i]; i = i + 1; } return s; } \
+         fn main() -> i64 { let mut a = [0, 0, 0, 0]; let mut i = 0; \
+         while i < 4 { a[i] = i * i; i = i + 1; } return total(a); }",
+        14,
+    );
+}
+
+#[test]
+fn a_tuple_is_built_and_read_by_position() {
+    returns(
+        "fn main() -> i64 { let t = (7, 9); return t[0] * 10 + t[1]; }",
+        79,
+    );
+}
+
+#[test]
+fn reading_past_the_end_fails_the_execution_and_writes_nothing() {
+    let view = on_chain("fn main() -> i64 { evm_sstore(0, 1); let a = [1, 2]; return a[5]; }");
+    assert!(!view.success);
+    assert!(String::from_utf8_lossy(&view.data).contains("ArrayIndexOutOfBounds"));
+}
+
+#[test]
+fn aggregate_misuse_is_refused_at_compile_time() {
+    let cases = [
+        (
+            "fn main() -> i64 { let a = [1, 2]; a[0] = 5; return a[0]; }",
+            "immutable",
+        ),
+        (
+            "fn main() -> i64 { let t = (1, 2); let i = 1; return t[i]; }",
+            "tuple index",
+        ),
+        (
+            "fn main() -> i64 { let mut a = [1, 2]; a[0] = true; return a[0]; }",
+            "Mismatch",
+        ),
+        (
+            "fn main() -> i64 { let a = [1, true]; return 0; }",
+            "InconsistentArrayElements",
+        ),
+        (
+            "fn f() -> [i64; 2] { return [1, 2]; } fn main() -> i64 { f()[0] = 3; return 0; }",
+            "named array",
+        ),
+    ];
+    for (source, expected) in cases {
+        let why = refusal(source);
+        assert!(
+            why.to_lowercase().contains(&expected.to_lowercase()),
+            "{source}\n  refused with: {why}\n  expected it to mention `{expected}`"
+        );
+    }
+}
+
+// ─── Structs ────────────────────────────────────────────────────────────────────────────────────
+
+#[test]
+fn a_struct_is_built_read_by_field_and_passed_to_a_function() {
+    returns(
+        "struct Point { x: i64, y: i64 } \
+         fn dot(a: Point, b: Point) -> i64 { return a.x * b.x + a.y * b.y; } \
+         fn main() -> i64 { let p = Point { x: 3, y: 4 }; let q = Point { y: 2, x: 5 }; \
+         return dot(p, q); }",
+        23,
+    );
+}
+
+#[test]
+fn a_field_assignment_has_value_semantics() {
+    returns(
+        "struct Acct { bal: i64, nonce: i64 } \
+         fn main() -> i64 { let mut a = Acct { bal: 10, nonce: 0 }; let before = a; \
+         a.bal = a.bal + 5; a.nonce = 1; return a.bal * 100 + a.nonce * 10 + before.bal; }",
+        1520,
+    );
+}
+
+#[test]
+fn structs_nest_and_hold_arrays_and_are_returned() {
+    returns(
+        "struct Leg { venue: i64, amounts: [i64; 2] } \
+         struct Route { first: Leg, second: Leg } \
+         fn make(v: i64) -> Leg { return Leg { venue: v, amounts: [v, v * 2] }; } \
+         fn main() -> i64 { let r = Route { first: make(1), second: make(3) }; \
+         return r.second.amounts[1] * 10 + r.first.venue; }",
+        61,
+    );
+}
+
+#[test]
+fn a_field_updated_in_a_loop_keeps_every_iteration() {
+    returns(
+        "struct Acc { sum: i64, n: i64 } \
+         fn main() -> i64 { let mut acc = Acc { sum: 0, n: 0 }; let mut i = 1; \
+         while i <= 4 { acc.sum = acc.sum + i; acc.n = acc.n + 1; i = i + 1; } \
+         return acc.sum * 10 + acc.n; }",
+        104,
+    );
+}
+
+#[test]
+fn a_struct_literals_fields_are_evaluated_in_the_order_written() {
+    // `b` is written first, so its store happens first and `a` reads it.
+    returns(
+        "struct P { a: i64, b: i64 } \
+         fn put(v: i64) -> i64 { evm_sstore(0, v); return v; } \
+         fn main() -> i64 { let p = P { b: put(7), a: evm_sload(0) }; return p.a * 10 + p.b; }",
+        77,
+    );
+}
+
+#[test]
+fn a_tuple_element_is_read_and_written_by_position() {
+    returns(
+        "fn main() -> i64 { let mut t = (1, 2); t.1 = 9; return t.0 * 10 + t.1; }",
+        19,
+    );
+}
+
+#[test]
+fn a_struct_value_returned_from_main_is_its_fields() {
+    let view =
+        on_chain("struct P { a: i64, b: bool } fn main() -> P { return P { a: 5, b: true }; }");
+    assert!(view.success, "{}", String::from_utf8_lossy(&view.data));
+    let expected = x3_vm::Value::Tuple(vec![x3_vm::Value::I64(5), x3_vm::Value::Bool(true)]);
+    assert_eq!(view.data, expected.return_bytes());
+}
+
+#[test]
+fn struct_misuse_is_refused_at_compile_time() {
+    let cases = [
+        ("struct P { a: i64 } fn main() -> i64 { let p = P { a: 1, b: 2 }; return 0; }", "NoSuchField"),
+        ("struct P { a: i64, b: i64 } fn main() -> i64 { let p = P { a: 1 }; return 0; }", "leaving out"),
+        ("struct P { a: i64 } fn main() -> i64 { let p = P { a: 1, a: 2 }; return 0; }", "twice"),
+        ("struct P { a: i64 } fn main() -> i64 { let p = P { a: true }; return 0; }", "Mismatch"),
+        ("fn main() -> i64 { let p = Q { a: 1 }; return 0; }", "UnknownType"),
+        ("struct P { a: i64 } fn main() -> i64 { let p = P { a: 1 }; return p.z; }", "NoSuchField"),
+        ("struct P { a: i64 } fn main() -> i64 { let p = P { a: 1 }; p.a = 2; return p.a; }", "immutable"),
+        ("struct P { a: i64 } fn main() -> i64 { let mut p = P { a: 1 }; p.a = true; return p.a; }", "Mismatch"),
+        ("struct P { a: P } fn main() -> i64 { return 0; }", "RecursiveType"),
+        ("struct P { a: Q } struct Q { p: P } fn main() -> i64 { return 0; }", "RecursiveType"),
+        ("struct P { a: Nope } fn main() -> i64 { return 0; }", "UnknownType"),
+        ("struct P { a: i64, a: i64 } fn main() -> i64 { return 0; }", "twice"),
+        ("struct P { a: i64 } struct P { b: i64 } fn main() -> i64 { return 0; }", "twice"),
+        // Nominal: the same fields under another name are another type.
+        (
+            "struct P { a: i64 } struct Q { a: i64 } fn f(p: P) -> i64 { return p.a; } \
+             fn main() -> i64 { return f(Q { a: 1 }); }",
+            "Mismatch",
+        ),
+        ("fn main() -> i64 { let t = (1, 2); return t.2; }", "NoSuchField"),
+    ];
+    for (source, expected) in cases {
+        let why = refusal(source);
+        assert!(
+            why.to_lowercase().contains(&expected.to_lowercase()),
+            "{source}\n  refused with: {why}\n  expected it to mention `{expected}`"
+        );
+    }
+}
+
+#[test]
+fn a_condition_followed_by_a_block_is_not_read_as_a_struct_literal() {
+    returns(
+        "struct S { v: i64 } fn main() -> i64 { let flag = true; let mut r = 0; \
+         if flag { r = 1; } while r < 3 { r = r + 1; } \
+         if (S { v: 2 }).v == 2 { r = r * 10; } return r; }",
+        30,
+    );
+}

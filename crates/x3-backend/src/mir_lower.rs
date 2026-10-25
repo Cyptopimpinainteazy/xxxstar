@@ -31,6 +31,8 @@ pub struct MirBytecodeCompiler {
     function_indices: HashMap<SymbolId, FuncIdx>,
     /// MIR value → register mapping (per function).
     value_regs: HashMap<MirValue, Register>,
+    /// MIR values assigned an integer literal, for operands the engine takes as immediates.
+    int_constants: HashMap<MirValue, i64>,
     /// Block → label mapping (per function).
     block_labels: HashMap<MirBlockId, crate::emit::Label>,
     /// Next available register.
@@ -48,6 +50,7 @@ impl MirBytecodeCompiler {
             layout: LayoutComputer::new(),
             function_indices: HashMap::new(),
             value_regs: HashMap::new(),
+            int_constants: HashMap::new(),
             block_labels: HashMap::new(),
             next_reg: 0,
             debug: false,
@@ -183,6 +186,9 @@ impl MirBytecodeCompiler {
                 let dst = self.get_or_alloc_reg(*target)?;
                 match rhs {
                     MirRhs::Literal(lit) => {
+                        if let Literal::Integer(n) = lit {
+                            self.int_constants.insert(*target, *n);
+                        }
                         self.compile_literal(lit, dst)?;
                     }
                     MirRhs::Unary(op, val) => {
@@ -220,6 +226,11 @@ impl MirBytecodeCompiler {
                             // `emit` is a statement, so its MIR value is the unit this backend
                             // represents as 0 — the same as a host call that returns nothing.
                             self.emitter.emit_int(dst, 0)?;
+                        } else if let Some(()) =
+                            self.compile_aggregate_call(target.0, dst, &arg_regs, args)?
+                        {
+                            // An array, tuple, index or length operation (see
+                            // `x3_common::intrinsics::ARRAY_NEW_SYMBOL` and its neighbours).
                         } else if let Some(intrinsic) = x3_common::intrinsics::by_symbol(target.0) {
                             if arg_regs.len() != intrinsic.arity {
                                 return Err(BackendError::new(
@@ -238,6 +249,14 @@ impl MirBytecodeCompiler {
                                 self.emitter.emit_evm_sstore(arg_regs[0], arg_regs[1]);
                                 // The call's value is unit, which this backend represents as 0.
                                 self.emitter.emit_int(dst, 0)?;
+                            } else if intrinsic == x3_common::intrinsics::CTX_BLOCK_HEIGHT {
+                                self.emitter.emit_ctx_block_height(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_TIMESTAMP {
+                                self.emitter.emit_ctx_timestamp(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_VALUE {
+                                self.emitter.emit_ctx_value(dst);
+                            } else if intrinsic == x3_common::intrinsics::CTX_CHAIN_ID {
+                                self.emitter.emit_ctx_chain_id(dst);
                             } else {
                                 return Err(BackendError::new(
                                     BackendErrorKind::Internal(format!(
@@ -450,6 +469,76 @@ impl MirBytecodeCompiler {
     }
 
     /// Allocate a new register.
+    /// Emit an aggregate operation if `symbol` names one; `None` if it does not.
+    fn compile_aggregate_call(
+        &mut self,
+        symbol: usize,
+        dst: Register,
+        args: &[Register],
+        mir_args: &[MirValue],
+    ) -> BackendResult<Option<()>> {
+        use x3_common::intrinsics as i;
+        let arity = |n: usize, what: &str| -> BackendResult<()> {
+            if args.len() == n {
+                Ok(())
+            } else {
+                Err(BackendError::new(
+                    BackendErrorKind::Internal(format!(
+                        "{what} takes {n} operand(s), MIR passed {}",
+                        args.len()
+                    )),
+                    self.current_span,
+                ))
+            }
+        };
+        if symbol == i::ARRAY_NEW_SYMBOL {
+            let capacity = u16::try_from(args.len()).map_err(|_| {
+                BackendError::new(
+                    BackendErrorKind::Internal("array literal too long".to_string()),
+                    self.current_span,
+                )
+            })?;
+            self.emitter.emit_new_array(dst, capacity);
+            for item in args {
+                self.emitter.emit_array_push(dst, *item);
+            }
+        } else if symbol == i::TUPLE_NEW_SYMBOL {
+            self.emitter.emit_new_tuple(dst, args);
+        } else if symbol == i::INDEX_GET_SYMBOL {
+            arity(2, "an index read")?;
+            self.emitter.emit_load_index(dst, args[0], args[1]);
+        } else if symbol == i::INDEX_SET_SYMBOL {
+            arity(3, "an element assignment")?;
+            // Value semantics: copy the array, then replace the element in the copy, so the
+            // original SSA value is unchanged for anything else that reads it.
+            self.emitter.emit_mov(dst, args[0]);
+            self.emitter.emit_store_index(dst, args[1], args[2]);
+        } else if symbol == i::FIELD_SET_SYMBOL {
+            arity(3, "a field assignment")?;
+            let field = mir_args
+                .get(1)
+                .and_then(|value| self.int_constants.get(value))
+                .and_then(|n| u16::try_from(*n).ok())
+                .ok_or_else(|| {
+                    BackendError::new(
+                        BackendErrorKind::Internal(
+                            "a field assignment's position is not a constant".to_string(),
+                        ),
+                        self.current_span,
+                    )
+                })?;
+            // Value semantics, as for an element: copy, then replace the field in the copy.
+            self.emitter.emit_mov(dst, args[0]);
+            self.emitter.emit_store_field(dst, field, args[2]);
+        } else if symbol == i::LEN_SYMBOL {
+            arity(1, "`len`")?;
+            self.emitter.emit_array_len(dst, args[0]);
+        } else {
+            return Ok(None);
+        }
+        Ok(Some(()))
+    }
+
     /// Allocate the next register, or refuse when the register file is exhausted.
     ///
     /// The runtime addresses registers with one byte and its register file holds

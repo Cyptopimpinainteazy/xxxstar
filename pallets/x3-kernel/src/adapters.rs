@@ -119,6 +119,23 @@ pub trait X3ExecutorAdapter {
         Self::execute_with_slots(payload, gas_limit, slots)
     }
 
+    /// Execute with the chain's slots, its private-submission posture, and the call's context.
+    ///
+    /// `context` is what the program's context opcodes read: the submitting account, the block,
+    /// its timestamp, the value attached and the chain id, each `None` where the pallet does not
+    /// know it. The default ignores it and delegates, which is fail closed: the engine is then
+    /// handed no context, so a program that reads one is refused rather than answered with zeros.
+    fn execute_with_context(
+        payload: &[u8],
+        gas_limit: u64,
+        slots: &[(H256, [u8; 32])],
+        private_channel_available: bool,
+        context: &x3_x3_integration::X3BlockContext,
+    ) -> Result<ExecutionReceipt, DispatchError> {
+        let _ = context;
+        Self::execute_with_slots_and_policy(payload, gas_limit, slots, private_channel_available)
+    }
+
     /// Validate X3 bytecode without execution
     fn validate(payload: &[u8]) -> Result<(), DispatchError>;
 
@@ -622,8 +639,8 @@ pub mod real_adapters {
     }
 
     /// The native runtime's X3 adapter. It delegates to `WasmX3Adapter`, so the native and the
-    /// wasm runtime execute X3 programs with the same engine; it used to run `x3-vm`, which no node
-    /// executing the wasm runtime ever runs (see `X3Executor::execute_on_chain`).
+    /// wasm runtime execute X3 programs with the same engine, `x3-vm`
+    /// (see `X3Executor::execute_on_chain`).
     pub struct X3VmAdapter;
 
     impl super::X3ExecutorAdapter for X3VmAdapter {
@@ -654,6 +671,22 @@ pub mod real_adapters {
                 gas_limit,
                 slots,
                 private_channel_available,
+            )
+        }
+
+        fn execute_with_context(
+            payload: &[u8],
+            gas_limit: u64,
+            slots: &[(H256, [u8; 32])],
+            private_channel_available: bool,
+            context: &x3_x3_integration::X3BlockContext,
+        ) -> Result<ExecutionReceipt, DispatchError> {
+            <crate::wasm_adapters::WasmX3Adapter as super::X3ExecutorAdapter>::execute_with_context(
+                payload,
+                gas_limit,
+                slots,
+                private_channel_available,
+                context,
             )
         }
 

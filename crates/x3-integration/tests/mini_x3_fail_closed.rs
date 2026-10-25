@@ -1,5 +1,10 @@
 //! The interpreter the chain actually runs must refuse what it cannot execute.
 //!
+//! **Since the runtime switched engines:** blocks execute `crates/x3-vm` through
+//! `X3Executor::execute_on_chain` in every build (`tests/chain_engine.rs`). `mini_x3` is no longer
+//! on any chain path; it stays as the reference this file holds the new engine to, until the old
+//! engines are retired. Where the text below says a block runs `mini_x3`, read "used to run".
+//!
 //! There are two readers of X3BC and two interpreters of its opcodes: `x3-backend`/`x3-vm` on the
 //! `std` side, and `x3-integration::mini_x3`, which exists because `pallets/x3-kernel` has to
 //! execute `.x3` inside the runtime, and the runtime has no `std`. The node builds its executor

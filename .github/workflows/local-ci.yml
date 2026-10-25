@@ -35,6 +35,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       GH_TOKEN: ${{ github.token }}
+      X3_LOCAL_CI_LOG_DIR: ${{ github.workspace }}/.ai/runlogs/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -52,7 +53,7 @@ jobs:
         # hard-linked copy of both homes (seconds to create, no extra disk until written).
         run: |
           set -euo pipefail
-          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin; do
+          for dir in "$HOME/.cargo/bin" "$HOME/.local/bin" /home/linuxbrew/.linuxbrew/bin "$HOME/.foundry/bin"; do
             [ -d "$dir" ] && echo "$dir" >> "$GITHUB_PATH"
           done
           iso="$HOME/.x3ci-runner-${RUNNER_NAME}"
@@ -69,7 +70,7 @@ jobs:
 
       - name: Show the resolved toolchain
         run: |
-          for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker; do
+          for tool in python3 pytest node npm cargo rustc cargo-deny cargo-audit docker anvil forge; do
             printf '%-12s %s\n' "$tool" "$(command -v "$tool" || echo MISSING)"
           done
           python3 --version; cargo --version
@@ -79,3 +80,15 @@ jobs:
           MODE: ${{ github.event.inputs.mode }}
         # Full gate set: a scoped run (--changed-from/--only) publishes no verdict.
         run: bash scripts/local-ci.sh ${MODE} --publish-status
+
+      # Gate output is redirected to per-gate files. Preserve it even when the
+      # gate fails, before the next checkout cleans this runner's workspace.
+      - name: Preserve Local CI evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: local-ci-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.X3_LOCAL_CI_LOG_DIR }}/local-ci-*
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

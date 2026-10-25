@@ -287,6 +287,10 @@ pub enum TypeKind {
     /// Tuple type: (T1, T2, ...).
     Tuple(Vec<Type>),
 
+    /// A declared struct: nominal (two structs with the same fields are different types), its
+    /// value laid out as its fields in declaration order.
+    Struct(StructType),
+
     /// Reference to a named type (before resolution).
     Named(String),
 
@@ -301,6 +305,24 @@ pub enum TypeKind {
 
     /// Error/unknown type (from failed inference).
     Error,
+}
+
+/// A struct's name and its fields, in declaration order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StructType {
+    pub name: String,
+    pub fields: Vec<(String, Type)>,
+}
+
+impl StructType {
+    /// The position and type of `field`.
+    pub fn field(&self, field: &str) -> Option<(usize, &Type)> {
+        self.fields
+            .iter()
+            .enumerate()
+            .find(|(_, (name, _))| name == field)
+            .map(|(i, (_, ty))| (i, ty))
+    }
 }
 
 /// A complete type with its kind and optional source span.
@@ -584,6 +606,7 @@ impl fmt::Display for Type {
                 write!(f, ")")
             }
             TypeKind::Named(name) => write!(f, "{name}"),
+            TypeKind::Struct(def) => write!(f, "{}", def.name),
             TypeKind::Vm(vm) => match vm {
                 VmType::Evm(evm) => match evm {
                     EvmType::Asset => write!(f, "evm::asset"),

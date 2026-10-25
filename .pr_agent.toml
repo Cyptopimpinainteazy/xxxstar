@@ -1,0 +1,73 @@
+# PR-Agent configuration for X3 Atomic Star.
+#
+# Model routing lives here, not in services/pr-agent/review.sh, so the local CLI
+# and the GitHub Action read the same values.
+#
+# DeepSeek is the primary: a review needs a 30k-100k token diff in one prompt and
+# structured output, which priced out at a few cents per PR. The local Ollama
+# model is the fallback so the tool still runs with no network egress.
+# Point --local at review.sh to use the GPUs as the primary instead.
+
+[config]
+model = "deepseek/deepseek-v4-pro"
+# The ids the key serves, per `services/pr-agent/check.sh` (2026-10-24):
+# deepseek-flash, deepseek-v4-pro. deepseek-chat is not among them.
+fallback_models = ["deepseek/deepseek-flash", "ollama/qwen3:8b"]
+# DeepSeek advertises 128k; cap at 64k so a runaway diff fails loudly instead of
+# costing a full-window call per retry.
+max_model_tokens = 65536
+custom_model_max_tokens = 65536
+response_language = "en"
+patch_extension_skip_types = [".md", ".txt", ".lock", ".sum"]
+# The repo has no lockfile at the workspace root; per-project locks are noise in a review.
+patch_extra_lines_before = 3
+patch_extra_lines_after = 3
+
+# Local fallback endpoint. Both cards (GTX 1070 + RTX 2060 SUPER) are served by
+# one Ollama daemon on the default port.
+[ollama]
+api_base = "http://127.0.0.1:11434"
+
+[pr_reviewer]
+require_score_review = false
+require_tests_review = true
+require_security_review = true
+require_estimate_effort_to_review = false
+require_estimate_contribution_time_cost = false
+require_ticket_analysis_review = false
+require_merge_recommendation = true
+inline_key_issues = true
+num_max_findings = 5
+persistent_comment = true
+enable_review_labels_security = true
+# On PR #671 both local models returned a bare "No major issues detected" while
+# the diff deleted a fabricated-liquidity fallback. An unqualified all-clear is
+# the failure mode to suppress: every claim must name the line it read.
+extra_instructions = """
+Report only findings you can point at, as `path:line`. Do not write a general
+summary of the change. If you find no defect, say which specific functions and
+invariants you checked and came up clean — an unqualified "no issues" is not an
+acceptable answer.
+
+This repository is a Substrate L1 in Rust. Enforce these repository rules in the review:
+- Money-like values (balances, rewards, slashes, settlement amounts) must be exact integers. Flag any f64/f32 in pallets/*/src, runtime/src, or consensus paths unless the line carries `// float-exemption: <reason>`.
+- A check wrapped in `#[cfg(feature = "std")]` disappears from the wasm build. Flag checks that were moved behind that guard.
+- `type WeightInfo = ();` in a runtime config drops the pallet from block-weight accounting. Flag it.
+- Atomic routes must roll back every leg on failure; partial success without rollback is a blocking defect.
+- Flag any test that was deleted, skipped, or weakened to make a change pass.
+- Flag stubs, no-op execution paths, placeholder logic, and silent fallbacks in security code as blocking.
+- Prefer findings in pallets/*/src, runtime/src and crates/x3-atomic-swap/src over documentation changes.
+"""
+
+[pr_code_suggestions]
+num_code_suggestions_per_chunk = 3
+focus_only_on_problems = true
+persistent_comment = true
+suggestions_score_threshold = 6
+
+[pr_description]
+publish_labels = false
+generate_ai_title = false
+enable_pr_type = true
+enable_semantic_files_types = true
+enable_pr_diagram = true

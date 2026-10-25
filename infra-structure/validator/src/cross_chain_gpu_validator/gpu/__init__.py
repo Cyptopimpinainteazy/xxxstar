@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .cuda_loader import CudaRuntime
+from .ed25519_gpu import Ed25519BatchVerifier
 from .kernels import GPUKernelError, GPUKernels
 from .secp256k1_gpu import Secp256k1BatchVerifier
 from .keccak_gpu import KeccakBatchHasher
@@ -18,6 +19,7 @@ __all__ = [
     "CudaRuntime",
     "GPUKernelError",
     "GPUKernels",
+    "Ed25519BatchVerifier",
     "Secp256k1BatchVerifier",
     "KeccakBatchHasher",
     "MultiGpuScheduler",

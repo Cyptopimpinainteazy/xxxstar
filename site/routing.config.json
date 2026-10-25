@@ -147,8 +147,8 @@
     "tps": {
       "name": "TPS Monitor",
       "route": "/tps/",
-      "entry": "infra/blockchain-tps/public/index.html",
-      "build": "infra/blockchain-tps/dist/",
+      "entry": "infra-structure/services/blockchain-tps/public/index.html",
+      "build": "infra-structure/services/blockchain-tps/dist/",
       "domain": ["org", "net"],
       "type": "react",
       "category": "Infrastructure",

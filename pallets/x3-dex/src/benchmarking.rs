@@ -3,8 +3,16 @@
 use super::*;
 use crate::Pallet as DEXPallet;
 use frame_benchmarking::{v2::benchmarks, whitelisted_caller};
+use frame_support::traits::Get;
 use frame_system::RawOrigin;
-use x3_dex::amm_pools::{AMMPool, TokenId};
+use x3_asset_kernel_types::traits::LedgerBenchmarkFunding;
+use x3_dex::amm_pools::TokenId;
+
+/// Give `who` enough of both benchmark assets to provide liquidity and swap.
+fn fund<T: Config>(who: &T::AccountId) {
+    T::BenchmarkHelper::fund(0, who, 1_000_000_000);
+    T::BenchmarkHelper::fund(1, who, 1_000_000_000);
+}
 
 #[benchmarks]
 mod benchmarks {
@@ -15,12 +23,13 @@ mod benchmarks {
     #[benchmark]
     fn create_pool() {
         let caller: T::AccountId = whitelisted_caller();
+        fund::<T>(&caller);
         let token_a = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 0,
         };
         let token_b = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 1,
         };
         let fee_basis_points = 30;
@@ -37,24 +46,23 @@ mod benchmarks {
     #[benchmark]
     fn add_liquidity() {
         let caller: T::AccountId = whitelisted_caller();
+        fund::<T>(&caller);
         let token_a = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 0,
         };
         let token_b = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
 
         #[extrinsic_call]
         add_liquidity(RawOrigin::Signed(caller), pool_id, 1000, 1000, 900, 900);
@@ -63,24 +71,23 @@ mod benchmarks {
     #[benchmark]
     fn remove_liquidity() {
         let caller: T::AccountId = whitelisted_caller();
+        fund::<T>(&caller);
         let token_a = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 0,
         };
         let token_b = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
             pool_id,
@@ -90,8 +97,8 @@ mod benchmarks {
             90000
         ));
 
-        // Get position ID (simplified - would need to track this)
-        let position_id = 0;
+        // The position `add_liquidity` just opened.
+        let position_id = NextPositionId::<T>::get() - 1;
 
         #[extrinsic_call]
         remove_liquidity(RawOrigin::Signed(caller), position_id, 50000, 45000, 45000);
@@ -100,24 +107,23 @@ mod benchmarks {
     #[benchmark]
     fn swap() {
         let caller: T::AccountId = whitelisted_caller();
+        fund::<T>(&caller);
         let token_a = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 0,
         };
         let token_b = TokenId {
-            chain_id: 1,
+            chain_id: T::LedgerChainId::get(),
             asset_id: 1,
         };
 
-        let pool_id = AMMPool::create_pool(token_a.clone(), token_b.clone(), 30)
-            .expect("benchmark token pair is valid")
-            .pool_id;
         assert_ok!(DEXPallet::<T>::create_pool(
             RawOrigin::Signed(caller.clone()).into(),
             token_a.clone(),
             token_b.clone(),
             30
         ));
+        let pool_id = NextPoolId::<T>::get();
         assert_ok!(DEXPallet::<T>::add_liquidity(
             RawOrigin::Signed(caller.clone()).into(),
             pool_id,

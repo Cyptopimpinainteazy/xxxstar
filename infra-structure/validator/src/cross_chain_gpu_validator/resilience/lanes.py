@@ -40,19 +40,21 @@ logger = logging.getLogger("x3.lanes")
 
 class LaneTier(Enum):
     """Execution tier priority (lower ordinal = higher priority)."""
-    PRIMARY = 1    # GPU-accelerated, full speed
-    SHADOW = 2     # Hot standby, GPU-warmed, no signing
-    TERTIARY = 3   # CPU-only degraded fallback
+
+    PRIMARY = 1  # GPU-accelerated, full speed
+    SHADOW = 2  # Hot standby, GPU-warmed, no signing
+    TERTIARY = 3  # CPU-only degraded fallback
 
 
 class LaneStatus(Enum):
     """Lifecycle state of an individual lane."""
-    ACTIVE = "active"         # Serving requests
-    STANDBY = "standby"       # Ready to promote
-    PROMOTING = "promoting"   # Being promoted (draining peer)
-    DRAINING = "draining"     # Draining in-flight before demotion
-    DEGRADED = "degraded"     # Running at reduced capacity
-    OFFLINE = "offline"       # Not available
+
+    ACTIVE = "active"  # Serving requests
+    STANDBY = "standby"  # Ready to promote
+    PROMOTING = "promoting"  # Being promoted (draining peer)
+    DRAINING = "draining"  # Draining in-flight before demotion
+    DEGRADED = "degraded"  # Running at reduced capacity
+    OFFLINE = "offline"  # Not available
 
 
 # ─── Lane Dataclass ──────────────────────────────────────────
@@ -86,7 +88,11 @@ class AccelerationLane:
 
     @property
     def available(self) -> bool:
-        return self.status in (LaneStatus.ACTIVE, LaneStatus.STANDBY, LaneStatus.DEGRADED)
+        return self.status in (
+            LaneStatus.ACTIVE,
+            LaneStatus.STANDBY,
+            LaneStatus.DEGRADED,
+        )
 
     def record_latency(self, ms: float) -> None:
         self.requests_served += 1
@@ -146,19 +152,25 @@ class LaneOrchestrator:
             LaneTier.PRIMARY: AccelerationLane(
                 tier=LaneTier.PRIMARY,
                 status=LaneStatus.ACTIVE,
-                breaker=CircuitBreaker("lane-primary", failure_threshold=3, recovery_seconds=15),
+                breaker=CircuitBreaker(
+                    "lane-primary", failure_threshold=3, recovery_seconds=15
+                ),
                 gpu_device_id=0,
             ),
             LaneTier.SHADOW: AccelerationLane(
                 tier=LaneTier.SHADOW,
                 status=LaneStatus.STANDBY,
-                breaker=CircuitBreaker("lane-shadow", failure_threshold=3, recovery_seconds=15),
+                breaker=CircuitBreaker(
+                    "lane-shadow", failure_threshold=3, recovery_seconds=15
+                ),
                 gpu_device_id=1,
             ),
             LaneTier.TERTIARY: AccelerationLane(
                 tier=LaneTier.TERTIARY,
                 status=LaneStatus.STANDBY,
-                breaker=CircuitBreaker("lane-tertiary", failure_threshold=10, recovery_seconds=5),
+                breaker=CircuitBreaker(
+                    "lane-tertiary", failure_threshold=10, recovery_seconds=5
+                ),
                 gpu_device_id=None,
             ),
         }
@@ -187,13 +199,17 @@ class LaneOrchestrator:
         with self._lock:
             # Try active lane first
             active = self._lanes[self._active_tier]
-            if active.available and (active.breaker is None or active.breaker.allow_request()):
+            if active.available and (
+                active.breaker is None or active.breaker.allow_request()
+            ):
                 return active
 
             # Fallback through tiers
             for tier in LaneTier:
                 lane = self._lanes[tier]
-                if lane.available and (lane.breaker is None or lane.breaker.allow_request()):
+                if lane.available and (
+                    lane.breaker is None or lane.breaker.allow_request()
+                ):
                     return lane
 
             # Everything down — return tertiary anyway (CPU always available)
@@ -213,7 +229,9 @@ class LaneOrchestrator:
             if tier in attempted:
                 continue
             lane = self._lanes[tier]
-            if not lane.available:
+            if not lane.available or (
+                lane.breaker is not None and not lane.breaker.allow_request()
+            ):
                 attempted.add(tier)
                 continue
 
@@ -233,11 +251,15 @@ class LaneOrchestrator:
                     lane.breaker.record_failure()
                 logger.warning(
                     "Lane %s failed (%.1fms): %s — trying next tier",
-                    tier.name, elapsed_ms, exc,
+                    tier.name,
+                    elapsed_ms,
+                    exc,
                 )
                 continue
 
-        raise RuntimeError("All execution lanes exhausted — no lane could serve the request")
+        raise RuntimeError(
+            "All execution lanes exhausted — no lane could serve the request"
+        )
 
     # ── Health-Driven Failover ───────────────────────────────
 
@@ -261,7 +283,11 @@ class LaneOrchestrator:
                 return
 
             # Check if a higher-priority lane can be recovered
-            if self._active_tier != LaneTier.PRIMARY and gpu_ok and score >= self._threshold + 0.1:
+            if (
+                self._active_tier != LaneTier.PRIMARY
+                and gpu_ok
+                and score >= self._threshold + 0.1
+            ):
                 # Hysteresis: require score 0.1 above threshold to re-promote
                 if now - self._last_promotion_at < self._cooldown:
                     return
@@ -309,7 +335,10 @@ class LaneOrchestrator:
         old.status = LaneStatus.STANDBY if old.is_gpu else LaneStatus.OFFLINE
 
         logger.warning(
-            "Lane failover #%d: %s → %s", self._failover_count, from_tier.name, to_tier.name
+            "Lane failover #%d: %s → %s",
+            self._failover_count,
+            from_tier.name,
+            to_tier.name,
         )
 
         if self._on_failover:

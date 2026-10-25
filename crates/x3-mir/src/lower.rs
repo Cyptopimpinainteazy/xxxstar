@@ -121,6 +121,17 @@ fn collect_mutated(stmts: &[HirStmt], out: &mut std::collections::HashSet<Symbol
             } => {
                 out.insert(*symbol);
             }
+            // `a[i] = v` rebinds `a` (value semantics), so `a` is assigned too. Missing this made
+            // a loop that fills an array keep only its last write: without a cell, each iteration
+            // read the array's value from before the loop.
+            HirStmt::Assign {
+                target: AssignTarget::Index { array, .. },
+                ..
+            } => {
+                if let HirExprKind::Var(symbol) = &array.kind {
+                    out.insert(*symbol);
+                }
+            }
             HirStmt::If {
                 then_block,
                 else_block,
@@ -289,9 +300,53 @@ impl MirFunctionBuilder {
                             self.value_map.insert(*symbol, evaluated);
                         }
                     }
-                    AssignTarget::Field { .. } | AssignTarget::Index { .. } => {
-                        // This arm used to evaluate the value and drop the write.
-                        return Err(unsupported("assignment to a field or an index"));
+                    AssignTarget::Index { array, index, .. } => {
+                        // `a[i] = v` rebinds `a` to a copy with element `i` replaced (value
+                        // semantics; see `x3_common::intrinsics::INDEX_SET_SYMBOL`). Only a named
+                        // array can be rebound, so `f()[i] = v` or `a[i][j] = v` is refused rather
+                        // than writing into a temporary nobody reads.
+                        let HirExprKind::Var(symbol) = &array.kind else {
+                            return Err(unsupported(
+                                "assignment to an element of something other than a named array",
+                            ));
+                        };
+                        // A struct's field or a tuple's element is written by position, fixed at
+                        // compile time; an array's element by a run-time index.
+                        let by_position = matches!(
+                            array.ty.kind,
+                            x3_typeck::TypeKind::Struct(_) | x3_typeck::TypeKind::Tuple(_)
+                        );
+                        if by_position && !matches!(index.kind, HirExprKind::Literal(_)) {
+                            return Err(unsupported(
+                                "assignment to a tuple or struct element at a run-time position",
+                            ));
+                        }
+                        let base = self.lower_expr(array)?;
+                        let at = self.lower_expr(index)?;
+                        let item = self.lower_expr(value)?;
+                        let updated = self.emit_assignment(MirRhs::Call {
+                            target: SymbolId(if by_position {
+                                x3_common::intrinsics::FIELD_SET_SYMBOL
+                            } else {
+                                x3_common::intrinsics::INDEX_SET_SYMBOL
+                            }),
+                            args: vec![base, at, item],
+                        });
+                        if let Some(&cell) = self.slots.get(symbol) {
+                            let stored = self.emit_assignment(MirRhs::Store {
+                                model: MemoryModel::Register,
+                                addr: cell,
+                                val: updated,
+                            });
+                            self.value_map.insert(*symbol, stored);
+                        } else {
+                            self.value_map.insert(*symbol, updated);
+                        }
+                    }
+                    AssignTarget::Field { .. } => {
+                        // A struct field's index needs the struct's layout, which HIR does not
+                        // carry. This arm used to evaluate the value and drop the write.
+                        return Err(unsupported("assignment to a field"));
                     }
                 }
             }
@@ -530,11 +585,42 @@ impl MirFunctionBuilder {
             // `self`) or its operand unchanged (a field access returned the whole object, a cast
             // returned the uncast value). Each such program compiled, ran and returned a value the
             // source did not compute. A construct with no lowering that keeps its meaning is refused.
+            HirExprKind::MethodCall {
+                receiver,
+                method,
+                args,
+            } if method == "len" && args.is_empty() => {
+                let base = self.lower_expr(receiver)?;
+                Ok(self.emit_assignment(MirRhs::Call {
+                    target: SymbolId(x3_common::intrinsics::LEN_SYMBOL),
+                    args: vec![base],
+                }))
+            }
             HirExprKind::MethodCall { .. } => Err(unsupported("a method call")),
             HirExprKind::Field { .. } => Err(unsupported("a field access")),
-            HirExprKind::Index { .. } => Err(unsupported("an index expression")),
-            HirExprKind::Array(_) => Err(unsupported("an array literal")),
-            HirExprKind::Tuple(_) => Err(unsupported("a tuple or range value")),
+            HirExprKind::Index { array, index } => {
+                let base = self.lower_expr(array)?;
+                let at = self.lower_expr(index)?;
+                Ok(self.emit_assignment(MirRhs::Call {
+                    target: SymbolId(x3_common::intrinsics::INDEX_GET_SYMBOL),
+                    args: vec![base, at],
+                }))
+            }
+            HirExprKind::Array(elements) | HirExprKind::Tuple(elements) => {
+                let target = if matches!(expr.kind, HirExprKind::Array(_)) {
+                    x3_common::intrinsics::ARRAY_NEW_SYMBOL
+                } else {
+                    x3_common::intrinsics::TUPLE_NEW_SYMBOL
+                };
+                let mut items = Vec::with_capacity(elements.len());
+                for element in elements {
+                    items.push(self.lower_expr(element)?);
+                }
+                Ok(self.emit_assignment(MirRhs::Call {
+                    target: SymbolId(target),
+                    args: items,
+                }))
+            }
             HirExprKind::Block { stmts, expr } => {
                 self.lower_statements(stmts)?;
                 if let Some(e) = expr {

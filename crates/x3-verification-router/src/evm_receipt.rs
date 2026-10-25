@@ -1427,6 +1427,7 @@ mod tests {
             expected_amount: TRANSFER_AMOUNT,
             expected_sender: Vec::new(),
             expected_recipient: recipient.to_vec(),
+            expected_beneficiary: Vec::new(),
         }
     }
 
@@ -1575,6 +1576,7 @@ mod tests {
                 expected_amount: 0,
                 expected_sender: Vec::new(),
                 expected_recipient: vec![0u8; 20],
+                expected_beneficiary: Vec::new(),
             },
         );
         assert!(matches!(r, Err(VerificationError::MalformedProof)));
@@ -1801,6 +1803,7 @@ mod tests {
                 expected_amount: 0,
                 expected_sender: Vec::new(),
                 expected_recipient: vec![0u8; 20],
+                expected_beneficiary: Vec::new(),
             },
         );
         assert!(matches!(r, Err(VerificationError::UnsupportedChain)));
@@ -1819,6 +1822,7 @@ mod tests {
                 expected_amount: 0,
                 expected_sender: Vec::new(),
                 expected_recipient: vec![0u8; 20],
+                expected_beneficiary: Vec::new(),
             },
         );
         assert!(matches!(r, Err(VerificationError::UnsupportedChain)));
@@ -1856,6 +1860,7 @@ mod tests {
                 expected_amount: 0,
                 expected_sender: Vec::new(),
                 expected_recipient: vec![0u8; 20],
+                expected_beneficiary: Vec::new(),
             },
         );
         assert!(matches!(r, Err(VerificationError::MalformedProof)));

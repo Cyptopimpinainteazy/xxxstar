@@ -1,0 +1,185 @@
+name: pr-agent-auto
+
+# Automatic PR-Agent on the local x3 runner. pr-agent.yml stays the manual,
+# dry-run-by-default entry point; this one publishes.
+#
+#   PR opened / reopened / ready for review  -> describe, review, improve
+#   new commits pushed                       -> review, improve
+#   comment /review /improve /describe       -> that command
+#   comment /ask <question>                  -> ask
+#
+# The runner is self-hosted, so nothing from the PR is ever executed here:
+# - pull_request_target runs this file and the scripts from the default
+#   branch, never the PR's copy. PR-Agent reads the diff through the API.
+# - The checkout pins the default branch explicitly, so a later edit that adds
+#   `ref: <pr head>` has to delete that line on purpose.
+# - Only same-repository PRs run, automatically or on a comment, and only
+#   OWNER, MEMBER or COLLABORATOR comments run a command. A fork PR never
+#   spends the DeepSeek key.
+# - Comment text reaches the shell through an environment variable and is
+#   parsed by services/pr-agent/on-comment.sh, never interpolated.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  # A push supersedes the review of the previous push. Each comment gets its own
+  # group: GitHub keeps one pending run per group, so a shared group would drop
+  # the middle one of three quick comments.
+  group: pr-agent-auto-${{ github.event.pull_request.number || format('comment-{0}', github.event.comment.id) }}
+  # No cancelling: a push during the opened run would kill its describe, and
+  # the synchronize run that replaces it never describes. GitHub already keeps
+  # only the newest pending run, so a burst of pushes still costs two runs.
+  # A comment run and a push run on one PR can overlap; whichever finishes
+  # last owns the persistent comment, and the next push rewrites it anyway.
+  cancel-in-progress: false
+
+# The local model is the last fallback in .pr_agent.toml. Its clean verdict is
+# not evidence (services/pr-agent/README.md), so CI never publishes one: if
+# DeepSeek fails, the job fails instead of posting an unlabelled 8B review.
+env:
+  CONFIG__FALLBACK_MODELS: '["deepseek/deepseek-flash"]'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  on-pr:
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 45
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      # The x3 runners' /usr/bin/python3 is 3.10 and pr-agent needs >= 3.12; the
+      # first live run (#668, 2026-10-24) failed here before this step existed.
+      - name: Set up Python 3.12
+        id: python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pr-agent
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: services/pr-agent/install.sh
+
+      - name: Require the DeepSeek key
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "DEEPSEEK_API_KEY repository secret is not set" >&2
+            exit 1
+          fi
+
+      # describe rewrites the PR body (it keeps the author's text as "User
+      # description"), so it runs when the PR opens, reopens or leaves draft,
+      # not on every push.
+      - name: Describe
+        if: github.event.action != 'synchronize'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" describe
+
+      # persistent_comment in .pr_agent.toml makes each push update the same
+      # review and suggestions comments instead of adding new ones.
+      # Review and improve do not depend on describe: a describe failure must
+      # not leave the PR unreviewed.
+      - name: Review
+        if: ${{ !cancelled() }}
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" review
+
+      - name: Improve
+        if: ${{ !cancelled() }}
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: services/pr-agent/review.sh "$PR" improve
+
+  on-comment:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout the default branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      # The x3 runners' /usr/bin/python3 is 3.10 and pr-agent needs >= 3.12; the
+      # first live run (#668, 2026-10-24) failed here before this step existed.
+      - name: Set up Python 3.12
+        id: python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install pr-agent
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: services/pr-agent/install.sh
+
+      - name: Require the DeepSeek key
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY:-}" ]; then
+            echo "DEEPSEEK_API_KEY repository secret is not set" >&2
+            exit 1
+          fi
+
+      # issue_comment carries no head repository, so look it up: a comment on a
+      # fork PR is skipped exactly like the fork PR itself.
+      - name: Skip fork PRs
+        id: origin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        # curl and the Python set up above, not gh: the runner is not known to have gh.
+        run: |
+          set -euo pipefail
+          head_repo="$(curl -fsS -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$REPO/pulls/$PR" \
+            | python -c 'import json, sys; print(((json.load(sys.stdin).get("head") or {}).get("repo") or {}).get("full_name") or "")')"
+          if [ "$head_repo" = "$REPO" ]; then
+            echo "same_repo=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PR #$PR comes from '${head_repo:-a deleted fork}', not $REPO; skipping"
+            echo "same_repo=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the commented command
+        if: steps.origin.outputs.same_repo == 'true'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          PR: ${{ github.event.issue.number }}
+        run: services/pr-agent/on-comment.sh "$PR"

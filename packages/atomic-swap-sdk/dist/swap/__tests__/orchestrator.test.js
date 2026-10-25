@@ -13,7 +13,7 @@ const base_1 = require("../../htlc/base");
         const validate = (amount) => BigInt(amount) > 0n;
         (0, vitest_1.expect)(validate("1000000")).toBe(true);
         (0, vitest_1.expect)(validate("0")).toBe(false);
-        (0, vitest_1.expect)(validate("-1")).toBe(false); // negative is not positive, not a throw
+        (0, vitest_1.expect)(() => validate("-1")).toThrow();
     });
     (0, vitest_1.it)("timeLock must be in the future", () => {
         const now = Math.floor(Date.now() / 1000);
@@ -63,19 +63,13 @@ const base_1 = require("../../htlc/base");
     (0, vitest_1.it)("creates a valid HTLC parameter set for a 1-hour swap", () => {
         const { secret, hashLock } = (0, base_1.generateSecret)();
         const { initiatorTimeLock, counterpartyTimeLock } = (0, base_1.calculateTimeLocks)(3600);
-        // All parameters are valid.
+        const now = Math.floor(Date.now() / 1000);
+        // All parameters are valid
         (0, vitest_1.expect)(secret).toMatch(/^0x[0-9a-f]{64}$/);
         (0, vitest_1.expect)(hashLock).toMatch(/^0x[0-9a-f]{64}$/);
-        // calculateTimeLocks is a deterministic function of the base duration w.r.t.
-        // a single internal observation of the wall clock, so we assert the relations
-        // that hold regardless of which second the internal Date.now() lands on
-        // (initiator gets 2x the base; counterparty gets 1x; initiator stays ahead).
+        (0, vitest_1.expect)(initiatorTimeLock).toBeGreaterThan(now + 3600);
+        (0, vitest_1.expect)(counterpartyTimeLock).toBeGreaterThan(now + 3600);
         (0, vitest_1.expect)(initiatorTimeLock).toBeGreaterThan(counterpartyTimeLock);
-        (0, vitest_1.expect)(initiatorTimeLock - counterpartyTimeLock).toBe(3600);
-        // Both timelocks are derived from the current epoch as a floor, so they are
-        // always present (never the pre-epoch negative sentinel).
-        (0, vitest_1.expect)(initiatorTimeLock).toBeGreaterThan(0);
-        (0, vitest_1.expect)(counterpartyTimeLock).toBeGreaterThan(0);
     });
 });
 //# sourceMappingURL=orchestrator.test.js.map

@@ -1,0 +1,73 @@
+warning: /home/lojak/Desktop/x3lang-receipt-01a15f00/pallets/pallet-x3-control/Cargo.toml: unused manifest key: dependencies.codec.package
+warning: Patch `sp-wasm-interface v24.0.0 (https://github.com/paritytech/polkadot-sdk?branch=stable2512#54f11b10)` was not used in the crate graph.
+Perhaps you misspelled the source URL being patched.
+Possible URLs for `[patch.<URL>]`:
+    /home/lojak/Desktop/x3lang-receipt-01a15f00/patches/sp-wasm-interface
+warning: Patch `fastbloom v0.14.1 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/fastbloom)` was not used in the crate graph.
+Patch `rustix v1.1.2 (/home/lojak/Desktop/x3lang-receipt-01a15f00/patches/rustix)` was not used in the crate graph.
+Check that the patched package version and available features are compatible
+with the dependency requirements. If the patch has a different version from
+what is locked in the Cargo.lock file, run `cargo update` to use the new
+version. This may also occur with an optional dependency that is not enabled.
+   Compiling x3-x3-integration v0.1.0 (/home/lojak/Desktop/x3lang-receipt-01a15f00/crates/x3-integration)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 07s
+     Running tests/x3lang_trading_differential.rs (/home/lojak/Desktop/xxxstar-master/target/debug/deps/x3lang_trading_differential-aba15c7ab1a7af75)
+
+running 2 tests
+test production_and_reference_agree_on_the_flagship_trade ... ok
+test production_and_reference_agree_across_pool_depths_and_fees ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/x3lang_trading_negative.rs (/home/lojak/Desktop/xxxstar-master/target/debug/deps/x3lang_trading_negative-fbc0f9326115bf88)
+
+running 28 tests
+test an_asset_id_that_does_not_fit_the_chain_asset_type_cannot_lower ... ok
+test a_reader_without_the_trading_extension_refuses_the_artifact ... ok
+test balance_overflow_is_a_checked_trap ... ok
+test amount_overflow_is_refused_at_compile_time ... ok
+test deadline_is_enforced_from_the_submission_block ... ok
+test an_asset_that_is_not_on_the_x3_chain_cannot_lower ... ok
+test costs_over_the_policy_ceiling_roll_back ... ok
+test gas_exhaustion_rolls_back_everything ... ok
+test divergent_oracle_sources_roll_back ... ok
+test malformed_trading_section_is_refused_before_execution ... ok
+test host_refusal_rolls_back ... ok
+test invalid_checked_numeric_conversion_is_a_trap ... ok
+test failure_after_swap_but_before_repay_rolls_back ... ok
+test flash_fee_over_the_policy_rolls_back ... ok
+test slippage_violation_rolls_back ... ok
+test private_submission_policy_refuses_a_public_route ... ok
+test stale_oracle_rolls_back ... ok
+test profit_below_the_compiled_floor_rolls_back ... ok
+test missing_required_capability_rolls_back ... ok
+test missing_oracle_rolls_back ... ok
+test unresolved_debt_is_refused_at_compile_time ... ok
+test unresolved_binding_is_refused_at_compile_time ... ok
+test truncated_bytecode_is_refused_before_execution ... ok
+test venue_price_far_from_the_oracle_rolls_back ... ok
+test unsupported_bytecode_version_is_refused ... ok
+test wrong_provider_version_rolls_back ... ok
+test wrong_chain_id_rolls_back ... ok
+test wrong_venue_version_rolls_back ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/x3lang_trading_production_e2e.rs (/home/lojak/Desktop/xxxstar-master/target/debug/deps/x3lang_trading_production_e2e-96e2e0308425ddbf)
+
+running 2 tests
+test x3lang_trading_source_to_signed_replayed_receipt_on_production_path ... ok
+test x3lang_trading_trap_after_swap_rolls_back_everything ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/x3lang_trading_rollback.rs (/home/lojak/Desktop/xxxstar-master/target/debug/deps/x3lang_trading_rollback-787f9a4786f245df)
+
+running 5 tests
+test a_commit_carries_every_journaled_effect_out ... ok
+test a_trade_opcode_outside_an_atomic_window_is_refused_by_the_verifier ... ok
+test nested_atomic_rollback_discards_inner_and_outer_effects ... ok
+test an_inner_commit_does_not_survive_an_outer_failure ... ok
+test a_failure_at_every_step_rolls_back_everything ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s

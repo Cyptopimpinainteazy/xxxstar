@@ -100,6 +100,38 @@ impl pallet_timestamp::Config for Test {
 /// Mock EVM adapter that returns 98% output (2% fee simulation)
 /// Uses the EvmExecutorAdapter trait from x3-kernel
 pub struct TradeEngineEvmAdapter;
+// Fault-injection controls and effects live only in this cfg(test) runtime.
+pub const SETTLEMENT_TEST_MODE: &[u8] = b":trade-test:settlement-mode";
+pub const SETTLEMENT_TEST_WRITE: &[u8] = b":trade-test:settlement-write";
+pub const VM_TEST_WRITE: &[u8] = b":trade-test:vm-write";
+pub const SETTLEMENT_TEST_TRANSFER: u128 = 100;
+
+pub struct TestSettlementBridge;
+impl crate::SettlementBridge<u64> for TestSettlementBridge {
+    fn register_completed_batch(
+        maker: &u64,
+        batch_id: H256,
+        _secret_hash: H256,
+        _legs: &[(crate::VmType, u128)],
+    ) -> Result<H256, DispatchError> {
+        if let Some(mode) = sp_io::storage::get(SETTLEMENT_TEST_MODE) {
+            // Deliberately mutate real FRAME balances and storage before a
+            // possible error, so the caller must supply the atomic boundary.
+            <Balances as frame_support::traits::Currency<u64>>::transfer(
+                maker,
+                &account(3),
+                SETTLEMENT_TEST_TRANSFER,
+                frame_support::traits::ExistenceRequirement::KeepAlive,
+            )?;
+            sp_io::storage::set(SETTLEMENT_TEST_WRITE, batch_id.as_bytes());
+            if mode.as_ref() == [1] {
+                return Err(DispatchError::Other("injected settlement failure"));
+            }
+        }
+        Ok(batch_id)
+    }
+}
+
 thread_local! {
     pub static LAST_EVM_CALLER: core::cell::Cell<Option<sp_core::H160>> = const { core::cell::Cell::new(None) };
 }
@@ -118,6 +150,9 @@ impl EvmExecutorAdapter for TradeEngineEvmAdapter {
         payload: &[u8],
         gas_limit: u64,
     ) -> Result<ExecutionReceipt, sp_runtime::DispatchError> {
+        if sp_io::storage::exists(SETTLEMENT_TEST_MODE) {
+            sp_io::storage::set(VM_TEST_WRITE, payload);
+        }
         // Simulate swap: parse amount from payload and return 98%
         let amount_in = if payload.len() >= 36 {
             // Parse amount from ABI-encoded payload (bytes 4-36)
@@ -339,10 +374,12 @@ impl pallet_x3_kernel::Config for Test {
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
     type RequireCrossVmProof = frame_support::traits::ConstBool<false>;
     type PrivateSubmissionChannel = frame_support::traits::ConstBool<false>;
+    type X3ChainId = frame_support::traits::ConstU64<650_000>;
     type CrossChainProofVerifier = pallet_x3_kernel::NoopProofVerifier;
     type BridgeEvmEscrow = BridgeEvmEscrowValue;
     type BridgeSvmEscrow = BridgeSvmEscrowValue;
     type EmergencyHaltController = MockEmergencyHaltController;
+    type TradingHost = ();
 }
 
 parameter_types! {
@@ -371,7 +408,7 @@ impl pallet_atomic_trade_engine::Config for Test {
     type DefaultTradeX3GasLimit = DefaultTradeX3GasLimit;
     type AmmRegistrarOrigin = frame_system::EnsureRoot<u64>;
     type WeightInfo = ();
-    type Settlement = pallet_atomic_trade_engine::NoOpSettlementBridge;
+    type Settlement = TestSettlementBridge;
     type SecurityHook = x3_security_events::NoOpHook;
     type ProtocolFeeBps = ProtocolFeeBps;
     type ProtocolTreasury = ProtocolTreasury;

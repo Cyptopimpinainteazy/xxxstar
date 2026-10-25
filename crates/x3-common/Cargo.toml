@@ -9,6 +9,8 @@ license.workspace = true
 publish = false
 
 [dependencies]
+# The X3BC header and version rules live in the canonical core; `bytecode` re-exports them.
+x3bc-core = { path = "../x3bc-core", default-features = false }
 serde = { version = "1.0", features = ["derive"], default-features = false }
 sp-core = { workspace = true }
 sp-io = { workspace = true }
@@ -19,5 +21,5 @@ secp256k1 = { version = "0.28", default-features = false, features = ["alloc", "
 
 [features]
 default = ["std"]
-std = ["serde/std", "sp-core/std", "sp-io/std", "sp-runtime/std", "sp-std/std", "hex/std", "secp256k1/std"]
+std = ["x3bc-core/std", "serde/std", "sp-core/std", "sp-io/std", "sp-runtime/std", "sp-std/std", "hex/std", "secp256k1/std"]
 alloc = ["serde/alloc"]

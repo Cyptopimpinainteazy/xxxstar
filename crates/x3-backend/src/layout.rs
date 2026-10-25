@@ -278,7 +278,7 @@ pub fn type_to_tag(ty: &x3_typeck::Type) -> u8 {
         TypeKind::Primitive(p) if p.is_integer() => type_tags::INT,
         TypeKind::String => type_tags::STRING,
         TypeKind::Array { .. } => type_tags::ARRAY,
-        TypeKind::Tuple(_) => type_tags::TUPLE,
+        TypeKind::Tuple(_) | TypeKind::Struct(_) => type_tags::TUPLE,
         TypeKind::Agent(_) => type_tags::AGENT,
         _ => type_tags::OTHER,
     }

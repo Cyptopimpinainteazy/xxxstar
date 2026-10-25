@@ -7,19 +7,30 @@ description = "X3 bytecode backend: HIR → bytecode lowering for the X3 virtual
 publish = false
 
 [dependencies]
-x3-ast = { path = "../x3-ast" }
-x3-hir = { path = "../x3-hir" }
-x3-mir = { path = "../x3-mir" }
-x3-common = { path = "../x3-common" }
-x3-typeck = { path = "../x3-typeck" }
-thiserror = "1.0"
-serde = { version = "1.0", features = ["derive"] }
+# The compiler front end (HIR/MIR lowering) is off-chain only. Without `std` this crate is
+# just the bytecode format, opcode table and decoder, which the on-chain VM needs.
+x3-ast = { path = "../x3-ast", optional = true }
+x3-hir = { path = "../x3-hir", optional = true }
+x3-mir = { path = "../x3-mir", optional = true }
+x3-common = { path = "../x3-common", default-features = false, features = ["alloc"] }
+# The opcode table, its spec and the container format are the canonical core's; this crate
+# re-exports them and keeps the compiler back end.
+x3bc-core = { path = "../x3bc-core", default-features = false }
+x3-typeck = { path = "../x3-typeck", optional = true }
+thiserror = { version = "2", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 
 [features]
 default = ["std"]
 std = [
+    "x3bc-core/std",
     "serde/std",
+    "thiserror/std",
     "x3-common/std",
+    "dep:x3-ast",
+    "dep:x3-hir",
+    "dep:x3-mir",
+    "dep:x3-typeck",
 ]
 
 [dev-dependencies]

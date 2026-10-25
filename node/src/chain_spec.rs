@@ -531,6 +531,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Development")
@@ -579,6 +580,7 @@ pub fn development_config_with_bridge_escrows(
         true,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -631,6 +633,7 @@ pub fn local_two_validator_config_with_bridge_escrows(
         true,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
 
     Ok(ChainSpec::builder(wasm_binary, Default::default())
@@ -679,6 +682,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local Testnet")
@@ -735,6 +739,7 @@ pub fn local_three_validator_config() -> Result<ChainSpec, String> {
         true,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Local 3-Validator Testnet")
@@ -788,6 +793,7 @@ pub fn staging_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Staging")
@@ -854,6 +860,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
+        Some(testnet_trading_config()),
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Testnet")
@@ -917,6 +924,7 @@ pub fn production_config() -> Result<ChainSpec, String> {
         false,
         x3_lang_gateways,
         settlement_gateways,
+        None,
     )?;
     Ok(ChainSpec::builder(wasm_binary, Default::default())
         .with_name("X3 Chain Production")
@@ -1034,6 +1042,24 @@ fn btc_checkpoints_from_env() -> Result<Vec<BtcBlockHeader>, String> {
         .collect()
 }
 
+/// The trade cost schedule development and test networks start with, so a compiled X3 Lang trade
+/// runs on them without a governance call: fees in USDC (kernel asset 3, 6 decimals) paid to the
+/// treasury. Gas at 10 base units (0.00001 USDC) per unit; settlement 0.20, protocol 0.10 and
+/// 0.01 per oracle read. No relay fee: the chain has no private submission channel.
+fn testnet_trading_config() -> pallet_x3_kernel::TradingConfig<AccountId> {
+    pallet_x3_kernel::TradingConfig {
+        fee_asset: 3,
+        gas_price: 10,
+        settlement_fee: 200_000,
+        relay_fee: 0,
+        protocol_fee: 100_000,
+        oracle_fee: 10_000,
+        solver_fee: 0,
+        cross_domain_fee: 0,
+        fee_collector: x3_chain_runtime::TreasuryAccountId::get(),
+    }
+}
+
 fn x3_chain_genesis(
     initial_authorities: Vec<(AuraId, GrandpaId)>,
     endowed_accounts: Vec<AccountId>,
@@ -1053,6 +1079,10 @@ fn x3_chain_genesis(
     // operator named in the environment, and is refused the published dev seeds.
     x3_lang_gateways: Vec<AccountId>,
     settlement_gateways: Vec<AccountId>,
+    // The trade cost schedule the chain starts with: [`testnet_trading_config`] on development and
+    // test networks; `None` on mainnet, where trading stays refused until governance sets real
+    // fees with `set_trading_config`.
+    trading_config: Option<pallet_x3_kernel::TradingConfig<AccountId>>,
 ) -> Result<RuntimeGenesisConfig, String> {
     let mut endowed: BTreeSet<AccountId> = endowed_accounts.into_iter().collect();
 
@@ -1129,6 +1159,7 @@ fn x3_chain_genesis(
             authorized_accounts: kernel_authorities,
             evm_escrow: evm_escrow_addr,
             svm_escrow: svm_escrow_addr,
+            trading_config,
         },
         transaction_payment: Default::default(),
         council: CouncilConfig {
@@ -1295,7 +1326,7 @@ mod council_quorum_tests {
 
 #[cfg(test)]
 mod treasury_genesis_tests {
-    use super::{x3_chain_genesis, ENDOWMENT};
+    use super::{testnet_trading_config, x3_chain_genesis, ENDOWMENT};
     use x3_chain_runtime::{
         AccountId, ExistentialDeposit, TreasuryAccountId, X3CrosschainGatewayConfig,
     };
@@ -1312,10 +1343,47 @@ mod treasury_genesis_tests {
             true,
             Vec::new(),
             Vec::new(),
+            Some(testnet_trading_config()),
         )
         .expect("genesis builds")
         .balances
         .balances
+    }
+
+    /// A development or test network is born able to trade: the genesis writes the cost schedule
+    /// into the kernel, in a fee asset the same genesis registers, paid to the treasury.
+    #[test]
+    fn a_test_network_starts_with_the_trade_cost_schedule() {
+        use sp_runtime::BuildStorage;
+        let genesis = x3_chain_genesis(
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Default::default(),
+            [0u8; 32],
+            X3CrosschainGatewayConfig::dev_defaults(),
+            true,
+            Vec::new(),
+            Vec::new(),
+            Some(testnet_trading_config()),
+        )
+        .expect("genesis builds");
+        let mut ext =
+            sp_io::TestExternalities::new(genesis.build_storage().expect("storage builds"));
+        ext.execute_with(|| {
+            let config = pallet_x3_kernel::TradingConfiguration::<x3_chain_runtime::Runtime>::get()
+                .expect("the schedule is set at genesis");
+            assert_eq!(config, testnet_trading_config());
+            assert_eq!(config.fee_collector, TreasuryAccountId::get());
+            let usdc =
+                pallet_x3_kernel::AssetRegistry::<x3_chain_runtime::Runtime>::get(config.fee_asset)
+                    .expect("the fee asset is registered");
+            assert_eq!(
+                (usdc.symbol.into_inner(), usdc.decimals),
+                (b"USDC".to_vec(), 6)
+            );
+        });
     }
 
     /// Fees are paid into the treasury, and a treasury with no account refuses every fee below the

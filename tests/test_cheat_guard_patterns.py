@@ -81,3 +81,23 @@ def test_a_script_entrypoint_is_not_mistaken_for_a_skipped_test(guard, line: str
     assert not _matches(guard.SKIP_PATTERNS + guard.WEAK_PATTERNS, line), (
         f"the guard reports a normal process exit as a skipped test: {line!r}"
     )
+
+
+@pytest.mark.parametrize("name,line,blocked", [
+    ("attestation.rs", f"for value in data.iter(){SKIP_CALL}32) {{}}", False),
+    ("test_values.rs", f"for value in data.into_iter(){SKIP_CALL}32) {{}}", False),
+    ("test_values.rs", IGNORE_ATTR, True),
+    ("test_values.rs", WEAK_ASSERT, True),
+    ("test_values.rs", f"suite{SKIP_CALL}32)", True),
+    ("test_values.rs", f"data.iter(){SKIP_CALL}32); {IGNORE_ATTR}", True),
+    ("test_values.ts", f"it{SKIP_CALL}'pending', () => {{}})", True),
+    ("test_values.py", f"@unittest{SKIP_CALL}'pending')", True),
+])
+def test_scan_distinguishes_rust_iterators_from_test_skips(tmp_path, monkeypatch,
+                                                         name, line, blocked):
+    module = _load_guard()
+    path = tmp_path / name
+    path.write_text(line + "\n")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "candidate_files", lambda base=None: [path])
+    assert bool(module.scan()) == blocked

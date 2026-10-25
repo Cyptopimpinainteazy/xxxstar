@@ -3,7 +3,8 @@
 //! Provides snapshot/restore semantics for atomic window rollback and a
 //! journal of all writes made during execution (for cross-VM delta sync).
 
-use std::collections::BTreeMap;
+use crate::prelude::*;
+use alloc::collections::BTreeMap;
 
 /// Storage key: 32-byte hash.
 pub type StorageKey = [u8; 32];

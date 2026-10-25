@@ -1,0 +1,7 @@
+{
+  "usage": [
+    {"day": "2026-10-24", "agent": "default", "provider": "deepseek_flash", "requests": 2, "cost_usd": 0.0012},
+    {"day": "2026-10-24", "agent": "default", "provider": "ollama_qwen3", "requests": 1, "cost_usd": 0.0},
+    {"day": "2026-10-23", "agent": "default", "provider": "deepseek_pro", "requests": 1, "cost_usd": 0.0041}
+  ]
+}

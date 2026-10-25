@@ -4,14 +4,24 @@
 //! They provide an interface between the VM and the host environment
 //! (blockchain runtime, sidecar, or local development server).
 
-use std::collections::BTreeMap;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Arc,
-};
+use crate::prelude::*;
+use alloc::collections::BTreeMap;
+use alloc::sync::Arc;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use crate::error::{VMError, VMErrorKind, VMResult};
 use crate::vm::Value;
+
+/// Output of the `print_*` hostcalls: stdout off-chain, the `log` facade (the runtime's
+/// logger) where there is no stdout.
+#[cfg(feature = "std")]
+macro_rules! host_print {
+    ($($arg:tt)*) => { println!($($arg)*) };
+}
+#[cfg(not(feature = "std"))]
+macro_rules! host_print {
+    ($($arg:tt)*) => { log::info!(target: "x3-vm", $($arg)*) };
+}
 
 /// Hostcall function signature.
 pub type HostcallFn = Box<dyn Fn(&[Value]) -> VMResult<Option<Value>> + Send + Sync>;
@@ -201,7 +211,7 @@ impl HostcallRegistry {
         // ID 20: print_i64 - print i64 value
         self.register(20, "print_i64", 1, |args| {
             if let Some(Value::I64(v)) = args.first() {
-                println!("{}", v);
+                host_print!("{}", v);
             }
             Ok(None)
         });
@@ -209,7 +219,7 @@ impl HostcallRegistry {
         // ID 21: print_f64 - print f64 value
         self.register(21, "print_f64", 1, |args| {
             if let Some(Value::F64(v)) = args.first() {
-                println!("{}", v);
+                host_print!("{}", v);
             }
             Ok(None)
         });
@@ -217,7 +227,7 @@ impl HostcallRegistry {
         // ID 22: print_string - print string value
         self.register(22, "print_string", 1, |args| {
             if let Some(Value::String(s)) = args.first() {
-                println!("{}", s);
+                host_print!("{}", s);
             }
             Ok(None)
         });

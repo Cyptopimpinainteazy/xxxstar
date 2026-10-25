@@ -1,0 +1,67 @@
+{
+  "schema": "x3.economic-engine.gate-evidence/v1",
+  "phase": "Economic Engine V1",
+  "recorded_at": "2026-10-22",
+  "integrated_head": "91b46a2c",
+  "components": [
+    {
+      "id": "profitproof",
+      "location": "crates/x3bc-core/src/economics.rs",
+      "question_it_answers": "What did this trade actually earn, and what may a fee be charged on?",
+      "source_of_truth": "the settlement asset's post-minus-pre balance; never a reported total",
+      "refusals": [
+        "a rolled-back trade has no priceable outcome (NotCommitted)",
+        "pricing in an asset the trade did not settle in (AssetMismatch)",
+        "a fee rate above 10_000 bps (InvalidFeeRate)",
+        "a difference wider than i128 (Overflow)"
+      ],
+      "tests": 16
+    },
+    {
+      "id": "profitlock",
+      "location": "pallets/x3-kernel/src/trading.rs (enforce_trade_constraints)",
+      "controls": [
+        "min_net_profit",
+        "max_execution_cost",
+        "deadline_blocks"
+      ],
+      "enforcement_point": "after the engine commits, before the first ledger movement",
+      "unset_behaviour": "identical to pre-ProfitLock",
+      "tests": 6
+    },
+    {
+      "id": "revenue-engine",
+      "location": "pallets/x3-kernel/src/trading.rs (distribute_revenue)",
+      "authorisation": "the trader sets their own agreement; nobody else can",
+      "atomicity": "fee distribution rides in the settlement's transaction",
+      "conservation": "shares are basis points of the fee and sum to it exactly",
+      "tests": 7
+    }
+  ],
+  "acceptance_test": {
+    "name": "a_verified_profit_pays_the_agreed_split_out_of_the_traders_balance",
+    "proves": [
+      "the flagship strategy compiles to canonical X3BC and runs on the production engine",
+      "it executes against real CanonicalLedger balances",
+      "profit and fees are recomputed from the receipt, not read from an event",
+      "an insufficient-profit outcome is rejected before any state change",
+      "a qualifying trade commits",
+      "trader, developer and protocol are paid per the agreement",
+      "a receipt is produced and recorded"
+    ]
+  },
+  "gates": [
+    { "command": "cargo test -p x3bc-core economics", "result": "16 passed" },
+    { "command": "cargo test -p pallet-x3-kernel --lib", "result": "279 passed" },
+    { "command": "cargo test -p x3-chain-runtime --lib", "result": "91 passed" },
+    { "command": "cargo test -p x3-chain-runtime --test automation_execution", "result": "8 passed" },
+    { "command": "cargo test -p x3-chain-runtime --test factory_router_accounting", "result": "4 passed" },
+    { "command": "cargo clippy -D warnings (x3bc-core, pallet-x3-kernel)", "result": "clean" }
+  ],
+  "open_limits": [
+    "Savings Engine is not implemented; it needs a credible pre-execution benchmark before any fee can rest on it.",
+    "Automation declarations parse and validate but do not yet lower to X3BC, so an economic workflow cannot be submitted as an automation.",
+    "Atomic multi-VM trading is unchanged: the atomic kernel still restricts legs to X3-native operations.",
+    "Language syntax for strategy/constraints/profit_share is deliberately deferred until these runtime semantics are proven."
+  ]
+}

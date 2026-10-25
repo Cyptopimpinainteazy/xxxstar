@@ -146,6 +146,14 @@ use precompiles::FrontierPrecompiles;
 #[cfg(all(test, feature = "std"))]
 mod tests;
 
+// `submit_trade` against the real dex, flash-loan and oracle pallets (absent from mainnet-rc1).
+#[cfg(all(test, feature = "std", not(feature = "mainnet-rc1")))]
+mod tests_trading;
+
+// A token launch through the launchpad, token factory, kernel ledger and dex (absent from mainnet-rc1).
+#[cfg(all(test, feature = "std", not(feature = "mainnet-rc1")))]
+mod tests_launchpad;
+
 pub mod fraud_proofs;
 
 #[cfg(any(feature = "std", test))]
@@ -404,10 +412,27 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: signed Ethereum transactions become self-contained extrinsics
     // (fp_self_contained::UncheckedExtrinsic). Existing signed extrinsics encode
     // exactly as before, so `transaction_version` is unchanged.
-    spec_version: 22,
+    // 23: `AtlasKernel.submit_trade` (the X3BC 1.1 trading section settled on the
+    // CanonicalLedger) and its trading configuration; launchpad custody on the ledger.
+    // New calls and storage only, so no migration.
+    // 24: atomic bundle legs execute on chain. `X3AtomicKernel.execute_bundle_leg`
+    // (call 9, the bundle's executor, spending only its own funds) runs a leg and records
+    // its journal in the new `ChainJournal` map; transfers wait in a per-bundle escrow and
+    // X3 slots are held for the bundle (`AtlasKernel.X3SlotHolds`) until it ends. A bundle
+    // finalizes only with every leg executed (escrow paid, slots released); a rollback
+    // undoes every leg or refuses. The unsigned `record_leg_execution_receipt` (call 7)
+    // now refuses every call. New storage only, so no migration; `transaction_version` is
+    // unchanged: no existing call's encoding moved. A bundle `Executing` across the
+    // upgrade has no journals: it cannot finalize, and its rollback is refused if any leg
+    // carries an old off-chain diff (expiry retries it); none exist on a network that ran
+    // only the refusing call 7.
+    // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
+    // leg; a leg runs only the execution it committed to), so its encoding changed and
+    // `transaction_version` goes to 2.
+    spec_version: 24,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
-    transaction_version: 1,
+    transaction_version: 2,
     // X3 (stable2512): RuntimeVersion no longer carries `state_version`.
     system_version: 1,
 };
@@ -1122,6 +1147,10 @@ impl pallet_x3_vrf::Config for Runtime {
 
 parameter_types! {
     pub const MaxPools: u32 = 100;
+    pub const DexPalletId: PalletId = PalletId(*b"x3/dexpl");
+    /// `TokenId::chain_id` of this chain's ledger assets: the X3 chain id the trading catalog uses
+    /// (`x3bc_core::trading::X3_CHAIN_ID`).
+    pub const DexLedgerChainId: u32 = 650_000;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -1129,6 +1158,12 @@ impl pallet_x3_dex::Config for Runtime {
     type MaxPools = MaxPools;
     type WeightInfo = pallet_x3_dex::weights::SubstrateWeight<Runtime>;
     type EconomicHalt = X3SupplyLedger;
+    // Pool reserves are `CanonicalLedger` balances of each pool's custody account.
+    type Ledger = KernelCanonicalLedger;
+    type PalletId = DexPalletId;
+    type LedgerChainId = DexLedgerChainId;
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = KernelCanonicalLedger;
 }
 
 parameter_types! {
@@ -1138,6 +1173,102 @@ parameter_types! {
     pub const MaxTaskExpiryBlocks: u32 = 2_628_000; // ~1 year at 12s blocks
 }
 
+// How long a stored median stays usable by automation. The oracle never deletes
+// an `AssetPrices` entry: when submissions go stale, `update_median_price`
+// returns early and leaves the last value in place. So "an entry exists" is not
+// the same as "the market was observed recently", and a stop-loss trigger must
+// not fire on a price nobody has reported since.
+#[cfg(not(feature = "mainnet-rc1"))]
+parameter_types! {
+    pub const MaxAutomationPriceAgeMs: u64 = 3_600_000; // 1 hour
+}
+
+/// Price feed for automation conditions.
+///
+/// Reads the median that `pallet-x3-oracle` computes across authorized
+/// submitters. A missing asset, too few submissions or a median older than
+/// `MaxAutomationPriceAgeMs` all answer `None`, and the automation pallet turns
+/// that into `PriceUnavailable` — a refusal that leaves the task active, never a
+/// zero price that would satisfy a "below threshold" trigger.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct AutomationOracle;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_automation::OracleProvider for AutomationOracle {
+    fn get_price(asset_id: &[u8]) -> Option<u128> {
+        let id = u32::from_le_bytes(asset_id.try_into().ok()?);
+        let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(id)?;
+        let now = pallet_timestamp::Pallet::<Runtime>::get();
+        let age = now.saturating_sub(price.timestamp);
+        if age > MaxAutomationPriceAgeMs::get() {
+            // A stale median is not a price: answer `None` so the pallet raises
+            // `PriceUnavailable` instead of executing on yesterday's market.
+            return None;
+        }
+        Some(u128::from(price.price))
+    }
+}
+
+#[cfg(not(feature = "mainnet-rc1"))]
+parameter_types! {
+    pub const MaxAutomationAttempts: u32 = 3;
+}
+
+/// Current wall clock for automation triggers.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct AutomationNow;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl Get<u64> for AutomationNow {
+    fn get() -> u64 {
+        pallet_timestamp::Pallet::<Runtime>::get()
+    }
+}
+
+/// Perform a task's action for its owner.
+///
+/// This is the only path through which automation can change state. Every
+/// variant is explicit; an unmapped action returns an error rather than a
+/// fabricated success, and `TransferNative` moves real balances with the owner's
+/// origin as the source.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct RuntimeActionDispatcher;
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatcher {
+    fn dispatch(
+        owner: &AccountId,
+        action: &x3_automation::Action,
+    ) -> Result<(x3_automation::ActionOutcome, Weight, [u8; 64]), DispatchError> {
+        use x3_automation::{Action, ActionOutcome};
+        match action {
+            Action::Noop => Ok((ActionOutcome::Noop, Weight::zero(), [0u8; 64])),
+            Action::TransferNative { recipient, amount } => {
+                let destination = AccountId::decode(&mut &recipient[..])
+                    .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
+                let value: Balance = (*amount)
+                    .try_into()
+                    .map_err(|_| DispatchError::Other("AutomationAmountOutOfRange"))?;
+                Balances::transfer_keep_alive(
+                    RuntimeOrigin::signed(owner.clone()),
+                    sp_runtime::MultiAddress::Id(destination),
+                    value,
+                )?;
+                let mut out = [0u8; 64];
+                out[..16].copy_from_slice(&value.to_le_bytes());
+                Ok((
+                    ActionOutcome::Applied,
+                    <Runtime as frame_system::Config>::DbWeight::get().reads_writes(2, 2),
+                    out,
+                ))
+            }
+            // A ledger-asset move needs an atomic account-level debit/credit the
+            // kernel does not expose yet, so it is refused rather than faked.
+            Action::TransferLedgerAsset { .. } => {
+                Err(DispatchError::Other("AutomationLedgerTransferUnavailable"))
+            }
+            Action::Custom(_) => Err(DispatchError::Other("AutomationActionUnsupported")),
+        }
+    }
+}
+
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_automation::Config for Runtime {
     type Currency = Balances;
@@ -1145,9 +1276,12 @@ impl pallet_x3_automation::Config for Runtime {
     type BaseRegistrationFee = BaseRegistrationFee;
     type ExecutionFee = ExecutionFee;
     type MaxTaskExpiryBlocks = MaxTaskExpiryBlocks;
+    type MaxAttempts = MaxAutomationAttempts;
+    type Now = AutomationNow;
     type WeightInfo = pallet_x3_automation::weights::SubstrateWeight<Runtime>;
-    type Oracle = pallet_x3_automation::NoopOracle;
+    type Oracle = AutomationOracle;
     type CustomEvaluator = pallet_x3_automation::NoopCustomEvaluator;
+    type Dispatcher = RuntimeActionDispatcher;
 }
 
 parameter_types! {
@@ -1828,6 +1962,8 @@ impl pallet_x3_kernel::Config for Runtime {
     type MaxPreparedOpsPerBlock = MaxPreparedOpsPerBlock;
     type RequireCrossVmProof = RequireCrossVmProof;
     type PrivateSubmissionChannel = RuntimePrivateSubmissionChannel;
+    // The EVM's chain id, so an X3 program and an EVM contract name this chain the same way.
+    type X3ChainId = ChainId;
     type WeightInfo = pallet_x3_kernel::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     // VM adapters:
@@ -1860,6 +1996,182 @@ impl pallet_x3_kernel::Config for Runtime {
     type BridgeSvmEscrow = BridgeSvmEscrowStorage;
     type MaxReplayPruneItemsPerBlock = MaxReplayPruneItemsPerBlock;
     type EmergencyHaltController = RuntimeEmergencyHaltController;
+    // `submit_trade` runs against the chain's dex pools, flash pools and oracle. The release
+    // candidate does not include those pallets, so there the host offers nothing and every trade
+    // is refused.
+    #[cfg(not(feature = "mainnet-rc1"))]
+    type TradingHost = X3TradingHost;
+    #[cfg(feature = "mainnet-rc1")]
+    type TradingHost = ();
+}
+
+/// The kernel's `CanonicalLedger`, as the ledger the dex and flash-loan pallets custody on.
+pub struct KernelCanonicalLedger;
+
+impl x3_asset_kernel_types::traits::CanonicalLedgerTransfer<AccountId> for KernelCanonicalLedger {
+    fn ledger_transfer(
+        asset: u32,
+        from: &AccountId,
+        to: &AccountId,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        // No halt check here: the supply ledger's transfer halt stops new flows (a dex swap, a
+        // kernel trade) at their entry points, and leaves exits such as removing liquidity open
+        // so a halt does not strand funds.
+        pallet_x3_kernel::Pallet::<Runtime>::ledger_transfer(asset, from, to, amount)
+    }
+
+    fn ledger_balance(asset: u32, who: &AccountId) -> u128 {
+        pallet_x3_kernel::Pallet::<Runtime>::ledger_balance_of(asset, who)
+    }
+}
+
+/// Issued tokens (the token factory's) are kernel ledger assets.
+impl x3_asset_kernel_types::traits::LedgerAssetIssuer<AccountId> for KernelCanonicalLedger {
+    fn issue(symbol: &[u8], decimals: u8) -> Result<Option<u32>, sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::issue_ledger_asset(symbol, decimals).map(Some)
+    }
+    fn mint(asset: u32, who: &AccountId, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::mint_to_ledger(asset, who, amount)
+    }
+    fn burn(asset: u32, who: &AccountId, amount: u128) -> Result<(), sp_runtime::DispatchError> {
+        pallet_x3_kernel::Pallet::<Runtime>::burn_from_ledger(asset, who, amount)
+    }
+}
+
+/// Benchmarks fund their accounts directly on the ledger, registering the asset if needed.
+#[cfg(feature = "runtime-benchmarks")]
+impl x3_asset_kernel_types::traits::LedgerBenchmarkFunding<AccountId> for KernelCanonicalLedger {
+    fn fund(asset: u32, who: &AccountId, amount: u128) {
+        if !pallet_x3_kernel::AssetRegistry::<Runtime>::contains_key(asset) {
+            let symbol = b"BENCH".to_vec().try_into().unwrap_or_default();
+            pallet_x3_kernel::AssetRegistry::<Runtime>::insert(
+                asset,
+                pallet_x3_kernel::AssetMetadata {
+                    symbol,
+                    decimals: 6,
+                },
+            );
+        }
+        pallet_x3_kernel::CanonicalLedger::<Runtime>::mutate(who, asset, |balance| {
+            *balance = balance.saturating_add(amount)
+        });
+    }
+}
+
+/// The kernel trading engine's view of this chain: `pallet_x3_dex` pools as venues,
+/// `pallet_x3_flashloan` asset pools as the flash provider, `pallet_x3_oracle` median prices.
+#[cfg(not(feature = "mainnet-rc1"))]
+pub struct X3TradingHost;
+
+#[cfg(not(feature = "mainnet-rc1"))]
+impl pallet_x3_kernel::KernelTradingHost<AccountId> for X3TradingHost {
+    fn venue(name: &str) -> Option<(x3bc_core::state::VenueState, AccountId)> {
+        let pool_id = x3bc_core::trading::venue_pool_id(name)?;
+        let pool = pallet_x3_dex::Pallet::<Runtime>::trading_pool(pool_id)?;
+        Some((
+            x3bc_core::state::VenueState {
+                name: name.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset_a: pool.asset_a,
+                asset_b: pool.asset_b,
+                reserve_a: pool.reserve_a,
+                reserve_b: pool.reserve_b,
+                fee_bps: pool.fee_bps,
+            },
+            pallet_x3_dex::Pallet::<Runtime>::pool_account(pool_id),
+        ))
+    }
+
+    fn set_venue_reserves(
+        name: &str,
+        reserve_a: u128,
+        reserve_b: u128,
+    ) -> sp_runtime::DispatchResult {
+        let pool_id = x3bc_core::trading::venue_pool_id(name)
+            .ok_or(sp_runtime::DispatchError::Other("not an x3dex venue"))?;
+        pallet_x3_dex::Pallet::<Runtime>::apply_trading_reserves(pool_id, reserve_a, reserve_b)
+    }
+
+    fn flash_pool(
+        provider: &str,
+        asset: u32,
+    ) -> Option<(x3bc_core::state::FlashPoolState, AccountId)> {
+        if provider != x3bc_core::trading::FLASH_PROVIDER {
+            return None;
+        }
+        let (fee_bps, liquidity) = pallet_x3_flashloan::Pallet::<Runtime>::asset_pool(asset)?;
+        Some((
+            x3bc_core::state::FlashPoolState {
+                provider: provider.into(),
+                version: x3bc_core::trading::CAPABILITY_VERSION,
+                asset,
+                liquidity,
+                fee_bps,
+            },
+            pallet_x3_flashloan::Pallet::<Runtime>::asset_pool_account(asset),
+        ))
+    }
+
+    fn usd_price(asset: u32) -> Option<(u128, u64)> {
+        let price = pallet_x3_oracle::Pallet::<Runtime>::get_price(asset)?;
+        Some((u128::from(price.price), u64::from(price.last_updated)))
+    }
+
+    fn transfers_halted() -> bool {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::EconomicHaltInspect>::is_halted()
+    }
+
+    /// The benchmark market, built through the dex, flash-loan and oracle pallets' own calls (the
+    /// same market `tests_trading` trades in). Only starting `CanonicalLedger` balances are
+    /// written directly, as a mint would.
+    #[cfg(feature = "runtime-benchmarks")]
+    fn benchmark_market(trader: &AccountId) -> Result<(), &'static str> {
+        use pallet_x3_kernel::trading::{BENCHMARK_USDX as USDX, BENCHMARK_WETX as WETX};
+        const UNIT: u128 = 1_000_000;
+        const LEDGER_CHAIN: u32 = 650_000;
+        let token = |asset: u32| x3_dex::TokenId {
+            chain_id: LEDGER_CHAIN,
+            asset_id: u128::from(asset),
+        };
+        let mint = |who: &AccountId, asset: u32, amount: u128| {
+            pallet_x3_kernel::CanonicalLedger::<Runtime>::mutate(who, asset, |b| *b += amount)
+        };
+        let seed = |byte: u8| AccountId::new([byte; 32]);
+        let (lp, provider) = (seed(0xB1), seed(0xB2));
+        let oracles = [seed(0xB3), seed(0xB4), seed(0xB5)];
+        let root = || RuntimeOrigin::root();
+        let signed = |who: &AccountId| RuntimeOrigin::signed(who.clone());
+        let refused = |_| "the benchmark market could not be built";
+
+        AtlasKernel::register_asset(root(), USDX, b"USDX".to_vec(), 6).map_err(refused)?;
+        AtlasKernel::register_asset(root(), WETX, b"WETX".to_vec(), 6).map_err(refused)?;
+        X3FlashLoan::create_asset_pool(root(), USDX, 5).map_err(refused)?;
+        for oracle in &oracles {
+            X3Oracle::authorize_oracle(root(), oracle.clone()).map_err(refused)?;
+        }
+        mint(&lp, USDX, 1_830_000 * UNIT);
+        mint(&lp, WETX, 900_000 * UNIT);
+        mint(&provider, USDX, 5_000_000 * UNIT);
+        mint(trader, USDX, 50 * UNIT);
+        let first = pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_add(1);
+        if first != 1 {
+            return Err("the benchmark market needs dex pool ids 1 and 2 free");
+        }
+        X3Dex::create_pool(signed(&lp), token(USDX), token(WETX), 30).map_err(refused)?;
+        X3Dex::add_liquidity(signed(&lp), 1, 1_000_000 * UNIT, 500_000 * UNIT, 0, 0)
+            .map_err(refused)?;
+        X3Dex::create_pool(signed(&lp), token(WETX), token(USDX), 30).map_err(refused)?;
+        X3Dex::add_liquidity(signed(&lp), 2, 400_000 * UNIT, 830_000 * UNIT, 0, 0)
+            .map_err(refused)?;
+        X3FlashLoan::provide_asset_liquidity(signed(&provider), USDX, 5_000_000 * UNIT, 0)
+            .map_err(refused)?;
+        for oracle in &oracles {
+            X3Oracle::submit_price(signed(oracle), USDX, 1_000_000).map_err(refused)?;
+            X3Oracle::submit_price(signed(oracle), WETX, 2_000_000).map_err(refused)?;
+        }
+        Ok(())
+    }
 }
 
 impl pallet_x3_coin::Config for Runtime {
@@ -2661,9 +2973,54 @@ parameter_types! {
     pub const TradeProtocolFeeBps: u32 = 5;
 }
 
+/// The router's supply-only interface cannot debit or credit factory token
+/// account balances. Refuse new movements until it can reconcile both ledgers.
+/// Keep refunds available for supply-only transfers persisted by older runtimes.
+pub struct RouterSupplyLedger;
+
+impl x3_asset_kernel_types::traits::SupplyLedgerWrite for RouterSupplyLedger {
+    fn debit_source_to_pending(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        source_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        frame_support::ensure!(
+            !pallet_x3_token_factory::Tokens::<Runtime>::contains_key(asset_id),
+            sp_runtime::DispatchError::Other("FactoryTokenCrossVmAccountingUnavailable")
+        );
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::debit_source_to_pending(asset_id, source_domain, amount)
+    }
+
+    fn credit_destination_from_pending(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        destination_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        frame_support::ensure!(
+            !pallet_x3_token_factory::Tokens::<Runtime>::contains_key(asset_id),
+            sp_runtime::DispatchError::Other("FactoryTokenCrossVmAccountingUnavailable")
+        );
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::credit_destination_from_pending(asset_id, destination_domain, amount)
+    }
+
+    fn refund_pending_to_source(
+        asset_id: &x3_asset_kernel_types::AssetId,
+        source_domain: x3_asset_kernel_types::DomainId,
+        amount: x3_asset_kernel_types::Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::refund_pending_to_source(asset_id, source_domain, amount)
+    }
+
+    fn ledger(
+        asset_id: &x3_asset_kernel_types::AssetId,
+    ) -> Option<x3_asset_kernel_types::SupplyLedger> {
+        <X3SupplyLedger as x3_asset_kernel_types::traits::SupplyLedgerWrite>::ledger(asset_id)
+    }
+}
+
 impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
-    type Ledger = X3SupplyLedger;
+    type Ledger = RouterSupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
     // Refuses every external root: nothing in this runtime can bind a foreign chain's block
     // root to that chain's consensus, and `register_external_root` writes a value the bridge
@@ -2688,6 +3045,8 @@ impl pallet_x3_token_factory::Config for Runtime {
     type Ledger = X3SupplyLedger;
     type EconomicHalt = X3SupplyLedger;
     type Sentinel = X3Sentinel;
+    // Launched tokens get a `CanonicalLedger` asset, so their supply has real balances.
+    type LedgerAssets = KernelCanonicalLedger;
     type WeightInfo = pallet_x3_token_factory::weights::SubstrateWeight<Runtime>;
 }
 
@@ -2833,7 +3192,26 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     /// pallet has recorded a receipts root for, and its confirmation depth is
     /// measured from the attested head rather than from the proof.
     type EvmHeaderAnchor = pallet_cross_chain_validator::Pallet<Runtime>;
+    /// The settlement engine's Bitcoin header store — checkpoint-anchored, proof-of-work and
+    /// difficulty checked — is what a Bitcoin deposit's block must be on, at its best chain's
+    /// depth.
+    type BtcHeaderAnchor = SettlementEngineBtcAnchor;
     type WeightInfo = pallet_x3_crosschain_gateway::weights::SubstrateWeight<Runtime>;
+}
+
+/// The settlement engine's best Bitcoin chain, as the gateway's verifier reads it.
+pub struct SettlementEngineBtcAnchor;
+
+impl x3_verification_router::BtcHeaderAnchor for SettlementEngineBtcAnchor {
+    fn best_chain_height(block_hash: &[u8; 32]) -> Option<u64> {
+        pallet_x3_settlement_engine::Pallet::<Runtime>::btc_best_chain_height(&H256::from(
+            *block_hash,
+        ))
+    }
+
+    fn best_height() -> Option<u64> {
+        pallet_x3_settlement_engine::Pallet::<Runtime>::btc_best_chain_tip_height()
+    }
 }
 
 // ===== Swarm Pallet Configuration =====
@@ -3060,6 +3438,182 @@ impl pallet_x3_atomic_kernel::Config for Runtime {
     // Production: CompositeReverter dispatches EVM/SVM/X3VM state-diff reversion
     // per leg. See pallets/x3-atomic-kernel/src/vm_revert.rs for per-VM implementations.
     type VmReverter = pallet_x3_atomic_kernel::vm_revert::CompositeReverter;
+    // Legs run on chain (`execute_bundle_leg`): X3 programs on the kernel's engine and ledger
+    // transfers, journaled so a rollback can undo exactly what they did.
+    type LegExecutor = RuntimeLegExecutor;
+}
+
+/// The runtime's on-chain bundle-leg executor (see `pallet_x3_atomic_kernel::chain_legs`).
+///
+/// It writes only through the owning pallets' typed APIs (`CanonicalLedger` transfers, the
+/// kernel's X3 execution and slot holds), never raw storage keys, so a journal always names state
+/// that exists. A transfer leg's funds wait in the bundle's escrow account
+/// ([`RuntimeLegExecutor::escrow`]) until the bundle ends; an X3 leg's slots are held for the
+/// bundle by the kernel.
+pub struct RuntimeLegExecutor;
+
+parameter_types! {
+    pub const AtomicLegEscrowPalletId: PalletId = PalletId(*b"x3/legsc");
+}
+
+impl RuntimeLegExecutor {
+    /// The account that holds bundle `bundle`'s transfer legs until it ends. Only this executor
+    /// moves funds out of it.
+    pub fn escrow(bundle: H256) -> AccountId {
+        use sp_runtime::traits::AccountIdConversion;
+        AtomicLegEscrowPalletId::get().into_sub_account_truncating(bundle)
+    }
+
+    fn accounts(from: &[u8], to: &[u8]) -> Option<(AccountId, AccountId)> {
+        Some((
+            AccountId::decode(&mut &from[..]).ok()?,
+            AccountId::decode(&mut &to[..]).ok()?,
+        ))
+    }
+
+    /// Run `apply` over `entries` (in the order given) in one storage transaction: every entry or
+    /// none.
+    fn all_or_nothing<'a, E>(
+        mut entries: impl Iterator<Item = &'a pallet_x3_atomic_kernel::chain_legs::JournalEntry>,
+        apply: impl Fn(&pallet_x3_atomic_kernel::chain_legs::JournalEntry) -> Result<(), E>,
+    ) -> Result<(), Option<E>> {
+        use frame_support::storage::{with_transaction, TransactionOutcome};
+        let mut refused = None;
+        with_transaction(|| match entries.try_for_each(&apply) {
+            Ok(()) => TransactionOutcome::Commit(Ok(())),
+            Err(error) => {
+                refused = Some(error);
+                TransactionOutcome::Rollback(Err(DispatchError::Other("journal refused")))
+            }
+        })
+        .map_err(|_: DispatchError| refused)
+    }
+}
+
+impl pallet_x3_atomic_kernel::chain_legs::LegExecutor<AccountId> for RuntimeLegExecutor {
+    fn execute(
+        bundle: H256,
+        context: H256,
+        executor: &AccountId,
+        execution: &pallet_x3_atomic_kernel::chain_legs::LegExecution<AccountId>,
+    ) -> Result<Vec<pallet_x3_atomic_kernel::chain_legs::JournalEntry>, DispatchError> {
+        use pallet_x3_atomic_kernel::chain_legs::{JournalEntry, LegExecution};
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        match execution {
+            LegExecution::Transfer { asset, to, amount } => {
+                KernelCanonicalLedger::ledger_transfer(
+                    *asset,
+                    executor,
+                    &Self::escrow(bundle),
+                    *amount,
+                )?;
+                Ok(vec![JournalEntry::LedgerEscrow {
+                    asset: *asset,
+                    from: executor.encode(),
+                    to: to.encode(),
+                    amount: *amount,
+                }])
+            }
+            LegExecution::X3 { program } => {
+                let writes = pallet_x3_kernel::Pallet::<Runtime>::execute_x3_program(
+                    context, executor, program, bundle,
+                )?;
+                Ok(writes
+                    .into_iter()
+                    .map(|write| JournalEntry::X3Slot {
+                        key: write.key,
+                        old: write.old_value,
+                        new: write.new_value,
+                    })
+                    .collect())
+            }
+        }
+    }
+
+    fn revert(
+        bundle: H256,
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), pallet_x3_atomic_kernel::vm_revert::RevertError> {
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        use pallet_x3_atomic_kernel::vm_revert::RevertError;
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        let failed = |reason: &str| RevertError::RevertFailed {
+            reason: reason.as_bytes().to_vec(),
+        };
+        Self::all_or_nothing(entries.iter().rev(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset,
+                from,
+                to,
+                amount,
+            } => {
+                let (from, _) = Self::accounts(from, to).ok_or(RevertError::InvalidStateDiff)?;
+                KernelCanonicalLedger::ledger_transfer(
+                    *asset,
+                    &Self::escrow(bundle),
+                    &from,
+                    *amount,
+                )
+                .map_err(|_| failed("the escrow does not hold the leg's funds"))
+            }
+            JournalEntry::X3Slot { key, old, new } => {
+                // The slot is held for the bundle, so nothing else wrote it; the check guards
+                // against a journal that does not describe this chain's state.
+                if pallet_x3_kernel::X3ContractStorage::<Runtime>::get(key) != *new {
+                    return Err(failed("the slot does not hold the leg's value"));
+                }
+                match old {
+                    Some(value) => {
+                        pallet_x3_kernel::X3ContractStorage::<Runtime>::insert(key, value)
+                    }
+                    None => pallet_x3_kernel::X3ContractStorage::<Runtime>::remove(key),
+                }
+                pallet_x3_kernel::Pallet::<Runtime>::release_x3_slot(bundle, *key)
+                    .map_err(|_| failed("the slot is not held for the bundle"))
+            }
+        })
+        .map_err(|refused| {
+            refused.unwrap_or(RevertError::RevertFailed {
+                reason: b"storage layer".to_vec(),
+            })
+        })
+    }
+
+    fn commit(
+        bundle: H256,
+        entries: &[pallet_x3_atomic_kernel::chain_legs::JournalEntry],
+    ) -> Result<(), DispatchError> {
+        use pallet_x3_atomic_kernel::chain_legs::JournalEntry;
+        use x3_asset_kernel_types::traits::CanonicalLedgerTransfer;
+        Self::all_or_nothing(entries.iter(), |entry| match entry {
+            JournalEntry::LedgerEscrow {
+                asset,
+                from,
+                to,
+                amount,
+            } => {
+                let (_, to) = Self::accounts(from, to)
+                    .ok_or(DispatchError::Other("a journal account does not decode"))?;
+                KernelCanonicalLedger::ledger_transfer(*asset, &Self::escrow(bundle), &to, *amount)
+            }
+            JournalEntry::X3Slot { key, .. } => {
+                pallet_x3_kernel::Pallet::<Runtime>::release_x3_slot(bundle, *key)
+            }
+        })
+        .map_err(|refused| refused.unwrap_or(DispatchError::Other("journal commit refused")))
+    }
+
+    fn max_weight() -> Weight {
+        // The larger of the two leg kinds: an X3 program at the kernel's gas limit, or a transfer.
+        pallet_x3_kernel::Pallet::<Runtime>::x3_program_weight()
+            .max(<Runtime as frame_system::Config>::DbWeight::get().reads_writes(4, 2))
+    }
+
+    fn max_entry_weight() -> Weight {
+        // A ledger transfer (asset, both balances; both written) or a slot restore and release
+        // (value and hold read; both written).
+        <Runtime as frame_system::Config>::DbWeight::get().reads_writes(3, 2)
+    }
 }
 
 // ===== X3 Slash Configuration =====
@@ -3459,6 +4013,9 @@ parameter_types! {
 // Bridge trait impl: launchpad can call TokenFactory to create tokens
 pub struct LaunchpadTokenFactoryBridge;
 impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactoryBridge {
+    /// Launch the token through the factory with `creator` (the launch's custody) receiving the
+    /// supply, and return the ledger asset that holds it. A token without a ledger asset is
+    /// refused: the launchpad pays contributors and seeds the pool from ledger balances.
     fn create_token(
         creator: &AccountId,
         symbol: Vec<u8>,
@@ -3482,71 +4039,69 @@ impl pallet_x3_launchpad::TokenFactoryCreate<AccountId> for LaunchpadTokenFactor
             class: x3_asset_kernel_types::TokenClass::FixedSupply,
             enabled_domains: enabled,
         };
-        // Use the extrinsic directly with a signed origin from the creator
-        pallet_x3_token_factory::Pallet::<Runtime>::create_token(
-            frame_system::RawOrigin::Signed(creator.clone()).into(),
-            config,
-        )
-        .map(|_| {
-            // The token was just created via the Factory + Registry; derive its asset_id
-            // from the nonce. For simplicity, return the current nonce - 1 as the last
-            // created asset id. In production, store this in a tracking map.
-            let nonce = pallet_x3_token_factory::FactoryNonce::<Runtime>::get();
-            nonce.saturating_sub(1) as u32
-        })
+        let (_asset_id, ledger_asset) =
+            pallet_x3_token_factory::Pallet::<Runtime>::do_create_token(creator.clone(), config)?;
+        ledger_asset.ok_or(DispatchError::Other("the token has no ledger asset"))
     }
 }
 
-// Bridge trait impl: launchpad can call DEX to create AMM pools
+// Bridge trait impl: launchpad seeds a DEX pool of ledger assets from the launch's custody.
 #[cfg(not(feature = "mainnet-rc1"))]
 pub struct LaunchpadDexBridge;
 #[cfg(not(feature = "mainnet-rc1"))]
 impl pallet_x3_launchpad::DexPoolCreate<AccountId> for LaunchpadDexBridge {
     fn create_pool(creator: &AccountId, token_a: u32, token_b: u32) -> Result<u64, DispatchError> {
-        // Use the DEX create_pool extrinsic with standard 30 bps fee
-        let fee_bps = 30u32;
+        // Both sides are `CanonicalLedger` assets, named on the ledger's chain id so the dex can
+        // custody them.
         pallet_x3_dex::Pallet::<Runtime>::create_pool(
             frame_system::RawOrigin::Signed(creator.clone()).into(),
             x3_dex::TokenId {
-                chain_id: 0,
+                chain_id: DexLedgerChainId::get(),
                 asset_id: token_a as u128,
             },
             x3_dex::TokenId {
-                chain_id: 0,
+                chain_id: DexLedgerChainId::get(),
                 asset_id: token_b as u128,
             },
-            fee_bps,
-        )
-        .map(|_| {
-            // The pool was just created; derive pool_id from NextPoolId - 1
-            pallet_x3_dex::NextPoolId::<Runtime>::get().saturating_sub(1)
-        })
+            30,
+        )?;
+        // `NextPoolId` holds the id `create_pool` just assigned.
+        Ok(pallet_x3_dex::NextPoolId::<Runtime>::get())
     }
-}
 
-// Bridge trait impl: launchpad can call LP Locker to lock tokens
-#[cfg(not(feature = "mainnet-rc1"))]
-pub struct LaunchpadLpLockerBridge;
-#[cfg(not(feature = "mainnet-rc1"))]
-impl pallet_x3_launchpad::LpLockCreate<AccountId, BlockNumber> for LaunchpadLpLockerBridge {
-    fn lock_lp_for(
-        owner: &AccountId,
+    fn add_liquidity(
+        provider: &AccountId,
         pool_id: u64,
-        lp_amount: u128,
-        unlock_at_block: BlockNumber,
-    ) -> frame_support::dispatch::DispatchResult {
-        pallet_x3_lp_locker::Pallet::<Runtime>::lock_lp(
-            frame_system::RawOrigin::Signed(owner.clone()).into(),
+        amount_a: u128,
+        amount_b: u128,
+    ) -> Result<u64, DispatchError> {
+        pallet_x3_dex::Pallet::<Runtime>::add_liquidity(
+            frame_system::RawOrigin::Signed(provider.clone()).into(),
             pool_id,
-            lp_amount,
-            unlock_at_block,
-        )
+            amount_a,
+            amount_b,
+            amount_a,
+            amount_b,
+        )?;
+        // The position `add_liquidity` just opened.
+        Ok(pallet_x3_dex::NextPositionId::<Runtime>::get().saturating_sub(1))
+    }
+
+    fn transfer_position(
+        position_id: u64,
+        from: &AccountId,
+        to: &AccountId,
+    ) -> frame_support::dispatch::DispatchResult {
+        pallet_x3_dex::Pallet::<Runtime>::transfer_position(position_id, from, to)
     }
 }
 
 parameter_types! {
     /// Asset ID of the quote token used in launchpad DEX pools (X3 native).
     pub const LaunchpadQuoteAssetId: u32 = 0;
+    pub const LaunchpadPalletId: PalletId = PalletId(*b"x3/lnchp");
+    /// Basis points of a launch's raise that seed its DEX pool at graduation.
+    pub const LaunchpadLiquidityBps: u16 = 5_000;
 }
 
 #[cfg(not(feature = "mainnet-rc1"))]
@@ -3558,7 +4113,11 @@ impl pallet_x3_launchpad::Config for Runtime {
     type MaxLaunchDurationBlocks = LaunchpadMaxDurationBlocks;
     type TokenFactory = LaunchpadTokenFactoryBridge;
     type Dex = LaunchpadDexBridge;
-    type LpLocker = LaunchpadLpLockerBridge;
+    // A launch's funds, tokens and locked LP position live on the kernel's ledger in a custody
+    // account derived from `LaunchpadPalletId`; half of what it raises seeds the pool.
+    type Ledger = KernelCanonicalLedger;
+    type PalletId = LaunchpadPalletId;
+    type LiquidityBps = LaunchpadLiquidityBps;
     type QuoteAssetId = LaunchpadQuoteAssetId;
     // `pallets/x3-launchpad/src/weights.rs` exists but is not a module of the pallet (`lib.rs`
     // declares no `mod weights;` and defines its own `WeightInfo` trait inside `#[pallet::config]`),
@@ -3627,6 +4186,9 @@ impl pallet_x3_flashloan::Config for Runtime {
     type FeeBasisPoints = FlashLoanFeeBasisPoints;
     type MaxLoanFraction = FlashLoanMaxLoanFraction;
     type WeightInfo = pallet_x3_flashloan::weights::SubstrateWeight<Runtime>;
+    // Asset pools custody liquidity on `CanonicalLedger`; governance opens them.
+    type Ledger = KernelCanonicalLedger;
+    type AssetPoolOrigin = EnsureRootOrHalfCouncil;
 }
 
 // ===== SVM Runtime Configuration =====
