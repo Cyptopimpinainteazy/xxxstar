@@ -345,6 +345,34 @@ The stream reports what actually happened:
 - `response.failed` when the upstream errored after the headers were sent. An
   interrupted answer is never dressed up as a completed one.
 
+Non-streaming requests have no event stream to carry that, so `complete()` reads
+the same signals off the body and refuses them explicitly:
+
+- Chat Completions: any choice with `finish_reason: "length"` is a truncation.
+- Responses: a body with `status: "incomplete"` is a truncation, and the reason
+  from `incomplete_details` is kept.
+
+A truncation answers `502` with `type: "output_truncated"` and a message naming
+the bound the caller has to raise, e.g. *"The answer was cut off at the output
+bound (4096 tokens) by cut. Raise max_output_tokens and retry."*
+
+Truncation is a capacity limit, not provider ill-health, so it is deliberately
+**not** a `ValueError` and does not call `note_provider_failure`. Before this,
+the two halves were both wrong: a partial answer was booked as a `200` success,
+and an empty one — which is what thinking mode leaves when the allowance is spent
+on reasoning — was read as a malformed body, benched the provider for 60 s, and
+let the chain answer from a cheaper model with nothing indicating it had.
+
+Measured against the same truncating upstream, master versus this change:
+
+| upstream | master | this change |
+| --- | --- | --- |
+| partial content, `length` | `200` with the fragment | `502 output_truncated` |
+| empty content, `length` | `502 no_provider_succeeded`, `ValueError`, 60 s cooldown | `502 output_truncated`, no cooldown |
+
+A streaming Chat Completions client still sees `finish_reason: "length"` relayed
+unchanged, which is the OpenAI-standard signal and already visible at the client.
+
 `response.completed` carries the real `usage` and the model that answered
 (`deepseek-flash`, not the `x3-auto` alias the client sent).
 
