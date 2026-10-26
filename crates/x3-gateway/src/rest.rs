@@ -1736,6 +1736,40 @@ mod tests {
     };
 
     #[tokio::test]
+    async fn svm_proof_summary_does_not_treat_unverified_signatures_as_quorum() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
+            source_domain: 1,
+            slot: 100,
+            blockhash: [1u8; 32],
+            validator_signatures: vec![ValidatorAttestationWire {
+                validator_pubkey: [2u8; 32],
+                // Correct byte length is not an authenticated validator signature.
+                signature: vec![0u8; 64],
+            }],
+            required_signatures: 1,
+        }))
+        .await;
+        let Ok(Json(summary)) = result else {
+            panic!("summary should expose the count without asserting finality");
+        };
+        assert_eq!(summary.validator_attestations, 1);
+        assert!(!summary.meets_quorum, "unverified signatures cannot establish quorum");
+    }
+
+    #[tokio::test]
+    async fn svm_proof_summary_refuses_zero_signature_threshold() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
+            source_domain: 1,
+            slot: 100,
+            blockhash: [1u8; 32],
+            validator_signatures: vec![],
+            required_signatures: 0,
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[tokio::test]
     async fn evm_proof_summary_never_reports_unverified_quorum() {
         let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
             source_domain: 1,
