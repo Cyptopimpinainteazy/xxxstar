@@ -207,6 +207,34 @@ LOCK_ONLY_ADVISORIES = {
         "rsa 0.9.10, reached only through sqlx-mysql, which no crate in this workspace "
         "enables (stale lock entry). No target in deny.toml's [graph] builds it."
     ),
+    "RUSTSEC-2026-0344": (
+        "ruzstd 0.8.3 is reached only through smoldot's wasm-blob decoder, which is built "
+        "for the node's light client behind frame-benchmarking-cli and subxt-lightclient; "
+        "no target in deny.toml's [graph] pulls it. Accepted rather than fixed because the "
+        "patched 0.9.1 is held by smoldot, and bounded at the one call site that uses it: "
+        "smoldot decodes with BlockDecodingStrategy::UptoBytes(max_allowed), so the "
+        "decompression bomb is capped by the caller's output limit."
+    ),
+    "RUSTSEC-2026-0367": (
+        "zip 0.6.6 is reached only through svm-rs <- ethers-solc <- ethers 2.x, in "
+        "x3-bot and x3-foundry-core. No target in deny.toml's [graph] builds those "
+        "tooling crates. Accepted rather than fixed because the patched 9.0.0 is a "
+        "breaking major held by svm-rs; the exposure is that svm-rs extracts official "
+        "solc release archives fetched over HTTPS, and ethers-solc itself never calls "
+        "extract()."
+    ),
+    "RUSTSEC-2026-0368": (
+        "zip 0.6.6, same svm-rs <- ethers-solc <- ethers 2.x path and the same absence "
+        "from deny.toml's [graph]. The symlink-escape defect needs extract() on an "
+        "attacker-controlled archive; the only extraction here is of solc release "
+        "archives over HTTPS."
+    ),
+    "RUSTSEC-2026-0369": (
+        "zip 0.6.6, same svm-rs <- ethers-solc <- ethers 2.x path and the same absence "
+        "from deny.toml's [graph]. Permissions are applied through a symlink only during "
+        "extract() of an attacker-controlled archive; the solc download is the sole "
+        "extraction path."
+    ),
 }
 
 
