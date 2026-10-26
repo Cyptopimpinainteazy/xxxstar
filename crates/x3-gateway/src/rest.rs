@@ -1703,6 +1703,42 @@ mod tests {
         BenchmarkWorkloadProfile,
     };
 
+    #[tokio::test]
+    async fn evm_proof_summary_never_reports_unverified_quorum() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
+            source_domain: 1,
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: vec![1, 2, 3],
+            expected_recipient: vec![3u8; 32],
+            expected_amount: "25".to_string(),
+        }))
+        .await;
+        let Ok(Json(summary)) = result else {
+            panic!("well-shaped proof summary must not fail");
+        };
+        assert_eq!(summary.kind, "evm");
+        assert!(!summary.meets_quorum, "a shape check is not finalized receipt verification");
+    }
+
+    #[tokio::test]
+    async fn evm_proof_summary_refuses_empty_proof_evidence() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
+            source_domain: 1,
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: Vec::new(),
+            expected_recipient: vec![3u8; 32],
+            expected_amount: "25".to_string(),
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
     fn sample_report() -> BenchmarkReport {
         BenchmarkReport {
             report_id: "report-1".to_string(),
