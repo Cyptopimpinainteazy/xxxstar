@@ -2206,6 +2206,15 @@ class Router:
                     self.finish(reservation, agent)
                     self.note_provider_failure(name, "unexpected error")
                     raise
+            if truncated and not self.config.get("allow_truncated_failover", False):
+                # Stop here rather than substituting a provider that happens to
+                # fit inside the same bound. A smaller model can usually finish
+                # where a reasoning model ran out, so carrying on turns "the
+                # answer was cut off" into "a different, weaker model answered"
+                # — and the caller cannot tell which happened. An operator who
+                # prefers availability over that certainty sets
+                # `allow_truncated_failover` to true.
+                break
         if budget_refused:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
         if truncated:

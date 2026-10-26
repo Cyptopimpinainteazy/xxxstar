@@ -2962,6 +2962,9 @@ class TruncationTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         ScriptedProvider.requests = []
         ScriptedProvider.script = None
+        # `Provider` is shared with other test classes in this module; a snapshot
+        # is taken per test so an assertion about it cannot see their traffic.
+        Provider.requests = []
         self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedProvider)
         self.upstream.daemon_threads = True
         threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
@@ -3032,21 +3035,39 @@ class TruncationTests(unittest.TestCase):
         self.assertEqual(registry["cut"]["failures"], 1,
                          "the answer was not usable, so the measured success rate stays honest")
 
-    def test_truncation_fails_over_to_a_provider_that_can_finish(self):
+    def with_whole_provider(self):
+        """A second provider in the chain that would answer successfully."""
         other = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
         other.daemon_threads = True
         threading.Thread(target=other.serve_forever, daemon=True).start()
         self.addCleanup(other.server_close)
         self.addCleanup(other.shutdown)
-        self.chat_body("half an ans", "length")
         self.config["routes"]["routine"] = ["cut", "whole"]
         self.config["providers"]["whole"] = {
             "base_url": f"http://127.0.0.1:{other.server_port}/v1", "model": "whole"}
+        return other
+
+    def test_a_truncated_answer_is_not_substituted_by_a_cheaper_model(self):
+        """The defect this exists for: a weaker model finishing is not the answer."""
+        self.with_whole_provider()
+        self.chat_body("half an ans", "length")
+        before = len(Provider.requests)
         status, body = self.ask()
-        self.assertEqual(status, 200, "a provider that can finish still serves the request")
-        self.assertEqual(body["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(status, 502, "the caller is told, instead of being given another model's answer")
+        self.assertEqual(body["error"]["type"], "output_truncated")
+        self.assertEqual(len(Provider.requests), before,
+                         "the second provider must not be asked to finish a request that was cut off")
         self.assertEqual(self.router.provider_cooldown("cut"), 0,
-                         "failing over must not have benched the provider that truncated")
+                         "being cut off is a capacity limit, so this is not a bench either")
+
+    def test_an_operator_can_opt_into_failing_over_after_a_truncation(self):
+        self.with_whole_provider()
+        self.config["allow_truncated_failover"] = True
+        self.chat_body("half an ans", "length")
+        status, body = self.ask()
+        self.assertEqual(status, 200, "the opt-in restores the availability-first behaviour")
+        self.assertEqual(body["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(self.router.provider_cooldown("cut"), 0)
 
     def test_a_malformed_body_still_benches_the_provider(self):
         def respond(handler, body):
