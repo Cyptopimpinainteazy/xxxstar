@@ -36,6 +36,7 @@ class RpcTests(unittest.TestCase):
             "chain_getHeader": {"number": "0x10"},
             "chain_getFinalizedHead": "0xfinal",
             "chain_getBlockHash": "0xgenesis",
+            "system_localPeerId": "peer-node0",
         }
         with patch.object(checker, "rpc", side_effect=lambda url, method, timeout, params=None: responses[method]):
             with patch.object(checker.urllib.request, "urlopen") as opener:
@@ -49,9 +50,9 @@ class ConsensusInvariantTests(unittest.TestCase):
     def records(self):
         before = [
             {"url": "node0", "genesis_hash": "0xgenesis", "peers": 1, "isSyncing": False,
-             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold"},
+             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold", "peer_id": "peer-node0"},
             {"url": "node1", "genesis_hash": "0xgenesis", "peers": 1, "isSyncing": False,
-             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold"},
+             "best_number": 14, "finalized_number": 10, "finalized_hash": "0xold", "peer_id": "peer-node1"},
         ]
         after = [{**n, "best_number": 16, "finalized_number": 11,
                   "finalized_hash": "0xnew"} for n in before]
@@ -60,6 +61,26 @@ class ConsensusInvariantTests(unittest.TestCase):
     def query(self, url, method, timeout, params):
         # Historical finalized hashes remain immutable, despite newer finality.
         return "0xold" if params == [10] else "0xnew"
+
+    def test_duplicate_rpc_peer_identity_is_rejected(self):
+        before, after = self.records()
+        # Different ports can forward to the same peer; they are not two validators.
+        before[1]["peer_id"] = before[0]["peer_id"]
+        after[1]["peer_id"] = after[0]["peer_id"]
+        errors = checker.validate_consensus(before, after, ["node0", "node1"], 1, 1, self.query)
+        self.assertTrue(any("duplicate node peer identities" in e for e in errors), errors)
+
+    def test_peer_identity_change_between_samples_is_rejected(self):
+        before, after = self.records()
+        after[1]["peer_id"] = "restarted-with-different-key"
+        errors = checker.validate_consensus(before, after, ["node0", "node1"], 1, 1, self.query)
+        self.assertTrue(any("peer identity changed" in e for e in errors), errors)
+
+    def test_missing_peer_identity_is_rejected(self):
+        before, after = self.records()
+        before[0].pop("peer_id")
+        errors = checker.validate_consensus(before, after, ["node0", "node1"], 1, 1, self.query)
+        self.assertTrue(any("missing node peer identity" in e for e in errors), errors)
 
     def test_progressing_consensus_accepts_stable_finality(self):
         before, after = self.records()
