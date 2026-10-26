@@ -444,9 +444,13 @@ async fn post_relayer_proof_summary(
             validator_signatures,
             required_signatures,
         } => {
+            if required_signatures == 0 {
+                return Err(GatewayError::BadRequest(
+                    "Solana required signatures must be positive".into(),
+                ));
+            }
             let attestations = validator_signatures.len();
             let validators = into_validator_signatures(&validator_signatures)?;
-            let meets_quorum = (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
             // this deserialization would have failed already.
@@ -462,7 +466,9 @@ async fn post_relayer_proof_summary(
                 proof_id_hex: hex::encode(blockhash),
                 validator_attestations: attestations,
                 required_signatures,
-                meets_quorum,
+                // A well-shaped 64-byte blob is not a verified signature,
+                // nor does this endpoint check validator committee membership.
+                meets_quorum: false,
                 chain_kind: "solana",
             }))
         }
