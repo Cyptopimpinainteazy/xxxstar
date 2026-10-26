@@ -373,6 +373,15 @@ Measured against the same truncating upstream, master versus this change:
 A streaming Chat Completions client still sees `finish_reason: "length"` relayed
 unchanged, which is the OpenAI-standard signal and already visible at the client.
 
+**Truncation is terminal by default.** The chain does not continue to the next
+provider after one truncates. A smaller model often fits where a reasoning model
+ran out, so continuing would serve "a different, weaker model answered" under the
+caller's original request, and the caller cannot tell which happened — the exact
+silent downgrade this endpoint exists to avoid. Set
+`allow_truncated_failover: true` in the router config to restore
+availability-first behaviour; the truncating provider is still not benched either
+way, because a capacity limit is not ill-health.
+
 `response.completed` carries the real `usage` and the model that answered
 (`deepseek-flash`, not the `x3-auto` alias the client sent).
 
