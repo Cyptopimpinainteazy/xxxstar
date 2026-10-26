@@ -1,7 +1,7 @@
 {
   "evidence_version": 1,
   "captured_at": "2026-10-26",
-  "candidate_commit": "40208f9b0",
+  "candidate_commit": "cdee9080e",
   "repository": "Cyptopimpinainteazy/xxxstar",
   "branch": "codex/mainnet-p0-integration-20261025",
   "scope": "Ethereum lock-mint and burn-release production wiring",
@@ -43,7 +43,7 @@
     {
       "command": "bash scripts/update-runtime-hashes.sh",
       "result": "PASS",
-      "detail": "Two from-scratch srtool builds agreed on x3-chain-25 compact and compressed artifacts."
+      "detail": "Two from-scratch srtool builds against cdee9080e agreed on x3-chain-25 compact and compressed artifacts."
     },
     {
       "command": "python3 scripts/feature_matrix.py check",

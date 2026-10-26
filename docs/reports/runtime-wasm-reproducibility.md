@@ -698,14 +698,13 @@ alters the runtime, so the record and the code land together.
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
 
-* `40208f9b0` (record anchor; the attested runtime includes the immediately following
-  lock-mint/burn-release change) — **verified gateway deposits now mint and burns now debit the
-  wrapped ledger atomically.** The gateway's operational credit and user burn calls both cross a
-  runtime-configured `DepositMinter`; the production implementation binds the route chain id, X3
-  asset id, signed or proof-bound account, amount and the full 32-byte proof/withdrawal id before
-  changing wrapped balances. Mint and burn failures roll the gateway status, pending counter and
-  collateral check back with the failed dispatch. Two new replay maps prevent proof-id mint and
-  withdrawal-id burn reuse. `spec_version` moves to 25. Two from-scratch srtool builds agreed:
+* `cdee9080e` — **verified gateway deposits now mint and burns now debit the wrapped ledger
+  atomically.** The gateway's operational credit and user burn calls both cross a runtime-configured
+  `DepositMinter`; the production implementation binds the route chain id, X3 asset id, signed or
+  proof-bound account, amount and the full 32-byte proof/withdrawal id before changing wrapped
+  balances. Mint and burn failures roll the gateway status, pending counter and collateral check
+  back with the failed dispatch. Two new replay maps prevent proof-id mint and withdrawal-id burn
+  reuse. `spec_version` moves to 25. Two from-scratch srtool builds against this commit agreed:
   compact 10,204,053 bytes
   (`0x2edaedfaa1880e088b9e21a2cdfc9a2a77774d679ce41db4830591366baa2406`) and compressed
   1,783,573 bytes
