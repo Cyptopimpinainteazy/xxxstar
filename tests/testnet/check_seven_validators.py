@@ -28,9 +28,12 @@ def snapshot(url, timeout):
     if not isinstance(body, dict) or body.get("error") is not None or not isinstance(body.get("result"), dict):
         raise RuntimeError("finalized header unavailable")
     genesis_hash = rpc(url, "chain_getBlockHash", timeout, [0])
+    # Guard against seven different RPC ports forwarding to the same peer.
+    peer_id = rpc(url, "system_localPeerId", timeout)
     return {
         "url": url,
         "genesis_hash": genesis_hash,
+        "peer_id": peer_id,
         "peers": health.get("peers"),
         "isSyncing": health.get("isSyncing"),
         "best_number": int(head["number"], 16),
@@ -46,6 +49,18 @@ def validate_consensus(before, after, urls, timeout, min_peers, query=rpc):
         return ["not all RPC endpoints responded"]
     if len({n["genesis_hash"] for n in before + after}) != 1:
         errors.append("genesis mismatch across samples")
+    if any(
+        not isinstance(n.get("peer_id"), str) or not n["peer_id"].strip()
+        for n in before + after
+    ):
+        errors.append("missing node peer identity")
+    else:
+        for label, nodes in (("before", before), ("after", after)):
+            if len({n["peer_id"] for n in nodes}) != len(urls):
+                errors.append(f"{label}: duplicate node peer identities")
+        for prior, current in zip(before, after):
+            if prior["peer_id"] != current["peer_id"]:
+                errors.append(f"{current['url']}: peer identity changed between samples")
     for prior, current in zip(before, after):
         url = current["url"]
         if prior["url"] != url:
