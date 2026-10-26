@@ -1,6 +1,34 @@
 {
   "_comment": "npm advisories this project has looked at and accepted. Written by scripts/check-npm-audit.py --update. critical and high findings can never appear here -- the gate fails on them unconditionally. An entry that stops being reported fails too, so the file cannot outlive the exposure it describes. Every entry was measured, not assumed: see .ai/reports/npm-audit-20260925.md.",
   "allowed": {
+    "apps/explorer": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/inferstructor-dashboard": {
+      "@vitest/mocker": "moderate",
+      "@vitest/ui": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/x3-desktop": {
+      "@vitest/coverage-v8": "moderate",
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/x3-studio": {
+      "@vitest/mocker": "moderate"
+    },
+    "infra-structure/services/blockchain-tps": {
+      "nodemailer": "moderate"
+    },
+    "packages/atomic-swap-sdk": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "packages/blockchain-connector": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
     "packages/polkawallet-bridge-adapter": {
       "@acala-network/eth-providers": "low",
       "@acala-network/eth-transactions": "low",
@@ -18,12 +46,6 @@
       "@ethersproject/transactions": "low",
       "@ethersproject/wallet": "low",
       "@ethersproject/wordlists": "low",
-      "@istanbuljs/load-nyc-config": "moderate",
-      "@jest/core": "moderate",
-      "@jest/expect": "moderate",
-      "@jest/globals": "moderate",
-      "@jest/reporters": "moderate",
-      "@jest/transform": "moderate",
       "@polkadot/apps-config": "low",
       "@polkadot/keyring": "low",
       "@polkadot/metadata": "low",
@@ -31,45 +53,12 @@
       "@polkadot/types-known": "low",
       "@polkadot/util-crypto": "low",
       "@polkawallet/bridge": "low",
-      "argparse": "moderate",
-      "babel-jest": "moderate",
-      "babel-plugin-istanbul": "moderate",
       "elliptic": "low",
       "ethers": "low",
-      "jest": "moderate",
-      "jest-circus": "moderate",
-      "jest-cli": "moderate",
-      "jest-config": "moderate",
-      "jest-resolve-dependencies": "moderate",
-      "jest-runner": "moderate",
-      "jest-runtime": "moderate",
-      "jest-snapshot": "moderate",
-      "js-yaml": "moderate",
-      "pontem-types-bundle": "low",
-      "sprintf-js": "moderate",
-      "ts-jest": "moderate"
+      "pontem-types-bundle": "low"
     },
-    "tests/wallet-integration": {
-      "@istanbuljs/load-nyc-config": "moderate",
-      "@jest/core": "moderate",
-      "@jest/expect": "moderate",
-      "@jest/globals": "moderate",
-      "@jest/reporters": "moderate",
-      "@jest/transform": "moderate",
-      "argparse": "moderate",
-      "babel-jest": "moderate",
-      "babel-plugin-istanbul": "moderate",
-      "jest": "moderate",
-      "jest-circus": "moderate",
-      "jest-cli": "moderate",
-      "jest-config": "moderate",
-      "jest-resolve-dependencies": "moderate",
-      "jest-runner": "moderate",
-      "jest-runtime": "moderate",
-      "jest-snapshot": "moderate",
-      "js-yaml": "moderate",
-      "sprintf-js": "moderate",
-      "ts-jest": "moderate"
+    "packages/polkawallet-plugin": {
+      "fast-uri": "moderate"
     }
   }
 }
