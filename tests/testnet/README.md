@@ -12,6 +12,18 @@ python3 tests/testnet/check_seven_validators.py --nodes 7 --settle-seconds 12 --
 
 The default RPC endpoints are http://127.0.0.1:9950 through :9956. Use `--host` and `--base-port` for a different topology. For validators on separate machines, use an SSH tunnel or run the checker from a secured management host with appropriate RPC routing. Do not expose unsafe RPC publicly.
 
+## RPC node identity requirement
+
+The checker calls `system_localPeerId` on each **management-only** RPC endpoint and
+requires seven distinct, nonempty peer identities that remain stable across
+sampling. This rejects multiple ports proxying the same node. If the RPC method
+is unavailable, the admission check fails closed; do not expose unsafe RPC
+methods to the public internet merely to make the checker pass.
+
+Distinct P2P peers are **not** proof of seven independent BABE/GRANDPA session
+authority keys. Confirm the on-chain validator/session authority set separately
+and retain signed chain-spec, genesis, finality and fleet evidence.
+
 ## Assertions
 
 - Every configured endpoint answers RPC.
