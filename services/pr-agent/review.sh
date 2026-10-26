@@ -182,6 +182,17 @@ elif [ "$via_router" = 1 ]; then
   # Same reason as --local: a PR-Agent fallback would reach a provider directly
   # and escape the router's accounting.
   export CONFIG__FALLBACK_MODELS='[]'
+  # DeepSeek runs thinking mode by default and its reasoning tokens count
+  # against the output allowance. With no bound set the provider's own default
+  # applies, the reasoning can consume all of it, the response arrives with no
+  # assistant message, and the router reports the provider as failed and
+  # silently serves the review from a free local model.
+  # `config.max_output_tokens` is the key litellm_ai_handler reads
+  # (_configured_max_output_tokens); `config.max_tokens` only exists under
+  # [openrouter], and `config.max_model_tokens` is the total-token limit used to
+  # fit the prompt, so neither raises this bound. Values below 4096 are raised
+  # to 4096 by PR-Agent.
+  overrides+=("--config.max_output_tokens=${PR_AGENT_ROUTER_MAX_TOKENS:-16000}")
 elif [ -n "$model_override" ]; then
   overrides+=("--config.model=$model_override")
 fi
