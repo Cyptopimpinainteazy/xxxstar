@@ -429,7 +429,12 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
     // leg; a leg runs only the execution it committed to), so its encoding changed and
     // `transaction_version` goes to 2.
-    spec_version: 24,
+    // 25: `credit_x3_representation` now completes the verified lock-mint path by
+    // calling the runtime's wrapped-asset minter atomically. The mint binds the route's
+    // numeric chain, X3 asset, 32-byte beneficiary, amount and full gateway proof id;
+    // a mint refusal rolls the transfer status back. One new wrapped-storage map, so no
+    // migration. No existing call encoding changed.
+    spec_version: 25,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 2,
@@ -3328,6 +3333,89 @@ parameter_types! {
     pub const X3CrosschainDailyWindow: u64 = 14_400;
 }
 
+/// Couples the governed gateway's verified deposit to the wrapped-asset
+/// ledger. The gateway invokes this only after external proof verification,
+/// replay checks, and route limits have passed.
+pub struct GatewayDepositMinter;
+
+impl pallet_x3_crosschain_gateway::DepositMinter for GatewayDepositMinter {
+    fn credit_verified_deposit(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        recipient: &[u8],
+        amount: u128,
+        proof_id: [u8; 32],
+    ) -> sp_runtime::DispatchResult {
+        let beneficiary: [u8; 32] = recipient
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        pallet_x3_wrapped::Pallet::<Runtime>::credit_verified_deposit(
+            chain_id,
+            asset_id,
+            AccountId::from(beneficiary),
+            amount,
+            proof_id,
+        )
+    }
+
+    fn burn_verified_withdrawal(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        amount: u128,
+        withdrawal_id: [u8; 32],
+    ) -> sp_runtime::DispatchResult {
+        let account: [u8; 32] = account
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        pallet_x3_wrapped::Pallet::<Runtime>::burn_verified_withdrawal(
+            chain_id,
+            asset_id,
+            AccountId::from(account),
+            amount,
+            withdrawal_id,
+        )
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn prepare_benchmark(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        seed_balance: u128,
+    ) -> sp_runtime::DispatchResult {
+        let account: [u8; 32] = account
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        if !pallet_x3_wrapped::RegisteredWrappedAssets::<Runtime>::contains_key(asset_id) {
+            pallet_x3_wrapped::RegisteredWrappedAssets::<Runtime>::insert(
+                asset_id,
+                pallet_x3_wrapped::WrappedAssetConfig {
+                    native_asset_id: asset_id,
+                    max_wrapped_supply: u128::MAX,
+                    governance_weight_bps: 10_000,
+                    bridge_fee_bps: 0,
+                    status: pallet_x3_wrapped::WrappedAssetStatus::Active,
+                },
+            );
+        }
+        if seed_balance > 0 {
+            let account = AccountId::from(account);
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::insert(
+                (chain_id, asset_id, &account),
+                seed_balance,
+            );
+            pallet_x3_wrapped::WrappedSupply::<Runtime>::mutate(chain_id, asset_id, |supply| {
+                *supply = supply.saturating_add(seed_balance)
+            });
+            pallet_x3_wrapped::TotalWrappedSupply::<Runtime>::mutate(|supply| {
+                *supply = supply.saturating_add(seed_balance);
+            });
+        }
+        Ok(())
+    }
+}
+
 impl pallet_x3_crosschain_gateway::Config for Runtime {
     type GovernanceOrigin =
         pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
@@ -3343,6 +3431,7 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     /// difficulty checked — is what a Bitcoin deposit's block must be on, at its best chain's
     /// depth.
     type BtcHeaderAnchor = SettlementEngineBtcAnchor;
+    type DepositMinter = GatewayDepositMinter;
     type WeightInfo = pallet_x3_crosschain_gateway::weights::SubstrateWeight<Runtime>;
 }
 

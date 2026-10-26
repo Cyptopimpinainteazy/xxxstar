@@ -737,21 +737,26 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 64,
+      "composite": 70,
       "confidence": "high",
       "evidence": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
         "crates/x3-verification-router/src/evm_receipt.rs",
         "crates/x3-relayer/src/evm_receipt_proof.rs",
-        "note: the 5-of-7 path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs",
+        "audit-artifacts/evidence/2026-10-26-ethereum-lock-mint-burn-release.json",
+        "note: the production deposit path verifies the EVM receipt through x3-verification-router, gates it through the governed gateway, and then mints through the wrapped-asset ledger; proof id, chain, asset, beneficiary, amount, supply cap and replay state are bound before the gateway reports X3Credited",
+        "note: the 5-of-7 model path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 while the public production path uses the gateway's receipt verifier"
       ],
       "id": "X3-XCHAIN-004",
-      "implemented": 80,
+      "implemented": 90,
       "launch_scope": "core",
-      "live_tested": "not a registered launch feature",
+      "live_tested": "GUARDED_TESTNET",
       "mainnet_ready": 45,
       "missing_work": [
-        "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
+        "**CLOSED 2026-10-26 \u2014 verified EVM deposits now mint the X3 representation atomically.** The gateway's `credit_x3_representation` calls the runtime-configured `DepositMinter`; the production implementation decodes the proof-bound 32-byte X3 beneficiary, calls `pallet-x3-wrapped`, and refuses to mark the transfer credited unless the wrapped asset, cap, balance, supply, and full 32-byte proof-id replay checks pass. A mint refusal rolls the status update back. The standalone `EthereumBridge` remains a model with no public-chain caller; the production path is now the gateway/verifier/wrapped/runtime chain above.",
         "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
         "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
         "No external audit"
@@ -760,15 +765,18 @@
       "paths": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
         "crates/x3-verification-router/src/evm_receipt.rs",
-        "crates/x3-relayer/src/evm_receipt_proof.rs"
+        "crates/x3-relayer/src/evm_receipt_proof.rs",
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 80,
+      "tests": "6 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -869,19 +877,22 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 75,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "crates/x3-crosschain-gateway/src/lib.rs",
         "pallets/x3-crosschain-gateway/src/lib.rs",
-        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, and refuses unregistered/disabled routes; the off-chain crate mirrors the lifecycle with a circuit breaker, insurance and risk engine"
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs",
+        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and now completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter"
       ],
       "id": "X3-XCHAIN-008",
-      "implemented": 80,
+      "implemented": 85,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 70,
       "missing_work": [
+        "**CLOSED 2026-10-26 \u2014 `credit_x3_representation` now mints instead of only emitting an event.** The runtime binds `DepositMinter` to the wrapped-asset pallet; the mint uses a full proof-id replay guard and rolls back with the gateway's status on any refusal.",
         "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
         "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
         "The withdrawal-id change (XOR \u2192 Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
@@ -898,8 +909,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 75,
-      "tests": "tested score 75% (no named test list on this row)"
+      "tested": 80,
+      "tests": "tested score 80% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4995,14 +5006,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "cc5dfc4f77acf1e36937cad2b6a079316e0861aac522f124e36c531c1f5c8aa9",
+    "source_digest": "828a8493b86062fbf8a84bfb0ce1e16c285055d9d963998c725a001777b57ce8",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "4ee68bbeb7cf8371b5c8ac4b17ef0d33a5f67841462e3fcc974848c8667807c3",
+      "feature-matrix/cross-chain.toml": "53c5d7f8af70113b230b8bd85a66bfc2e8028514b7cb2645adc07a53581d8547",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",

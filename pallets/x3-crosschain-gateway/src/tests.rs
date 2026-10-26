@@ -3,7 +3,9 @@ use crate::pallet::Error;
 use crate::{
     ExternalAssetRef, ExternalChainId, GatewayMode, GatewayTransferStatus, Pallet, RouteConfig,
 };
+use codec::Encode;
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::DispatchError;
 
 // ── SVM validator-set helpers ──────────────────────────────────────────────
 
@@ -1133,6 +1135,145 @@ fn credit_x3_representation_twice_fails() {
             X3CrosschainGateway::credit_x3_representation(RuntimeOrigin::signed(1), [1u8; 32]),
             Error::<Test>::InvalidTransferStatus
         );
+    });
+}
+
+#[test]
+fn credit_invokes_the_configured_mint_with_the_verified_binding() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let proof_id = [1u8; 32];
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [1u8; 32],
+            deposit_proof(proof_id, 100),
+        ));
+        assert!(take_credit_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::credit_x3_representation(
+            RuntimeOrigin::signed(1),
+            proof_id,
+        ));
+
+        assert_eq!(
+            take_credit_calls(),
+            vec![(
+                ExternalChainId::BaseSepolia
+                    .wrapped_chain_id()
+                    .expect("base sepolia id"),
+                [9u8; 32],
+                b"0xRECIPIENT".to_vec(),
+                100,
+                proof_id,
+            )]
+        );
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::X3Credited
+        );
+    });
+}
+
+#[test]
+fn mint_failure_rolls_the_credit_status_back_and_can_be_retried() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let proof_id = [1u8; 32];
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [1u8; 32],
+            deposit_proof(proof_id, 100),
+        ));
+
+        fail_next_credit();
+        assert_noop!(
+            X3CrosschainGateway::credit_x3_representation(RuntimeOrigin::signed(1), proof_id,),
+            DispatchError::Other("test deposit minter refused")
+        );
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::Verified
+        );
+        assert!(take_credit_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::credit_x3_representation(
+            RuntimeOrigin::signed(1),
+            proof_id,
+        ));
+        assert_eq!(take_credit_calls().len(), 1);
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::X3Credited
+        );
+    });
+}
+
+#[test]
+fn burn_invokes_the_configured_ledger_with_the_signed_account_and_withdrawal() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+
+        let withdrawal_id = request_burn_withdrawal(40);
+        assert_eq!(
+            take_burn_calls(),
+            vec![(
+                ExternalChainId::BaseSepolia
+                    .wrapped_chain_id()
+                    .expect("base sepolia id"),
+                [9u8; 32],
+                2u64.encode(),
+                40,
+                withdrawal_id,
+            )]
+        );
+    });
+}
+
+#[test]
+fn burn_failure_does_not_mark_the_withdrawal_burned_and_can_be_retried() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+        let withdrawal_id = expected_withdrawal_id(40);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+
+        fail_next_burn();
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), withdrawal_id,),
+            DispatchError::Other("test deposit minter refused burn")
+        );
+        assert!(
+            !crate::Withdrawals::<Test>::get(withdrawal_id)
+                .expect("withdrawal")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 0);
+        assert!(take_burn_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            withdrawal_id,
+        ));
+        assert_eq!(take_burn_calls().len(), 1);
+        assert!(
+            crate::Withdrawals::<Test>::get(withdrawal_id)
+                .expect("withdrawal")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 40);
     });
 }
 

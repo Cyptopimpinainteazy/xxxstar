@@ -18,6 +18,7 @@
 //! half the council, while the mock uses root and any signed account.
 
 use super::*;
+use codec::Encode;
 use frame_benchmarking::v2::*;
 use frame_support::traits::{ConstU32, EnsureOrigin};
 use frame_support::BoundedVec;
@@ -62,7 +63,7 @@ mod benchmarks {
     }
 
     fn recipient() -> Result<BoundedVec<u8, ConstU32<128>>, BenchmarkError> {
-        BoundedVec::try_from(b"0xRECIPIENT".to_vec()).map_err(|_| BenchmarkError::Weightless)
+        BoundedVec::try_from([0xCC; 32].to_vec()).map_err(|_| BenchmarkError::Weightless)
     }
 
     fn solana_stakes() -> Result<BoundedVec<SolanaStakeEntry, MaxSvmValidators>, BenchmarkError> {
@@ -234,6 +235,15 @@ mod benchmarks {
     /// A verified transfer, which `credit_x3_representation` requires.
     fn setup_verified_transfer<T: Config>() -> Result<(), BenchmarkError> {
         setup_route::<T>()?;
+        T::DepositMinter::prepare_benchmark(
+            SOLANA_CHAIN
+                .wrapped_chain_id()
+                .ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &recipient()?,
+            0,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
         Pallet::<T>::submit_deposit_proof(relayer::<T>()?, ROUTE_ID, solana_deposit_proof::<T>(1)?)
             .map_err(|_| BenchmarkError::Weightless)
     }
@@ -258,6 +268,13 @@ mod benchmarks {
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
         let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        T::DepositMinter::prepare_benchmark(
+            CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &who.encode(),
+            WITHDRAW_AMOUNT,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
         Pallet::<T>::burn_x3_representation(RawOrigin::Signed(who).into(), id)
             .map_err(|_| BenchmarkError::Weightless)?;
         Ok(id)
@@ -357,6 +374,13 @@ mod benchmarks {
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
         let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        T::DepositMinter::prepare_benchmark(
+            CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &who.encode(),
+            WITHDRAW_AMOUNT,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
 
         #[extrinsic_call]
         burn_x3_representation(RawOrigin::Signed(who), id);

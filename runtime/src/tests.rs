@@ -13,6 +13,121 @@ use pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
 use pallet_x3_settlement_engine::types::{AssetSpec, ExternalChainId, TokenId};
 use sp_runtime::DispatchError;
 
+#[test]
+fn gateway_deposit_minter_credits_wrapped_balance_once_and_binds_the_full_proof_id() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        let asset_id = [0x42; 32];
+        let beneficiary = account(7);
+        let chain_id = pallet_x3_crosschain_gateway::ExternalChainId::EthereumMainnet
+            .wrapped_chain_id()
+            .expect("ethereum chain id");
+        let proof_id = [0x55; 32];
+
+        assert_ok!(X3Wrapped::register_wrapped_asset(
+            RuntimeOrigin::root(),
+            asset_id,
+            pallet_x3_wrapped::WrappedAssetConfig {
+                native_asset_id: asset_id,
+                max_wrapped_supply: 1_000,
+                governance_weight_bps: 10_000,
+                bridge_fee_bps: 0,
+                status: pallet_x3_wrapped::WrappedAssetStatus::Active,
+            },
+        ));
+
+        assert_ok!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                100,
+                proof_id,
+            )
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            100
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedSupply::<Runtime>::get(chain_id, asset_id),
+            100
+        );
+
+        assert!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                1,
+                proof_id,
+            )
+            .is_err(),
+            "the full 32-byte proof id must prevent a second mint"
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            100
+        );
+
+        let withdrawal_id = [0x66; 32];
+        assert_ok!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::burn_verified_withdrawal(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                40,
+                withdrawal_id,
+            )
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            60
+        );
+        assert!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::burn_verified_withdrawal(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                1,
+                withdrawal_id,
+            )
+            .is_err(),
+            "a withdrawal id cannot burn twice"
+        );
+    });
+}
+
+#[test]
+fn gateway_deposit_minter_refuses_non_canonical_beneficiary_bytes() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        let error =
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                1,
+                [0x42; 32],
+                &[0x11; 31],
+                1,
+                [0x55; 32],
+            )
+            .expect_err("31-byte beneficiaries are not X3 accounts");
+        assert!(
+            matches!(error, DispatchError::Module(_)),
+            "the gateway's typed beneficiary refusal must reach the caller"
+        );
+    });
+}
+
 fn account(seed: u8) -> AccountId {
     AccountId::from([seed; 32])
 }

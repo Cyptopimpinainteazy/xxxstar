@@ -7,7 +7,7 @@ use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
-    BuildStorage,
+    BuildStorage, DispatchError, DispatchResult,
 };
 
 pub type AccountId = u64;
@@ -16,6 +16,73 @@ pub type _BlockNumber = u64;
 
 pub type _UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = system::mocking::MockBlock<Test>;
+pub type CreditCall = (u32, [u8; 32], Vec<u8>, u128, [u8; 32]);
+pub type BurnCall = (u32, [u8; 32], Vec<u8>, u128, [u8; 32]);
+
+thread_local! {
+    static CREDIT_CALLS: std::cell::RefCell<Vec<CreditCall>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static BURN_CALLS: std::cell::RefCell<Vec<BurnCall>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static FAIL_NEXT_CREDIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FAIL_NEXT_BURN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub struct TestDepositMinter;
+
+impl DepositMinter for TestDepositMinter {
+    fn credit_verified_deposit(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        recipient: &[u8],
+        amount: u128,
+        proof_id: [u8; 32],
+    ) -> DispatchResult {
+        if FAIL_NEXT_CREDIT.with(|flag| flag.replace(false)) {
+            return Err(DispatchError::Other("test deposit minter refused"));
+        }
+        CREDIT_CALLS.with(|calls| {
+            calls
+                .borrow_mut()
+                .push((chain_id, asset_id, recipient.to_vec(), amount, proof_id));
+        });
+        Ok(())
+    }
+
+    fn burn_verified_withdrawal(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        amount: u128,
+        withdrawal_id: [u8; 32],
+    ) -> DispatchResult {
+        if FAIL_NEXT_BURN.with(|flag| flag.replace(false)) {
+            return Err(DispatchError::Other("test deposit minter refused burn"));
+        }
+        BURN_CALLS.with(|calls| {
+            calls
+                .borrow_mut()
+                .push((chain_id, asset_id, account.to_vec(), amount, withdrawal_id));
+        });
+        Ok(())
+    }
+}
+
+pub fn take_credit_calls() -> Vec<CreditCall> {
+    CREDIT_CALLS.with(|calls| std::mem::take(&mut *calls.borrow_mut()))
+}
+
+pub fn fail_next_credit() {
+    FAIL_NEXT_CREDIT.with(|flag| flag.set(true));
+}
+
+pub fn take_burn_calls() -> Vec<BurnCall> {
+    BURN_CALLS.with(|calls| std::mem::take(&mut *calls.borrow_mut()))
+}
+
+pub fn fail_next_burn() {
+    FAIL_NEXT_BURN.with(|flag| flag.set(true));
+}
 
 construct_runtime!(
     pub enum Test
@@ -74,6 +141,7 @@ impl pallet_x3_crosschain_gateway::Config for Test {
     type DailyLimitWindowBlocks = DailyWindow;
     type EvmHeaderAnchor = MockEvmAnchor;
     type BtcHeaderAnchor = MockBtcAnchor;
+    type DepositMinter = TestDepositMinter;
     type WeightInfo = ();
 }
 
@@ -134,6 +202,10 @@ pub fn forget_attested_header() {
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
+    take_credit_calls();
+    take_burn_calls();
+    FAIL_NEXT_CREDIT.with(|flag| flag.set(false));
+    FAIL_NEXT_BURN.with(|flag| flag.set(false));
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();

@@ -698,6 +698,19 @@ alters the runtime, so the record and the code land together.
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
 
+* `40208f9b0` (record anchor; the attested runtime includes the immediately following
+  lock-mint/burn-release change) — **verified gateway deposits now mint and burns now debit the
+  wrapped ledger atomically.** The gateway's operational credit and user burn calls both cross a
+  runtime-configured `DepositMinter`; the production implementation binds the route chain id, X3
+  asset id, signed or proof-bound account, amount and the full 32-byte proof/withdrawal id before
+  changing wrapped balances. Mint and burn failures roll the gateway status, pending counter and
+  collateral check back with the failed dispatch. Two new replay maps prevent proof-id mint and
+  withdrawal-id burn reuse. `spec_version` moves to 25. Two from-scratch srtool builds agreed:
+  compact 10,204,053 bytes
+  (`0x2edaedfaa1880e088b9e21a2cdfc9a2a77774d679ce41db4830591366baa2406`) and compressed
+  1,783,573 bytes
+  (`0xcb6e3c22116ca52b53f85c1be14243ff13689dbd7eac88f3db9a3e1f5800f60e`).
+
 * `7332aa279` — **the guardian pallets are attested.** `x3-app-registry`, `x3-security-gate` and
   `x3-trust-gate` (with their weights) are wired into the runtime; the record's exemption for
   test-only files kept this from being demanded for the test edits on the way here. Two

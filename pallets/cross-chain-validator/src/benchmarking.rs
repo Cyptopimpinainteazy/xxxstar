@@ -5,7 +5,7 @@ use frame_benchmarking::{account, whitelisted_caller, BenchmarkError};
 use frame_support::traits::EnsureOrigin;
 use frame_system::RawOrigin;
 use sp_core::{ed25519, Pair, H256};
-use sp_std::vec;
+use sp_std::{vec, vec::Vec};
 
 const SEED: u32 = 0;
 
