@@ -409,6 +409,12 @@ pub enum RelayerProofRequest {
         state_root: [u8; 32],
         finalized_block: u64,
         proof_nonce: u32,
+        /// Canonical receipt proof bytes; presence is not proof of validity.
+        proof_payload: Vec<u8>,
+        /// Exact on-chain recipient bound by the deposit event.
+        expected_recipient: Vec<u8>,
+        /// String-encoded to preserve the full unsigned 128-bit value.
+        expected_amount: String,
     },
 }
 
@@ -466,20 +472,46 @@ async fn post_relayer_proof_summary(
             state_root,
             finalized_block,
             proof_nonce,
+            proof_payload,
+            expected_recipient,
+            expected_amount,
         } => {
+            let expected_amount = expected_amount
+                .parse::<u128>()
+                .map_err(|_| GatewayError::BadRequest("invalid EVM proof amount".into()))?;
+            if proof_payload.is_empty() || proof_payload.len() > 1_048_576 {
+                return Err(GatewayError::BadRequest(
+                    "EVM receipt proof must contain 1 to 1048576 bytes".into(),
+                ));
+            }
+            if expected_recipient.is_empty() || expected_recipient.len() > 128 {
+                return Err(GatewayError::BadRequest(
+                    "EVM recipient must contain 1 to 128 bytes".into(),
+                ));
+            }
+            if expected_amount == 0 || block_hash == [0u8; 32] || state_root == [0u8; 32] {
+                return Err(GatewayError::BadRequest(
+                    "EVM receipt amount, block hash and state root must be nonzero".into(),
+                ));
+            }
             let _proof = EvmProof {
                 source_domain,
                 block_hash,
                 state_root,
                 finalized_block,
                 proof_nonce,
+                proof_payload,
+                expected_recipient,
+                expected_amount,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "evm",
                 proof_id_hex: hex::encode(block_hash),
                 validator_attestations: 0,
                 required_signatures: 0,
-                meets_quorum: block_hash != [0u8; 32],
+                // This endpoint only checks shape. It does not independently
+                // authenticate finalized headers or receipt inclusion.
+                meets_quorum: false,
                 chain_kind: "evm",
             }))
         }
