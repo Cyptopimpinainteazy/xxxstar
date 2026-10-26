@@ -61,9 +61,9 @@ ignore = [
     "RUSTSEC-2026-0344",   # ruzstd 0.8.3
     "RUSTSEC-2026-0346",   # rustls 0.21.12
     "RUSTSEC-2026-0349",   # rustls 0.21.12
-    "RUSTSEC-2026-0367",   # zip 0.6.6
-    "RUSTSEC-2026-0368",   # zip 0.6.6
-    "RUSTSEC-2026-0369",   # zip 0.6.6
+    "RUSTSEC-2026-0367",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
+    "RUSTSEC-2026-0368",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
+    "RUSTSEC-2026-0369",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
     "RUSTSEC-2026-0381",   # webpki-roots 0.24.0
     "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7
 

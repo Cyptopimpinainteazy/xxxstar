@@ -352,6 +352,11 @@ GATES_FAST=(
   # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
   # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
   "advisory scope:python3 scripts/check-advisory-scope.py"
+  # The security fix spans two semver-incompatible zstd API lines and a
+  # Windows-only zip dependency. Audit proves the lock has no affected version;
+  # this gate proves the vendored replacements compile and retain their
+  # failure-mode regressions.
+  "vendored zstd patch regressions:bash scripts/ci/test-zstd-patches.sh"
   # Every KV of the EVM/SVM *external* surface has to be either proven against a real
   # testnet or explicitly closed. None can be proven here, so this checks the closure:
   # the gate in the code, the behavioural refusal test behind it, and the flag in

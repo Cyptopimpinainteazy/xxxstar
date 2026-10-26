@@ -212,15 +212,15 @@ LOCK_ONLY_ADVISORIES = {
         "target that builds it."
     ),
     "RUSTSEC-2026-0367": (
-        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "zip 0.6.7 is a stale lock entry; cargo tree finds no configured or all-feature "
         "target that builds it."
     ),
     "RUSTSEC-2026-0368": (
-        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "zip 0.6.7 is a stale lock entry; cargo tree finds no configured or all-feature "
         "target that builds it."
     ),
     "RUSTSEC-2026-0369": (
-        "zip 0.6.6 is a stale lock entry; cargo tree finds no configured or all-feature "
+        "zip 0.6.7 is a stale lock entry; cargo tree finds no configured or all-feature "
         "target that builds it."
     ),
 }
