@@ -28,11 +28,7 @@ use x3_lang_execution::{
 };
 
 // Keep the concrete route tuple named so the host's type contract is readable.
-type NativeRoute<T: Config> = (
-    <T as frame_system::Config>::AccountId,
-    T::AssetId,
-    T::AssetId,
-);
+type NativeRoute<AccountId, AssetId> = (AccountId, AssetId, AssetId);
 
 fn error(message: &str) -> HostError {
     HostError {
@@ -290,7 +286,7 @@ impl<T: Config> NativeHost<T> {
         venue: &str,
         from: &AssetKey,
         to: &AssetKey,
-    ) -> Result<NativeRoute<T>, HostError> {
+    ) -> Result<NativeRoute<T::AccountId, T::AssetId>, HostError> {
         let name =
             capability_name(venue.as_bytes().to_vec()).map_err(|_| error("invalid venue name"))?;
         let (account, a, b) =
