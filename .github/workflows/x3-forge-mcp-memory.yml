@@ -1,0 +1,31 @@
+name: X3 Forge MCP Memory
+
+on:
+  pull_request:
+    paths:
+      - 'tools/x3-forge/**'
+      - 'tools/x3-mcp/**'
+      - '.github/workflows/x3-forge-mcp-memory.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'tools/x3-forge/**'
+      - 'tools/x3-mcp/**'
+      - '.github/workflows/x3-forge-mcp-memory.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  forge-memory-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Unit/integration tests for repo brain adapters
+        run: python3 -m unittest discover -s tools/x3-mcp/tests -p 'test_*.py' -v
+      - name: Compile MCP Python modules
+        run: python3 -m compileall -q tools/x3-mcp/src/x3_mcp
