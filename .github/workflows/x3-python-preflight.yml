@@ -1,0 +1,52 @@
+name: X3 Python CI Preflight
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/local-ci.yml'
+      - '.github/workflows/x3-python-preflight.yml'
+      - 'requirements-dev.txt'
+      - 'scripts/check_ci_workflow_refs.py'
+      - 'tests/test_ci_python_preflight.py'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/local-ci.yml'
+      - '.github/workflows/x3-python-preflight.yml'
+      - 'requirements-dev.txt'
+      - 'scripts/check_ci_workflow_refs.py'
+      - 'tests/test_ci_python_preflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-python-preflight-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  isolated-python:
+    # Public repo: never run fork-supplied source on physical self-hosted workers.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Provision same requirements and venv as Local CI
+        run: |
+          set -euo pipefail
+          python3 -m venv "${RUNNER_TEMP}/x3-python-preflight"
+          "${RUNNER_TEMP}/x3-python-preflight/bin/python" -m pip install --disable-pip-version-check -r requirements-dev.txt
+          "${RUNNER_TEMP}/x3-python-preflight/bin/python" -m pytest --version
+          "${RUNNER_TEMP}/x3-python-preflight/bin/python" -c 'import yaml; print("PyYAML", yaml.__version__)'
+          echo "${RUNNER_TEMP}/x3-python-preflight/bin" >> "${GITHUB_PATH}"
+      - name: Assert CI Python isolation and dependencies
+        run: |
+          python3 -m unittest discover -s tests -p test_ci_python_preflight.py -v
+      - name: Execute workflow reference gate with provisioned interpreter
+        run: |
+          python3 scripts/check_ci_workflow_refs.py --quiet
