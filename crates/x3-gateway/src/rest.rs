@@ -1759,7 +1759,10 @@ mod tests {
             panic!("summary should expose the count without asserting finality");
         };
         assert_eq!(summary.validator_attestations, 1);
-        assert!(!summary.meets_quorum, "unverified signatures cannot establish quorum");
+        assert!(
+            !summary.meets_quorum,
+            "unverified signatures cannot establish quorum"
+        );
     }
 
     #[tokio::test]
@@ -1792,7 +1795,10 @@ mod tests {
             panic!("well-shaped proof summary must not fail");
         };
         assert_eq!(summary.kind, "evm");
-        assert!(!summary.meets_quorum, "a shape check is not finalized receipt verification");
+        assert!(
+            !summary.meets_quorum,
+            "a shape check is not finalized receipt verification"
+        );
     }
 
     #[tokio::test]
