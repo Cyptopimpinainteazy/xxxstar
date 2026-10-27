@@ -31,7 +31,9 @@ def valid_runs():
     return [
         {"id": i + 1, "run_attempt": 1, "path": item["path"],
          "head_sha": HEAD, "created_at": "2026-10-26T19:00:00Z",
-         "status": "completed", "conclusion": "success"}
+         "status": "completed", "conclusion": "success",
+         "jobs": [{"id": 1000 + i, "name": "gate-" + str(i),
+                   "head_sha": HEAD, "status": "completed", "conclusion": "success"}]}
         for i, item in enumerate(POLICY["required_workflows"])
     ]
 
@@ -126,6 +128,27 @@ class AdmissionTests(unittest.TestCase):
         runs = valid_runs()
         runs[0]["path"] = g.DEFAULT_REPO + "/.github/workflows/local-ci.yml@refs/heads/master"
         self.assertEqual(check(runs=runs)["checks"][0]["status"], "PASS")
+
+    def test_workflow_without_jobs_never_passes(self):
+        runs = valid_runs()
+        runs[0].pop("jobs")
+        self.assertEqual(check(runs=runs)["checks"][0]["status"], "NO_JOBS")
+
+    def test_workflow_with_only_skipped_jobs_never_passes(self):
+        runs = valid_runs()
+        runs[0]["jobs"][0]["conclusion"] = "skipped"
+        self.assertEqual(check(runs=runs)["checks"][0]["status"], "JOBS_NOT_GREEN")
+
+    def test_workflow_with_queued_job_never_passes(self):
+        runs = valid_runs()
+        runs[0]["jobs"][0]["status"] = "queued"
+        runs[0]["jobs"][0]["conclusion"] = None
+        self.assertEqual(check(runs=runs)["checks"][0]["status"], "JOBS_NOT_GREEN")
+
+    def test_job_from_other_commit_cannot_pass(self):
+        runs = valid_runs()
+        runs[0]["jobs"][0]["head_sha"] = OTHER
+        self.assertEqual(check(runs=runs)["checks"][0]["status"], "JOBS_NOT_GREEN")
 
     def test_offline_fixture_never_admits(self):
         report = check(source="fixture")
