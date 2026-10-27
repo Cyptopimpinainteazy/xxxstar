@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "purpose": "Reproducible file provenance for one X3 PUBLIC TESTNET integration candidate; not launch authorization",
-  "execution_parent_sha": "b0fe521a2760f17b850f33af137efb18c1790db8",
+  "execution_parent_sha": "d3becc58196b079740b32d97bae37028036a73bc",
   "required_upstream_security_commit": "754ad4687f8b227e776a7a639064d1499dd06682",
   "release_profile": "mainnet-rc1",
   "external_bridges_must_remain_disabled": true,
