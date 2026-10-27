@@ -785,7 +785,10 @@ fn a_block_number_task_executes_at_its_block() {
 
         System::set_block_number(50);
         assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
-        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Executed);
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Executed
+        );
     });
 }
 
