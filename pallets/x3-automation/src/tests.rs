@@ -704,3 +704,32 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         );
     });
 }
+
+#[test]
+fn event_condition_reads_the_production_event_storage() {
+    use parity_scale_codec::Encode;
+
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        // Emit a real runtime event by registering a first task.
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Manual,
+            Action::Noop,
+            1000
+        ));
+        let recorded = System::events().last().expect("registration emits an event").event.clone();
+        let topic = sp_io::hashing::blake2_256(&recorded.encode());
+
+        // The event condition must see the same records via storage in no_std builds.
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Event { topic },
+            Action::Noop,
+            1000
+        ));
+        let task_id = *Automation::account_tasks(1).last().expect("second task exists");
+        assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
+        assert!(Automation::receipt(task_id, 1).is_some());
+    });
+}
