@@ -403,6 +403,13 @@ pub mod pallet {
             let mut task = Tasks::<T>::get(task_id).ok_or(Error::<T>::TaskNotFound)?;
             ensure!(task.status == TaskStatus::Active, Error::<T>::TaskNotActive);
 
+            // Refuse legacy event tasks before expiry bookkeeping, events, attempts,
+            // dispatch or keeper accounting. This must be a true no-op, even if
+            // the task was stored by an older runtime.
+            if matches!(&task.condition, Condition::Event { .. }) {
+                return Err(DispatchError::Other("EventConditionUnsupported"));
+            }
+
             let current_block = frame_system::Pallet::<T>::block_number().saturated_into::<u64>();
             if current_block >= task.expiry_block {
                 Self::finish(&task, TaskStatus::Expired);
