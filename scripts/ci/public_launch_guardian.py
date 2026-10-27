@@ -42,6 +42,9 @@ def require_policy(policy):
                 not isinstance(path, str) or
                 not re.fullmatch(r"\.github/workflows/[\w-]+\.ya?ml", path) or path in paths):
             raise ValueError("invalid or duplicate workflow identity")
+        minimum = item.get("min_successful_jobs", 1)
+        if type(minimum) is not int or minimum < 1:
+            raise ValueError("invalid minimum required job count")
         names.add(name)
         paths.add(path)
     for field in ("required_fleet_assertions", "required_operator_assertions"):
@@ -109,7 +112,7 @@ def check_workflows(candidate, runs, policy, repo, now, max_age_days=14):
             status = "STALE"
         elif run.get("status") == "completed" and run.get("conclusion") == "success":
             jobs = run.get("jobs")
-            if not isinstance(jobs, list) or not jobs:
+            if not isinstance(jobs, list) or len(jobs) < requirement.get("min_successful_jobs", 1):
                 status = "NO_JOBS"
             elif any(
                 not isinstance(job, dict) or
