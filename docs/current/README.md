@@ -1,14 +1,16 @@
-# X3 Current Documentation
+# X3 Bridge-Testnet Notes
 
-**Updated:** 2026-06-18
+**Evidence snapshot:** Checks initially recorded June 18, 2026, with later
+updates in this directory. They are historical results, not a test report for
+the current `master` head.
 
-This is the clean documentation set for what the codebase currently offers.
-Older docs and reports remain in place for history, but start here for the
-current operator view.
+Use [launch scope](../../LAUNCH_SCOPE.md) for the intended release boundary,
+[release gates](../../RELEASE_GATES.md) for required checks, and current
+GitHub Actions results for exact-commit evidence.
 
-## Current Position
+## Bridge-testnet code paths
 
-The repo has a bridge-enabled testnet path in code:
+The repository contains code and scripts for a bridge-enabled testnet:
 
 - Substrate runtime with `testnet` feature support.
 - `pallet-x3-crosschain-gateway` wired into runtime construction.
@@ -19,10 +21,13 @@ The repo has a bridge-enabled testnet path in code:
 - EVM gateway contracts and Foundry tests under `X3-contracts/evm`.
 - Scripts for local multi-validator testnets, bridge e2e verification, and Anvil plus X3 relayer e2e flow.
 
-This documentation is written for running and hardening that bridged testnet
-capability, not for old milestone claims.
+This is an inventory of work exercised during earlier development. Code paths
+listed here may be feature-gated or incomplete in the latest release candidate.
 
-Current verified status:
+### Checks recorded during earlier development
+
+The following results were reported at prior commits. They have **not** been
+rechecked by this documentation edit, and do not establish current CI status:
 
 - `cargo check --workspace` compiles clean (build fixed 2026-06-18 - Phase 0).
 - SHA-256/XOR vulnerability fixed in SVM syscall table.
@@ -44,7 +49,11 @@ Current verified status:
 - `docs/current/VERIFICATION_EVIDENCE.md` — local checks run during this documentation pass.
 - `docs/current/FAILURES_AND_TODOS.md` — current hard failures, stubs, and repair order.
 
-## Fast Path
+## Example verification commands
+
+Run these only in a disposable test environment with the intended feature
+flags, chain spec and keys. The seven-validator launcher starts real local
+processes; its `--wipe` option removes its testnet base directory.
 
 ```bash
 cargo check -p x3-chain-runtime --features testnet
@@ -70,7 +79,7 @@ production wrapped-asset minting or a non-local proof-validation profile.
 
 ## Legacy Docs
 
-The previous documentation set is broad and historical: root markdown files,
-`docs/reports/`, `reports/`, `.planning/`, `.audit/`, `.x3/`, `.ai/`, `.cline/`,
-`.swarm/`, and package-level READMEs. Use it as source material, but treat this
-`docs/current/` set as the operator entrypoint.
+Other dated records live in root markdown files, `docs/reports/`,
+`reports/`, `.planning/`, `.audit/`, and package-level READMEs.
+Use them to trace past work. Recheck commands and claims against the selected
+commit before relying on them in deployment or release notes.
