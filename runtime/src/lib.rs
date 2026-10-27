@@ -1243,9 +1243,10 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
             Action::TransferNative { recipient, amount } => {
                 let destination = AccountId::decode(&mut &recipient[..])
                     .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
-                let value: Balance = (*amount)
-                    .try_into()
-                    .map_err(|_| DispatchError::Other("AutomationAmountOutOfRange"))?;
+                // `Balance` and `Action::TransferNative::amount` are both `u128`,
+                // so there is no range to check; the previous `try_into` could not
+                // fail and clippy rejects it as a useless conversion.
+                let value: Balance = *amount;
                 Balances::transfer_keep_alive(
                     RuntimeOrigin::signed(owner.clone()),
                     sp_runtime::MultiAddress::Id(destination),

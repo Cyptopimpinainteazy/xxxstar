@@ -7,6 +7,11 @@
 //!   asset with no median **fails closed** instead of reading as zero;
 //! * a task's action moves real balances through `RuntimeActionDispatcher`, and
 //!   the keeper is paid only when a dispatch happened.
+//!
+//! The automation pallet is not part of the mainnet-rc1 pallet set (see
+//! `runtime/Cargo.toml`), so under that feature the runtime has no Config impl
+//! for it and these calls cannot resolve. Same guard as `dex_atomic_rollback.rs`.
+#![cfg(not(feature = "mainnet-rc1"))]
 
 use frame_support::{assert_noop, assert_ok, traits::Currency};
 use x3_automation::{Action, Condition, TaskStatus};

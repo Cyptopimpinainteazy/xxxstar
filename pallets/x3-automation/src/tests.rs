@@ -704,3 +704,93 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
         );
     });
 }
+
+// ── Event conditions ────────────────────────────────────────────────────────
+// `Condition::Event` compares a topic against the SCALE encoding of every event
+// in the block. The branch used `frame_system::events()`, which is
+// `#[cfg(any(feature = "std", feature = "runtime-benchmarks", test))]` and so
+// does not exist in a wasm build: the pallet compiled under `cargo test` and
+// failed to compile for the runtime. These cover the behaviour of the
+// no_std-capable read that replaced it.
+
+use parity_scale_codec::Encode;
+use sp_core::H256;
+
+fn remarked_event(sender: u64) -> RuntimeEvent {
+    RuntimeEvent::System(frame_system::Event::Remarked {
+        sender,
+        hash: H256::zero(),
+    })
+}
+
+fn topic_of(event: &RuntimeEvent) -> [u8; 32] {
+    sp_io::hashing::blake2_256(&event.encode())
+}
+
+#[test]
+fn an_event_condition_triggers_on_a_matching_event_in_the_block() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let event = remarked_event(1);
+        let topic = topic_of(&event);
+
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Event { topic },
+            custom_action(9),
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+
+        frame_system::Pallet::<Test>::deposit_event(event);
+
+        assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Executed);
+    });
+}
+
+#[test]
+fn an_event_condition_does_not_trigger_on_a_different_event() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let wanted = topic_of(&remarked_event(1));
+
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Event { topic: wanted },
+            custom_action(9),
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+
+        // A different sender commits to a different topic, so it must not match.
+        frame_system::Pallet::<Test>::deposit_event(remarked_event(7));
+
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            Error::<Test>::ConditionNotMet
+        );
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
+    });
+}
+
+#[test]
+fn an_event_condition_does_not_trigger_with_no_events_in_the_block() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        let topic = topic_of(&remarked_event(1));
+
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Event { topic },
+            custom_action(9),
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            Error::<Test>::ConditionNotMet
+        );
+    });
+}
