@@ -133,6 +133,28 @@ def toml_document(path: Path) -> dict:
         return tomllib.load(file)
 
 
+def check_rc1_runtime_pallet_scope(source: str) -> list[str]:
+    """Verify the actual narrow construct_runtime! variant, not just TOML flags."""
+    start = source.find("// ── mainnet-rc1:")
+    end = source.find("// ── default (", start + 1)
+    if start < 0 or end <= start:
+        return ["runtime: explicit narrowed RC-1 construct_runtime variant missing"]
+    body = source[start:end]
+    failures = []
+    for component in (
+        "AtomicTradeEngine", "X3AtomicKernel", "X3CrossVmRouter",
+        "X3SettlementEngine", "X3SupplyLedger", "SvmRuntime",
+    ):
+        if not re.search(r"^\\s*" + re.escape(component) + r"\\s*:", body, re.MULTILINE):
+            failures.append(f"runtime: required RC-1 pallet {component} is not active")
+    for experimental in ("X3Dex", "X3Automation", "Evm", "Ethereum"):
+        if re.search(r"^\\s*" + re.escape(experimental) + r"\\s*:", body, re.MULTILINE):
+            failures.append(f"runtime: experimental {experimental} unexpectedly active in RC-1")
+    if 'not(feature = "frontier")' not in body:
+        failures.append("runtime: RC-1 lacks explicit non-Frontier feature guard")
+    return failures
+
+
 def verify_bridge_feature_scope(root: Path) -> list[str]:
     files = {
         "node": root / "node/Cargo.toml",
@@ -161,6 +183,9 @@ def verify_bridge_feature_scope(root: Path) -> list[str]:
         failures.append("runtime: router scope-lock not activated by RC-1")
     if "x3-chain-runtime/mainnet-rc1" not in doc["node"].get("features", {}).get("mainnet-rc1", []):
         failures.append("node: narrowed runtime RC-1 profile not forwarded")
+    failures.extend(check_rc1_runtime_pallet_scope(
+        (root / "runtime/src/lib.rs").read_text(encoding="utf-8")
+    ))
     return failures
 
 
