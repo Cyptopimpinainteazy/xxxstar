@@ -2,17 +2,24 @@
 
 A Substrate-based blockchain with native cross-VM execution across X3Native, X3Evm, and X3Svm domains.
 
-> **Current Status:** v0.4 Internal Testnet Candidate
-> **Current docs:** Start with [`docs/current/README.md`](./docs/current/README.md).
-> **Failure/TODO ledger:** See [`docs/current/FAILURES_AND_TODOS.md`](./docs/current/FAILURES_AND_TODOS.md).
-> ⚠️ **IMPORTANT:** See [LAUNCH_SCOPE.md](./LAUNCH_SCOPE.md) for the **single authoritative** scope statement. This supersedes all other status documents.
-> See [CURRENT_MAINNET_STATUS.md](./CURRENT_MAINNET_STATUS.md) for the detailed subsystem scoreboard.
-> 
-> > **x3-lang status:** The X3 language (`x3-lang/`) is in **MVP status** — the Python/pipeline track under `x3-lang/` is the **current authoritative implementation**. The Rust compiler work in `crates/x3-compiler` is experimental and not production-ready.
+> **Release status:** v0.4 internal testnet candidate. **Not approved for a public testnet or mainnet.**
+>
+> [Launch scope](./LAUNCH_SCOPE.md) defines what is in scope.
+> [Mainnet status](./CURRENT_MAINNET_STATUS.md) and
+> [known failures](./docs/current/FAILURES_AND_TODOS.md) record historical
+> assessments; use current GitHub Actions runs at the exact commit for build
+> or test claims.
+>
+> **X3Lang:** The Python pipeline, Rust compiler and runtime paths are under
+> integration. Do not call any compiler or native backend the production
+> execution path until the canonical compiler, determinism and runtime checks
+> pass at the release candidate's exact commit.
 
 ---
 
-## Quick Start
+## Local development
+
+These commands start a development node, not a public validator deployment.
 
 ### 1. Install prerequisites
 
@@ -53,19 +60,24 @@ cargo build --release -p x3-chain-node
 ./scripts/start-validator-easy.sh --chain deployment/chain-specs/x3-testnet-raw.json
 ```
 
-### 5. Run a 3-validator local testnet
+### 5. Test multiple validators
 
-```bash
-./scripts/testnet-full-launch.sh
-```
+Use the [staging testnet guide](./docs/STAGING_TESTNET_SETUP.md) and
+review each launcher's process cleanup and data-directory settings first.
+In particular, `scripts/testnet-full-launch.sh` can stop other
+`x3-chain-node` processes during cleanup; do not use it on a shared
+validator host without isolating the processes.
 
-### 5. Connect a wallet
+### 6. Connect a wallet
 
 Open [Polkadot.js Apps](https://polkadot.js.org/apps) → Development → Local Node → `ws://127.0.0.1:9944`
 
 ---
 
 ## Architecture
+
+The repository contains these components. Their presence does not establish
+that every VM executes statefully, atomically or with production finality.
 
 ```
 X3 Atomic Star
@@ -113,9 +125,16 @@ cargo test --workspace
 
 ---
 
-## CI
+## CI and verification
 
-All merges to `main` require the `x3 / critical-path-all-pass` check (9 worker jobs + 1 aggregate job in `.github/workflows/ci.yml`; the branch-protection required status check name is `x3 / critical-path-all-pass`):
+The default branch is `master`. Pull requests to `master` run
+[Local CI](./.github/workflows/local-ci.yml) on self-hosted X3 runners.
+Other workflows cover compiler, trading, storage and release-specific checks.
+A workflow file or queued run is **not** evidence that a check passed.
+Verify the current commit SHA, completed jobs and applicable branch protections
+before claiming readiness.
+
+Useful local commands (not a substitute for the full exact-head CI suite):
 
 - `cargo fmt --all -- --check` — format gate
 - `cargo check -p x3-chain-runtime` — runtime compile gate
@@ -148,4 +167,4 @@ Features disabled at RC-1 (require governance + audit to enable):
 - [RELEASE_GATES.md](./RELEASE_GATES.md) — mainnet release gates summary (binary pass/fail gate tracker, retired MAINNET_LAUNCH_CHECKLIST.md archived under Desktop/xxxstar/olddocs)
 - [docs/X3_DEPLOYMENT_POLICY.md](./docs/X3_DEPLOYMENT_POLICY.md) — full node deployment policy and guide
 - [docs/STAGING_TESTNET_SETUP.md](./docs/STAGING_TESTNET_SETUP.md) — 5-7 validator staging testnet guide
-- [scripts/create-rc1-release.sh](./scripts/create-rc1-release.sh) — one-command RC-1 release creation
+- [scripts/create-rc1-release.sh](./scripts/create-rc1-release.sh) — release helper; requires a separate operator release decision
