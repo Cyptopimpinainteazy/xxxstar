@@ -698,6 +698,17 @@ alters the runtime, so the record and the code land together.
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
 
+* `0c4d8ea98` — **withdrawals are bound to their exact route and exposure limits.**
+  `request_withdrawal` now requires the route chosen by the user, stores that binding in a side map,
+  and derives the withdrawal id over route, asset, recipient, amount, and block. Burn, proof release,
+  and operational finalization all re-check the exact route, mode, chain, asset, transfer window,
+  pending count, and collateral state. The separate map preserves the old withdrawal-record
+  encoding; pre-upgrade records without a binding fail closed. `spec_version` moves to 26. Two
+  from-scratch srtool builds against this commit agreed: compact 10,220,572 bytes
+  (`0x531c15e26a928f81e9e1b8c4bb819513c6219f86345200409a6ca88658e98316`) and compressed
+  1,785,249 bytes
+  (`0xa42216ff1a342056a517db03d9985259a320a4dcb60d4f083f60443412d17ebc`).
+
 * `cdee9080e` — **verified gateway deposits now mint and burns now debit the wrapped ledger
   atomically.** The gateway's operational credit and user burn calls both cross a runtime-configured
   `DepositMinter`; the production implementation binds the route chain id, X3 asset id, signed or
