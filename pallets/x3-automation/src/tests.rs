@@ -646,7 +646,10 @@ fn an_expired_task_never_dispatches_and_releases_the_reservation() {
         let task_id = Automation::account_tasks(1)[0];
         assert_eq!(reserved(1), BaseRegistrationFee::get());
 
-        System::set_block_number(100);
+        // Past its trigger block and at the end of its expiry window.
+        let expiry = Automation::tasks(task_id).unwrap().expiry_block;
+        assert!(expiry > 50, "a block trigger falls due before it expires");
+        System::set_block_number(expiry);
         let keeper_before = free(2);
         assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
 
@@ -672,7 +675,14 @@ fn cleanup_expires_stale_tasks_without_dispatching() {
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
-        System::set_block_number(100);
+        let expiry = Automation::tasks(task_id).unwrap().expiry_block;
+        System::set_block_number(expiry - 1);
+        assert_eq!(
+            Automation::cleanup_expired_tasks(),
+            0,
+            "a due task is not stale"
+        );
+        System::set_block_number(expiry);
         assert_eq!(Automation::cleanup_expired_tasks(), 1);
         assert_eq!(
             Automation::tasks(task_id).unwrap().status,
@@ -755,5 +765,49 @@ fn legacy_event_task_refusal_never_dispatches_or_charges_fees() {
             Automation::tasks(task_id).unwrap().status,
             TaskStatus::Active
         );
+    });
+}
+
+// ── Block-number expiry window ──────────────────────────────────────────────
+// A `BlockNumber(b)` task used to get `expiry_block = b`; `execute_task` checks
+// expiry before the condition, so the task expired at the block it fell due.
+
+#[test]
+fn a_block_number_task_executes_at_its_block() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::BlockNumber(50),
+            Action::NoChange,
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+
+        System::set_block_number(50);
+        assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Executed);
+    });
+}
+
+#[test]
+fn a_block_number_beyond_the_expiry_window_is_refused() {
+    new_test_ext().execute_with(|| {
+        let window_end = System::block_number() + u64::from(MaxTaskExpiryBlocks::get());
+
+        assert_noop!(
+            Automation::register_task(
+                RuntimeOrigin::signed(1),
+                Condition::BlockNumber(window_end),
+                Action::NoChange,
+                1000
+            ),
+            Error::<Test>::ExpiryTooFar
+        );
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::BlockNumber(window_end - 1),
+            Action::NoChange,
+            1000
+        ));
     });
 }

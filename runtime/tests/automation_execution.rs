@@ -492,10 +492,6 @@ fn a_block_number_task_executed_before_its_block_does_nothing() {
 }
 
 #[test]
-#[ignore = "bug: register_task sets a BlockNumber(b) task's expiry_block to b, and \
-            execute_task checks expiry (current >= expiry_block) before the condition \
-            (current >= b), so the task expires at the very block it becomes due and \
-            can never execute"]
 fn a_block_number_task_executes_once_its_block_is_reached() {
     setup().execute_with(|| {
         let owner = account(28);

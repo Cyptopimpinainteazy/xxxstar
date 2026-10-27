@@ -317,10 +317,14 @@ pub mod pallet {
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let max_expiry = current_block.saturating_add(T::MaxTaskExpiryBlocks::get().into());
-            let expiry_block = match condition {
-                Condition::BlockNumber(block) => block.min(max_expiry.saturated_into::<u64>()),
-                _ => max_expiry.saturated_into::<u64>(),
-            };
+            // Every task gets the full expiry window. A `BlockNumber(b)` task must
+            // fall due strictly before it expires: `execute_task` checks expiry
+            // before the condition, so expiring at `b` (or clamping a far `b` to
+            // the window) would leave a task that can never run.
+            let expiry_block: u64 = max_expiry.saturated_into();
+            if let Condition::BlockNumber(block) = condition {
+                ensure!(block < expiry_block, Error::<T>::ExpiryTooFar);
+            }
             ensure!(
                 expiry_block > current_block.saturated_into::<u64>(),
                 Error::<T>::ExpiryTooFar
