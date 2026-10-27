@@ -36,6 +36,26 @@
       "gate": "consensus_integration",
       "path": ".github/workflows/zombienet-integration.yml",
       "min_successful_jobs": 1
+    },
+    {
+      "gate": "canonical_compiler_bridge",
+      "path": ".github/workflows/x3lang-canonical-compiler-bridge.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "control_flow_parity",
+      "path": ".github/workflows/x3lang-control-flow-parity.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "language_workspace",
+      "path": ".github/workflows/x3-lang-nested-workspace.yml",
+      "min_successful_jobs": 2
+    },
+    {
+      "gate": "seven_validator_checker",
+      "path": ".github/workflows/testnet-checker.yml",
+      "min_successful_jobs": 1
     }
   ],
   "min_validators": 7,
