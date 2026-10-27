@@ -1,0 +1,48 @@
+name: X3 Automation Consensus Admission
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'pallets/x3-automation/**'
+      - '.github/workflows/x3-automation-consensus.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'pallets/x3-automation/**'
+      - '.github/workflows/x3-automation-consensus.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-automation-consensus-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  automation-consensus:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 70
+    env:
+      CARGO_BUILD_JOBS: '8'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.90.0'
+          components: rustfmt, clippy
+          targets: wasm32v1-none
+      - name: Check pallet formatting
+        run: cargo fmt --package pallet-x3-automation -- --check
+      - name: Check no_std pallet builds
+        run: cargo check --locked -p pallet-x3-automation --no-default-features --target wasm32v1-none
+      - name: Check production root consumer builds
+        run: cargo check --locked -p x3-chain-node --all-targets
+      - name: Run automation behavior regressions
+        run: cargo test --locked -p pallet-x3-automation
+      - name: Lint automation pallet
+        run: cargo clippy --locked -p pallet-x3-automation --all-targets -- -D warnings

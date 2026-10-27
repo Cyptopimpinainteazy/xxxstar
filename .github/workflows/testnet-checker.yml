@@ -1,0 +1,21 @@
+name: X3 Testnet Checker Unit Tests
+on:
+  pull_request:
+    paths:
+      - 'tests/testnet/**'
+      - '.github/workflows/testnet-checker.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checker-unit:
+    # The repository cannot run GitHub-hosted jobs. Reject fork PR code on our machines.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax validation
+        run: python3 -m py_compile tests/testnet/check_seven_validators.py tests/testnet/test_checker.py
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests/testnet -p 'test_*.py' -v

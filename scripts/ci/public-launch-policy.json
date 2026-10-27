@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "purpose": "Public testnet candidate triage; not autonomous release authorization",
+  "required_workflows": [
+    {
+      "gate": "local_ci",
+      "path": ".github/workflows/local-ci.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "compiler_runtime",
+      "path": ".github/workflows/x3lang-production-unification.yml",
+      "min_successful_jobs": 3
+    },
+    {
+      "gate": "compiled_storage",
+      "path": ".github/workflows/x3-compiled-storage-build.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "atomic_trading",
+      "path": ".github/workflows/x3-atomic-trade-engine.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "security_review",
+      "path": ".github/workflows/security-audit.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "release_gates",
+      "path": ".github/workflows/production-gate.yml",
+      "min_successful_jobs": 4
+    },
+    {
+      "gate": "consensus_integration",
+      "path": ".github/workflows/zombienet-integration.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "canonical_compiler_bridge",
+      "path": ".github/workflows/x3lang-canonical-compiler-bridge.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "control_flow_parity",
+      "path": ".github/workflows/x3lang-control-flow-parity.yml",
+      "min_successful_jobs": 1
+    },
+    {
+      "gate": "language_workspace",
+      "path": ".github/workflows/x3-lang-nested-workspace.yml",
+      "min_successful_jobs": 2
+    },
+    {
+      "gate": "seven_validator_checker",
+      "path": ".github/workflows/testnet-checker.yml",
+      "min_successful_jobs": 1
+    }
+  ],
+  "min_validators": 7,
+  "required_fleet_assertions": [
+    "finality_progress_verified",
+    "fault_recovery_verified",
+    "onchain_authority_set_verified",
+    "chain_spec_verified"
+  ],
+  "required_operator_assertions": [
+    "rpc_rate_limits_verified",
+    "keys_and_firewall_reviewed",
+    "monitoring_alerts_verified",
+    "rollback_rehearsed",
+    "faucet_abuse_controls_verified",
+    "independent_security_reviewed"
+  ]
+}

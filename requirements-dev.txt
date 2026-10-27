@@ -10,6 +10,8 @@
 #
 pytest>=9.1.1
 pytest-asyncio>=0.24
+# Needed by scripts/check_ci_workflow_refs.py (the local-ci workflow-wiring gate).
+PyYAML>=6.0.2,<7
 pydantic>=2
 aiohttp>=3.14.3
 redis>=8.1.0
