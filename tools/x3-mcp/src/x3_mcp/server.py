@@ -15,12 +15,17 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import FastMCP
 
+from .forge_bridge import register as register_forge_brain
+
 mcp = FastMCP("x3")
 
 REPO_ROOT = Path(os.environ.get("X3_REPO_ROOT", Path(__file__).resolve().parents[3])).resolve()
 RPC_URL = os.environ.get("X3_RPC_URL", "http://127.0.0.1:9944")
 COMMAND_TIMEOUT = int(os.environ.get("X3_MCP_COMMAND_TIMEOUT", "900"))
 PROOF_LEDGER = Path(os.environ.get("X3_PROOF_LEDGER", REPO_ROOT / "audit-artifacts" / "x3vm-proof-ledger.json")).resolve()
+
+# Use the already installed X3 Forge index/memory; Serena is not required.
+register_forge_brain(mcp, REPO_ROOT)
 
 
 def _rpc(method: str, params: list[Any] | None = None) -> Any:
