@@ -69,7 +69,7 @@ def classify(job, log=""):
 def report(head_sha, jobs, logs=None):
     """Create an exact-head advisory evidence packet; never authorize release."""
     logs = logs or {}
-    items = [classify(job, logs.get(str(job.get("id")), "")) for job in jobs]
+    items = [classify(job, logs.get(str(job.get("id", job.get("job_id"))), "")) for job in jobs]
     return {
         "head_sha": head_sha,
         "overall": "PASS_OBSERVED" if items and all(item["classification"] == "PASSED" for item in items) else "BLOCKED",
