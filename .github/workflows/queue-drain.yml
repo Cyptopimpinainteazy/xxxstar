@@ -1,69 +1,67 @@
-name: X3 CI Queue Drain
+name: X3 CI Queue Inspection
 
+# Former queue drain cancelled every PR run except obsolete hard-coded PRs.
+# Replaced by a read-only diagnostic; no API writes or cancellation permission.
 on:
-  push:
-    branches:
-      - ops/drain-actions-queue-20260911
-    paths:
-      - .github/workflows/queue-drain.yml
   workflow_dispatch:
+  pull_request:
+    branches: [master]
+    paths:
+      - '.github/workflows/queue-drain.yml'
+      - 'scripts/ci/queue_audit.py'
+      - 'scripts/ci/test_queue_audit.py'
 
 permissions:
-  actions: write
   contents: read
   pull-requests: read
+  actions: read
 
 concurrency:
-  group: x3-ci-queue-drain
-  cancel-in-progress: true
+  group: x3-ci-queue-inspection-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  drain:
-    name: Cancel stale and blocked PR runs
-    runs-on: ubuntu-latest
+  unit-tests:
+    # Never run code submitted by fork PRs on physical self-hosted CI runners.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
     timeout-minutes: 10
     steps:
-      - name: Keep only priority PR exact-head runs
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Reject stale/unknown and never authorize cancellation
+        run: python3 -m unittest discover -s scripts/ci -p 'test_queue_audit.py' -v
+
+  inspect-queue:
+    # Only the protected default branch can inspect live registry state.
+    # No auto-run on push, and never act on data from arbitrary PR code.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    needs: [unit-tests]
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Inspect queued and running pull-request workflows without mutation
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
           set -euo pipefail
+          python3 scripts/ci/queue_audit.py --live --output "${RUNNER_TEMP}/x3-queue-audit.json" > /dev/null
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-          declare -A priority_sha=()
-          for pr in 130 181; do
-            sha="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${pr}" --jq '.head.sha')"
-            priority_sha["$sha"]=1
-            echo "priority PR #$pr -> $sha"
-          done
-
-          declare -A newest_priority_run=()
-          cancelled=0
-          kept=0
-
-          while IFS=$'\t' read -r run_id head_sha workflow_name status; do
-            [[ -z "$run_id" ]] && continue
-            [[ "$run_id" == "$GITHUB_RUN_ID" ]] && continue
-
-            if [[ -n "${priority_sha[$head_sha]:-}" ]]; then
-              key="$head_sha|$workflow_name"
-              if [[ -z "${newest_priority_run[$key]:-}" ]]; then
-                newest_priority_run["$key"]="$run_id"
-                echo "KEEP   $status $run_id $workflow_name $head_sha"
-                kept=$((kept + 1))
-                continue
-              fi
-            fi
-
-            echo "CANCEL $status $run_id $workflow_name $head_sha"
-            gh api --method POST               "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/cancel"               >/dev/null 2>&1 || true
-            cancelled=$((cancelled + 1))
-          done < <(
-            gh api --paginate               "repos/${GITHUB_REPOSITORY}/actions/runs?per_page=100"               --jq '.workflow_runs[]
-                | select(.event == "pull_request")
-                | select(.status == "queued" or .status == "in_progress")
-                | [.id, .head_sha, .name, .status]
-                | @tsv'
-          )
-
-          echo "kept=$kept cancelled=$cancelled"
+          report = json.loads((Path(os.environ["RUNNER_TEMP"]) / "x3-queue-audit.json").read_text())
+          assert report["cancel_authorized"] is False
+          assert report["release_authorized"] is False
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("## X3 Actions queue inspection (read-only)\n\n")
+              summary.write(f"Open PRs: {report['open_pr_count']}; observed queued/in-progress PR runs: {report['pending_run_count']}\n\n")
+              for state, count in report["counts"].items():
+                  summary.write(f"- {state}: {count}\n")
+              summary.write("\nNo runs were cancelled, retried, or approved. Review candidates manually against exact PR heads.\n")
+          PY
