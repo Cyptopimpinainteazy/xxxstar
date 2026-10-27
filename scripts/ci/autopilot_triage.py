@@ -9,6 +9,7 @@ import re
 PATTERNS = (
     ("CONFIGURATION", (r"permission denied \(publickey\)", r"authentication failed", r"bad credentials", r"resource not accessible by integration", r"no such host")),
     ("INFRASTRUCTURE", (r"lost communication with the server", r"runner connection lost", r"the runner has received a shutdown signal", r"no space left on device", r"could not resolve host")),
+    ("ACTION_DOWNLOAD_FAILURE", (r"failed to resolve action download info", r"launch\\.actions\\.githubusercontent\\.com", r"the http request timed out after")),
     ("PYTHON_DEPENDENCY", (r"no module named", r"pyyaml is required", r"pytest: command not found", r"module\s+notfounderror")),
     ("RUST_FORMAT", (r"diff in .*\.rs:", r"rustfmt failed", r"cargo fmt.*--check.*failed")),
     ("LOCKFILE_DRIFT", (r"lock file.*needs to be updated but --locked", r"lockfile.*needs to be updated")),
@@ -27,6 +28,7 @@ REPRODUCERS = {
     "BUILD_FAILURE": "run the exact failing cargo check command from the trusted job",
     "ARTIFACT_STORAGE": "inspect Actions artifact quota and retention without deleting artifacts",
     "INFRASTRUCTURE": "inspect runner health and disk space; do not auto-retry",
+    "ACTION_DOWNLOAD_FAILURE": "inspect Actions download connectivity and runner DNS; do not auto-retry",
     "CONFIGURATION": "verify runner configuration and permissions without exposing credentials",
 }
 
