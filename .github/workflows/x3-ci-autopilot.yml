@@ -38,6 +38,12 @@ permissions:
   actions: read
   pull-requests: read
 
+# Only supersede old attempts of this one advisory workflow for the same PR.
+# Default-branch and manual runs are not interrupted; no other release gate is touched.
+concurrency:
+  group: x3-ci-autopilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   autopilot-tests:
     # Do not execute fork-supplied code on physical self-hosted machines.
