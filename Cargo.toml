@@ -1,5 +1,13 @@
 [workspace]
 exclude = [
+    # Canonical language packages keep their own workspace and lint policy.
+    "x3-lang/compiler",
+    "x3-lang/vm",
+    "x3-lang/crates/x3-execution",
+    "x3-lang/crates/x3-common",
+    "x3-lang/crates/x3-ast",
+    "x3-lang/crates/x3-lexer",
+    "x3-lang/crates/x3-tools",
     "apps/x3-desktop/src-tauri",
     "apps/inferstructor-dashboard/src-tauri",
     # X3-contracts is a separate dual-stack contracts workspace

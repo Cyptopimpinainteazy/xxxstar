@@ -436,12 +436,14 @@ pub enum RelayerProofRequest {
         state_root: [u8; 32],
         finalized_block: u64,
         proof_nonce: u32,
+        /// Canonical receipt proof bytes; presence is not proof of validity.
         proof_payload: Vec<u8>,
         source_asset: Vec<u8>,
         expected_sender: Vec<u8>,
         expected_contract: Vec<u8>,
         expected_beneficiary: Vec<u8>,
         expected_nonce: u64,
+        /// String-encoded to preserve the full unsigned 128-bit value.
         expected_amount: String,
     },
 }
@@ -484,6 +486,11 @@ async fn post_relayer_proof_summary(
             validator_signatures,
             required_signatures,
         } => {
+            if required_signatures == 0 {
+                return Err(GatewayError::BadRequest(
+                    "Solana required signatures must be positive".into(),
+                ));
+            }
             let attestations = validator_signatures.len();
             let validators = into_validator_signatures(&validator_signatures)?;
             let expected_amount = expected_amount.parse::<u128>().map_err(|error| {
@@ -533,8 +540,6 @@ async fn post_relayer_proof_summary(
                     "SVM transaction slot does not match the finalized slot".into(),
                 ));
             }
-            let meets_quorum =
-                proof_id != [0u8; 32] && (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
             // this deserialization would have failed already.
@@ -562,7 +567,9 @@ async fn post_relayer_proof_summary(
                 proof_id_hex: hex::encode(proof_id),
                 validator_attestations: attestations,
                 required_signatures,
-                meets_quorum,
+                // A well-shaped 64-byte blob is not a verified signature,
+                // nor does this endpoint check validator committee membership.
+                meets_quorum: false,
                 chain_kind: "solana",
             }))
         }
@@ -593,9 +600,23 @@ async fn post_relayer_proof_summary(
             let expected_contract: [u8; 20] = expected_contract.try_into().map_err(|_| {
                 GatewayError::BadRequest("EVM gateway contract must be 20 bytes".into())
             })?;
+            if proof_payload.is_empty() || proof_payload.len() > 1_048_576 {
+                return Err(GatewayError::BadRequest(
+                    "EVM receipt proof must contain 1 to 1048576 bytes".into(),
+                ));
+            }
             if expected_beneficiary.is_empty() || expected_beneficiary.len() > 128 {
                 return Err(GatewayError::BadRequest(
                     "EVM beneficiary must be between 1 and 128 bytes".into(),
+                ));
+            }
+            if expected_amount == 0
+                || proof_id == [0u8; 32]
+                || block_hash == [0u8; 32]
+                || state_root == [0u8; 32]
+            {
+                return Err(GatewayError::BadRequest(
+                    "EVM proof id, amount, block hash and state root must be nonzero".into(),
                 ));
             }
             let _proof = EvmProof {
@@ -618,9 +639,9 @@ async fn post_relayer_proof_summary(
                 proof_id_hex: hex::encode(proof_id),
                 validator_attestations: 0,
                 required_signatures: 0,
-                meets_quorum: proof_id != [0u8; 32]
-                    && block_hash != [0u8; 32]
-                    && !proof_payload.is_empty(),
+                // This endpoint only checks shape. It does not independently
+                // authenticate finalized headers or receipt inclusion.
+                meets_quorum: false,
                 chain_kind: "evm",
             }))
         }
@@ -1883,6 +1904,57 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn svm_proof_summary_refuses_zero_signature_threshold() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
+            source_domain: 1,
+            proof_id: [8u8; 32],
+            cluster: "devnet".into(),
+            slot: 100,
+            parent_slot: 99,
+            blockhash: [7u8; 32],
+            bank_hash: [6u8; 32],
+            parent_bank_hash: [5u8; 32],
+            stake_table_digest: [4u8; 32],
+            expected_asset_id: [3u8; 32],
+            expected_amount: "25".into(),
+            expected_sender: vec![2u8; 32],
+            expected_recipient: vec![1u8; 32],
+            expected_beneficiary: vec![9u8; 32],
+            transaction: SolanaTransactionEvidenceWire {
+                slot: 100,
+                index: 0,
+                succeeded: true,
+                raw_transaction: vec![1, 2, 3],
+            },
+            validator_signatures: Vec::new(),
+            required_signatures: 0,
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[tokio::test]
+    async fn evm_proof_summary_refuses_empty_proof_evidence() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
+            source_domain: 1,
+            proof_id: [9u8; 32],
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: Vec::new(),
+            source_asset: vec![2u8; 20],
+            expected_sender: vec![3u8; 20],
+            expected_contract: vec![4u8; 20],
+            expected_beneficiary: vec![5u8; 32],
+            expected_nonce: 1,
+            expected_amount: "25".to_string(),
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
     fn sample_report() -> BenchmarkReport {
         BenchmarkReport {
             report_id: "report-1".to_string(),
@@ -2273,7 +2345,7 @@ mod tests {
             "source_domain": 1,
             "proof_id": vec![9u8; 32],
             "block_hash": vec![1u8; 32],
-            "state_root": vec![0u8; 32],
+            "state_root": vec![6u8; 32],
             "finalized_block": 42,
             "proof_nonce": 0u32,
             "proof_payload": vec![1u8; 96],
@@ -2295,7 +2367,7 @@ mod tests {
         assert_eq!(proof_resp.status().as_u16(), 200);
         let proof: Value = proof_resp.json().await.expect("proof-summary json");
         assert_eq!(proof["kind"], json!("evm"));
-        assert_eq!(proof["meets_quorum"], json!(true));
+        assert_eq!(proof["meets_quorum"], json!(false));
 
         let raw_transaction = hex::decode(concat!(
             "010ca9bbc1fd52fb8a2d08c512ccdb720fc3100804cb2fb8cba4bbc9ce4df7a7d0",
@@ -2344,7 +2416,7 @@ mod tests {
         let svm_summary: Value = svm_resp.json().await.expect("SVM proof-summary json");
         assert_eq!(svm_summary["kind"], json!("svm"));
         assert_eq!(svm_summary["proof_id_hex"], json!(hex::encode([8u8; 32])));
-        assert_eq!(svm_summary["meets_quorum"], json!(true));
+        assert_eq!(svm_summary["meets_quorum"], json!(false));
 
         // The GraphQL endpoint is served and answers a real query.
         let gql = client

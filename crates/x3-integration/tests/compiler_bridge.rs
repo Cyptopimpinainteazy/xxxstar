@@ -6,7 +6,10 @@
 #![cfg(all(feature = "std", feature = "compile"))]
 
 use x3_backend::BytecodeModule;
-use x3_x3_integration::compiler_bridge::{compile_source, compile_source_with_policy};
+use x3_x3_integration::compiler_bridge::{
+    compile_legacy_source as compile_source,
+    compile_legacy_source_with_policy as compile_source_with_policy,
+};
 use x3_x3_integration::mini_x3::{self, MiniValue};
 use x3_x3_integration::{CompilationPolicy, X3Executor, X3ExecutorConfig};
 

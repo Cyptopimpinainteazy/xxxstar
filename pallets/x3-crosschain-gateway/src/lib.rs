@@ -990,6 +990,10 @@ pub mod pallet {
         InvalidSolanaStakeThreshold,
         /// The total or signed stake could not be represented.
         SolanaStakeOverflow,
+        /// `X3Internal` verification on a gateway route. Every gateway route has an external
+        /// source chain, and the internal strategy needs no external evidence, so a route
+        /// configured with it would credit deposits nobody proved.
+        InternalVerificationOnExternalRoute,
     }
 
     // ── Hooks ───────────────────────────────────────────────────────────
@@ -1032,6 +1036,10 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::enable_route())]
         pub fn enable_route(origin: OriginFor<T>, mut config: RouteConfig) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
+            ensure!(
+                config.verification_level != RouteVerificationLevel::X3Internal,
+                Error::<T>::InternalVerificationOnExternalRoute
+            );
             ensure!(
                 Assets::<T>::contains_key(
                     config.external_chain_id,

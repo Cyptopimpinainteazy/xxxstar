@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "links": [
+    {
+      "endpoint_a": "x3star1:eno2",
+      "endpoint_b": null,
+      "observed_link": "UP 1000Mb/s Full",
+      "evidence": "local ethtool; remote switch/port unknown"
+    },
+    {
+      "endpoint_a": "x3star1:eno3",
+      "endpoint_b": "U3581156:rear EMP",
+      "observed_link": "UP; 10.30.10.1/24 to 10.30.10.11/24",
+      "evidence": "Operator identifies rear EMP cable; host carrier=1; ping 3/3; strict pinned-key SSH returns serial U3581156"
+    },
+    {
+      "endpoint_a": "x3star1:eno4",
+      "endpoint_b": "U3581140:rear EMP",
+      "observed_link": "DOWN: no host carrier; intended cable endpoint not verified",
+      "evidence": "Host eno4 carrier off; operator instructed to attach this direct management link"
+    }
+  ],
+  "switch_uplinks": [],
+  "lldp_discovery": "BLOCKED: lldpd not installed/running",
+  "fibre_channel": "OUT OF SCOPE"
+}

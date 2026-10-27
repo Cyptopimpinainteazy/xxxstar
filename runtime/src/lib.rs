@@ -429,7 +429,10 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
     // leg; a leg runs only the execution it committed to), so its encoding changed and
     // `transaction_version` goes to 2.
-    // 25: `credit_x3_representation` now completes the verified lock-mint path by
+    // 25: canonical X3Lang native trading, shared WASM verifier/interpreter, and
+    // appended asset/lender/venue registration calls. Existing call/event indices and
+    // transaction_version remain stable.
+    // 26: `credit_x3_representation` completes the verified lock-mint path by
     // calling the runtime's wrapped-asset minter atomically. The mint binds the route's
     // numeric chain, X3 asset, 32-byte beneficiary, amount and full gateway proof id;
     // a mint refusal rolls the transfer status back. One new wrapped-storage map, so no
@@ -1952,6 +1955,7 @@ impl pallet_x3_kernel::EmergencyHaltController for RuntimeEmergencyHaltControlle
 impl pallet_x3_kernel::Config for Runtime {
     type Balance = Balance;
     type AssetId = AssetId;
+    type NativeFeeAssetId = frame_support::traits::ConstU32<0>;
     type AtlasId = AtlasId;
     type MaxAssetsPerAccount = MaxAssetsPerAccount;
     type MaxAssetSymbolLength = MaxAssetSymbolLength;

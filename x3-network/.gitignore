@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.raw
+*.cfg
+*.conf
+*.log
+*.pcap*

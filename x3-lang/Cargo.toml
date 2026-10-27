@@ -5,6 +5,7 @@ members = [
     "crates/x3-lexer",
     "crates/x3-ast",
     "crates/x3-tools",
+    "crates/x3-execution",
     "compiler",
     "vm",
 ]

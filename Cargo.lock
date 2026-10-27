@@ -12688,6 +12688,7 @@ dependencies = [
  "proptest",
  "scale-info",
  "serde",
+ "serde_json",
  "sp-api",
  "sp-core",
  "sp-io",
@@ -12697,8 +12698,10 @@ dependencies = [
  "x3-backend",
  "x3-common",
  "x3-cross-vm-bridge",
+ "x3-dex",
  "x3-evm-integration",
  "x3-lang-compiler",
+ "x3-lang-execution",
  "x3-packet-schema",
  "x3-svm-integration",
  "x3-vm",
@@ -27260,8 +27263,17 @@ dependencies = [
  "x3-automation",
  "x3-lang-ast",
  "x3-lang-common",
+ "x3-lang-execution",
  "x3-lang-lexer",
  "x3bc-core",
+]
+
+[[package]]
+name = "x3-lang-execution"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -27288,6 +27300,7 @@ dependencies = [
  "sha3",
  "x3-lang-common",
  "x3-lang-compiler",
+ "x3-lang-execution",
 ]
 
 [[package]]
@@ -28100,6 +28113,7 @@ dependencies = [
  "x3-compiler",
  "x3-evm-integration",
  "x3-lang-compiler",
+ "x3-lang-execution",
  "x3-lang-vm",
  "x3-mir",
  "x3-opt",

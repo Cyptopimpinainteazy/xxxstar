@@ -14,6 +14,7 @@ description = "X3 Virtual Machine core runtime (executor, JIT, and glue)"
 bitcoin-adapter = []
 
 [dependencies]
+x3-lang-execution = { path = "../crates/x3-execution" }
 x3-lang-common = { path = "../crates/x3-common" }
 x3-lang-compiler = { path = "../compiler" }
 serde = { workspace = true, features = ["derive"] }

@@ -823,7 +823,7 @@ fn a_bundle_finalizes_once_with_the_receipt_root_the_chain_requires() {
         let gateway = atomic_gateway();
         let leg = pallet_x3_atomic_kernel::chain_legs::LegExecution::X3 {
             program: BoundedVec::try_from(
-                x3_x3_integration::compiler_bridge::compile_source(
+                x3_x3_integration::compiler_bridge::compile_legacy_source(
                     "fn main() -> i64 { evm_sstore(3, 1); return 1; }",
                 )
                 .expect("compiles"),
@@ -1110,7 +1110,7 @@ fn kernel_test_ext() -> sp_io::TestExternalities {
 #[test]
 fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_recorded() {
     let submitter = account(7);
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -1184,7 +1184,7 @@ fn a_compiled_x3_program_is_executed_through_the_runtime_and_its_comit_is_record
 #[test]
 fn a_corrupted_x3_program_is_refused_by_the_runtime_path() {
     let submitter = account(7);
-    let mut program = x3_x3_integration::compiler_bridge::compile_source(
+    let mut program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -1740,7 +1740,7 @@ fn chain_executed_legs_are_undone_exactly_by_a_rollback() {
     use pallet_x3_atomic_kernel::chain_legs::LegExecution;
     use pallet_x3_atomic_kernel::{BundleRollbackReason, BundleStatus, Bundles};
 
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
     )
     .expect("the slot writer compiles");
@@ -1906,11 +1906,11 @@ fn a_finalized_bundle_pays_its_escrow_and_releases_its_slots() {
     use pallet_x3_atomic_kernel::chain_legs::LegExecution;
     use pallet_x3_atomic_kernel::Bundles;
 
-    let writer = x3_x3_integration::compiler_bridge::compile_source(
+    let writer = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 { evm_sstore(7, 41); return evm_sload(7); }",
     )
     .expect("the slot writer compiles");
-    let other_writer = x3_x3_integration::compiler_bridge::compile_source(
+    let other_writer = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 { evm_sstore(7, 99); return 0; }",
     )
     .expect("compiles");

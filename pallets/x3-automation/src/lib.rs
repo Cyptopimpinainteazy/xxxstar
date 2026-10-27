@@ -572,7 +572,11 @@ pub mod pallet {
                     // than storing a task that is dead on arrival.
                     ensure!(lower <= upper, Error::<T>::InvalidTask);
                 }
-                Condition::Event { .. } | Condition::Manual => {}
+                // Matching an unbounded System::Events list in consensus execution
+                // can exhaust PoV. No bounded, indexed event source exists yet.
+                // Reject registration rather than charge for a task that cannot fire.
+                Condition::Event { .. } => return Err(Error::<T>::InvalidTask.into()),
+                Condition::Manual => {}
                 Condition::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -625,18 +629,11 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                #[cfg(feature = "std")]
-                Condition::Event { topic } => frame_system::Pallet::<T>::events()
-                    .iter()
-                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
-                // `frame_system::Pallet::events()` is deliberately unavailable
-                // in a consensus runtime because reading the unbounded event
-                // buffer would expose block execution to its size. An event
-                // condition therefore cannot be decided on chain and fails
-                // closed; a runtime that needs this trigger must provide a
-                // bounded on-chain event index.
-                #[cfg(not(feature = "std"))]
-                Condition::Event { .. } => false,
+                // Legacy event tasks must also fail closed at execution, never
+                // scan an unbounded block event list or pretend the event fired.
+                Condition::Event { .. } => {
+                    return Err(DispatchError::Other("EventConditionUnsupported"));
+                }
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })

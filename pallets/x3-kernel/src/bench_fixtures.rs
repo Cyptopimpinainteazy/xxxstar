@@ -41,8 +41,9 @@ mod tests {
     /// fails, the fixture has to be regenerated rather than the assertion relaxed.
     #[test]
     fn the_embedded_program_compiles_to_the_embedded_bytes() {
-        let compiled = x3_x3_integration::compiler_bridge::compile_source(super::X3_PROGRAM_SOURCE)
-            .expect("the embedded source must compile");
+        let compiled =
+            x3_x3_integration::compiler_bridge::compile_legacy_source(super::X3_PROGRAM_SOURCE)
+                .expect("the embedded source must compile");
         assert_eq!(
             compiled,
             super::X3_PROGRAM_FIXTURE,
@@ -54,8 +55,9 @@ mod tests {
     /// The loop fixture is what the compiler emits for its source, for the same reason.
     #[test]
     fn the_embedded_loop_compiles_to_the_embedded_bytes() {
-        let compiled = x3_x3_integration::compiler_bridge::compile_source(super::X3_LOOP_SOURCE)
-            .expect("the embedded loop must compile");
+        let compiled =
+            x3_x3_integration::compiler_bridge::compile_legacy_source(super::X3_LOOP_SOURCE)
+                .expect("the embedded loop must compile");
         assert_eq!(
             compiled,
             super::X3_LOOP_FIXTURE,

@@ -85,7 +85,7 @@ const path = require('path');
 const { createRequire } = require('module');
 
 const repoRoot = process.cwd();
-const originalWorkspace = process.env.X3_ORIGINAL_WORKSPACE || '/home/lojak/Desktop/X3_ATOMIC_STAR';
+const originalWorkspace = process.env.X3_ORIGINAL_WORKSPACE || repoRoot;
 const requireRoots = [
   path.join(repoRoot, 'packages/blockchain-connector/node_modules'),
   path.join(repoRoot, 'packages/atomic-swap-sdk/node_modules'),

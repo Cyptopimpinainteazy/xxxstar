@@ -261,6 +261,7 @@ pub struct Initialize<'info> {
     pub verifier: Account<'info, Verifier>,
     #[account(mut)]
     pub authority: Signer<'info>,
+    /// CHECK: Address constrained to the canonical instructions sysvar.
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
@@ -285,6 +286,7 @@ pub struct Verify<'info> {
         bump,
     )]
     pub verifier: Account<'info, Verifier>,
+    /// CHECK: Constrained to the canonical instructions sysvar and read with load_instruction_at_checked.
     #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
     pub instructions_sysvar: AccountInfo<'info>,
     /// CHECK: recipient address (used as message input data)

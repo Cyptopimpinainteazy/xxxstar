@@ -1,2 +1,5 @@
 [toolchain]
-channel = "stable"
+# Anchor 0.30.1 IDL generation uses the pre-1.88 proc_macro span API.
+# Bytecode is compiled separately by cargo-build-sbf/platform-tools v1.54.
+channel = "nightly-2025-03-01"
+profile = "minimal"

@@ -18,7 +18,7 @@ use x3_common::artifact::{
     RegisteredArtifactKey,
 };
 use x3_common::bytecode;
-use x3_x3_integration::compiler_bridge::compile_source;
+use x3_x3_integration::compiler_bridge::compile_legacy_source as compile_source;
 use x3_x3_integration::{X3Executor, X3ExecutorConfig, X3IntegrationError};
 
 const SOURCE: &str = "fn main() -> i64 { let mut total = 0; let mut i = 0; \

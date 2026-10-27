@@ -398,6 +398,11 @@ impl X3Executor {
         use x3_vm::{BytecodeModule as Module, VMConfig as Config, VMErrorKind, Value, VM as Vm};
 
         Self::verify_on_chain(bytecode)?;
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return Err(X3IntegrationError::ExecutionFailed(
+                "canonical trading requires an authenticated ledger host".into(),
+            ));
+        }
         let module = Module::from_bytes(bytecode)
             .map_err(|e| X3IntegrationError::InvalidBytecode(format!("{:?}", e)))?;
 
@@ -510,6 +515,11 @@ impl X3Executor {
     /// the gas budget, no debug, GPU or floating-point opcodes, no opcode the engine cannot run,
     /// and an entry function that takes no arguments.
     pub fn verify_on_chain(bytecode: &[u8]) -> X3Result<()> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|_| ())
+                .map_err(X3IntegrationError::VerificationFailed);
+        }
         x3_vm::Verifier::verify_module_bytes(bytecode, &x3_vm::VerifyOptions::on_chain())
             .map(|_| ())
             .map_err(|e| X3IntegrationError::VerificationFailed(format!("{:?}", e)))
@@ -520,6 +530,11 @@ impl X3Executor {
     /// A size-based bound (EIP-2028 style), unchanged from the engine this replaced, so the
     /// weight a call is pre-charged does not move with this change.
     pub fn estimate_gas_on_chain(bytecode: &[u8]) -> u64 {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|artifact| artifact.gas_used)
+                .unwrap_or(u64::MAX);
+        }
         ON_CHAIN_BASE_GAS
             .saturating_add((bytecode.len() as u64).saturating_mul(ON_CHAIN_GAS_PER_BYTE))
     }
@@ -527,6 +542,9 @@ impl X3Executor {
     /// Verify bytecode without execution
     #[cfg(feature = "std")]
     pub fn verify(bytecode: &[u8], allow_debug_ops: bool) -> X3Result<()> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return Self::verify_on_chain(bytecode);
+        }
         let opts = if allow_debug_ops {
             VerifyOptions::default()
         } else {
@@ -551,6 +569,11 @@ impl X3Executor {
     /// native caller and the chain (`estimate_gas_on_chain`) priced the same bytes differently.
     #[cfg(feature = "std")]
     pub fn estimate_gas(bytecode: &[u8]) -> X3Result<u64> {
+        if crate::canonical::is_canonical_artifact(bytecode) {
+            return crate::canonical::decode_artifact(bytecode)
+                .map(|artifact| artifact.gas_used)
+                .map_err(X3IntegrationError::VerificationFailed);
+        }
         Self::verify(bytecode, false)?;
         Ok(Self::estimate_gas_on_chain(bytecode))
     }

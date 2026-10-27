@@ -365,7 +365,7 @@ fn a_compiled_x3_program_is_finalized_and_its_receipt_is_readable() {
     assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
 
     // 2. Compile the program in the test: this is the compiler's output, not a fixture blob.
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -544,7 +544,7 @@ fn a_tampered_artifact_cannot_be_executed_under_the_original_signature() {
     let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
     assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
 
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the program must compile");
@@ -1098,7 +1098,7 @@ fn a_finalized_x3_comit_survives_a_node_restart() {
     let alice_uri = dev_uri("Alice");
     let comit_id = H256::from_low_u64_be(0x05E5_7A47);
     let probe_comit_id = H256::from_low_u64_be(0x05E5_7A48);
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -1193,7 +1193,7 @@ fn a_replayed_x3_comit_extrinsic_is_not_mined_twice() {
     let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
     assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
 
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
@@ -1270,7 +1270,7 @@ fn a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt() {
     let (_, authorize_head) = wait_finalized(&authorize, Duration::from_secs(180));
     assert_dispatch_succeeded(&alice, &authorize_head, &authorize);
 
-    let program = x3_x3_integration::compiler_bridge::compile_source(
+    let program = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn burn(n: i64) -> i64 {\n    let mut i = 0;\n    let mut total = 0;\n    while (i < n) {\n        total = total + i;\n        i = i + 1;\n    }\n    return total;\n}\n\nfn main() -> i64 {\n    return burn(3000000);\n}\n",
     )
     .expect("the burn program must compile");
@@ -1320,7 +1320,7 @@ fn a_program_past_the_gas_limit_is_refused_and_leaves_no_receipt() {
 
     // The chain is still healthy for a program that respects the budget: a refusal that broke the
     // path would pass the two assertions above.
-    let cheap = x3_x3_integration::compiler_bridge::compile_source(
+    let cheap = x3_x3_integration::compiler_bridge::compile_legacy_source(
         "fn main() -> i64 {\n    return 42;\n}\n",
     )
     .expect("the fixture must compile");
