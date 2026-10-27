@@ -7,14 +7,14 @@ from pathlib import Path
 import re
 
 PATTERNS = (
-    ("CONFIGURATION", (r"permission denied \\(publickey\\)", r"authentication failed", r"bad credentials", r"resource not accessible by integration", r"no such host")),
+    ("CONFIGURATION", (r"permission denied \(publickey\)", r"authentication failed", r"bad credentials", r"resource not accessible by integration", r"no such host")),
     ("INFRASTRUCTURE", (r"lost communication with the server", r"runner connection lost", r"the runner has received a shutdown signal", r"no space left on device", r"could not resolve host")),
-    ("PYTHON_DEPENDENCY", (r"no module named", r"pyyaml is required", r"pytest: command not found", r"module\\s+notfounderror")),
-    ("RUST_FORMAT", (r"diff in .*\\.rs:", r"rustfmt failed", r"cargo fmt.*--check.*failed")),
+    ("PYTHON_DEPENDENCY", (r"no module named", r"pyyaml is required", r"pytest: command not found", r"module\s+notfounderror")),
+    ("RUST_FORMAT", (r"diff in .*\.rs:", r"rustfmt failed", r"cargo fmt.*--check.*failed")),
     ("LOCKFILE_DRIFT", (r"lock file.*needs to be updated but --locked", r"lockfile.*needs to be updated")),
     ("ARTIFACT_STORAGE", (r"artifact storage quota", r"storage quota has been hit", r"artifact quota")),
-    ("TEST_FAILURE", (r"test result: failed", r"assertion.*failed", r"failures:", r"\\bpanicked at\\b", r"error: test failed")),
-    ("BUILD_FAILURE", (r"error\\[e[0-9]{4}\\]", r"compilation failed", r"could not compile")),
+    ("TEST_FAILURE", (r"test result: failed", r"assertion.*failed", r"failures:", r"\bpanicked at\b", r"error: test failed")),
+    ("BUILD_FAILURE", (r"error\[e[0-9]{4}\]", r"compilation failed", r"could not compile")),
 )
 
 # Recommendations are diagnostic commands/instructions only; none change a
