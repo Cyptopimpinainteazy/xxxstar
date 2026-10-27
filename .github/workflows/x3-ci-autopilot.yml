@@ -76,6 +76,18 @@ jobs:
         run: |
           [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'PR number must be numeric' >&2; exit 2; }
           python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
+      - name: Classify exact-head CI failures (advisory only)
+        if: github.event_name == 'pull_request'
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_autopilot_triage.py -v
+          python3 scripts/ci/autopilot_triage.py \
+            --github-evidence "$RUNNER_TEMP/x3-github-evidence.json" \
+            --head-sha "$EVENT_HEAD_SHA" \
+            --expected-head "$EVENT_HEAD_SHA" \
+            --output "$RUNNER_TEMP/x3-autopilot-triage.json" > /dev/null
+          python3 -m json.tool "$RUNNER_TEMP/x3-autopilot-triage.json" > /dev/null
       - name: Verify exact-head PR-Agent and CI evidence join
         run: python3 -m unittest discover -s scripts/ci -p test_integration_join.py -v
       - name: Verify PR-Agent output evidence bridge
@@ -96,6 +108,7 @@ jobs:
             ${{ runner.temp }}/x3-integration-audit.json
             ${{ runner.temp }}/x3-integration-synthetic.json
             ${{ runner.temp }}/x3-github-evidence.json
+            ${{ runner.temp }}/x3-autopilot-triage.json
           if-no-files-found: warn
           retention-days: 14
       - name: Report evidence retention status
