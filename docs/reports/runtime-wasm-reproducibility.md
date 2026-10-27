@@ -698,6 +698,15 @@ alters the runtime, so the record and the code land together.
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
 
+* `54c840bb2` — **the public-testnet admission candidate and bridge hardening compile as
+  one runtime.** This merges the canonical X3Lang native-trading runtime, the exact-route
+  withdrawal lifecycle, pending and daily release limits, the master security baseline, and
+  the canonical admission workflow. Two from-scratch srtool builds against this commit agreed:
+  compact 10,564,128 bytes
+  (`0x852d8e4053d4992b255525150c2c98e8b9689bb424d39532e69b89a062f5390f`) and compressed
+  1,852,407 bytes
+  (`0x33302603814cc6d0727daf0076340ee3e5652fddfedff968e2c45cc6968d4826`).
+
 * `0c4d8ea98` — **withdrawals are bound to their exact route and exposure limits.**
   `request_withdrawal` now requires the route chosen by the user, stores that binding in a side map,
   and derives the withdrawal id over route, asset, recipient, amount, and block. Burn, proof release,
