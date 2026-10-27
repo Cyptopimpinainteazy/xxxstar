@@ -491,6 +491,8 @@ pub mod pallet {
         InvalidReceiptFormat,
         /// Output too large
         OutputTooLarge,
+        /// A job with this id is already recorded
+        DuplicateJob,
     }
 
     // ============================================================================
@@ -563,11 +565,15 @@ pub mod pallet {
                 Error::<T>::VerificationDisabled
             );
 
-            // Reserve reward
-            T::Currency::reserve(&who, reward)?;
-
             // Generate job ID
             let job_id = Self::generate_job_id(&who, &bytecode_hash, &input_hash);
+            // The id is derived from (submitter, bytecode, input, block), so the same
+            // job submitted twice in one block collides. Overwriting the first record
+            // would strand its reserved reward with nothing able to release it.
+            ensure!(!Jobs::<T>::contains_key(job_id), Error::<T>::DuplicateJob);
+
+            // Reserve reward
+            T::Currency::reserve(&who, reward)?;
 
             let record = JobRecord {
                 submitter: who.clone(),
@@ -618,6 +624,16 @@ pub mod pallet {
                 ensure!(
                     job.status == JobStatus::Pending || job.status == JobStatus::Submitted,
                     Error::<T>::JobAlreadyCompleted
+                );
+                // A receipt is only for the job it names: it must execute that job's
+                // input, within that job's gas limit, or the reward pays for other work.
+                ensure!(
+                    receipt.input_hash == job.input_hash,
+                    Error::<T>::InvalidReceiptFormat
+                );
+                ensure!(
+                    receipt.gas_used <= job.gas_limit,
+                    Error::<T>::InvalidReceiptFormat
                 );
 
                 // Verify signature
@@ -694,8 +710,11 @@ pub mod pallet {
                     .ok_or(Error::<T>::ExecutorNotRegistered)?;
                 executor.active = false;
 
-                // Unreserve stake
+                // Unreserve stake, and record that it is gone: otherwise a second call
+                // would unreserve the same amount again, releasing whatever else the
+                // account has reserved (such as the reward of a job it submitted).
                 T::Currency::unreserve(&who, executor.stake);
+                executor.stake = 0u32.into();
 
                 Ok(())
             })
