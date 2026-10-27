@@ -89,6 +89,24 @@ class ForgeBrainTests(unittest.TestCase):
         self.assertEqual(result["matches"][0]["occurrences"], 2)
         self.assertIn("unverified", result["trust"])
 
+    def test_operator_shared_memory_path_works_without_checkout_local_log(self):
+        shared = self.root / "shared" / "memory.jsonl"
+        with patch.dict(os.environ, {
+            "X3_FORGE_ALLOW_WRITES": "1",
+            "X3_FORGE_SHARED_MEMORY": str(shared),
+        }):
+            brain.remember(self.root, "success", "x3-lang",
+                           "deterministic receipt validated")
+            result = brain.recall(self.root, "deterministic receipt")
+        self.assertEqual(result["total_entries"], 1)
+        self.assertTrue(shared.exists())
+        self.assertFalse((self.root / ".x3-forge" / "memory.jsonl").exists())
+
+    def test_relative_shared_memory_location_rejected(self):
+        with patch.dict(os.environ, {"X3_FORGE_SHARED_MEMORY": "relative.jsonl"}):
+            with self.assertRaisesRegex(ValueError, "absolute path"):
+                brain.recall(self.root, "refund")
+
     def test_bad_memory_type_and_invalid_query_rejected(self):
         with patch.dict(os.environ, {"X3_FORGE_ALLOW_WRITES": "1"}):
             with self.assertRaises(ValueError):
