@@ -1,8 +1,12 @@
-# FINAL_REPORT.md
+# X3 Finalization Evidence Report (Template)
 
-## YOLO Finisher v5.1 — Finalization Completion Report
+This file is an **unfilled release-report template**, not evidence of a passing
+build, completed audit or approved launch. Record the exact commit, dated
+commands, results, external reviews and artifacts before marking a section
+complete. Unknown or missing evidence blocks sign-off.
 
-This report is the mandatory, self-scoring, end-to-end completion proof for the repository. No repo is considered finished without a complete, evidence-backed, and validated FINAL_REPORT.md.
+The phase and score fields below are retained for compatibility with the
+existing review process. Their presence does not prove a phase passed.
 
 ### 1. Repo Identification
 - **Repository Name:**
@@ -37,13 +41,17 @@ This report is the mandatory, self-scoring, end-to-end completion proof for the 
 | Chaos / Fuzz | 10 |  | Safe degradation |  |
 | Docs ↔ Execution Match | 10 |  | No reality diffs |  |
 | Recovery Behavior | 5 |  | Restart-safe |  |
-| **TOTAL** | **100** | **0** | **Must be 100 to ship** |  |
+| **TOTAL** | **100** | **Not assessed** | **Must be 100 to ship** |  |
 
 ### 4. Self-Scoring Completion Gate
-- **Are there any TODOs, stubs, or incomplete features?** (Yes/No): No
-- **Are all configs, scripts, and docs up to date and correct?** (Yes/No): Yes
-- **Is the repo provably shippable, secure, and production-ready?** (Yes/No): Yes
-- **If any answer is No, explain why and block release:**
+
+Do not pre-fill these answers. Each answer needs an evidence link tied to the
+commit being considered. **Unknown is blocking**, not a default pass.
+
+- **Are there any TODOs, stubs, or incomplete features?** Unassessed
+- **Are all configs, scripts, and docs current and correct?** Unassessed
+- **Is this specific release candidate approved for its stated scope?** No approval recorded
+- **Unresolved gaps and reason for blocking release:** Not yet evaluated
 
 ### 5. Security & Compliance Checklist
 - [ ] All secrets, keys, and credentials are removed or secured
@@ -110,10 +118,13 @@ This report is the mandatory, self-scoring, end-to-end completion proof for the 
 - **Signature / Hash:**
 
 ### 17. Attachments & Artifacts
-- [ ] Link to full test logs: https://
-- [ ] Link to security scan reports: https://
-- [ ] Link to coverage reports: https://
-- [ ] Link to deployment artifacts: https://
-- [ ] Other supporting evidence: https://
+- [ ] Full test logs: pending
+- [ ] Security scan reports: pending
+- [ ] Coverage reports: pending
+- [ ] Deployment artifacts: pending
+- [ ] Other supporting evidence: pending
 
-> **Release Gate Rule:** Shipping is forbidden unless TOTAL score is 100, all mandatory sections are complete, all checkboxes are checked, and all evidence links are valid.
+> **Release review rule:** The existing policy requires a 100/100 score,
+> completed mandatory sections, checked items and verifiable evidence links.
+> Filling in this template does **not** enforce the gate or authorize shipping;
+> the release requires current CI, independent reviews and operator sign-off.

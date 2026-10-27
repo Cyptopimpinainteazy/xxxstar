@@ -1,15 +1,20 @@
 # X3 Atomic Star — Launch Scope (Authoritative)
 
-**Version:** 1.1  
-**Date:** 2026-06-10  
-**Status:** v0.4 Internal Testnet Candidate  
-**Supersedes:** README.md status claims, CURRENT_MAINNET_STATUS.md, MAINNET_RC1_SCOPE.md
+**Scope version:** 1.1 (June 10, 2026)  
+**Release phase:** v0.4 internal testnet candidate  
+**Scope priority:** Supersedes older release-scope claims in README.md,
+CURRENT_MAINNET_STATUS.md and MAINNET_RC1_SCOPE.md. It does not supersede
+newer dated CI failures, security findings or observed runtime behavior.
 
 ---
 
 ## Purpose
 
-This document is the single authoritative source of truth for X3 Atomic Star's launch scope. All public messaging, release notes, audit engagement, operator onboarding, and security assessments MUST reference this document. Contradictory claims in other repo documents are superseded by this file.
+This document defines the intended boundaries of the internal release.
+It does not certify that a component builds, its tests pass, or the physical
+network is running. Release notes and operator decisions must also use the
+latest exact-commit CI evidence, outstanding security findings and fleet
+verification. Older feature-status claims cannot override those results.
 
 ---
 
@@ -19,9 +24,13 @@ X3 Atomic Star is in **v0.4 Internal Testnet Candidate** phase. This is an inter
 
 ---
 
-## Enabled in RC-1
+## Included in RC-1 scope
 
-The following capabilities are part of the shipped RC-1 product surface:
+The table records the intended internal RC-1 capabilities and the assurance
+reported when this scope was written. **Active** describes inclusion in that
+scope, not public availability or a passing result at the latest commit.
+Before deployment, verify each relevant component against current tests,
+runtime configuration and the release gates.
 
 | Capability | Status | Assurance Level |
 |---|---|---|
@@ -72,9 +81,12 @@ The following claims in `CURRENT_MAINNET_STATUS.md` are **INCORRECT** for the cu
 | "Bitcoin — 100% production" | SPV verifier and vault code exists but is NOT active. Present for audit review only. |
 | "Relayer infrastructure — 100% production" | Relayer code is present but NOT operational in RC-1. External bridge flows are disabled at genesis. |
 
-## Launched vs Pre-Launch Artifacts
+## RC-1 artifacts and deferred integrations
 
-### Fully Launched and Active
+### In-tree RC-1 components and tooling
+
+The following items are present as code, scripts or configuration. This list
+is **not** proof of a running public service or a passing release gate.
 - Internal cross-VM routing (native ↔ evm ↔ svm)
 - Supply ledger with invariant enforcement
 - Settlement engine with refund path
@@ -128,7 +140,7 @@ The following gates MUST pass before transitioning to a public staged testnet:
 
 | Gate | Criterion | Current Status |
 |---|---|---|
-| Scope reconciliation | This document is the sole truth source | ✅ COMPLETE |
+| Scope reconciliation | Intended scope documented; current evidence still required | Documented June 2026 |
 | Broken docs fixed | README deployment link points to existing doc | ✅ COMPLETE |
 | Feature-gate enforcement | `external-gateway` removed from `mainnet-rc1` + `compile_error!` guard added | ✅ COMPLETE |
 | CI semantic analysis | CodeQL + Semgrep in CI | ✅ COMPLETE |
