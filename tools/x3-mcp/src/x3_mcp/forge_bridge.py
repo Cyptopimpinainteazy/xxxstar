@@ -6,6 +6,7 @@ to share memory. No code is executed from a query, and nothing is silently index
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import importlib.util
 import json
 import os
@@ -78,6 +79,17 @@ def context(root: Path, query: str, budget_tokens: int = 12000,
     return _checked_package(root, package)
 
 
+def _store(root: Path) -> Path:
+    """Use one operator-configured memory file across isolated agent worktrees."""
+    configured = os.getenv("X3_FORGE_SHARED_MEMORY", "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+        if not path.is_absolute():
+            raise ValueError("X3_FORGE_SHARED_MEMORY must be an absolute path")
+        return path.resolve()
+    return root.resolve() / ".x3-forge" / "memory.jsonl"
+
+
 def recall(root: Path, query: str, kind: str = "", limit: int = 10) -> dict[str, Any]:
     """Retrieve agent-supplied incident notes; never represent them as proof."""
     if not query.strip():
@@ -87,7 +99,7 @@ def recall(root: Path, query: str, kind: str = "", limit: int = 10) -> dict[str,
     memory = _module(root.resolve(), "failure_memory")
     if kind and kind not in memory.KINDS:
         raise ValueError("unknown memory kind")
-    entries = memory.load(root / ".x3-forge" / "memory.jsonl")
+    entries = memory.load(_store(root))
     return {
         "matches": memory.search(entries, query, kind=kind or None, limit=limit),
         "total_entries": len(entries),
@@ -109,11 +121,20 @@ def remember(root: Path, kind: str, component: str, observation: str,
         raise ValueError("memory field exceeds 4000 characters")
     root = root.resolve()
     memory = _module(root, "failure_memory")
-    saved = memory.record(
-        root / ".x3-forge" / "memory.jsonl",
-        {"kind": kind, "component": component, "error": observation,
-         "fix": resolution, "regression": regression, "commit": _head(root)},
-    )
+    store = _store(root)
+    store.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = store.with_name(store.name + ".lock")
+    # Guard concurrent workers writing the same memory log on Linux.
+    with lock_path.open("a+b") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            saved = memory.record(
+                store,
+                {"kind": kind, "component": component, "error": observation,
+                 "fix": resolution, "regression": regression, "commit": _head(root)},
+            )
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
     return {"saved": saved, "trust": "agent-supplied; not verified evidence"}
 
 
