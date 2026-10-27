@@ -108,7 +108,20 @@ def check_workflows(candidate, runs, policy, repo, now, max_age_days=14):
         elif created > now + dt.timedelta(minutes=10) or now - created > dt.timedelta(days=max_age_days):
             status = "STALE"
         elif run.get("status") == "completed" and run.get("conclusion") == "success":
-            status = "PASS"
+            jobs = run.get("jobs")
+            if not isinstance(jobs, list) or not jobs:
+                status = "NO_JOBS"
+            elif any(
+                not isinstance(job, dict) or
+                type(job.get("id")) is not int or job["id"] <= 0 or
+                not isinstance(job.get("name"), str) or not job["name"] or
+                job.get("head_sha") not in (None, candidate) or
+                job.get("status") != "completed" or job.get("conclusion") != "success"
+                for job in jobs
+            ):
+                status = "JOBS_NOT_GREEN"
+            else:
+                status = "PASS"
         else:
             status = "BLOCKED"
         if status != "PASS":
@@ -235,6 +248,51 @@ def fetch_github_runs(repo, sha, token, max_pages=10):
     raise ValueError("GitHub run pagination limit reached; no partial admission")
 
 
+def fetch_required_jobs(repo, runs, policy, sha, token, max_pages=10):
+    """Enrich only the latest required run with exact-head jobs.
+
+    The workflow's green result is not sufficient; missing or skipped jobs
+    block admission. A partial job page is never accepted as complete.
+    """
+    for required in policy["required_workflows"]:
+        matching = [run for run in runs if run_path(run, repo) == required["path"]
+                    and run.get("head_sha") == sha]
+        if not matching:
+            continue
+        matching.sort(key=lambda run: (
+            timestamp(run.get("created_at")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc),
+            run.get("id") if type(run.get("id")) is int else -1,
+            run.get("run_attempt") if type(run.get("run_attempt")) is int else -1,
+        ), reverse=True)
+        run = matching[0]
+        if type(run.get("id")) is not int or run["id"] < 1:
+            continue
+        jobs = []
+        for page in range(1, max_pages + 1):
+            query = urllib.parse.urlencode({"per_page": 100, "page": page})
+            request = urllib.request.Request(
+                f"https://api.github.com/repos/{repo}/actions/runs/{run['id']}/jobs?{query}",
+                headers={"Authorization": "Bearer " + token,
+                         "Accept": "application/vnd.github+json",
+                         "User-Agent": "x3-public-launch-guardian/1",
+                         "X-GitHub-Api-Version": "2022-11-28"},
+            )
+            with urllib.request.urlopen(request, timeout=20) as response:
+                payload = json.load(response)
+            batch = payload.get("jobs")
+            if not isinstance(batch, list):
+                raise ValueError("GitHub workflow jobs API response invalid")
+            jobs.extend(batch)
+            if len(batch) < 100:
+                break
+        else:
+            raise ValueError("GitHub jobs pagination limit reached; no partial admission")
+        # A rerun or forced update can race the metadata collection. Require
+        # the observed attempt to match the latest run attempt at the end.
+        run["jobs"] = jobs
+    return runs
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate-sha", required=True)
@@ -252,8 +310,10 @@ def main(argv=None):
         if not SHA.fullmatch(args.candidate_sha) or not REPO.fullmatch(args.repo):
             raise ValueError("invalid candidate SHA or repository")
         if args.fetch_github:
-            runs = fetch_github_runs(args.repo, args.candidate_sha,
-                                     os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN"))
+            token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+            require_policy(policy)
+            runs = fetch_github_runs(args.repo, args.candidate_sha, token)
+            runs = fetch_required_jobs(args.repo, runs, policy, args.candidate_sha, token)
             source_label = "github_live"
         else:
             fixture = json.loads(args.runs_json.read_text(encoding="utf-8"))
