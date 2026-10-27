@@ -4,31 +4,38 @@
   "required_workflows": [
     {
       "gate": "local_ci",
-      "path": ".github/workflows/local-ci.yml"
+      "path": ".github/workflows/local-ci.yml",
+      "min_successful_jobs": 1
     },
     {
       "gate": "compiler_runtime",
-      "path": ".github/workflows/x3lang-production-unification.yml"
+      "path": ".github/workflows/x3lang-production-unification.yml",
+      "min_successful_jobs": 3
     },
     {
       "gate": "compiled_storage",
-      "path": ".github/workflows/x3-compiled-storage-build.yml"
+      "path": ".github/workflows/x3-compiled-storage-build.yml",
+      "min_successful_jobs": 1
     },
     {
       "gate": "atomic_trading",
-      "path": ".github/workflows/x3-atomic-trade-engine.yml"
+      "path": ".github/workflows/x3-atomic-trade-engine.yml",
+      "min_successful_jobs": 1
     },
     {
       "gate": "security_review",
-      "path": ".github/workflows/security-audit.yml"
+      "path": ".github/workflows/security-audit.yml",
+      "min_successful_jobs": 1
     },
     {
       "gate": "release_gates",
-      "path": ".github/workflows/production-gate.yml"
+      "path": ".github/workflows/production-gate.yml",
+      "min_successful_jobs": 4
     },
     {
       "gate": "consensus_integration",
-      "path": ".github/workflows/zombienet-integration.yml"
+      "path": ".github/workflows/zombienet-integration.yml",
+      "min_successful_jobs": 1
     }
   ],
   "min_validators": 7,
