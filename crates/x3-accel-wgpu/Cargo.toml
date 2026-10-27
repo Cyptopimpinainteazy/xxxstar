@@ -13,4 +13,5 @@ wgpu = "0.20"
 
 [dev-dependencies]
 keccak-hash = "0.11"
+secp256k1 = { version = "0.28", features = ["recovery", "global-context"] }
 sha2 = "0.10"

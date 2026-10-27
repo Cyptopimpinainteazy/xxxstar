@@ -81,6 +81,16 @@ P0_BASELINE_COUNT = 82
 P0_CAPABILITY_COUNT = 79
 P0_CLAIM_HYGIENE_COUNT = 3
 CLAIM_HYGIENE_SUBSYSTEM = "claims_hygiene"
+
+
+def _open_blockers(blockers: list[object]) -> list[object]:
+    """Return only blockers that are not explicitly recorded as closed."""
+    resolved = re.compile(r"^\*{0,2}\s*CLOSED\b", re.IGNORECASE)
+    return [
+        blocker
+        for blocker in blockers
+        if not resolved.match(str(blocker).strip())
+    ]
 LAUNCH_RECORD_PATH = ROOT / "reports" / "launch" / "promotion.json"
 LAUNCH_RECORD_SCHEMA = 2
 AUDIT_SCOPES_A = {"runtime", "consensus", "atomic"}
@@ -226,10 +236,11 @@ def evaluate_p0_scope(matrix: dict, repo_root: pathlib.Path | str) -> list[str]:
         blockers = feature.get("blockers", [])
         if not isinstance(blockers, list):
             errors.append(f"{label}: blockers is not an array")
-        elif blockers:
+        elif open_blockers := _open_blockers(blockers):
             errors.append(
-                f"{label}: P0 release has {len(blockers)} open blocker"
-                f"{'s' if len(blockers) != 1 else ''}: {'; '.join(map(str, blockers))}"
+                f"{label}: P0 release has {len(open_blockers)} open blocker"
+                f"{'s' if len(open_blockers) != 1 else ''}: "
+                f"{'; '.join(map(str, open_blockers))}"
             )
 
         required_tests = feature.get("required_tests", [])

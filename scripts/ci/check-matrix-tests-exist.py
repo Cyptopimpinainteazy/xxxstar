@@ -7,9 +7,9 @@ exists as a real test function. The *matrix* fragments carry the same field and 
 2026-09-26, which is what prompted this script.
 
 A citation is evidence, so it has to resolve. This reads every `feature-matrix/*.toml` fragment, takes
-each row's `required_tests` and `paths`, and requires `fn <name>` to exist under one of those paths
-(a file path means the directory containing it, so a row may cite `.../src/lib.rs` while its tests
-live in `.../src/tests.rs`).
+each row's `required_tests`, `paths` and `test_paths`, and requires `fn <name>` to exist under one of
+those paths (a file path means the directory containing it, so a row may cite `.../src/lib.rs`
+while its tests live in `.../src/tests.rs`).
 
     scripts/ci/check-matrix-tests-exist.py           # check
     scripts/ci/check-matrix-tests-exist.py --list    # print every citation and where it resolved
@@ -56,6 +56,40 @@ def names(text: str) -> set[str]:
     return set(FN.findall(text))
 
 
+def search_paths(feature: dict) -> list[str]:
+    paths = feature.get("paths") or []
+    test_paths = feature.get("test_paths") or []
+    if not isinstance(paths, list) or not isinstance(test_paths, list):
+        return []
+    return [
+        value
+        for value in paths + test_paths
+        if isinstance(value, str) and value.strip()
+    ]
+
+
+def citation_missing(feature: dict, citation: str) -> str | None:
+    paths = search_paths(feature)
+    wanted = citation.split("::")[-1]
+    if wanted in names(corpus_for(paths)):
+        return None
+    return (
+        f"{feature.get('id')}: required_tests cites {citation!r} "
+        f"but no fn {wanted} exists under {paths}"
+    )
+
+
+def unresolved_for(feature: dict) -> list[str]:
+    citations = feature.get("required_tests") or []
+    if not citations:
+        return []
+    return [
+        problem
+        for citation in citations
+        if (problem := citation_missing(feature, citation)) is not None
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--list", action="store_true", help="print every citation and its resolution")
@@ -70,21 +104,17 @@ def main() -> int:
             print(f"check-matrix-tests-exist: {fragment.name} is not valid TOML: {err}", file=sys.stderr)
             return 2
         for feature in data.get("feature", []):
-            citations = feature.get("required_tests") or []
-            if not citations:
-                continue
-            defined = names(corpus_for(feature.get("paths") or []))
-            for citation in citations:
-                checked += 1
-                # `module::name` cites the tail; the field is for fn names.
-                wanted = citation.split("::")[-1]
-                if wanted in defined:
-                    if args.list:
-                        print(f"ok    {feature.get('id')}  {citation}")
-                else:
-                    missing.append(f"{feature.get('id')}: required_tests cites {citation!r} but no fn {wanted} exists under {feature.get('paths')}")
-                    if args.list:
-                        print(f"MISS  {feature.get('id')}  {citation}")
+            feature_missing = unresolved_for(feature)
+            checked += len(feature.get("required_tests") or [])
+            missing.extend(feature_missing)
+            if args.list:
+                for citation in feature.get("required_tests") or []:
+                    status = (
+                        "MISS"
+                        if citation_missing(feature, citation) is not None
+                        else "ok  "
+                    )
+                    print(f"{status}  {feature.get('id')}  {citation}")
 
     if args.list:
         print(f"\n{checked} citation(s) checked, {len(missing)} unresolved")

@@ -1,0 +1,102 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "base_commit": "ef6f1dbc96d8c90a1bb79d7ca78c01c9a4c702d1",
+  "working_tree_dirty": true,
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-candidate-20261024",
+  "scope": "Durable independent-validator Solana V4 vote exchange and runtime-intent binding",
+  "issue_fixed": "Independently signed Solana votes had no production transport, accepted proofs did not require the signed proof id to match the runtime settlement intent, and the submitter/library aggregation path had no end-to-end test through a real vote service.",
+  "implementation": [
+    "Add a bounded HTTP vote exchange for complete Solana V4 evidence packages.",
+    "Authenticate every submission against the configured Solana validator set with strict Ed25519 verification.",
+    "Persist accepted votes as JSON with file and parent-directory sync, an atomic temporary-file replacement, and verification of every persisted vote when the store is reopened.",
+    "Persist each validator's observed evidence digests for a proof id, refuse a different package without immediately condemning the submitter, and record equivocation only when the history proves one validator signed multiple packages.",
+    "Reject a reopened store with duplicate proof ids, unauthorized observations, invalid signatures, or unrecorded multi-digest equivocation.",
+    "Make repeated publication idempotent for the same validator and exact evidence package.",
+    "Expose health, publish, and query routes plus a reusable client for validator and aggregator processes.",
+    "Require the signed V4 proof id to equal the settlement-engine runtime intent id in the relayer submission boundary and the settlement verifier.",
+    "Add a real HTTP aggregation test that publishes two independent votes, retrieves them through the client, combines them with the submitter's own vote, and verifies the resulting three-signature Solana proof."
+  ],
+  "verification": [
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-relayer --no-fail-fast",
+      "result": "PASS",
+      "library_tests_passed": 81,
+      "executable_tests_passed": 6,
+      "failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p pallet-x3-settlement-engine --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 238,
+      "failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p pallet-x3-settlement-engine --features runtime-benchmarks --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 247,
+      "failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test -p x3-chain-runtime --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 95,
+      "failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-verification-router -p x3-relayer -p pallet-x3-settlement-engine -p x3-chain-runtime --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p pallet-x3-settlement-engine --features runtime-benchmarks --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy -p x3-relayer --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check -p x3-relayer --no-default-features",
+      "result": "PASS"
+    },
+    {
+      "command": "cargo fmt --check -p x3-relayer -p pallet-x3-settlement-engine",
+      "result": "PASS"
+    },
+    {
+      "command": "bash scripts/local-ci.sh --only feature-matrix-check,audit-matrix-freshness,matrix-tests-exist,matrix-test-evidence,fake-code-scan,test-cheat-scan,fake-code-scanner-self-test,claims-hygiene,mainnet-release-contract-tests,release-artifact-provenance,launch-record",
+      "result": "PASS",
+      "gates_passed": 11,
+      "gates_failed": 0,
+      "runlog": ".ai/runlogs/local-ci-20261025T161134Z-summary.json"
+    }
+  ],
+  "named_tests": [
+    "durable_quorum_rejects_equivocation_and_reloads",
+    "real_http_client_publishes_and_queries_votes",
+    "http_vote_exchange_assembles_a_real_svm_quorum",
+    "unauthorized_and_bad_signatures_are_refused",
+    "store_refuses_duplicate_proofs_and_unrecorded_equivocation",
+    "svm_settlement_refuses_missing_intent_and_runtime_signer",
+    "solana_v4_settlement_verifies_transaction_and_intent_economics"
+  ],
+  "negative_and_boundary_tests": [
+    "An unauthorized validator key is refused before persistence.",
+    "A forged or tampered Ed25519 signature is refused.",
+    "A second evidence package for an existing proof id is refused without condemning a validator that has not signed another package.",
+    "Submitting the same conflicting package repeatedly remains an evidence conflict rather than becoming equivocation.",
+    "A validator that signs both the canonical package and an alternate package is recorded as equivocated and loses its prior vote.",
+    "A validator already marked equivocated cannot return with another vote for the same proof id.",
+    "A reopened store refuses duplicate proof ids and multi-digest observation history that lacks an equivocation record.",
+    "A persisted store is revalidated at open time and refuses unauthorized or invalid persisted votes.",
+    "The submitter refuses a signed proof whose proof id differs from the runtime settlement intent.",
+    "The settlement engine refuses V4 evidence whose proof id differs from the intent."
+  ],
+  "limitations": [
+    "No public Solana RPC or live mainnet-beta transaction was queried in this evidence run.",
+    "The HTTP exchange was exercised between local processes; it has not yet been deployed as independent validator and aggregator services.",
+    "The standalone x3-relayer executable still needs to be replaced by the library RelayerService.",
+    "No external audit, public testnet, or controlled mainnet canary covers this transport."
+  ]
+}

@@ -7,8 +7,7 @@ license.workspace = true
 [dependencies]
 # Crypto and hashing
 sha3 = "0.10"
-k256 = { version = "0.13", features = ["ecdsa"] }
-ecdsa = { version = "0.16" }
+k256 = { version = "0.14", features = ["ecdsa"] }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -46,9 +45,6 @@ hex = "0.4"
 
 # Workspace integrations
 x3-gpu-validator-swarm = { path = "../x3-gpu-validator-swarm" }
-
-# Random for testing
-rand = "0.8"
 
 [features]
 cuda = []

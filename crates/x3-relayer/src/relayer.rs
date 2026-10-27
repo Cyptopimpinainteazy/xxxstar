@@ -17,12 +17,13 @@ use x3_finality_oracle::{
 };
 use x3_gateway_risk_engine::{GatewayRiskEngine, RiskPolicy, RouteRiskInput};
 use x3_proof_dispute::{DisputeStatus, DisputeTracker};
-use x3_validator_attestation::{Attestation, AttestationSet, ValidatorId};
+#[cfg(test)]
+use x3_verification_router::VerificationRouter;
 use x3_verification_router::{
+    ethereum_beacon::VerifiedEthereumExecutionHeader,
     evm_receipt::{AnchoredEvmHeader, EvmHeaderAnchorSource},
     ChainKind, ProductionEvmReceiptVerifier, ProofEnvelope, SolanaCluster,
-    SolanaStakeWeightedVerifier, SolanaValidatorStake, VerificationRouter, VerificationStrategy,
-    Verifier,
+    SolanaStakeWeightedVerifier, SolanaValidatorStake, VerificationStrategy, Verifier,
 };
 
 pub struct RelayerService {
@@ -39,20 +40,15 @@ pub struct RelayerService {
 
 struct RelayerSafetyPipeline {
     finality_oracle: InMemoryFinalityOracle,
+    #[cfg(test)]
     verification_router: VerificationRouter,
     risk_engine: GatewayRiskEngine,
     evm_finality_thresholds: BTreeMap<u32, u32>,
     svm_finality_thresholds: BTreeMap<u32, u32>,
-    /// The same authorized-validator set the router's `SolanaFinalizedVerifier`
-    /// was constructed with (issue #351): `evaluate_svm_proof` builds its
-    /// `AttestationSet` from this field rather than a second, independent
-    /// list, so the router-level check and the attestation-level check can
-    /// never silently disagree about who's authorized.
-    ///
-    /// It is also the only source of the required quorum. The count is derived
-    /// from the set through the workspace's single supermajority rule, so a
-    /// proof cannot lower its own bar by declaring a smaller
-    /// `required_signatures`.
+    svm_verifier: Arc<SolanaStakeWeightedVerifier>,
+    /// The configured signer set is used for the policy floor and claim checks.
+    /// The stake-weighted verifier separately enforces the configured stake
+    /// supermajority over the same keys.
     svm_quorum: AuthorizedValidatorSet,
 }
 
@@ -62,9 +58,11 @@ struct RelayerInternalState {
     svm_heads: BTreeMap<u32, u64>, // domain_id -> slot
     finalized_evm_headers: BTreeMap<u32, u64>, // domain_id -> finalized block_number
     finalized_svm_headers: BTreeMap<u32, u64>, // domain_id -> finalized slot
+    svm_finalized_floors: BTreeMap<u32, u64>, // durable finalized-slot floor
     finalized_evm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (block_hash + state_root)
     finalized_svm_data: BTreeMap<u32, HeaderInfo>, // domain_id -> finalized header (blockhash)
     pending_evm_receipts: BTreeMap<u32, Vec<PendingEvmReceipt>>,
+    pending_svm_requests: BTreeMap<u32, SvmProofRequest>,
     proof_cache: BTreeSet<[u8; 32]>, // Submitted proof hashes (replay protection)
     pending_submissions: u32,
     shutdown_signal: bool,
@@ -73,10 +71,34 @@ struct RelayerInternalState {
 
 #[derive(Clone)]
 struct PendingEvmReceipt {
+    runtime_intent_id: [u8; 32],
     finalized_block: u64,
+    verified_header: VerifiedEthereumExecutionHeader,
     proof_payload: Vec<u8>,
-    expected_recipient: Vec<u8>,
+    proof_id: [u8; 32],
+    source_asset: [u8; 20],
+    expected_sender: [u8; 20],
+    expected_contract: [u8; 20],
+    expected_beneficiary: Vec<u8>,
+    expected_nonce: u64,
     expected_amount: u128,
+}
+
+/// A finalized EVM receipt and the exact `DepositLocked` fields it must prove.
+#[derive(Clone)]
+pub struct EvmReceiptProofRequest {
+    pub runtime_intent_id: [u8; 32],
+    pub domain_id: u32,
+    pub finalized_block: u64,
+    pub verified_header: VerifiedEthereumExecutionHeader,
+    pub proof_payload: Vec<u8>,
+    pub proof_id: [u8; 32],
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
+    pub expected_amount: u128,
 }
 
 fn configured_solana_cluster(clusters: &[SvmClusterConfig]) -> Result<SolanaCluster, String> {
@@ -152,6 +174,9 @@ impl RelayerService {
         }
 
         // Initialize SVM watchers
+        for svm_config in &config.svm_clusters {
+            SvmHeaderWatcher::validate_rpc_sources(svm_config).map_err(anyhow::Error::msg)?;
+        }
         let mut svm_watchers = Vec::new();
         for svm_config in &config.svm_clusters {
             match SvmHeaderWatcher::new(svm_config.clone()).await {
@@ -163,16 +188,30 @@ impl RelayerService {
             }
         }
 
+        let svm_cluster =
+            configured_solana_cluster(&config.svm_clusters).map_err(anyhow::Error::msg)?;
+        let mut svm_finalized_floors = BTreeMap::new();
+        for watcher in &svm_watchers {
+            svm_finalized_floors.insert(watcher.domain_id(), watcher.finalized_floor().await);
+        }
+
         // Initialize RPC submitter
-        let submitter = RpcSubmitter::new_with_retry_config(
-            config.x3.rpc_url.clone(),
-            config.x3.relayer_account.clone(),
-            config.x3.relayer_custody_key_id.clone(),
-            config.x3.relayer_seed_phrase.as_deref(),
-            &config.validator_set.svm_validator_pubkeys,
-            config.submission.max_retries,
-            config.submission.retry_backoff_ms,
-        )
+        let submitter = RpcSubmitter::new_with_retry_config(crate::submitter::RpcSubmitterConfig {
+            x3_rpc_url: config.x3.rpc_url.clone(),
+            relayer_account: config.x3.relayer_account.clone(),
+            relayer_custody_key_id: config.x3.relayer_custody_key_id.clone(),
+            relayer_seed_phrase: config.x3.relayer_seed_phrase.clone(),
+            svm_validator_pubkeys: config.validator_set.svm_validator_pubkeys.clone(),
+            svm_validator_stakes: config.validator_set.svm_validator_stakes.clone(),
+            svm_cluster,
+            evm_domain_chains: config
+                .evm_chains
+                .iter()
+                .map(|chain| (chain.x3_domain_id, chain.chain_id.into()))
+                .collect(),
+            max_retries: config.submission.max_retries,
+            retry_backoff_ms: config.submission.retry_backoff_ms,
+        })
         .await?;
 
         let state = RelayerInternalState {
@@ -181,9 +220,11 @@ impl RelayerService {
             svm_heads: BTreeMap::new(),
             finalized_evm_headers: BTreeMap::new(),
             finalized_svm_headers: BTreeMap::new(),
+            svm_finalized_floors,
             finalized_evm_data: BTreeMap::new(),
             finalized_svm_data: BTreeMap::new(),
             pending_evm_receipts: BTreeMap::new(),
+            pending_svm_requests: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,
@@ -213,32 +254,104 @@ impl RelayerService {
 
     /// Attach the event-specific receipt proof that finality polling alone cannot
     /// derive. The proof is consumed only after the matching block is finalized.
-    pub async fn queue_evm_receipt_proof(
-        &self,
-        domain_id: u32,
-        finalized_block: u64,
-        proof_payload: Vec<u8>,
-        expected_recipient: Vec<u8>,
-        expected_amount: u128,
-    ) -> Result<()> {
-        if proof_payload.is_empty() {
+    pub async fn queue_evm_receipt_proof(&self, request: EvmReceiptProofRequest) -> Result<()> {
+        if request.proof_payload.is_empty() {
             anyhow::bail!("EVM receipt proof payload must not be empty");
         }
-        if expected_recipient.len() != 20 {
-            anyhow::bail!("EVM deposit recipient must be 20 bytes");
+        if request.proof_id == [0u8; 32] {
+            anyhow::bail!("EVM gateway message id must not be zero");
+        }
+        if request.runtime_intent_id == [0u8; 32] {
+            anyhow::bail!("EVM settlement intent id must not be zero");
+        }
+        if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
+            anyhow::bail!("EVM deposit beneficiary must be between 1 and 128 bytes");
+        }
+        if request.verified_header.block_number != request.finalized_block {
+            anyhow::bail!("verified beacon header does not match the finalized block");
         }
         self.state
             .write()
             .await
             .pending_evm_receipts
-            .entry(domain_id)
+            .entry(request.domain_id)
             .or_default()
             .push(PendingEvmReceipt {
-                finalized_block,
-                proof_payload,
-                expected_recipient,
-                expected_amount,
+                runtime_intent_id: request.runtime_intent_id,
+                finalized_block: request.finalized_block,
+                verified_header: request.verified_header,
+                proof_payload: request.proof_payload,
+                proof_id: request.proof_id,
+                source_asset: request.source_asset,
+                expected_sender: request.expected_sender,
+                expected_contract: request.expected_contract,
+                expected_beneficiary: request.expected_beneficiary,
+                expected_nonce: request.expected_nonce,
+                expected_amount: request.expected_amount,
             });
+        Ok(())
+    }
+
+    /// Queue complete Solana V4 evidence. The proof is not produced until the
+    /// watcher has observed that finalized slot, and no bank hash or transfer
+    /// field is derived from a caller-chosen conclusion.
+    pub async fn queue_svm_proof_request(&self, request: SvmProofRequest) -> Result<()> {
+        if request.runtime_intent_id == [0u8; 32] {
+            anyhow::bail!("SVM settlement intent id must not be zero");
+        }
+        let configured = self
+            .config
+            .svm_clusters
+            .iter()
+            .find(|cluster| cluster.x3_domain_id == request.source_domain)
+            .ok_or_else(|| anyhow::anyhow!("SVM proof domain is not configured"))?;
+        let cluster = configured_solana_cluster(std::slice::from_ref(configured))
+            .map_err(anyhow::Error::msg)?;
+        if cluster != request.cluster {
+            anyhow::bail!("SVM proof cluster does not match the configured cluster");
+        }
+        if request.proof_id == [0u8; 32]
+            || request.blockhash == [0u8; 32]
+            || request.bank_hash == [0u8; 32]
+            || request.parent_bank_hash == [0u8; 32]
+            || request.stake_table_digest == [0u8; 32]
+            || request.transaction.signature == [0u8; 64]
+            || request.transaction.commitment == [0u8; 32]
+            || request.transaction.recent_blockhash == [0u8; 32]
+        {
+            anyhow::bail!("SVM finality evidence contains a zero identity");
+        }
+        if request.transaction.slot != request.slot {
+            anyhow::bail!("SVM transaction slot does not match the finalized slot");
+        }
+        if !request.transaction.succeeded {
+            anyhow::bail!("SVM transaction evidence reports a failed transaction");
+        }
+        if request.parent_slot >= request.slot {
+            anyhow::bail!("SVM parent slot must precede the finalized slot");
+        }
+        if request.expected_beneficiary.is_empty() || request.expected_beneficiary.len() > 128 {
+            anyhow::bail!("SVM beneficiary must be between 1 and 128 bytes");
+        }
+        let watcher = self
+            .svm_watchers
+            .iter()
+            .find(|watcher| watcher.domain_id() == request.source_domain)
+            .ok_or_else(|| anyhow::anyhow!("SVM watcher for the proof domain is unavailable"))?;
+        let signature = bs58::encode(request.transaction.signature).into_string();
+        let observed = watcher
+            .finalized_transaction_evidence(&signature, request.slot, request.blockhash)
+            .await?;
+        if observed != request.transaction {
+            anyhow::bail!(
+                "SVM transaction evidence does not match the finalized RPC quorum observation"
+            );
+        }
+        self.state
+            .write()
+            .await
+            .pending_svm_requests
+            .insert(request.source_domain, request);
         Ok(())
     }
 
@@ -443,6 +556,9 @@ impl RelayerService {
                                         .finalized_svm_headers
                                         .insert(header.chain_id, header.block_number);
                                     state
+                                        .svm_finalized_floors
+                                        .insert(header.chain_id, header.block_number);
+                                    state
                                         .finalized_svm_data
                                         .insert(header.chain_id, header.clone());
                                 }
@@ -527,12 +643,18 @@ impl RelayerService {
                 if let Ok(proof) = self
                     .submitter
                     .acquire_evm_proof(EvmProofRequest {
+                        runtime_intent_id: pending.runtime_intent_id,
                         source_domain: domain_id,
+                        proof_id: pending.proof_id,
                         finalized_block: block_number,
                         block_hash,
                         state_root,
                         proof_payload: pending.proof_payload,
-                        expected_recipient: pending.expected_recipient,
+                        source_asset: pending.source_asset,
+                        expected_sender: pending.expected_sender,
+                        expected_contract: pending.expected_contract,
+                        expected_beneficiary: pending.expected_beneficiary,
+                        expected_nonce: pending.expected_nonce,
                         expected_amount: pending.expected_amount,
                     })
                     .await
@@ -546,13 +668,28 @@ impl RelayerService {
                         .await
                         .proofs_failed
                         .min(u64::from(u32::MAX)) as u32;
+                    let beacon_header = &pending.verified_header;
+                    if !beacon_header.matches_evm_header(
+                        block_number,
+                        block_hash,
+                        state_root,
+                        receipts_root,
+                    ) {
+                        warn!(
+                            "Verified beacon header for domain {} block {} disagrees with the RPC header",
+                            domain_id, block_number
+                        );
+                        let mut metrics = self.metrics.write().await;
+                        metrics.proofs_failed += 1;
+                        continue;
+                    }
                     if let Err(reason) = self.safety_pipeline.evaluate_evm_proof_against_header(
                         &proof,
                         AnchoredEvmHeader {
-                            number: block_number,
-                            receipts_root,
-                            state_root,
-                            block_hash,
+                            number: beacon_header.block_number,
+                            receipts_root: beacon_header.receipts_root.to_fixed_bytes(),
+                            state_root: beacon_header.state_root.to_fixed_bytes(),
+                            block_hash: beacon_header.block_hash.to_fixed_bytes(),
                         },
                         attested_head,
                         recent_failures,
@@ -576,7 +713,11 @@ impl RelayerService {
                     }
 
                     // Submit proof with retries
-                    match self.submitter.submit_evm_proof(proof).await {
+                    match self
+                        .submitter
+                        .submit_evm_proof(sp_core::H256(pending.runtime_intent_id), proof)
+                        .await
+                    {
                         Ok(tx_hash) => {
                             debug!("Submitted EVM proof: {}", tx_hash);
                             state.pending_submissions = state.pending_submissions.saturating_sub(1);
@@ -606,9 +747,6 @@ impl RelayerService {
                     domain_id, slot
                 );
 
-                // Acquire proof from finalized slot.
-                // blockhash comes from the header stored when this slot crossed
-                // the finality threshold in poll_svm_headers.
                 let blockhash = match state.finalized_svm_data.get(&domain_id) {
                     Some(h) => h.block_hash,
                     None => {
@@ -620,21 +758,45 @@ impl RelayerService {
                     }
                 };
 
-                if let Ok(proof) = self
-                    .submitter
-                    .acquire_svm_proof(domain_id, slot, blockhash)
-                    .await
-                {
+                let request = match state.pending_svm_requests.get(&domain_id).cloned() {
+                    Some(request) if request.slot == slot && request.blockhash == blockhash => {
+                        request
+                    }
+                    Some(_) => {
+                        warn!(
+                            "Queued SVM evidence for domain {} does not match finalized slot {}",
+                            domain_id, slot
+                        );
+                        continue;
+                    }
+                    None => {
+                        debug!(
+                            "No V4 stake-weighted evidence queued for finalized SVM domain {}",
+                            domain_id
+                        );
+                        continue;
+                    }
+                };
+                let runtime_intent_id = request.runtime_intent_id;
+
+                if let Ok(proof) = self.submitter.acquire_svm_proof(request).await {
+                    state.pending_svm_requests.remove(&domain_id);
+                    let finalized_floor = state
+                        .svm_finalized_floors
+                        .get(&domain_id)
+                        .copied()
+                        .unwrap_or(slot);
                     let recent_failures = self
                         .metrics
                         .read()
                         .await
                         .proofs_failed
                         .min(u64::from(u32::MAX)) as u32;
-                    if let Err(reason) = self
-                        .safety_pipeline
-                        .evaluate_svm_proof(&proof, recent_failures)
-                    {
+                    if let Err(reason) = self.safety_pipeline.evaluate_svm_proof(
+                        &proof,
+                        finalized_floor,
+                        recent_failures,
+                    ) {
                         warn!(
                             "Skipping SVM proof submission for domain {} slot {}: {}",
                             domain_id, slot, reason
@@ -654,7 +816,11 @@ impl RelayerService {
                     }
 
                     // Submit proof with retries
-                    match self.submitter.submit_svm_proof(proof).await {
+                    match self
+                        .submitter
+                        .submit_svm_proof(sp_core::H256(runtime_intent_id), proof)
+                        .await
+                    {
                         Ok(tx_hash) => {
                             debug!("Submitted SVM proof: {}", tx_hash);
                             state.pending_submissions = state.pending_submissions.saturating_sub(1);
@@ -687,14 +853,19 @@ impl RelayerService {
         use sha2::{Digest, Sha256};
 
         let mut hasher = Sha256::new();
-        hasher.update(b"x3-relayer-evm-proof-v2");
+        hasher.update(b"x3-relayer-evm-proof-v3");
         hasher.update(proof.source_domain.to_le_bytes());
+        hasher.update(proof.proof_id);
         hasher.update(proof.finalized_block.to_le_bytes());
         hasher.update(proof.block_hash);
         hasher.update(proof.state_root);
         hasher.update(proof.proof_nonce.to_le_bytes());
-        hasher.update((proof.expected_recipient.len() as u64).to_le_bytes());
-        hasher.update(&proof.expected_recipient);
+        hasher.update(proof.source_asset);
+        hasher.update(proof.expected_sender);
+        hasher.update(proof.expected_contract);
+        hasher.update(proof.expected_nonce.to_le_bytes());
+        hasher.update((proof.expected_beneficiary.len() as u64).to_le_bytes());
+        hasher.update(&proof.expected_beneficiary);
         hasher.update(proof.expected_amount.to_le_bytes());
         hasher.update((proof.proof_payload.len() as u64).to_le_bytes());
         hasher.update(&proof.proof_payload);
@@ -703,18 +874,40 @@ impl RelayerService {
 
     /// Calculate hash of SVM proof for deduplication
     fn calculate_proof_hash_svm(&self, proof: &crate::types::SvmProof) -> [u8; 32] {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+        use sha2::{Digest, Sha256};
 
-        let mut hasher = DefaultHasher::new();
-        proof.source_domain.hash(&mut hasher);
-        proof.slot.hash(&mut hasher);
-        proof.blockhash.hash(&mut hasher);
-
-        let hash_u64 = hasher.finish();
-        let mut result = [0u8; 32];
-        result[0..8].copy_from_slice(&hash_u64.to_le_bytes());
-        result
+        let envelope = proof
+            .encoded_envelope()
+            .expect("SVM proofs are encoded before deduplication");
+        let mut hasher = Sha256::new();
+        hasher.update(b"x3-relayer-svm-proof-v3");
+        hasher.update(proof.source_domain.to_le_bytes());
+        hasher.update(proof.proof_id);
+        hasher.update([proof.cluster as u8]);
+        hasher.update(proof.slot.to_le_bytes());
+        hasher.update(proof.parent_slot.to_le_bytes());
+        hasher.update(proof.blockhash);
+        hasher.update(proof.bank_hash);
+        hasher.update(proof.parent_bank_hash);
+        hasher.update(proof.stake_table_digest);
+        hasher.update(proof.transaction.slot.to_le_bytes());
+        hasher.update(proof.transaction.index.to_le_bytes());
+        hasher.update([u8::from(proof.transaction.succeeded)]);
+        hasher.update(proof.transaction.signature);
+        hasher.update(proof.transaction.commitment);
+        hasher.update(proof.transaction.recent_blockhash);
+        hasher.update(proof.expected_asset_id);
+        hasher.update(proof.expected_amount.to_le_bytes());
+        for value in [
+            &proof.expected_sender,
+            &proof.expected_recipient,
+            &proof.expected_beneficiary,
+            &envelope.payload,
+        ] {
+            hasher.update((value.len() as u64).to_le_bytes());
+            hasher.update(value);
+        }
+        hasher.finalize().into()
     }
 }
 
@@ -746,20 +939,6 @@ impl RelayerSafetyPipeline {
             svm_finality_thresholds.insert(cluster.x3_domain_id, cluster.finality_threshold);
         }
 
-        let mut verification_router = VerificationRouter::new();
-        // Production: register the real EVM receipt proof verifier with
-        // a 12-confirmation default. Per-chain thresholds may override
-        // this in the proof envelope.
-        // Anchored to `NoEvmHeaderAnchor`: this pipeline has no store of
-        // attested external headers, and a receipt proof carries a header of its
-        // own, so there is nothing here to check one against. Every EVM proof is
-        // refused until a source is wired in — which is the honest state, rather
-        // than verifying a receipt against the root the prover chose.
-        verification_router.register_verifier(Arc::new(
-            ProductionEvmReceiptVerifier::anchored_by::<
-                x3_verification_router::evm_receipt::NoEvmHeaderAnchor,
-            >(12),
-        ));
         // The authorized validator set, and with it the quorum, comes from
         // configuration. A malformed entry is refused at startup by
         // `RpcSubmitter::new_with_retry_config`, which decodes the same list;
@@ -775,7 +954,7 @@ impl RelayerSafetyPipeline {
             }
         };
 
-        // Production uses only V2 stake-weighted evidence. If the stake table is
+        // Production uses only V4 stake-weighted evidence. If the stake table is
         // absent, malformed or disagrees with the authorized signer list, register
         // the empty verifier so every SVM proof fails closed rather than falling
         // back to the legacy signer-count V1 path.
@@ -785,25 +964,24 @@ impl RelayerSafetyPipeline {
             SolanaStakeWeightedVerifier::new(cluster, stakes, 2, 3, 0)
                 .map_err(|error| format!("{error:?}"))
         });
-        match stake_result {
-            Ok(verifier) => verification_router.register_verifier(Arc::new(verifier)),
+        let svm_verifier = match stake_result {
+            Ok(verifier) => Arc::new(verifier),
             Err(error) => {
-                warn!("refusing every SVM proof: no valid V2 stake table: {error}");
-                verification_router.register_verifier(Arc::new(
-                    SolanaStakeWeightedVerifier::empty(
-                        configured_solana_cluster(&config.svm_clusters)
-                            .unwrap_or(SolanaCluster::MainnetBeta),
-                    ),
-                ));
+                warn!("refusing every SVM proof: no valid V4 stake table: {error}");
+                Arc::new(SolanaStakeWeightedVerifier::empty(
+                    configured_solana_cluster(&config.svm_clusters)
+                        .unwrap_or(SolanaCluster::MainnetBeta),
+                ))
             }
-        }
-
+        };
         Self {
             finality_oracle,
-            verification_router,
+            #[cfg(test)]
+            verification_router: VerificationRouter::new(),
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
+            svm_verifier,
             svm_quorum,
         }
     }
@@ -820,6 +998,7 @@ impl RelayerSafetyPipeline {
         config: &RelayerConfig,
         verification_router: VerificationRouter,
         svm_authorized_validators: Vec<[u8; 32]>,
+        svm_verifier: Arc<SolanaStakeWeightedVerifier>,
     ) -> Self {
         let mut finality_oracle = InMemoryFinalityOracle::new();
         let mut evm_finality_thresholds = BTreeMap::new();
@@ -852,13 +1031,14 @@ impl RelayerSafetyPipeline {
             risk_engine: GatewayRiskEngine::new(RiskPolicy::default()),
             evm_finality_thresholds,
             svm_finality_thresholds,
+            svm_verifier,
             svm_quorum: AuthorizedValidatorSet::from_keys(svm_authorized_validators),
         }
     }
 
     #[cfg(test)]
     fn evaluate_evm_proof(&self, proof: &EvmProof, recent_failures: u32) -> Result<(), String> {
-        let proof_id = proof.block_hash;
+        let proof_id = proof.proof_id;
         let required_confirmations = self
             .evm_finality_thresholds
             .get(&proof.source_domain)
@@ -877,7 +1057,7 @@ impl RelayerSafetyPipeline {
             VerificationStrategy::EvmReceiptProof,
             proof.proof_payload.clone(),
             proof.source_domain,
-            proof.expected_recipient.clone(),
+            proof.expected_contract.to_vec(),
             proof.expected_amount,
         ) {
             return self.raise_dispute(proof_id, proof.finalized_block, reason);
@@ -905,7 +1085,7 @@ impl RelayerSafetyPipeline {
         attested_head: u64,
         recent_failures: u32,
     ) -> Result<(), String> {
-        let proof_id = proof.block_hash;
+        let proof_id = proof.proof_id;
         let required_confirmations = self
             .evm_finality_thresholds
             .get(&proof.source_domain)
@@ -936,7 +1116,9 @@ impl RelayerSafetyPipeline {
                 header: anchor,
                 head: attested_head,
             },
-        );
+        )
+        .with_source_asset(proof.source_asset)
+        .with_expected_nonce(proof.expected_nonce);
         let envelope = ProofEnvelope {
             proof_id,
             strategy: VerificationStrategy::EvmReceiptProof,
@@ -947,9 +1129,9 @@ impl RelayerSafetyPipeline {
             payload: proof.proof_payload.clone(),
             expected_asset_id: [0u8; 32],
             expected_amount: proof.expected_amount,
-            expected_sender: Vec::new(),
-            expected_recipient: proof.expected_recipient.clone(),
-            expected_beneficiary: Vec::new(),
+            expected_sender: proof.expected_sender.to_vec(),
+            expected_recipient: proof.expected_contract.to_vec(),
+            expected_beneficiary: proof.expected_beneficiary.clone(),
         };
         if let Err(reason) = verifier.verify(&envelope) {
             return self.raise_dispute(
@@ -964,7 +1146,12 @@ impl RelayerSafetyPipeline {
         Ok(())
     }
 
-    fn evaluate_svm_proof(&self, proof: &SvmProof, recent_failures: u32) -> Result<(), String> {
+    fn evaluate_svm_proof(
+        &self,
+        proof: &SvmProof,
+        finalized_floor: u64,
+        recent_failures: u32,
+    ) -> Result<(), String> {
         let proof_id = proof.blockhash;
         let required_confirmations = self
             .svm_finality_thresholds
@@ -972,66 +1159,20 @@ impl RelayerSafetyPipeline {
             .copied()
             .unwrap_or(0) as u64;
 
+        if self.svm_quorum.is_empty() {
+            return self.raise_dispute(
+                proof_id,
+                proof.slot,
+                "no_authorized_validators_configured".into(),
+            );
+        }
+
         if let Err(reason) =
             self.evaluate_finality(proof.source_domain, proof.slot, required_confirmations)
         {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
 
-        let payload = svm_proof_payload(proof);
-        if let Err(reason) = self.evaluate_verification(
-            VerificationStrategy::SolanaFinalizedProof,
-            payload,
-            proof.source_domain,
-            Vec::new(),
-            0,
-        ) {
-            return self.raise_dispute(proof_id, proof.slot, reason);
-        }
-
-        // `AttestationSet::add_attestation` now verifies each signature against
-        // its `statement_hash`, so this must be the exact message validators
-        // sign — `BLAKE2b-256(slot_le || blockhash)`, not the bare blockhash
-        // (`proof_id`) used for dispute bookkeeping below.
-        let signed_message =
-            x3_verification_router::solana_attestation_message(proof.slot, &proof.blockhash);
-        // Same root cause as the router fix above (issue #351):
-        // `AttestationSet::new` used to perform no authorization check at
-        // all, so a self-generated keypair signed just as validly as a real
-        // validator's. `self.svm_authorized_validators` is the exact same
-        // set the router's `SolanaFinalizedVerifier` was constructed with
-        // (empty in production today — fails closed on every attestation —
-        // populated by tests via `solana_pipeline_with`), so the two checks
-        // can never silently disagree about who's authorized.
-        let mut attestations = AttestationSet::with_authorized_validators(
-            signed_message,
-            self.svm_quorum.keys().iter().copied(),
-        );
-        for signature in proof.validator_signatures.iter() {
-            let attestation = Attestation {
-                // Identity is the validator's public key, not its position in the
-                // vector: keying on the index let a proof repeat one validator's
-                // signature N times and still satisfy an N-of-M quorum.
-                validator: ValidatorId(hex::encode(signature.validator_pubkey)),
-                statement_hash: signed_message,
-                public_key: signature.validator_pubkey,
-                signature: signature.signature.to_vec(),
-                weight: 1,
-            };
-            if let Err(err) = attestations.add_attestation(attestation) {
-                return self.raise_dispute(
-                    proof_id,
-                    proof.slot,
-                    format!("attestation_rejected: {err:?}"),
-                );
-            }
-        }
-
-        // `proof.required_signatures` is caller-supplied, so it is a floor the
-        // prover may raise but must never be allowed to lower. A proof asking for
-        // fewer signatures than the configured set's supermajority is refused by
-        // name before any count is compared — before this check the field *was*
-        // the policy, and the submitter wrote a literal `1` into it.
         let policy_required = self.svm_quorum.required_signatures();
         if proof.required_signatures < policy_required {
             return self.raise_dispute(
@@ -1046,22 +1187,17 @@ impl RelayerSafetyPipeline {
                 ),
             );
         }
-
-        // Two bars, both must be met: the policy's supermajority over distinct
-        // authorized validators (the workspace's single rule definition), and the
-        // count the proof itself claims to carry (so a proof claiming more
-        // signatures than it attached is still refused).
-        let policy_met = attestations.has_supermajority(self.svm_quorum.len());
-        let claim_met = attestations.has_quorum(proof.required_signatures as u64);
-        let quorum_met = policy_met && claim_met;
-        if !quorum_met {
+        let attached = self
+            .svm_quorum
+            .distinct_signers(&proof.validator_signatures) as u32;
+        if attached < proof.required_signatures {
             return self.raise_dispute(
                 proof_id,
                 proof.slot,
                 format!(
                     "attestation_quorum_not_met: distinct_attestations={}, proof required={}, \
                      policy supermajority={} of {}",
-                    attestations.unique_validators(),
+                    attached,
                     proof.required_signatures,
                     policy_required,
                     self.svm_quorum.len()
@@ -1069,7 +1205,38 @@ impl RelayerSafetyPipeline {
             );
         }
 
-        if let Err(reason) = self.evaluate_risk(quorum_met, recent_failures) {
+        let envelope = match proof.encoded_envelope() {
+            Ok(envelope) => envelope,
+            Err(error) => {
+                return self.raise_dispute(
+                    proof_id,
+                    proof.slot,
+                    format!("verification_error: {error}"),
+                );
+            }
+        };
+        let outcome = match self
+            .svm_verifier
+            .verify_with_finalized_floor(&envelope, finalized_floor)
+        {
+            Ok(outcome) if outcome.accepted => outcome,
+            Err(error) => {
+                return self.raise_dispute(
+                    proof_id,
+                    proof.slot,
+                    format!("verification_error: {error}"),
+                );
+            }
+            Ok(outcome) => {
+                return self.raise_dispute(
+                    proof_id,
+                    proof.slot,
+                    format!("verification_rejected: {}", outcome.reason),
+                );
+            }
+        };
+
+        if let Err(reason) = self.evaluate_risk(outcome.accepted, recent_failures) {
             return self.raise_dispute(proof_id, proof.slot, reason);
         }
 
@@ -1099,6 +1266,7 @@ impl RelayerSafetyPipeline {
         ))
     }
 
+    #[cfg(test)]
     fn evaluate_verification(
         &self,
         kind: VerificationStrategy,
@@ -1211,33 +1379,6 @@ impl x3_verification_router::Verifier for AcceptAnyEvmVerifier {
     }
 }
 
-/// Builds the `SolanaFinalizedProof` payload in the format the verifier parses
-/// (`SOLANA_FINALIZED_FORMAT_V1`):
-///
-/// ```text
-/// version u8 | slot u64 LE | blockhash [32] | count u32 LE | (pubkey[32] || sig[64])*
-/// ```
-///
-/// Each signature is over `BLAKE2b-256(slot_le || blockhash)` — see
-/// `Submitter::sign_proof_payload`. Without the version, slot and count the
-/// verifier cannot reconstruct the signed message, which is why the previous
-/// bare `blockhash || (pubkey || sig)*` layout could not be checked at all.
-pub(crate) fn svm_proof_payload(proof: &SvmProof) -> Vec<u8> {
-    let mut payload = Vec::with_capacity(
-        x3_verification_router::SOLANA_PAYLOAD_HEADER_LEN
-            + proof.validator_signatures.len() * x3_verification_router::SOLANA_ATTESTATION_LEN,
-    );
-    payload.push(x3_verification_router::SOLANA_FINALIZED_FORMAT_V1);
-    payload.extend_from_slice(&proof.slot.to_le_bytes());
-    payload.extend_from_slice(&proof.blockhash);
-    payload.extend_from_slice(&(proof.validator_signatures.len() as u32).to_le_bytes());
-    for signature in &proof.validator_signatures {
-        payload.extend_from_slice(&signature.validator_pubkey);
-        payload.extend_from_slice(&signature.signature);
-    }
-    payload
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1265,6 +1406,7 @@ mod tests {
                 cluster_name: "devnet".to_string(),
                 x3_domain_id: 200,
                 rpc_endpoint: "http://localhost:8899".to_string(),
+                rpc_quorum_endpoints: Vec::new(),
                 finality_threshold: 32,
                 slot_poll_interval_ms: 400,
                 max_concurrent_requests: 5,
@@ -1274,6 +1416,24 @@ mod tests {
             governance: GovernanceConfig::default(),
             logging: LoggingConfig::default(),
         }
+    }
+
+    #[test]
+    fn shipped_mainnet_config_parses_with_a_solana_rpc_quorum() {
+        let config: RelayerConfig =
+            serde_yaml::from_str(include_str!("../relayer-config-mainnet.yaml"))
+                .expect("mainnet relayer template parses");
+        let solana = config
+            .svm_clusters
+            .iter()
+            .find(|cluster| cluster.cluster_name == "mainnet-beta")
+            .expect("mainnet Solana cluster");
+        SvmHeaderWatcher::validate_rpc_sources(solana).expect("three distinct RPC endpoints");
+        assert!(
+            config.validator_set.svm_validator_pubkeys.is_empty()
+                && config.validator_set.svm_validator_stakes.is_empty(),
+            "the template must stay fail-closed until governance supplies the real committee"
+        );
     }
 
     #[test]
@@ -1393,9 +1553,11 @@ mod tests {
             svm_heads: BTreeMap::new(),
             finalized_evm_headers: BTreeMap::new(),
             finalized_svm_headers: BTreeMap::new(),
+            svm_finalized_floors: BTreeMap::new(),
             finalized_evm_data: BTreeMap::new(),
             finalized_svm_data: BTreeMap::new(),
             pending_evm_receipts: BTreeMap::new(),
+            pending_svm_requests: BTreeMap::new(),
             proof_cache: BTreeSet::new(),
             pending_submissions: 0,
             shutdown_signal: false,
@@ -1477,15 +1639,25 @@ mod tests {
         let config = test_config();
         let mut router = VerificationRouter::new();
         router.register_verifier(Arc::new(AcceptAnyEvmVerifier));
-        let pipeline = RelayerSafetyPipeline::for_test(&config, router, Vec::new());
+        let pipeline = RelayerSafetyPipeline::for_test(
+            &config,
+            router,
+            Vec::new(),
+            Arc::new(SolanaStakeWeightedVerifier::empty(SVM_CLUSTER)),
+        );
         let proof = EvmProof {
             source_domain: 100,
+            proof_id: [0x70u8; 32],
             block_hash: [1u8; 32],
             state_root: [2u8; 32],
             finalized_block: 1_000,
             proof_nonce: 1,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 1,
             expected_amount: 1_000,
         };
 
@@ -1498,12 +1670,17 @@ mod tests {
         let pipeline = RelayerSafetyPipeline::new(&config);
         let proof = EvmProof {
             source_domain: 999,
+            proof_id: [0x70u8; 32],
             block_hash: [3u8; 32],
             state_root: [4u8; 32],
             finalized_block: 55,
             proof_nonce: 9,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 9,
             expected_amount: 1_000,
         };
 
@@ -1520,12 +1697,17 @@ mod tests {
         let pipeline = RelayerSafetyPipeline::new(&config);
         let proof = EvmProof {
             source_domain: 100,
+            proof_id: [0x70u8; 32],
             block_hash: [3u8; 32],
             state_root: [4u8; 32],
             finalized_block: 55,
             proof_nonce: 9,
             proof_payload: vec![1u8; 96],
-            expected_recipient: vec![2u8; 20],
+            source_asset: [0x71u8; 20],
+            expected_sender: [0x72u8; 20],
+            expected_contract: [0x73u8; 20],
+            expected_beneficiary: vec![0x74u8; 32],
+            expected_nonce: 9,
             expected_amount: 1_000,
         };
         let error = pipeline
@@ -1547,6 +1729,131 @@ mod tests {
         );
     }
 
+    const SVM_CLUSTER: SolanaCluster = SolanaCluster::Devnet;
+    const SVM_SLOT: u64 = 42;
+    const SVM_PARENT_SLOT: u64 = 41;
+    const SVM_BLOCKHASH: [u8; 32] = [6u8; 32];
+    const SVM_BANK_HASH: [u8; 32] = [8u8; 32];
+    const SVM_PARENT_BANK_HASH: [u8; 32] = [7u8; 32];
+
+    fn svm_transaction() -> x3_verification_router::SolanaTransactionEvidence {
+        use ed25519_dalek::Signer;
+
+        let key = ed25519_dalek::SigningKey::from_bytes(&[0x5au8; 32]);
+        let recent_blockhash = [5u8; 32];
+        let mut message = vec![1, 0, 0, 1];
+        message.extend_from_slice(&key.verifying_key().to_bytes());
+        message.extend_from_slice(&recent_blockhash);
+        message.push(0);
+        let signature = key.sign(&message).to_bytes();
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&signature);
+        raw_transaction.extend_from_slice(&message);
+        x3_verification_router::SolanaTransactionEvidence::from_raw(
+            SVM_SLOT,
+            2,
+            true,
+            raw_transaction,
+        )
+        .expect("signed SVM transaction fixture")
+    }
+
+    fn solana_stakes(keys: &[ed25519_dalek::SigningKey], stake: u64) -> Vec<SolanaValidatorStake> {
+        let mut stakes = keys
+            .iter()
+            .map(|key| SolanaValidatorStake {
+                pubkey: key.verifying_key().to_bytes(),
+                stake,
+            })
+            .collect::<Vec<_>>();
+        stakes.sort_by_key(|entry| entry.pubkey);
+        stakes
+    }
+
+    fn unsigned_svm_proof(stake_table: &[SolanaValidatorStake]) -> SvmProof {
+        SvmProof {
+            source_domain: 200,
+            proof_id: [9u8; 32],
+            cluster: SVM_CLUSTER,
+            slot: SVM_SLOT,
+            parent_slot: SVM_PARENT_SLOT,
+            blockhash: SVM_BLOCKHASH,
+            bank_hash: SVM_BANK_HASH,
+            parent_bank_hash: SVM_PARENT_BANK_HASH,
+            stake_table_digest: x3_verification_router::solana_stake_table_digest(stake_table),
+            transaction: svm_transaction(),
+            expected_asset_id: [4u8; 32],
+            expected_amount: 5_000,
+            expected_sender: b"sender".to_vec(),
+            expected_recipient: b"recipient".to_vec(),
+            expected_beneficiary: vec![5u8; 32],
+            validator_signatures: Vec::new(),
+            required_signatures: x3_validator_attestation::supermajority_threshold(
+                stake_table.len(),
+            ),
+        }
+    }
+
+    fn signed_v2_validator(
+        proof: &SvmProof,
+        signing_key: &ed25519_dalek::SigningKey,
+    ) -> ValidatorSignature {
+        use ed25519_dalek::Signer;
+
+        let envelope = proof.envelope();
+        let message = x3_verification_router::solana_finality_message_v4(
+            proof.cluster,
+            proof.slot,
+            proof.parent_slot,
+            &proof.blockhash,
+            &proof.bank_hash,
+            &proof.parent_bank_hash,
+            &proof.stake_table_digest,
+            &proof.transaction,
+            &envelope,
+        )
+        .expect("fixture intent");
+        ValidatorSignature {
+            validator_pubkey: signing_key.verifying_key().to_bytes(),
+            signature: signing_key.sign(&message).to_bytes(),
+        }
+    }
+
+    fn v2_proof(
+        proof: &SvmProof,
+        keys: &[ed25519_dalek::SigningKey],
+        signer_indices: &[usize],
+    ) -> SvmProof {
+        let mut proof = proof.clone();
+        proof.validator_signatures = signer_indices
+            .iter()
+            .map(|index| signed_v2_validator(&proof, &keys[*index]))
+            .collect();
+        proof
+    }
+
+    fn solana_pipeline_with_stakes(
+        keys: &[ed25519_dalek::SigningKey],
+        stakes: &[SolanaValidatorStake],
+    ) -> RelayerSafetyPipeline {
+        use std::sync::Arc;
+
+        let mut router = VerificationRouter::new();
+        let verifier = Arc::new(
+            SolanaStakeWeightedVerifier::new(SVM_CLUSTER, stakes.to_vec(), 2, 3, 0)
+                .expect("fixture stake table"),
+        );
+        router.register_verifier(verifier.clone());
+        RelayerSafetyPipeline::for_test(
+            &test_config(),
+            router,
+            keys.iter()
+                .map(|key| key.verifying_key().to_bytes())
+                .collect(),
+            verifier,
+        )
+    }
+
     /// A router-level quorum of 1 (one authorized signer is enough to pass
     /// `SolanaFinalizedVerifier`) is deliberately lower than the proof's own
     /// `required_signatures` (2), so this proof clears router verification
@@ -1559,19 +1866,14 @@ mod tests {
     #[test]
     fn safety_pipeline_rejects_svm_quorum_gap() {
         let key = ed25519_dalek::SigningKey::from_bytes(&[9u8; 32]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let pipeline = solana_pipeline_with(vec![key.verifying_key().to_bytes()], 1);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![signed_validator(&key, slot, &blockhash)],
-            required_signatures: 2,
-        };
+        let stakes = solana_stakes(std::slice::from_ref(&key), 100);
+        let pipeline = solana_pipeline_with_stakes(std::slice::from_ref(&key), &stakes);
+        let mut proof = unsigned_svm_proof(&stakes);
+        proof.required_signatures = 2;
+        let proof = v2_proof(&proof, std::slice::from_ref(&key), &[0]);
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("insufficient signatures should fail quorum");
         assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
         assert!(err.contains("dispute_status=Accepted"));
@@ -1593,21 +1895,18 @@ mod tests {
         let config = test_config();
         let pipeline = RelayerSafetyPipeline::new(&config);
         let key = ed25519_dalek::SigningKey::from_bytes(&[42u8; 32]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![signed_validator(&key, slot, &blockhash)],
-            required_signatures: 1,
-        };
+        let stakes = solana_stakes(std::slice::from_ref(&key), 100);
+        let proof = v2_proof(
+            &unsigned_svm_proof(&stakes),
+            std::slice::from_ref(&key),
+            &[0],
+        );
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("no validator set is authorized yet; every SVM proof must fail closed");
         assert!(
-            err.contains("no authorized validators configured"),
+            err.contains("no_authorized_validators_configured"),
             "got: {err}"
         );
     }
@@ -1624,28 +1923,19 @@ mod tests {
     #[test]
     fn safety_pipeline_rejects_repeated_svm_signer() {
         let key = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        // Authorize the one key this test uses so the proof clears
-        // router-level verification (issue #351's fix made the router a
-        // real, fail-closed verifier) and reaches the attestation-level
-        // duplicate-signer check this test actually regression-tests.
-        let pipeline = solana_pipeline_with(vec![key.verifying_key().to_bytes()], 1);
-        let signer = signed_validator(&key, slot, &blockhash);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![signer.clone(), signer],
-            required_signatures: 2,
-        };
+        let stakes = solana_stakes(std::slice::from_ref(&key), 100);
+        let pipeline = solana_pipeline_with_stakes(std::slice::from_ref(&key), &stakes);
+        let mut proof = unsigned_svm_proof(&stakes);
+        proof.required_signatures = 2;
+        let signer = signed_v2_validator(&proof, &key);
+        proof.validator_signatures = vec![signer.clone(), signer];
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("one validator cannot supply both quorum signatures");
         assert!(
-            err.contains("DuplicateValidator"),
-            "expected a duplicate-signer rejection, got: {err}"
+            err.contains("attestation_quorum_not_met"),
+            "expected a quorum rejection, got: {err}"
         );
         assert!(err.contains("dispute_status=Accepted"));
     }
@@ -1659,12 +1949,6 @@ mod tests {
             .collect()
     }
 
-    fn pubkeys_of(keys: &[ed25519_dalek::SigningKey]) -> Vec<[u8; 32]> {
-        keys.iter()
-            .map(|key| key.verifying_key().to_bytes())
-            .collect()
-    }
-
     /// The gap `X3-XCHAIN-003` records, as a test: three validators are
     /// authorized, one of them signs, and the proof declares
     /// `required_signatures: 1`. Before this workstream the declared number *was*
@@ -1674,21 +1958,14 @@ mod tests {
     #[test]
     fn safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied() {
         let keys = validator_keys(&[1, 2, 3]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        // Router threshold 1 so the proof clears router verification and reaches
-        // the attestation stage this test is actually about.
-        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![signed_validator(&keys[0], slot, &blockhash)],
-            required_signatures: 1,
-        };
+        let stakes = solana_stakes(&keys, 100);
+        let pipeline = solana_pipeline_with_stakes(&keys, &stakes);
+        let mut proof = unsigned_svm_proof(&stakes);
+        proof.required_signatures = 1;
+        let proof = v2_proof(&proof, &keys, &[0]);
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("one of three authorized validators is not a supermajority");
         assert!(
             err.contains("attestation_quorum_below_policy"),
@@ -1708,19 +1985,12 @@ mod tests {
     #[test]
     fn safety_pipeline_refuses_a_proof_that_carries_fewer_signatures_than_policy() {
         let keys = validator_keys(&[1, 2, 3]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![signed_validator(&keys[0], slot, &blockhash)],
-            required_signatures: 3,
-        };
+        let stakes = solana_stakes(&keys, 100);
+        let pipeline = solana_pipeline_with_stakes(&keys, &stakes);
+        let proof = v2_proof(&unsigned_svm_proof(&stakes), &keys, &[0]);
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("one signature cannot meet a three-validator supermajority");
         assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
         assert!(err.contains("of 3"), "got: {err}");
@@ -1732,24 +2002,27 @@ mod tests {
     #[test]
     fn safety_pipeline_accepts_a_three_of_three_proof() {
         let keys = validator_keys(&[1, 2, 3]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 3);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: keys
-                .iter()
-                .map(|key| signed_validator(key, slot, &blockhash))
-                .collect(),
-            required_signatures: 3,
-        };
+        let stakes = solana_stakes(&keys, 100);
+        let pipeline = solana_pipeline_with_stakes(&keys, &stakes);
+        let proof = v2_proof(&unsigned_svm_proof(&stakes), &keys, &[0, 1, 2]);
 
         assert!(
-            pipeline.evaluate_svm_proof(&proof, 0).is_ok(),
+            pipeline.evaluate_svm_proof(&proof, 0, 0).is_ok(),
             "a full supermajority must be accepted"
         );
+    }
+
+    #[test]
+    fn solana_pipeline_enforces_the_persisted_finalized_slot_floor() {
+        let keys = validator_keys(&[1, 2, 3]);
+        let stakes = solana_stakes(&keys, 100);
+        let pipeline = solana_pipeline_with_stakes(&keys, &stakes);
+        let proof = v2_proof(&unsigned_svm_proof(&stakes), &keys, &[0, 1, 2]);
+
+        let err = pipeline
+            .evaluate_svm_proof(&proof, proof.slot + 1, 0)
+            .expect_err("a proof below the persisted finalized floor must be refused");
+        assert!(err.contains("below the persisted floor"), "got: {err}");
     }
 
     /// A proof may raise its claim; it may not pretend to carry more than it
@@ -1757,65 +2030,15 @@ mod tests {
     #[test]
     fn safety_pipeline_refuses_a_claim_above_the_signatures_it_carries() {
         let keys = validator_keys(&[1, 2, 3]);
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let pipeline = solana_pipeline_with(pubkeys_of(&keys), 1);
-        let proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![
-                signed_validator(&keys[0], slot, &blockhash),
-                signed_validator(&keys[1], slot, &blockhash),
-            ],
-            required_signatures: 4,
-        };
+        let stakes = solana_stakes(&keys, 100);
+        let pipeline = solana_pipeline_with_stakes(&keys, &stakes);
+        let mut proof = v2_proof(&unsigned_svm_proof(&stakes), &keys, &[0, 1]);
+        proof.required_signatures = 4;
 
         let err = pipeline
-            .evaluate_svm_proof(&proof, 0)
+            .evaluate_svm_proof(&proof, 0, 0)
             .expect_err("two distinct signatures cannot satisfy a claim of four");
         assert!(err.contains("attestation_quorum_not_met"), "got: {err}");
-    }
-
-    /// Sign with the same construction as `Submitter::sign_proof_payload` but
-    /// using a key the test controls.
-    fn signed_validator(
-        signing_key: &ed25519_dalek::SigningKey,
-        slot: u64,
-        blockhash: &[u8; 32],
-    ) -> ValidatorSignature {
-        use ed25519_dalek::Signer;
-
-        let mut preimage = Vec::with_capacity(40);
-        preimage.extend_from_slice(&slot.to_le_bytes());
-        preimage.extend_from_slice(blockhash);
-        let message = x3_verification_router::solana_attestation_message(slot, blockhash);
-        // The two BLAKE2b implementations must agree, or signatures the relayer
-        // produces can never verify.
-        assert_eq!(
-            message.as_slice(),
-            blake2b_simd::Params::new()
-                .hash_length(32)
-                .hash(&preimage)
-                .as_bytes(),
-            "relayer (blake2b_simd) and router (blake2) must hash identically"
-        );
-
-        ValidatorSignature {
-            validator_pubkey: signing_key.verifying_key().to_bytes(),
-            signature: signing_key.sign(&message).to_bytes(),
-        }
-    }
-
-    fn solana_pipeline_with(pubkeys: Vec<[u8; 32]>, threshold: u32) -> RelayerSafetyPipeline {
-        use std::sync::Arc;
-        use x3_verification_router::{SolanaFinalizedVerifier, VerificationRouter, Verifier};
-
-        let mut router = VerificationRouter::new();
-        let verifier: Arc<dyn Verifier> =
-            Arc::new(SolanaFinalizedVerifier::new(pubkeys.clone(), threshold));
-        router.register_verifier(verifier);
-        RelayerSafetyPipeline::for_test(&test_config(), router, pubkeys)
     }
 
     #[test]
@@ -1824,38 +2047,15 @@ mod tests {
             ed25519_dalek::SigningKey::from_bytes(&[1u8; 32]),
             ed25519_dalek::SigningKey::from_bytes(&[2u8; 32]),
         );
-        let slot = 42u64;
-        let blockhash = [8u8; 32];
-        let mut proof = SvmProof {
-            source_domain: 200,
-            slot,
-            blockhash,
-            validator_signatures: vec![
-                signed_validator(&a, slot, &blockhash),
-                signed_validator(&b, slot, &blockhash),
-            ],
-            required_signatures: 2,
-        };
+        let keys = [a, b];
+        let stakes = solana_stakes(&keys, 100);
+        let proof = v2_proof(&unsigned_svm_proof(&stakes), &keys, &[0, 1]);
 
         // Format and crypto agree end to end: relayer builds the payload, the
         // router's real Solana verifier accepts it.
-        let payload = svm_proof_payload(&proof);
-        let envelope = x3_verification_router::ProofEnvelope {
-            proof_id: [0u8; 32],
-            strategy: x3_verification_router::VerificationStrategy::SolanaFinalizedProof,
-            source_chain: x3_verification_router::ChainKind::Solana,
-            destination_chain: x3_verification_router::ChainKind::X3,
-            payload,
-            expected_asset_id: [0u8; 32],
-            expected_amount: 0,
-            expected_sender: Vec::new(),
-            expected_recipient: Vec::new(),
-            expected_beneficiary: Vec::new(),
-        };
-        let verifier = x3_verification_router::SolanaFinalizedVerifier::new(
-            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
-            2,
-        );
+        let envelope = proof.encoded_envelope().expect("V2 payload");
+        let verifier = SolanaStakeWeightedVerifier::new(SVM_CLUSTER, stakes.clone(), 2, 3, 0)
+            .expect("stake table");
         use x3_verification_router::Verifier as _;
         let outcome = verifier
             .verify(&envelope)
@@ -1866,12 +2066,9 @@ mod tests {
         );
 
         // One signature short of the threshold is rejected.
+        let mut proof = proof;
         proof.validator_signatures.pop();
-        let pipeline = solana_pipeline_with(
-            vec![a.verifying_key().to_bytes(), b.verifying_key().to_bytes()],
-            2,
-        );
-        let one_signature = svm_proof_payload(&proof);
+        let one_signature = proof.encode_payload().expect("V2 payload");
         let one_envelope = x3_verification_router::ProofEnvelope {
             payload: one_signature,
             ..envelope
@@ -1880,6 +2077,5 @@ mod tests {
             verifier.verify(&one_envelope).is_err(),
             "one signature must not satisfy a 2-validator quorum"
         );
-        let _ = pipeline;
     }
 }

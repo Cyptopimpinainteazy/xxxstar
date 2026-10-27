@@ -221,6 +221,18 @@ pub mod pallet {
         /// Unix time provider for timeout enforcement.
         type UnixTime: UnixTime;
 
+        /// Origin allowed to submit already-verified external proofs on behalf
+        /// of any settlement intent.
+        ///
+        /// The chain runtime points this at its governance-managed settlement
+        /// gateway. A maker or taker is also accepted directly, so normal user
+        /// flows do not require the gateway. This origin may submit proofs only;
+        /// claims and refunds remain restricted to the intent parties.
+        type SettlementProofOrigin: EnsureOrigin<
+            <Self as frame_system::Config>::RuntimeOrigin,
+            Success = <Self as frame_system::Config>::AccountId,
+        >;
+
         /// Maximum legs per settlement intent.
         #[pallet::constant]
         type MaxSettlementLegs: Get<u32>;
@@ -1538,24 +1550,19 @@ pub mod pallet {
 
         /// Submit external execution proof to X3
         #[pallet::call_index(2)]
-        #[pallet::weight(T::SettlementWeightInfo::submit_external_proof())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::submit_external_proof()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         pub fn submit_proof(
             origin: OriginFor<T>,
             intent_id: H256,
             chain: ExternalChainId,
             proof: SettlementProof,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // Verify intent exists and caller is party to the intent.
-            // Only the maker or taker may advance proof state to prevent third-party
-            // actors from triggering state transitions for intents they are not party to.
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let _who = Self::ensure_proof_submitter(origin, &intent)?;
 
             let state = IntentStates::<T>::get(intent_id);
             ensure!(
@@ -1579,7 +1586,7 @@ pub mod pallet {
             );
 
             // Verify proof based on chain type
-            let is_valid = Self::verify_proof(&chain, &proof)?;
+            let is_valid = Self::verify_proof_for_intent(&chain, &proof, &intent)?;
             ensure!(is_valid, Error::<T>::InvalidProof);
 
             // Emit proof verification event for bridge integration tracking
@@ -1656,6 +1663,10 @@ pub mod pallet {
             // Verify intent exists
             let mut intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
+            ensure!(
+                who == intent.maker || who == intent.taker,
+                Error::<T>::NotAuthorized
+            );
 
             let state = IntentStates::<T>::get(intent_id);
             ensure!(
@@ -1779,19 +1790,18 @@ pub mod pallet {
         /// Full bundles are verified against the canonical H256 runtime intent,
         /// then compact proof hashes are committed into consensus storage.
         #[pallet::call_index(33)]
-        #[pallet::weight(T::SettlementWeightInfo::claim_settlement())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::claim_settlement()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         pub fn submit_cross_domain_proof_set(
             origin: OriginFor<T>,
             intent_id: H256,
             proof_set: CrossDomainProofSet,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let who = Self::ensure_proof_submitter(origin, &intent)?;
 
             proof_set
                 .verify_runtime_binding(intent_id.to_fixed_bytes())
@@ -1923,7 +1933,10 @@ pub mod pallet {
         /// `submit_btc_header` after `anchor_btc_checkpoint`); this call no longer
         /// admits headers of its own.
         #[pallet::call_index(10)]
-        #[pallet::weight(T::SettlementWeightInfo::verify_btc_proof())]
+        #[pallet::weight(
+            T::SettlementWeightInfo::verify_btc_proof()
+                .saturating_add(<T as frame_system::Config>::DbWeight::get().reads(1))
+        )]
         #[allow(clippy::too_many_arguments)]
         pub fn submit_btc_proof(
             origin: OriginFor<T>,
@@ -1935,17 +1948,9 @@ pub mod pallet {
             merkle_proof: Vec<H256>,
             block_header: BtcBlockHeader,
         ) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-
-            // Verify intent exists and restrict proof submission to intent parties.
-            // Only the maker or taker may submit a BTC proof to prevent DoS or
-            // replay attacks from arbitrary accounts.
             let intent =
                 SettlementIntents::<T>::get(intent_id).ok_or(Error::<T>::IntentNotFound)?;
-            ensure!(
-                who == intent.maker || who == intent.taker,
-                Error::<T>::NotAuthorized
-            );
+            let _who = Self::ensure_proof_submitter(origin, &intent)?;
 
             // The header behind this proof has to be one this chain already holds on
             // a checkpoint-anchored chain.
@@ -2552,6 +2557,35 @@ pub mod pallet {
     const MAX_EXPIRY_INDEX_SPILL_BLOCKS: u32 = 16;
 
     impl<T: Config> Pallet<T> {
+        /// Accept either an intent party or the runtime's authorized proof
+        /// origin.
+        ///
+        /// This path may advance an intent to `ExecutingExternal`, but it never
+        /// releases funds. Claims and refunds continue to require a signed
+        /// intent party, so an authorized relayer cannot take custody by
+        /// submitting evidence.
+        fn ensure_proof_submitter(
+            origin: OriginFor<T>,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<AccountIdOf<T>, DispatchError> {
+            let signer = ensure_signed(origin.clone()).ok();
+            if let Some(who) = signer.as_ref() {
+                if who == &intent.maker || who == &intent.taker {
+                    return Ok(who.clone());
+                }
+            }
+
+            if let Ok(origin_account) = T::SettlementProofOrigin::try_origin(origin) {
+                return Ok(origin_account);
+            }
+
+            if signer.is_some() {
+                Err(Error::<T>::NotAuthorized.into())
+            } else {
+                Err(DispatchError::BadOrigin)
+            }
+        }
+
         /// Register `intent_id` in the first deadline bucket at or after
         /// `start_block` that still has room, spilling forward when a bucket is full.
         ///
@@ -2635,6 +2669,29 @@ pub mod pallet {
                     Self::verify_svm_proof(proof)
                 }
                 _ => Ok(false),
+            }
+        }
+
+        fn verify_proof_for_intent(
+            chain: &ExternalChainId,
+            proof: &SettlementProof,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<bool, DispatchError> {
+            if matches!(chain, ExternalChainId::Solana) {
+                return Self::verify_svm_proof_for_intent(chain, proof, intent);
+            }
+            Self::verify_proof(chain, proof)
+        }
+
+        fn external_asset_id(token: &TokenId) -> [u8; 32] {
+            match token {
+                TokenId::Native => [0u8; 32],
+                TokenId::Contract(bytes) => *bytes,
+                TokenId::X3Asset(id) => {
+                    let mut encoded = [0u8; 32];
+                    encoded[..4].copy_from_slice(&id.to_be_bytes());
+                    encoded
+                }
             }
         }
 
@@ -2834,6 +2891,86 @@ pub mod pallet {
                 }
                 _ => false,
             }
+        }
+
+        /// Verify the runtime-facing Solana settlement proof.
+        ///
+        /// V4 evidence is decoded from the exact portable envelope and checked
+        /// against the governance stake committee before accepting it. The
+        /// legacy transaction-only path remains available only behind the
+        /// existing unbound-proof switch used by local tests.
+        pub(crate) fn verify_svm_proof_for_intent(
+            chain: &ExternalChainId,
+            proof: &SettlementProof,
+            intent: &SettlementIntent<AccountIdOf<T>>,
+        ) -> Result<bool, DispatchError> {
+            if proof.proof_type != ProofType::SolanaProof || proof.confirmations < 1 {
+                return Ok(false);
+            }
+            if !proof
+                .receipt_data
+                .starts_with(&x3_verification_router::SOLANA_SETTLEMENT_EVIDENCE_MAGIC)
+            {
+                return Self::verify_svm_proof(proof);
+            }
+
+            let evidence =
+                x3_verification_router::decode_solana_settlement_evidence(&proof.receipt_data)
+                    .map_err(|_| Error::<T>::InvalidProof)?;
+            if evidence.proof.proof_id != intent.intent_id.to_fixed_bytes() {
+                return Ok(false);
+            }
+            let binding =
+                x3_verification_router::solana_v4_finality_binding(&evidence.finality_payload)
+                    .map_err(|_| Error::<T>::InvalidProof)?;
+            let expected_cluster = match chain {
+                ExternalChainId::Solana => x3_verification_router::SolanaCluster::MainnetBeta,
+                ExternalChainId::SolanaDevnet => x3_verification_router::SolanaCluster::Devnet,
+                _ => return Ok(false),
+            };
+            if binding.cluster != expected_cluster
+                || proof.chain_height != Some(binding.finalized_slot)
+                || proof.receipt_index != Some(binding.transaction_index)
+                || proof.block_hash != H256::from(binding.finalized_blockhash)
+                || proof.tx_hash != H256::from(binding.transaction_commitment)
+            {
+                return Ok(false);
+            }
+
+            if !Self::intent_matches_external_asset(
+                intent,
+                &ExternalChainId::Solana,
+                evidence.proof.expected_amount,
+                evidence.proof.expected_asset_id,
+            ) {
+                return Ok(false);
+            }
+
+            let Some(verifier) = T::CrossChainValidator::solana_v4_verifier(binding.cluster) else {
+                return Ok(false);
+            };
+            let mut envelope = evidence.proof;
+            envelope.payload = evidence.finality_payload;
+            if x3_verification_router::Verifier::verify(&verifier, &envelope).is_err() {
+                return Ok(false);
+            }
+            Ok(T::CrossChainValidator::record_solana_v4_finalized_slot(
+                binding.cluster,
+                binding.finalized_slot,
+            ))
+        }
+
+        fn intent_matches_external_asset(
+            intent: &SettlementIntent<AccountIdOf<T>>,
+            chain: &ExternalChainId,
+            amount: u128,
+            asset_id: [u8; 32],
+        ) -> bool {
+            [&intent.asset_a, &intent.asset_b].into_iter().any(|asset| {
+                asset.chain == *chain
+                    && asset.amount == amount
+                    && Self::external_asset_id(&asset.token) == asset_id
+            })
         }
 
         /// Verify Solana transaction proof

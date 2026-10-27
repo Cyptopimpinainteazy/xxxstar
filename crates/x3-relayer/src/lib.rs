@@ -16,14 +16,21 @@ pub mod relayer;
 pub mod submitter;
 pub mod types;
 #[cfg(feature = "std")]
+pub mod vote_exchange;
+#[cfg(feature = "std")]
 pub mod watchers;
 
 #[cfg(feature = "std")]
 pub use quorum::{AuthorizedValidatorSet, ValidatorSetError};
 #[cfg(feature = "std")]
-pub use relayer::RelayerService;
+pub use relayer::{EvmReceiptProofRequest, RelayerService};
 #[cfg(feature = "std")]
-pub use submitter::RpcSubmitter;
+pub use submitter::{RpcSubmitter, RpcSubmitterConfig};
 pub use types::*;
+#[cfg(feature = "std")]
+pub use vote_exchange::{
+    serve_vote_exchange, SolanaVoteEvidence, SolanaVoteSubmission, VoteExchange,
+    VoteExchangeClient, VoteExchangeError, VotesResponse,
+};
 #[cfg(feature = "std")]
 pub use watchers::{EvmHeaderWatcher, SvmHeaderWatcher};

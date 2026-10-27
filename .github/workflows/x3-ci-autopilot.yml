@@ -1,0 +1,130 @@
+name: X3 CI Autopilot Foundation
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Optional PR to collect read-only GitHub Actions metadata from'
+        required: false
+        type: string
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/ci/autopilot.py'
+      - 'scripts/ci/test_autopilot.py'
+      - 'scripts/ci/autopilot_capacity.py'
+      - 'scripts/ci/test_autopilot_capacity.py'
+      - 'scripts/ci/autopilot_triage.py'
+      - 'scripts/ci/test_autopilot_triage.py'
+      - 'scripts/ci/integration_audit.py'
+      - 'scripts/ci/test_integration_audit.py'
+      - 'scripts/ci/integration_e2e.py'
+      - 'scripts/ci/test_integration_e2e.py'
+      - 'scripts/ci/github_evidence.py'
+      - 'scripts/ci/test_github_evidence.py'
+      - 'scripts/ci/integration_join.py'
+      - 'scripts/ci/test_integration_join.py'
+      - 'scripts/ci/review_evidence.py'
+      - 'scripts/ci/test_review_evidence.py'
+      - '.github/workflows/pr-agent.yml'
+      - '.github/workflows/pr-agent-auto.yml'
+      - '.pr_agent.toml'
+      - 'services/pr-agent/**'
+      - '.github/workflows/local-ci.yml'
+      - '.github/workflows/x3-ci-autopilot.yml'
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+# Only supersede old attempts of this one advisory workflow for the same PR.
+# Default-branch and manual runs are not interrupted; no other release gate is touched.
+concurrency:
+  group: x3-ci-autopilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  autopilot-tests:
+    # Do not execute fork-supplied code on physical self-hosted machines.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test diagnostics
+        run: python3 -m unittest discover -s scripts/ci -p 'test_autopilot*.py' -v
+      - name: Test PR-Agent integration wiring
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_integration_audit.py -v
+          python3 scripts/ci/integration_audit.py --output "$RUNNER_TEMP/x3-integration-audit.json"
+      - name: Run isolated integration fault-injection suite
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_integration_e2e.py -v
+          python3 scripts/ci/integration_e2e.py --output "$RUNNER_TEMP/x3-integration-synthetic.json"
+      - name: Verify GitHub metadata adapter (fake API; no token)
+        run: python3 -m unittest discover -s scripts/ci -p test_github_evidence.py -v
+      - name: Verify live exact-head PR evidence (same-repository PR only)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --expected-head "$EVENT_HEAD_SHA" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
+      - name: Collect live PR evidence (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo 'PR number must be numeric' >&2; exit 2; }
+          python3 scripts/ci/github_evidence.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/x3-github-evidence.json" > /dev/null
+      - name: Classify exact-head CI failures (advisory only)
+        if: github.event_name == 'pull_request'
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_autopilot_triage.py -v
+          python3 scripts/ci/autopilot_triage.py \
+            --github-evidence "$RUNNER_TEMP/x3-github-evidence.json" \
+            --head-sha "$EVENT_HEAD_SHA" \
+            --expected-head "$EVENT_HEAD_SHA" \
+            --output "$RUNNER_TEMP/x3-autopilot-triage.json" > /dev/null
+          python3 -m json.tool "$RUNNER_TEMP/x3-autopilot-triage.json" > /dev/null
+      - name: Verify exact-head PR-Agent and CI evidence join
+        run: python3 -m unittest discover -s scripts/ci -p test_integration_join.py -v
+      - name: Verify PR-Agent output evidence bridge
+        run: python3 -m unittest discover -s scripts/ci -p test_review_evidence.py -v
+      - name: Collect local-only diagnostic evidence
+        run: |
+          python3 scripts/ci/autopilot.py --local-only --output "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
+          python3 -m json.tool "$RUNNER_TEMP/x3-ci-autopilot.json" > /dev/null
+      - name: Preserve diagnostic evidence (best effort)
+        id: diagnostic_upload
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-ci-autopilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/x3-ci-autopilot.json
+            ${{ runner.temp }}/x3-integration-audit.json
+            ${{ runner.temp }}/x3-integration-synthetic.json
+            ${{ runner.temp }}/x3-github-evidence.json
+            ${{ runner.temp }}/x3-autopilot-triage.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Report evidence retention status
+        if: always()
+        env:
+          UPLOAD_OUTCOME: ${{ steps.diagnostic_upload.outcome }}
+        run: |
+          if [ "$UPLOAD_OUTCOME" = "success" ]; then
+            echo "Diagnostic evidence artifact uploaded for this run." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Diagnostic evidence artifact unavailable (upload outcome: $UPLOAD_OUTCOME). Check artifact storage quota and repository retention settings."
+            echo "Diagnostic artifact UNAVAILABLE; automated integration evidence is incomplete. This does not override earlier test results or grant release approval." >> "$GITHUB_STEP_SUMMARY"
+          fi

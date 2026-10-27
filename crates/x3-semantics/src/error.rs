@@ -100,9 +100,9 @@ impl std::error::Error for SemanticError {}
 pub enum SemanticErrorKind {
     /// Reference to an undefined variable.
     UndefinedVariable(String),
-    /// A call to a cross-VM intrinsic (`evm_call`, `svm_invoke`, ...) the chain cannot serve: the
-    /// runtime's EVM and SVM are stateless per execution, so there is no deployed contract or
-    /// account for the call to reach (X3-LANG-001).
+    /// A call to a cross-VM intrinsic (`evm_call`, `svm_invoke`, ...) for which the chain has no
+    /// call ABI. Compiled programs use `evm_sload`/`evm_sstore` for X3 contract storage, but direct
+    /// EVM/SVM calls are not routed to the runtime adapters (X3-LANG-001).
     UnavailableCrossVmCall(String),
 
     /// Reference to an undefined function.
@@ -142,9 +142,9 @@ impl std::fmt::Display for SemanticErrorKind {
             Self::UndefinedVariable(name) => write!(f, "undefined variable '{name}'"),
             Self::UnavailableCrossVmCall(name) => write!(
                 f,
-                "`{name}` is not available on chain: the runtime's EVM and SVM keep no state \
-                 between executions, so there is no deployed contract or account for it to call. \
-                 `evm_sload`/`evm_sstore` are the host calls a program can make"
+                "`{name}` has no on-chain call ABI. Compiled programs use `evm_sload`/`evm_sstore` \
+                 for X3 contract storage; direct EVM and SVM intrinsics are not routed to the \
+                 runtime adapters"
             ),
             Self::UndefinedFunction(name) => write!(f, "undefined function '{name}'"),
             Self::DuplicateName { name, .. } => {

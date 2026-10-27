@@ -4,24 +4,27 @@
 //! generic router. A proof is accepted only when:
 //!
 //! - it names the configured Solana cluster;
-//! - it supplies a finalized slot and bank hash, plus its parent slot and parent
-//!   bank hash;
+//! - it supplies a finalized slot, blockhash, and bank hash, plus its parent slot
+//!   and parent bank hash;
+//! - it supplies transaction-inclusion evidence for that finalized slot: the
+//!   transaction index, signature, raw-transaction commitment, recent blockhash,
+//!   and successful execution status;
 //! - its stake-table digest matches the governance-configured stake table;
 //! - distinct authorized validators holding at least the configured
-//!   supermajority of stake sign the exact X3 transfer intent and finality
-//!   claim; and
+//!   supermajority of stake sign the exact X3 transfer intent, transaction
+//!   evidence, and bank-state claim; and
 //! - the finalized slot is not below the caller-supplied finalized-slot floor.
 //!
 //! The finalized-slot floor is explicit rather than hidden mutable state. That
 //! keeps verification deterministic and lets the runtime persist the floor in
 //! consensus storage, where it can survive restarts and reorgs.
 //!
-//! This verifier proves stake-weighted finality of a bank hash and binds that
-//! proof to the transfer fields in [`ProofEnvelope`]. It does not parse a raw
-//! Solana transaction. A production producer must obtain the bank hash and
-//! transfer result from a Solana RPC provider quorum and persist the finalized
-//! slot before accepting value. Raw transaction-entry and instruction decoding
-//! remains a separate adapter boundary.
+//! This verifier proves a stake-weighted finalized transaction and bank state,
+//! and binds both to the transfer fields in [`ProofEnvelope`]. It does not
+//! silently accept the legacy V3 bank-hash-only format: V3 omitted transaction
+//! inclusion and is refused for production settlement. A production producer
+//! must still obtain the transaction and bank evidence from independent Solana
+//! RPC providers before validators sign it.
 
 extern crate alloc;
 
@@ -35,29 +38,61 @@ use crate::{
     Verifier,
 };
 
-/// Version byte for a stake-weighted Solana finality proof.
-pub const SOLANA_FINALIZED_FORMAT_V2: u8 = 2;
+/// Version byte for a stake-weighted Solana finality proof that commits to the
+/// finalized blockhash and bank hash separately.
+pub const SOLANA_FINALIZED_FORMAT_V3: u8 = 3;
 
-/// Maximum number of vote records accepted in one V2 proof.
+/// Version byte for a stake-weighted Solana proof that additionally binds a
+/// successful transaction to the finalized bank.
+pub const SOLANA_FINALIZED_FORMAT_V4: u8 = 4;
+
+/// Maximum number of vote records accepted in one proof.
 ///
 /// The bound keeps malformed payloads from forcing unbounded verification work.
 pub const MAX_SOLANA_FINALITY_VOTES: usize = 1_024;
 
+/// Maximum serialized Solana transaction size accepted in V4 evidence.
+pub const MAX_SOLANA_TRANSACTION_BYTES: usize = 1_232;
+
+/// Maximum length of each transfer-intent byte field in portable settlement
+/// evidence.
+pub const MAX_SOLANA_SETTLEMENT_FIELD_BYTES: usize = 128;
+
 /// Fixed length of a V2 vote record: Ed25519 public key plus signature.
 pub const SOLANA_FINALITY_VOTE_LEN: usize = 96;
 
-/// Fixed header length of a V2 proof.
+/// Fixed header length of a V3 proof.
 ///
 /// ```text
 /// version u8 | cluster u8 | finalized_slot u64 | parent_slot u64 |
+/// finalized_blockhash [32] | finalized_bank_hash [32] |
 /// finalized_bank_hash [32] | parent_bank_hash [32] |
 /// stake_table_digest [32] | vote_count u32
 /// ```
-pub const SOLANA_FINALITY_V2_HEADER_LEN: usize = 118;
+pub const SOLANA_FINALITY_V3_HEADER_LEN: usize = 150;
+
+/// Fixed header length of a V4 proof.
+///
+/// ```text
+/// version u8 | cluster u8 | finalized_slot u64 | parent_slot u64 |
+/// transaction_slot u64 | transaction_index u32 | succeeded u8 |
+/// finalized_blockhash [32] | finalized_bank_hash [32] |
+/// parent_bank_hash [32] | stake_table_digest [32] |
+/// transaction_signature [64] | transaction_commitment [32] |
+/// transaction_recent_blockhash [32] | transaction_len u32 |
+/// raw_transaction [transaction_len] | vote_count u32
+/// ```
+pub const SOLANA_FINALITY_V4_HEADER_LEN: usize = 295;
+
+/// Length of the fixed V4 bytes before the raw transaction.
+pub const SOLANA_FINALITY_V4_FIXED_LEN: usize = 291;
 
 const STAKE_TABLE_DOMAIN: &[u8] = b"X3/SOLANA_STAKE_TABLE/V2";
-const FINALITY_DOMAIN: &[u8] = b"X3/SOLANA_FINALITY/V2";
-const TRANSFER_DOMAIN: &[u8] = b"X3/SOLANA_TRANSFER/V2";
+const FINALITY_DOMAIN: &[u8] = b"X3/SOLANA_FINALITY/V3";
+const FINALITY_DOMAIN_V4: &[u8] = b"X3/SOLANA_FINALITY/V4";
+const TRANSFER_DOMAIN: &[u8] = b"X3/SOLANA_TRANSFER/V3";
+/// Magic prefix for portable Solana settlement evidence.
+pub const SOLANA_SETTLEMENT_EVIDENCE_MAGIC: [u8; 8] = *b"X3SV4S01";
 
 /// Solana cluster bound by a finality proof.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +118,225 @@ impl SolanaCluster {
 pub struct SolanaValidatorStake {
     pub pubkey: [u8; 32],
     pub stake: u64,
+}
+
+/// Transaction-inclusion evidence bound into a V4 finality proof.
+///
+/// `commitment` is a domain-separated digest of the exact serialized
+/// transaction returned by the Solana RPC source. Validators sign this structure
+/// only after checking that the transaction succeeded in `slot` at `index`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolanaTransactionEvidence {
+    pub slot: u64,
+    pub index: u32,
+    pub signature: [u8; 64],
+    pub commitment: [u8; 32],
+    pub recent_blockhash: [u8; 32],
+    pub succeeded: bool,
+    pub raw_transaction: Vec<u8>,
+}
+
+impl SolanaTransactionEvidence {
+    /// Parse and validate a signed Solana transaction before using it as V4
+    /// evidence. The derived fields cannot be selected independently of the
+    /// transaction bytes.
+    pub fn from_raw(
+        slot: u64,
+        index: u32,
+        succeeded: bool,
+        raw_transaction: Vec<u8>,
+    ) -> Result<Self, VerificationError> {
+        let parsed = parse_solana_transaction(&raw_transaction)?;
+        Ok(Self {
+            slot,
+            index,
+            signature: parsed.signature,
+            commitment: parsed.commitment,
+            recent_blockhash: parsed.recent_blockhash,
+            succeeded,
+            raw_transaction,
+        })
+    }
+}
+
+/// Portable Solana V4 evidence consumed by the settlement engine.
+///
+/// The finality payload is self-contained; the surrounding envelope binds it to
+/// the exact transfer fields validators signed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SolanaSettlementEvidence {
+    pub proof: ProofEnvelope,
+    pub finality_payload: Vec<u8>,
+}
+
+/// Encode the transfer envelope and its V4 finality payload for a settlement
+/// extrinsic.
+pub fn encode_solana_settlement_evidence(
+    proof: &ProofEnvelope,
+    finality_payload: &[u8],
+) -> Result<Vec<u8>, VerificationError> {
+    if proof.strategy != VerificationStrategy::SolanaFinalizedProof
+        || proof.source_chain != ChainKind::Solana
+        || proof.destination_chain != ChainKind::X3
+    {
+        return Err(VerificationError::InvalidStrategy);
+    }
+    if finality_payload.is_empty()
+        || proof.expected_sender.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+        || proof.expected_recipient.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+        || proof.expected_beneficiary.len() > MAX_SOLANA_SETTLEMENT_FIELD_BYTES
+    {
+        return Err(VerificationError::MalformedProof);
+    }
+    let finality_len =
+        u16::try_from(finality_payload.len()).map_err(|_| VerificationError::MalformedProof)?;
+    let mut encoded = Vec::with_capacity(
+        8 + 32
+            + 32
+            + 16
+            + 3
+            + proof.expected_sender.len()
+            + proof.expected_recipient.len()
+            + proof.expected_beneficiary.len()
+            + 2
+            + finality_payload.len(),
+    );
+    encoded.extend_from_slice(&SOLANA_SETTLEMENT_EVIDENCE_MAGIC);
+    encoded.extend_from_slice(&proof.proof_id);
+    encoded.extend_from_slice(&proof.expected_asset_id);
+    encoded.extend_from_slice(&proof.expected_amount.to_le_bytes());
+    for field in [
+        &proof.expected_sender,
+        &proof.expected_recipient,
+        &proof.expected_beneficiary,
+    ] {
+        encoded.push(field.len() as u8);
+        encoded.extend_from_slice(field);
+    }
+    encoded.extend_from_slice(&finality_len.to_le_bytes());
+    encoded.extend_from_slice(finality_payload);
+    Ok(encoded)
+}
+
+/// Decode portable V4 settlement evidence without accepting trailing or
+/// truncated bytes.
+pub fn decode_solana_settlement_evidence(
+    encoded: &[u8],
+) -> Result<SolanaSettlementEvidence, VerificationError> {
+    const PREFIX_LEN: usize = 8 + 32 + 32 + 16 + 3 + 2;
+    if encoded.len() < PREFIX_LEN || encoded[..8] != SOLANA_SETTLEMENT_EVIDENCE_MAGIC {
+        return Err(VerificationError::MalformedProof);
+    }
+    let mut proof_id = [0u8; 32];
+    proof_id.copy_from_slice(&encoded[8..40]);
+    let mut expected_asset_id = [0u8; 32];
+    expected_asset_id.copy_from_slice(&encoded[40..72]);
+    let expected_amount = u128::from_le_bytes(
+        encoded[72..88]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let mut cursor = 88usize;
+    let mut fields = Vec::with_capacity(3);
+    for _ in 0..3 {
+        let len = *encoded
+            .get(cursor)
+            .ok_or(VerificationError::MalformedProof)? as usize;
+        cursor += 1;
+        if len > MAX_SOLANA_SETTLEMENT_FIELD_BYTES {
+            return Err(VerificationError::MalformedProof);
+        }
+        let end = cursor
+            .checked_add(len)
+            .ok_or(VerificationError::MalformedProof)?;
+        fields.push(
+            encoded
+                .get(cursor..end)
+                .ok_or(VerificationError::MalformedProof)?
+                .to_vec(),
+        );
+        cursor = end;
+    }
+    let finality_len = u16::from_le_bytes(
+        encoded
+            .get(cursor..cursor + 2)
+            .ok_or(VerificationError::MalformedProof)?
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    ) as usize;
+    cursor += 2;
+    let finality_end = cursor
+        .checked_add(finality_len)
+        .ok_or(VerificationError::MalformedProof)?;
+    if finality_len == 0 || finality_end != encoded.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+    Ok(SolanaSettlementEvidence {
+        proof: ProofEnvelope {
+            proof_id,
+            strategy: VerificationStrategy::SolanaFinalizedProof,
+            source_chain: ChainKind::Solana,
+            destination_chain: ChainKind::X3,
+            payload: Vec::new(),
+            expected_asset_id,
+            expected_amount,
+            expected_sender: fields[0].clone(),
+            expected_recipient: fields[1].clone(),
+            expected_beneficiary: fields[2].clone(),
+        },
+        finality_payload: encoded[cursor..finality_end].to_vec(),
+    })
+}
+
+/// Finality identifiers that a settlement caller must compare with the
+/// surrounding [`SettlementProof`] fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolanaV4FinalityBinding {
+    pub cluster: SolanaCluster,
+    pub finalized_slot: u64,
+    pub transaction_index: u32,
+    pub finalized_blockhash: [u8; 32],
+    pub transaction_commitment: [u8; 32],
+}
+
+/// Extract the non-vote finality identifiers from a V4 payload.
+pub fn solana_v4_finality_binding(
+    finality_payload: &[u8],
+) -> Result<SolanaV4FinalityBinding, VerificationError> {
+    if finality_payload.len() < SOLANA_FINALITY_V4_FIXED_LEN
+        || finality_payload[0] != SOLANA_FINALIZED_FORMAT_V4
+    {
+        return Err(VerificationError::UnsupportedProofFormat);
+    }
+    let cluster = SolanaCluster::decode(finality_payload[1])?;
+    let finalized_slot = u64::from_le_bytes(
+        finality_payload[2..10]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let transaction_index = u32::from_le_bytes(
+        finality_payload[26..30]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let mut finalized_blockhash = [0u8; 32];
+    finalized_blockhash.copy_from_slice(&finality_payload[31..63]);
+    let mut transaction_commitment = [0u8; 32];
+    transaction_commitment.copy_from_slice(&finality_payload[223..255]);
+    Ok(SolanaV4FinalityBinding {
+        cluster,
+        finalized_slot,
+        transaction_index,
+        finalized_blockhash,
+        transaction_commitment,
+    })
+}
+
+/// Read the transaction commitment from a V4 finality payload.
+pub fn solana_v4_transaction_commitment(
+    finality_payload: &[u8],
+) -> Result<[u8; 32], VerificationError> {
+    Ok(solana_v4_finality_binding(finality_payload)?.transaction_commitment)
 }
 
 /// Why a stake-weighted verifier could not be constructed.
@@ -216,11 +470,26 @@ impl SolanaStakeWeightedVerifier {
             return Err(VerificationError::NoAuthorizedValidators);
         }
 
-        let decoded = decode_v2(proof)?;
+        let decoded = decode_v4(proof)?;
         if decoded.cluster != self.cluster {
             return Err(VerificationError::WrongCluster);
         }
         if decoded.parent_slot >= decoded.finalized_slot {
+            return Err(VerificationError::MalformedProof);
+        }
+        if decoded.transaction.slot != decoded.finalized_slot {
+            return Err(VerificationError::MalformedProof);
+        }
+        if !decoded.transaction.succeeded {
+            return Err(VerificationError::MalformedProof);
+        }
+        if decoded.finalized_blockhash == [0u8; 32]
+            || decoded.finalized_bank_hash == [0u8; 32]
+            || decoded.parent_bank_hash == [0u8; 32]
+            || decoded.transaction.signature == [0u8; 64]
+            || decoded.transaction.commitment == [0u8; 32]
+            || decoded.transaction.recent_blockhash == [0u8; 32]
+        {
             return Err(VerificationError::MalformedProof);
         }
         if decoded.stake_table_digest != self.stake_table_digest {
@@ -238,13 +507,15 @@ impl SolanaStakeWeightedVerifier {
             }
         }
 
-        let message = solana_finality_message_v2(
+        let message = solana_finality_message_v4(
             decoded.cluster,
             decoded.finalized_slot,
             decoded.parent_slot,
+            &decoded.finalized_blockhash,
             &decoded.finalized_bank_hash,
             &decoded.parent_bank_hash,
             &decoded.stake_table_digest,
+            &decoded.transaction,
             proof,
         )?;
 
@@ -269,7 +540,7 @@ impl SolanaStakeWeightedVerifier {
 
         Ok(VerificationOutcome {
             accepted: true,
-            reason: "solana_stake_weighted_bank_hash_verified",
+            reason: "solana_stake_weighted_transaction_and_bank_state_verified",
             verified_at_height: Some(decoded.finalized_slot),
         })
     }
@@ -297,11 +568,13 @@ pub fn solana_stake_table_digest(validators: &[SolanaValidatorStake]) -> [u8; 32
     digest(hasher)
 }
 
-/// Encode a V2 proof. Validators must already be sorted by public key.
-pub fn encode_solana_finality_v2(
+/// Encode a V3 proof. Validators must already be sorted by public key.
+#[allow(clippy::too_many_arguments)]
+pub fn encode_solana_finality_v3(
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: [u8; 32],
     finalized_bank_hash: [u8; 32],
     parent_bank_hash: [u8; 32],
     stake_table_digest: [u8; 32],
@@ -314,18 +587,76 @@ pub fn encode_solana_finality_v2(
         .len()
         .checked_mul(SOLANA_FINALITY_VOTE_LEN)
         .ok_or(VerificationError::MalformedProof)?;
-    let payload_len = SOLANA_FINALITY_V2_HEADER_LEN
+    let payload_len = SOLANA_FINALITY_V3_HEADER_LEN
         .checked_add(body_len)
         .ok_or(VerificationError::MalformedProof)?;
 
     let mut payload = Vec::with_capacity(payload_len);
-    payload.push(SOLANA_FINALIZED_FORMAT_V2);
+    payload.push(SOLANA_FINALIZED_FORMAT_V3);
     payload.push(cluster as u8);
     payload.extend_from_slice(&finalized_slot.to_le_bytes());
     payload.extend_from_slice(&parent_slot.to_le_bytes());
+    payload.extend_from_slice(&finalized_blockhash);
     payload.extend_from_slice(&finalized_bank_hash);
     payload.extend_from_slice(&parent_bank_hash);
     payload.extend_from_slice(&stake_table_digest);
+    payload.extend_from_slice(&(votes.len() as u32).to_le_bytes());
+    for (pubkey, signature) in votes {
+        payload.extend_from_slice(pubkey);
+        payload.extend_from_slice(signature);
+    }
+    Ok(payload)
+}
+
+/// Encode a V4 proof containing finalized bank state and transaction inclusion.
+///
+/// Validators must already be sorted by public key.
+#[allow(clippy::too_many_arguments)]
+pub fn encode_solana_finality_v4(
+    cluster: SolanaCluster,
+    finalized_slot: u64,
+    parent_slot: u64,
+    finalized_blockhash: [u8; 32],
+    finalized_bank_hash: [u8; 32],
+    parent_bank_hash: [u8; 32],
+    stake_table_digest: [u8; 32],
+    transaction: SolanaTransactionEvidence,
+    votes: &[([u8; 32], [u8; 64])],
+) -> Result<Vec<u8>, VerificationError> {
+    validate_transaction_evidence(&transaction)?;
+    if votes.len() > MAX_SOLANA_FINALITY_VOTES {
+        return Err(VerificationError::MalformedProof);
+    }
+    let transaction_len = u32::try_from(transaction.raw_transaction.len())
+        .map_err(|_| VerificationError::MalformedProof)?;
+    let body_len = votes
+        .len()
+        .checked_mul(SOLANA_FINALITY_VOTE_LEN)
+        .ok_or(VerificationError::MalformedProof)?;
+    let payload_len = SOLANA_FINALITY_V4_FIXED_LEN
+        .checked_add(4)
+        .and_then(|len| len.checked_add(transaction.raw_transaction.len()))
+        .and_then(|len| len.checked_add(4))
+        .and_then(|len| len.checked_add(body_len))
+        .ok_or(VerificationError::MalformedProof)?;
+
+    let mut payload = Vec::with_capacity(payload_len);
+    payload.push(SOLANA_FINALIZED_FORMAT_V4);
+    payload.push(cluster as u8);
+    payload.extend_from_slice(&finalized_slot.to_le_bytes());
+    payload.extend_from_slice(&parent_slot.to_le_bytes());
+    payload.extend_from_slice(&transaction.slot.to_le_bytes());
+    payload.extend_from_slice(&transaction.index.to_le_bytes());
+    payload.push(u8::from(transaction.succeeded));
+    payload.extend_from_slice(&finalized_blockhash);
+    payload.extend_from_slice(&finalized_bank_hash);
+    payload.extend_from_slice(&parent_bank_hash);
+    payload.extend_from_slice(&stake_table_digest);
+    payload.extend_from_slice(&transaction.signature);
+    payload.extend_from_slice(&transaction.commitment);
+    payload.extend_from_slice(&transaction.recent_blockhash);
+    payload.extend_from_slice(&transaction_len.to_le_bytes());
+    payload.extend_from_slice(&transaction.raw_transaction);
     payload.extend_from_slice(&(votes.len() as u32).to_le_bytes());
     for (pubkey, signature) in votes {
         payload.extend_from_slice(pubkey);
@@ -341,22 +672,24 @@ struct SolanaVote {
 }
 
 #[derive(Debug)]
-struct DecodedSolanaFinalityV2<'a> {
+struct DecodedSolanaFinalityV4<'a> {
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: [u8; 32],
     finalized_bank_hash: [u8; 32],
     parent_bank_hash: [u8; 32],
     stake_table_digest: [u8; 32],
+    transaction: SolanaTransactionEvidence,
     votes: &'a [u8],
 }
 
-fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, VerificationError> {
+fn decode_v4(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV4<'_>, VerificationError> {
     let payload = proof.payload.as_slice();
-    if payload.len() < SOLANA_FINALITY_V2_HEADER_LEN {
+    if payload.len() < SOLANA_FINALITY_V4_HEADER_LEN {
         return Err(VerificationError::MalformedProof);
     }
-    if payload[0] != SOLANA_FINALIZED_FORMAT_V2 {
+    if payload[0] != SOLANA_FINALIZED_FORMAT_V4 {
         return Err(VerificationError::UnsupportedProofFormat);
     }
 
@@ -371,16 +704,55 @@ fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, Verif
             .try_into()
             .map_err(|_| VerificationError::MalformedProof)?,
     );
+    let transaction_slot = u64::from_le_bytes(
+        payload[18..26]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let transaction_index = u32::from_le_bytes(
+        payload[26..30]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    );
+    let transaction_succeeded = match payload[30] {
+        0 => false,
+        1 => true,
+        _ => return Err(VerificationError::MalformedProof),
+    };
 
+    let mut finalized_blockhash = [0u8; 32];
+    finalized_blockhash.copy_from_slice(&payload[31..63]);
     let mut finalized_bank_hash = [0u8; 32];
-    finalized_bank_hash.copy_from_slice(&payload[18..50]);
+    finalized_bank_hash.copy_from_slice(&payload[63..95]);
     let mut parent_bank_hash = [0u8; 32];
-    parent_bank_hash.copy_from_slice(&payload[50..82]);
+    parent_bank_hash.copy_from_slice(&payload[95..127]);
     let mut stake_table_digest = [0u8; 32];
-    stake_table_digest.copy_from_slice(&payload[82..114]);
+    stake_table_digest.copy_from_slice(&payload[127..159]);
+    let mut transaction_signature = [0u8; 64];
+    transaction_signature.copy_from_slice(&payload[159..223]);
+    let mut transaction_commitment = [0u8; 32];
+    transaction_commitment.copy_from_slice(&payload[223..255]);
+    let mut transaction_recent_blockhash = [0u8; 32];
+    transaction_recent_blockhash.copy_from_slice(&payload[255..287]);
 
+    let transaction_len = u32::from_le_bytes(
+        payload[287..291]
+            .try_into()
+            .map_err(|_| VerificationError::MalformedProof)?,
+    ) as usize;
+    if transaction_len == 0 || transaction_len > MAX_SOLANA_TRANSACTION_BYTES {
+        return Err(VerificationError::MalformedProof);
+    }
+    let transaction_start = SOLANA_FINALITY_V4_FIXED_LEN;
+    let transaction_end = transaction_start
+        .checked_add(transaction_len)
+        .ok_or(VerificationError::MalformedProof)?;
+    if transaction_end + 4 > payload.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+    let raw_transaction = payload[transaction_start..transaction_end].to_vec();
     let count = u32::from_le_bytes(
-        payload[114..118]
+        payload[transaction_end..transaction_end + 4]
             .try_into()
             .map_err(|_| VerificationError::MalformedProof)?,
     ) as usize;
@@ -390,25 +762,40 @@ fn decode_v2(proof: &ProofEnvelope) -> Result<DecodedSolanaFinalityV2<'_>, Verif
     let vote_bytes = count
         .checked_mul(SOLANA_FINALITY_VOTE_LEN)
         .ok_or(VerificationError::MalformedProof)?;
-    let expected_len = SOLANA_FINALITY_V2_HEADER_LEN
+    let expected_len = transaction_end
+        .checked_add(4)
+        .ok_or(VerificationError::MalformedProof)?
         .checked_add(vote_bytes)
         .ok_or(VerificationError::MalformedProof)?;
     if payload.len() != expected_len {
         return Err(VerificationError::MalformedProof);
     }
 
-    Ok(DecodedSolanaFinalityV2 {
+    let transaction = SolanaTransactionEvidence {
+        slot: transaction_slot,
+        index: transaction_index,
+        signature: transaction_signature,
+        commitment: transaction_commitment,
+        recent_blockhash: transaction_recent_blockhash,
+        succeeded: transaction_succeeded,
+        raw_transaction,
+    };
+    validate_transaction_evidence(&transaction)?;
+
+    Ok(DecodedSolanaFinalityV4 {
         cluster,
         finalized_slot,
         parent_slot,
+        finalized_blockhash,
         finalized_bank_hash,
         parent_bank_hash,
         stake_table_digest,
-        votes: &payload[SOLANA_FINALITY_V2_HEADER_LEN..],
+        transaction,
+        votes: &payload[transaction_end + 4..],
     })
 }
 
-impl DecodedSolanaFinalityV2<'_> {
+impl DecodedSolanaFinalityV4<'_> {
     fn votes(&self) -> impl Iterator<Item = SolanaVote> + '_ {
         self.votes
             .chunks_exact(SOLANA_FINALITY_VOTE_LEN)
@@ -442,6 +829,143 @@ fn find_validator<'a>(
         .map(|index| &validators[index])
 }
 
+/// Domain-separated commitment to the exact serialized Solana transaction.
+pub fn solana_transaction_commitment(raw_transaction: &[u8]) -> [u8; 32] {
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(b"X3/SOLANA_TRANSACTION/V1");
+    hasher.update((raw_transaction.len() as u32).to_le_bytes());
+    hasher.update(raw_transaction);
+    digest(hasher)
+}
+
+fn validate_transaction_evidence(
+    evidence: &SolanaTransactionEvidence,
+) -> Result<(), VerificationError> {
+    let parsed = parse_solana_transaction(&evidence.raw_transaction)?;
+    if evidence.signature != parsed.signature
+        || evidence.recent_blockhash != parsed.recent_blockhash
+        || evidence.commitment != parsed.commitment
+    {
+        return Err(VerificationError::MalformedProof);
+    }
+    Ok(())
+}
+
+struct ParsedSolanaTransaction {
+    signature: [u8; 64],
+    recent_blockhash: [u8; 32],
+    commitment: [u8; 32],
+}
+
+fn parse_solana_transaction(
+    raw_transaction: &[u8],
+) -> Result<ParsedSolanaTransaction, VerificationError> {
+    if raw_transaction.is_empty() || raw_transaction.len() > MAX_SOLANA_TRANSACTION_BYTES {
+        return Err(VerificationError::MalformedProof);
+    }
+
+    let mut cursor = 0usize;
+    let signature_count = read_shortvec(raw_transaction, &mut cursor)?;
+    if signature_count == 0 || signature_count > 128 {
+        return Err(VerificationError::MalformedProof);
+    }
+    let signatures_end = cursor
+        .checked_add(
+            signature_count
+                .checked_mul(64)
+                .ok_or(VerificationError::MalformedProof)?,
+        )
+        .ok_or(VerificationError::MalformedProof)?;
+    if signatures_end > raw_transaction.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+    let mut signature = [0u8; 64];
+    signature.copy_from_slice(&raw_transaction[cursor..cursor + 64]);
+
+    let message_start = signatures_end;
+    cursor = message_start;
+    let message_prefix = *raw_transaction
+        .get(cursor)
+        .ok_or(VerificationError::MalformedProof)?;
+    if message_prefix & 0x80 != 0 {
+        if message_prefix != 0x80 {
+            return Err(VerificationError::MalformedProof);
+        }
+        cursor += 1;
+    }
+
+    let header_end = cursor
+        .checked_add(3)
+        .ok_or(VerificationError::MalformedProof)?;
+    if header_end > raw_transaction.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+    let required_signatures = raw_transaction[cursor] as usize;
+    let readonly_signed = raw_transaction[cursor + 1] as usize;
+    let readonly_unsigned = raw_transaction[cursor + 2] as usize;
+    cursor = header_end;
+
+    let account_count = read_shortvec(raw_transaction, &mut cursor)?;
+    if account_count == 0
+        || account_count > 256
+        || required_signatures == 0
+        || required_signatures > account_count
+        || readonly_signed > required_signatures
+        || readonly_unsigned > account_count - required_signatures
+    {
+        return Err(VerificationError::MalformedProof);
+    }
+    let account_keys_end = cursor
+        .checked_add(
+            account_count
+                .checked_mul(32)
+                .ok_or(VerificationError::MalformedProof)?,
+        )
+        .ok_or(VerificationError::MalformedProof)?;
+    let blockhash_end = account_keys_end
+        .checked_add(32)
+        .ok_or(VerificationError::MalformedProof)?;
+    if blockhash_end > raw_transaction.len() {
+        return Err(VerificationError::MalformedProof);
+    }
+
+    let mut fee_payer = [0u8; 32];
+    fee_payer.copy_from_slice(&raw_transaction[cursor..cursor + 32]);
+    let mut recent_blockhash = [0u8; 32];
+    recent_blockhash.copy_from_slice(&raw_transaction[account_keys_end..blockhash_end]);
+
+    let key = ed25519_dalek::VerifyingKey::from_bytes(&fee_payer)
+        .map_err(|_| VerificationError::MalformedProof)?;
+    let signature_value = ed25519_dalek::Signature::from_slice(&signature)
+        .map_err(|_| VerificationError::MalformedProof)?;
+    key.verify_strict(&raw_transaction[message_start..], &signature_value)
+        .map_err(|_| VerificationError::MalformedProof)?;
+
+    Ok(ParsedSolanaTransaction {
+        signature,
+        recent_blockhash,
+        commitment: solana_transaction_commitment(raw_transaction),
+    })
+}
+
+fn read_shortvec(input: &[u8], cursor: &mut usize) -> Result<usize, VerificationError> {
+    let mut value = 0usize;
+    for position in 0..3 {
+        let byte = *input
+            .get(*cursor)
+            .ok_or(VerificationError::MalformedProof)?;
+        *cursor += 1;
+        value |= usize::from(byte & 0x7f) << (position * 7);
+        if byte & 0x80 == 0 {
+            if position > 0 && byte == 0 {
+                return Err(VerificationError::MalformedProof);
+            }
+            return Ok(value);
+        }
+    }
+    Err(VerificationError::MalformedProof)
+}
+
 fn verify_ed25519(pubkey: &[u8; 32], signature: &[u8; 64], message: &[u8; 32]) -> bool {
     ed25519_dalek::VerifyingKey::from_bytes(pubkey)
         .ok()
@@ -453,10 +977,12 @@ fn verify_ed25519(pubkey: &[u8; 32], signature: &[u8; 64], message: &[u8; 32]) -
         .unwrap_or(false)
 }
 
-pub fn solana_finality_message_v2(
+#[allow(clippy::too_many_arguments)]
+pub fn solana_finality_message_v3(
     cluster: SolanaCluster,
     finalized_slot: u64,
     parent_slot: u64,
+    finalized_blockhash: &[u8; 32],
     finalized_bank_hash: &[u8; 32],
     parent_bank_hash: &[u8; 32],
     stake_table_digest: &[u8; 32],
@@ -468,9 +994,48 @@ pub fn solana_finality_message_v2(
     hasher.update([cluster as u8]);
     hasher.update(finalized_slot.to_le_bytes());
     hasher.update(parent_slot.to_le_bytes());
+    hasher.update(finalized_blockhash);
     hasher.update(finalized_bank_hash);
     hasher.update(parent_bank_hash);
     hasher.update(stake_table_digest);
+
+    hasher.update(TRANSFER_DOMAIN);
+    hasher.update(proof.expected_asset_id);
+    hasher.update(proof.expected_amount.to_le_bytes());
+    update_vec(&mut hasher, &proof.expected_sender)?;
+    update_vec(&mut hasher, &proof.expected_recipient)?;
+    update_vec(&mut hasher, &proof.expected_beneficiary)?;
+    Ok(digest(hasher))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn solana_finality_message_v4(
+    cluster: SolanaCluster,
+    finalized_slot: u64,
+    parent_slot: u64,
+    finalized_blockhash: &[u8; 32],
+    finalized_bank_hash: &[u8; 32],
+    parent_bank_hash: &[u8; 32],
+    stake_table_digest: &[u8; 32],
+    transaction: &SolanaTransactionEvidence,
+    proof: &ProofEnvelope,
+) -> Result<[u8; 32], VerificationError> {
+    let mut hasher = Blake2b::<U32>::new();
+    hasher.update(FINALITY_DOMAIN_V4);
+    hasher.update(proof.proof_id);
+    hasher.update([cluster as u8]);
+    hasher.update(finalized_slot.to_le_bytes());
+    hasher.update(parent_slot.to_le_bytes());
+    hasher.update(transaction.slot.to_le_bytes());
+    hasher.update(transaction.index.to_le_bytes());
+    hasher.update([u8::from(transaction.succeeded)]);
+    hasher.update(finalized_blockhash);
+    hasher.update(finalized_bank_hash);
+    hasher.update(parent_bank_hash);
+    hasher.update(stake_table_digest);
+    hasher.update(transaction.signature);
+    hasher.update(transaction.commitment);
+    hasher.update(transaction.recent_blockhash);
 
     hasher.update(TRANSFER_DOMAIN);
     hasher.update(proof.expected_asset_id);
@@ -519,10 +1084,26 @@ mod tests {
         entries
     }
 
+    fn transaction(slot: u64) -> SolanaTransactionEvidence {
+        let key = signing_key(0x55);
+        let recent_blockhash = [11u8; 32];
+        let mut message = vec![1, 0, 0, 1];
+        message.extend_from_slice(&key.verifying_key().to_bytes());
+        message.extend_from_slice(&recent_blockhash);
+        message.push(0);
+        let signature = key.sign(&message).to_bytes();
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&signature);
+        raw_transaction.extend_from_slice(&message);
+        SolanaTransactionEvidence::from_raw(slot, 7, true, raw_transaction)
+            .expect("signed transaction fixture")
+    }
+
     struct ProofInput<'a> {
         cluster: SolanaCluster,
         finalized_slot: u64,
         parent_slot: u64,
+        finalized_blockhash: [u8; 32],
         finalized_bank_hash: [u8; 32],
         parent_bank_hash: [u8; 32],
         stake_table_digest: [u8; 32],
@@ -544,13 +1125,16 @@ mod tests {
             expected_recipient: input.recipient.to_vec(),
             expected_beneficiary: vec![9u8; 20],
         };
-        let message = solana_finality_message_v2(
+        let transaction = transaction(input.finalized_slot);
+        let message = solana_finality_message_v4(
             input.cluster,
             input.finalized_slot,
             input.parent_slot,
+            &input.finalized_blockhash,
             &input.finalized_bank_hash,
             &input.parent_bank_hash,
             &input.stake_table_digest,
+            &transaction,
             &envelope,
         )
         .expect("test intent has bounded fields");
@@ -564,13 +1148,15 @@ mod tests {
                 )
             })
             .collect::<Vec<_>>();
-        envelope.payload = encode_solana_finality_v2(
+        envelope.payload = encode_solana_finality_v4(
             input.cluster,
             input.finalized_slot,
             input.parent_slot,
+            input.finalized_blockhash,
             input.finalized_bank_hash,
             input.parent_bank_hash,
             input.stake_table_digest,
+            transaction,
             &votes,
         )
         .expect("test proof fits");
@@ -588,6 +1174,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -600,7 +1187,10 @@ mod tests {
             .verify_with_finalized_floor(&envelope, 390)
             .expect("80 of 100 stake must satisfy two thirds");
         assert_eq!(outcome.verified_at_height, Some(400));
-        assert_eq!(outcome.reason, "solana_stake_weighted_bank_hash_verified");
+        assert_eq!(
+            outcome.reason,
+            "solana_stake_weighted_transaction_and_bank_state_verified"
+        );
     }
 
     #[test]
@@ -618,6 +1208,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -642,6 +1233,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -667,6 +1259,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -674,15 +1267,17 @@ mod tests {
             sender: b"sender",
             recipient: b"recipient",
         });
-        let decoded = decode_v2(&envelope).expect("well formed proof");
+        let decoded = decode_v4(&envelope).expect("well formed proof");
         let vote = decoded.votes().next().expect("one vote");
-        let duplicated = encode_solana_finality_v2(
+        let duplicated = encode_solana_finality_v4(
             SolanaCluster::MainnetBeta,
             400,
             399,
+            [6u8; 32],
             [8u8; 32],
             [7u8; 32],
             verifier.stake_table_digest(),
+            decoded.transaction,
             &[(vote.pubkey, vote.signature), (vote.pubkey, vote.signature)],
         )
         .expect("fits");
@@ -709,6 +1304,7 @@ mod tests {
             cluster: SolanaCluster::Devnet,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -737,6 +1333,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -751,7 +1348,7 @@ mod tests {
     }
 
     #[test]
-    fn tampered_bank_hash_parent_and_stake_digest_are_rejected() {
+    fn tampered_blockhash_bank_hash_parent_and_stake_digest_are_rejected() {
         let (a, b) = (signing_key(1), signing_key(2));
         let verifier = SolanaStakeWeightedVerifier::new(
             SolanaCluster::MainnetBeta,
@@ -765,6 +1362,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -773,22 +1371,29 @@ mod tests {
             recipient: b"recipient",
         });
 
+        let mut blockhash_tampered = valid.clone();
+        blockhash_tampered.payload[31] ^= 1;
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&blockhash_tampered, 0),
+            Err(VerificationError::InsufficientStake)
+        );
+
         let mut bank_hash_tampered = valid.clone();
-        bank_hash_tampered.payload[18] ^= 1;
+        bank_hash_tampered.payload[63] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&bank_hash_tampered, 0),
             Err(VerificationError::InsufficientStake)
         );
 
         let mut parent_tampered = valid.clone();
-        parent_tampered.payload[50] ^= 1;
+        parent_tampered.payload[95] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&parent_tampered, 0),
             Err(VerificationError::InsufficientStake)
         );
 
         let mut digest_tampered = valid;
-        digest_tampered.payload[82] ^= 1;
+        digest_tampered.payload[127] ^= 1;
         assert_eq!(
             verifier.verify_with_finalized_floor(&digest_tampered, 0),
             Err(VerificationError::StakeTableMismatch)
@@ -810,6 +1415,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -834,6 +1440,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -852,6 +1459,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: verifier.stake_table_digest(),
@@ -867,6 +1475,237 @@ mod tests {
     }
 
     #[test]
+    fn zero_finality_identities_fail_closed_even_with_a_quorum() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let entries = stakes(&[&a, &b], &[50, 50]);
+        let verifier =
+            SolanaStakeWeightedVerifier::new(SolanaCluster::MainnetBeta, entries, 2, 3, 0)
+                .expect("valid stake table");
+        for (blockhash, bank_hash, parent_bank_hash) in [
+            ([0u8; 32], [8u8; 32], [7u8; 32]),
+            ([6u8; 32], [0u8; 32], [7u8; 32]),
+            ([6u8; 32], [8u8; 32], [0u8; 32]),
+        ] {
+            let envelope = proof(ProofInput {
+                cluster: SolanaCluster::MainnetBeta,
+                finalized_slot: 400,
+                parent_slot: 399,
+                finalized_blockhash: blockhash,
+                finalized_bank_hash: bank_hash,
+                parent_bank_hash,
+                stake_table_digest: verifier.stake_table_digest(),
+                keys: &[&a, &b],
+                sender: b"sender",
+                recipient: b"recipient",
+            });
+            assert_eq!(
+                verifier.verify_with_finalized_floor(&envelope, 0),
+                Err(VerificationError::MalformedProof)
+            );
+        }
+    }
+
+    #[test]
+    fn zero_transaction_identities_fail_closed_even_with_a_quorum() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let valid = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+
+        for (offset, length) in [(159, 64), (223, 32), (255, 32)] {
+            let mut tampered = valid.clone();
+            tampered.payload[offset..offset + length].fill(0);
+            assert_eq!(
+                verifier.verify_with_finalized_floor(&tampered, 0),
+                Err(VerificationError::MalformedProof)
+            );
+        }
+    }
+
+    #[test]
+    fn raw_transaction_signature_and_commitment_are_verified() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let valid = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+
+        let mut signature_tampered = valid.clone();
+        signature_tampered.payload[292] ^= 1;
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&signature_tampered, 0),
+            Err(VerificationError::MalformedProof)
+        );
+
+        let mut commitment_tampered = valid;
+        commitment_tampered.payload[223] ^= 1;
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&commitment_tampered, 0),
+            Err(VerificationError::MalformedProof)
+        );
+    }
+
+    #[test]
+    fn portable_settlement_evidence_round_trips_without_trailing_bytes() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let envelope = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+        let finality_payload = envelope.payload.clone();
+        let encoded =
+            encode_solana_settlement_evidence(&envelope, &finality_payload).expect("encode");
+        let decoded = decode_solana_settlement_evidence(&encoded).expect("decode");
+        assert_eq!(decoded.proof.proof_id, envelope.proof_id);
+        assert_eq!(decoded.proof.expected_asset_id, envelope.expected_asset_id);
+        assert_eq!(decoded.proof.expected_amount, envelope.expected_amount);
+        assert_eq!(decoded.proof.expected_sender, envelope.expected_sender);
+        assert_eq!(
+            decoded.proof.expected_recipient,
+            envelope.expected_recipient
+        );
+        assert_eq!(
+            decoded.proof.expected_beneficiary,
+            envelope.expected_beneficiary
+        );
+        assert_eq!(decoded.finality_payload, finality_payload);
+        assert_eq!(
+            solana_v4_transaction_commitment(&decoded.finality_payload).expect("V4 commitment"),
+            transaction(400).commitment
+        );
+
+        let mut trailing = encoded.clone();
+        trailing.push(0);
+        assert_eq!(
+            decode_solana_settlement_evidence(&trailing),
+            Err(VerificationError::MalformedProof)
+        );
+        assert_eq!(
+            decode_solana_settlement_evidence(&encoded[..encoded.len() - 1]),
+            Err(VerificationError::MalformedProof)
+        );
+    }
+
+    #[test]
+    fn failed_or_misplaced_transaction_evidence_is_refused() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let valid = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+
+        let mut failed = valid.clone();
+        failed.payload[30] = 0;
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&failed, 0),
+            Err(VerificationError::MalformedProof)
+        );
+
+        let mut wrong_slot = valid;
+        wrong_slot.payload[18..26].copy_from_slice(&399u64.to_le_bytes());
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&wrong_slot, 0),
+            Err(VerificationError::MalformedProof)
+        );
+    }
+
+    #[test]
+    fn legacy_v3_bank_only_evidence_is_refused() {
+        let (a, b) = (signing_key(1), signing_key(2));
+        let verifier = SolanaStakeWeightedVerifier::new(
+            SolanaCluster::MainnetBeta,
+            stakes(&[&a, &b], &[50, 50]),
+            2,
+            3,
+            0,
+        )
+        .expect("valid stake table");
+        let mut envelope = proof(ProofInput {
+            cluster: SolanaCluster::MainnetBeta,
+            finalized_slot: 400,
+            parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
+            finalized_bank_hash: [8u8; 32],
+            parent_bank_hash: [7u8; 32],
+            stake_table_digest: verifier.stake_table_digest(),
+            keys: &[&a, &b],
+            sender: b"sender",
+            recipient: b"recipient",
+        });
+        envelope.payload[0] = SOLANA_FINALIZED_FORMAT_V3;
+
+        assert_eq!(
+            verifier.verify_with_finalized_floor(&envelope, 0),
+            Err(VerificationError::UnsupportedProofFormat)
+        );
+    }
+
+    #[test]
     fn malformed_and_unconfigured_proofs_fail_closed() {
         let a = signing_key(1);
         let unconfigured = SolanaStakeWeightedVerifier::empty(SolanaCluster::MainnetBeta);
@@ -874,6 +1713,7 @@ mod tests {
             cluster: SolanaCluster::MainnetBeta,
             finalized_slot: 400,
             parent_slot: 399,
+            finalized_blockhash: [6u8; 32],
             finalized_bank_hash: [8u8; 32],
             parent_bank_hash: [7u8; 32],
             stake_table_digest: [0u8; 32],

@@ -36,10 +36,15 @@ pub use gateway_types::{
     ExternalAssetRef, ExternalChainId, VerificationRequest, VerificationResult,
 };
 pub use solana_finality::{
-    encode_solana_finality_v2, solana_finality_message_v2, solana_stake_table_digest,
-    SolanaCluster, SolanaStakeWeightedVerifier, SolanaValidatorStake, SolanaVerifierConfigError,
-    MAX_SOLANA_FINALITY_VOTES, SOLANA_FINALITY_V2_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
-    SOLANA_FINALIZED_FORMAT_V2,
+    decode_solana_settlement_evidence, encode_solana_finality_v3, encode_solana_finality_v4,
+    encode_solana_settlement_evidence, solana_finality_message_v3, solana_finality_message_v4,
+    solana_stake_table_digest, solana_transaction_commitment, solana_v4_finality_binding,
+    solana_v4_transaction_commitment, SolanaCluster, SolanaSettlementEvidence,
+    SolanaStakeWeightedVerifier, SolanaTransactionEvidence, SolanaV4FinalityBinding,
+    SolanaValidatorStake, SolanaVerifierConfigError, MAX_SOLANA_FINALITY_VOTES,
+    MAX_SOLANA_SETTLEMENT_FIELD_BYTES, MAX_SOLANA_TRANSACTION_BYTES, SOLANA_FINALITY_V3_HEADER_LEN,
+    SOLANA_FINALITY_V4_FIXED_LEN, SOLANA_FINALITY_V4_HEADER_LEN, SOLANA_FINALITY_VOTE_LEN,
+    SOLANA_FINALIZED_FORMAT_V3, SOLANA_FINALIZED_FORMAT_V4, SOLANA_SETTLEMENT_EVIDENCE_MAGIC,
 };
 
 use alloc::collections::btree_map::BTreeMap;
@@ -102,10 +107,14 @@ pub struct ProofEnvelope {
     pub payload: alloc::vec::Vec<u8>,
     pub expected_asset_id: [u8; 32],
     pub expected_amount: u128,
+    /// Party that initiated the external transfer (for EVM this is the
+    /// indexed depositor/recipient; for Solana it is the source account).
     pub expected_sender: alloc::vec::Vec<u8>,
+    /// External contract or vault whose event/funding must prove the transfer
+    /// (for EVM this is the gateway contract, not the X3 beneficiary).
     pub expected_recipient: alloc::vec::Vec<u8>,
-    /// The X3 account the deposit credits. A Bitcoin proof must show the transaction committed to
-    /// it (see [`bitcoin_spv`]); other strategies do not read it.
+    /// The X3 account the deposit credits. EVM `DepositLocked` and Bitcoin
+    /// proofs must bind it to the external event/transaction.
     pub expected_beneficiary: alloc::vec::Vec<u8>,
 }
 

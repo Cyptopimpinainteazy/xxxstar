@@ -18,11 +18,13 @@ pub const DEFAULT_TOTAL_SIGNERS: u32 = 5;
 /// not a bare count of bytes — by signing `deposit_approval_message(..)`
 /// with the private key matching their entry in `config.signer_pubkeys`.
 pub const BTC_DEPOSIT_APPROVAL_FORMAT_V1: u8 = 1;
+pub const BTC_WITHDRAWAL_APPROVAL_FORMAT_V1: u8 = 1;
 
 /// Domain-separation tag, distinct from any other message format this
 /// workspace signs, so a signature produced for one purpose can never be
 /// replayed as an approval for another.
 const BTC_DEPOSIT_APPROVAL_DOMAIN: &[u8] = b"X3-BTC-DEPOSIT-APPROVAL-V1";
+const BTC_WITHDRAWAL_APPROVAL_DOMAIN: &[u8] = b"X3-BTC-WITHDRAWAL-APPROVAL-V1";
 
 /// The exact message a signer must sign (and this crate verifies) to
 /// approve `deposit`. Binds the approval to this deposit's UTXO (txid,
@@ -41,6 +43,34 @@ pub fn deposit_approval_message(
     hasher.update(vout.to_le_bytes());
     hasher.update(amount.to_le_bytes());
     hasher.update(asset_id);
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&hasher.finalize());
+    out
+}
+
+/// The exact message a signer approves for a Bitcoin withdrawal.
+///
+/// The message binds the burn identity, recipient script, amount, and the
+/// digest of the X3 proof that authorized the withdrawal. A signature cannot be
+/// moved to another withdrawal or reused after either payload changes.
+pub fn withdrawal_approval_message(
+    burn_message_id: &[u8; 32],
+    btc_recipient: &[u8],
+    amount: u64,
+    x3_proof: &[u8],
+) -> [u8; 32] {
+    fn component(hasher: &mut Sha256, bytes: &[u8]) {
+        hasher.update((bytes.len() as u64).to_le_bytes());
+        hasher.update(bytes);
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update([BTC_WITHDRAWAL_APPROVAL_FORMAT_V1]);
+    hasher.update(BTC_WITHDRAWAL_APPROVAL_DOMAIN);
+    hasher.update(burn_message_id);
+    hasher.update(amount.to_le_bytes());
+    component(&mut hasher, btc_recipient);
+    component(&mut hasher, x3_proof);
     let mut out = [0u8; 32];
     out.copy_from_slice(&hasher.finalize());
     out
@@ -260,13 +290,9 @@ pub struct BtcWithdrawalRequest {
     pub btc_recipient: Vec<u8>,
     pub amount: u64,
     pub x3_proof: Vec<u8>,
-    /// Unlike `BtcDepositRequest.signatures`, there is currently no method
-    /// that populates this field at all — `submit_withdrawal` always
-    /// initializes it empty, and nothing in this crate ever pushes to it.
-    /// Issue #272 named this field as sharing the deposit side's
-    /// unverified-signature problem; in fact the withdrawal signer-approval
-    /// flow doesn't exist yet, which is a larger, separate gap than this fix
-    /// (real verification for deposits) addresses.
+    /// Verified signer approvals. A signature is added only after the signer is
+    /// authorized and its compact secp256k1 signature verifies over
+    /// [`withdrawal_approval_message`] for this exact withdrawal.
     pub signatures: Vec<([u8; 32], Vec<u8>)>,
     pub status: BtcWithdrawalStatus,
 }
@@ -279,6 +305,16 @@ pub enum BtcWithdrawalStatus {
     Broadcasted { txid: [u8; 32] },
     Completed,
     Rejected,
+}
+
+/// Authority that verifies the X3-side proof authorizing a withdrawal.
+///
+/// The vault intentionally does not interpret the proof bytes itself. A
+/// production integration must supply the runtime verifier that checked the
+/// burn against finalized X3 state. The vault refuses to count signer approvals
+/// until that verifier succeeds.
+pub trait WithdrawalX3ProofVerifier {
+    fn verify(&self, withdrawal: &BtcWithdrawalRequest) -> Result<(), BtcVaultError>;
 }
 
 #[derive(Debug, Clone, scale_info::TypeInfo)]
@@ -510,6 +546,7 @@ impl BtcVault {
         btc_recipient: Vec<u8>,
         amount: u64,
         x3_proof: Vec<u8>,
+        current_day: u64,
     ) -> Result<(), BtcVaultError> {
         if amount == 0 {
             return Err(BtcVaultError::ZeroAmount);
@@ -517,18 +554,31 @@ impl BtcVault {
         if amount > self.config.max_withdrawal_per_tx {
             return Err(BtcVaultError::ExceedsMaxWithdrawal);
         }
-        if self.utxos.total_spendable() < amount {
+        if current_day < self.last_withdrawal_day {
+            return Err(BtcVaultError::WithdrawalDayRegression);
+        }
+        let reserved = self
+            .pending_withdrawals
+            .iter()
+            .filter(|withdrawal| {
+                !matches!(
+                    withdrawal.status,
+                    BtcWithdrawalStatus::Completed | BtcWithdrawalStatus::Rejected
+                )
+            })
+            .map(|withdrawal| withdrawal.amount)
+            .fold(0u64, u64::saturating_add);
+        if self.utxos.total_spendable().saturating_sub(reserved) < amount {
             return Err(BtcVaultError::InsufficientReserves);
         }
 
-        let current_day = 0;
-        if current_day == self.last_withdrawal_day {
-            if self.daily_withdrawn.saturating_add(amount) > self.config.daily_withdrawal_limit {
-                return Err(BtcVaultError::DailyWithdrawalLimitExceeded);
-            }
+        let next_daily_withdrawn = if current_day == self.last_withdrawal_day {
+            self.daily_withdrawn.saturating_add(amount)
         } else {
-            self.last_withdrawal_day = current_day;
-            self.daily_withdrawn = 0;
+            amount
+        };
+        if next_daily_withdrawn > self.config.daily_withdrawal_limit {
+            return Err(BtcVaultError::DailyWithdrawalLimitExceeded);
         }
 
         let withdrawal = BtcWithdrawalRequest {
@@ -539,7 +589,102 @@ impl BtcVault {
             signatures: Vec::new(),
             status: BtcWithdrawalStatus::PendingX3Proof,
         };
+        self.last_withdrawal_day = current_day;
+        self.daily_withdrawn = next_daily_withdrawn;
         self.pending_withdrawals.push(withdrawal);
+        Ok(())
+    }
+
+    /// Advance a withdrawal from X3-proof pending to signer approval after an
+    /// external verifier has authenticated the burn and its exact payload.
+    pub fn verify_withdrawal_x3_proof(
+        &mut self,
+        withdrawal_index: usize,
+        verifier: &impl WithdrawalX3ProofVerifier,
+    ) -> Result<(), BtcVaultError> {
+        let withdrawal = self
+            .pending_withdrawals
+            .get(withdrawal_index)
+            .ok_or(BtcVaultError::WithdrawalNotFound)?;
+        if withdrawal.status != BtcWithdrawalStatus::PendingX3Proof {
+            return Err(BtcVaultError::InvalidStateTransition);
+        }
+        verifier.verify(withdrawal)?;
+
+        let threshold = self.config.threshold;
+        let withdrawal = self
+            .pending_withdrawals
+            .get_mut(withdrawal_index)
+            .ok_or(BtcVaultError::WithdrawalNotFound)?;
+        withdrawal.status = BtcWithdrawalStatus::PendingSignerApproval {
+            approvals: 0,
+            threshold,
+        };
+        Ok(())
+    }
+
+    /// Record one verified signer approval for a withdrawal.
+    ///
+    /// The signer must be configured, cannot vote twice, and must produce a
+    /// compact secp256k1 signature over the exact withdrawal message. The
+    /// withdrawal becomes `Approved` only when distinct verified signers reach
+    /// the configured threshold.
+    pub fn add_withdrawal_signer_approval(
+        &mut self,
+        withdrawal_index: usize,
+        signer_pubkey: [u8; 32],
+        signature_bytes: Vec<u8>,
+    ) -> Result<(), BtcVaultError> {
+        let withdrawal = self
+            .pending_withdrawals
+            .get_mut(withdrawal_index)
+            .ok_or(BtcVaultError::WithdrawalNotFound)?;
+
+        let (approvals, threshold) = match &withdrawal.status {
+            BtcWithdrawalStatus::PendingSignerApproval {
+                approvals,
+                threshold,
+            } => (*approvals, *threshold),
+            _ => return Err(BtcVaultError::InvalidStateTransition),
+        };
+
+        let signer_index = self
+            .config
+            .signers
+            .iter()
+            .position(|signer| *signer == signer_pubkey)
+            .ok_or(BtcVaultError::InvalidSigner)?;
+        if withdrawal
+            .signatures
+            .iter()
+            .any(|(key, _)| *key == signer_pubkey)
+        {
+            return Err(BtcVaultError::DuplicateSignature);
+        }
+
+        let verifying_pubkey = self
+            .config
+            .signer_pubkeys
+            .get(signer_index)
+            .ok_or(BtcVaultError::InvalidSigner)?;
+        let message = withdrawal_approval_message(
+            &withdrawal.burn_message_id,
+            &withdrawal.btc_recipient,
+            withdrawal.amount,
+            &withdrawal.x3_proof,
+        );
+        verify_signer_signature(verifying_pubkey, &message, &signature_bytes)?;
+
+        withdrawal.signatures.push((signer_pubkey, signature_bytes));
+        let new_approvals = approvals + 1;
+        if new_approvals >= threshold {
+            withdrawal.status = BtcWithdrawalStatus::Approved;
+        } else {
+            withdrawal.status = BtcWithdrawalStatus::PendingSignerApproval {
+                approvals: new_approvals,
+                threshold,
+            };
+        }
         Ok(())
     }
 
@@ -652,8 +797,10 @@ pub enum BtcVaultError {
     ExceedsMaxDeposit,
     ExceedsMaxWithdrawal,
     DailyWithdrawalLimitExceeded,
+    WithdrawalDayRegression,
     InsufficientReserves,
     DepositNotFound,
+    WithdrawalNotFound,
     InvalidStateTransition,
     TooManyPending,
     SpvVerificationFailed,
@@ -676,8 +823,12 @@ impl Display for BtcVaultError {
             BtcVaultError::DailyWithdrawalLimitExceeded => {
                 write!(f, "daily withdrawal limit exceeded")
             }
+            BtcVaultError::WithdrawalDayRegression => {
+                write!(f, "withdrawal day went backwards")
+            }
             BtcVaultError::InsufficientReserves => write!(f, "insufficient vault reserves"),
             BtcVaultError::DepositNotFound => write!(f, "deposit not found"),
+            BtcVaultError::WithdrawalNotFound => write!(f, "withdrawal not found"),
             BtcVaultError::InvalidStateTransition => write!(f, "invalid state transition"),
             BtcVaultError::TooManyPending => write!(f, "too many pending requests"),
             BtcVaultError::SpvVerificationFailed => write!(f, "SPV verification failed"),
@@ -687,7 +838,7 @@ impl Display for BtcVaultError {
             BtcVaultError::InvalidSigner => write!(f, "invalid signer"),
             BtcVaultError::DuplicateSignature => write!(f, "duplicate signature"),
             BtcVaultError::InvalidApprovalSignature => {
-                write!(f, "signature does not verify for this deposit and signer")
+                write!(f, "signature does not verify for this request and signer")
             }
             BtcVaultError::ConfirmationCountRegression => {
                 write!(f, "confirmation count went backwards")
@@ -873,7 +1024,7 @@ mod tests {
         let pubkeys: Vec<[u8; 33]> = keys
             .iter()
             .map(|k| {
-                let point = k.verifying_key().to_encoded_point(true);
+                let point = k.verifying_key().to_sec1_point(true);
                 let mut out = [0u8; 33];
                 out.copy_from_slice(point.as_bytes());
                 out
@@ -883,25 +1034,68 @@ mod tests {
         (BtcVault::new(config), keys)
     }
 
+    fn sign_prehash(key: &k256::ecdsa::SigningKey, message: &[u8; 32]) -> Vec<u8> {
+        use k256::ecdsa::signature::hazmat::PrehashSigner;
+        use k256::ecdsa::Signature;
+
+        let signature: Signature = key
+            .sign_prehash(message)
+            .expect("sign over a 32-byte prehash cannot fail");
+        signature.to_bytes().to_vec()
+    }
+
     /// Signs `deposit_approval_message(..)` for `deposit` with `key`,
     /// returning the compact 64-byte signature `add_signer_approval` expects.
     fn sign_deposit_approval(
         key: &k256::ecdsa::SigningKey,
         deposit: &BtcDepositRequest,
     ) -> Vec<u8> {
-        use k256::ecdsa::signature::hazmat::PrehashSigner;
-        use k256::ecdsa::Signature;
-
         let message = deposit_approval_message(
             &deposit.txid,
             deposit.vout,
             deposit.amount,
             &deposit.asset_id,
         );
-        let signature: Signature = key
-            .sign_prehash(&message)
-            .expect("sign over a 32-byte prehash cannot fail");
-        signature.to_bytes().to_vec()
+        sign_prehash(key, &message)
+    }
+
+    fn sign_withdrawal_approval(
+        key: &k256::ecdsa::SigningKey,
+        withdrawal: &BtcWithdrawalRequest,
+    ) -> Vec<u8> {
+        sign_prehash(
+            key,
+            &withdrawal_approval_message(
+                &withdrawal.burn_message_id,
+                &withdrawal.btc_recipient,
+                withdrawal.amount,
+                &withdrawal.x3_proof,
+            ),
+        )
+    }
+
+    struct ExactWithdrawalProof(Vec<u8>);
+
+    impl WithdrawalX3ProofVerifier for ExactWithdrawalProof {
+        fn verify(&self, withdrawal: &BtcWithdrawalRequest) -> Result<(), BtcVaultError> {
+            if withdrawal.x3_proof == self.0 {
+                Ok(())
+            } else {
+                Err(BtcVaultError::InvalidStateTransition)
+            }
+        }
+    }
+
+    fn vault_with_spendable_utxo() -> (BtcVault, Vec<k256::ecdsa::SigningKey>) {
+        let (mut vault, keys) = default_vault_with_keys();
+        vault.utxos.add(BtcUtxoEntry {
+            txid: [0x42; 32],
+            vout: 0,
+            amount: 10_000_000,
+            script_pubkey: vec![],
+            spendable: true,
+        });
+        (vault, keys)
     }
 
     #[test]
@@ -1083,18 +1277,223 @@ mod tests {
         assert_eq!(vault.utxos.total_spendable(), 10_000_000);
 
         vault
-            .submit_withdrawal([1u8; 32], vec![0x03, 0x04], 5_000_000, vec![1, 2, 3])
+            .submit_withdrawal([1u8; 32], vec![0x03, 0x04], 5_000_000, vec![1, 2, 3], 0)
             .unwrap();
         assert_eq!(vault.pending_withdrawals.len(), 1);
+    }
+
+    #[test]
+    fn withdrawal_x3_proof_must_verify_before_signer_approval() {
+        let (mut vault, _) = vault_with_spendable_utxo();
+        vault
+            .submit_withdrawal([7u8; 32], vec![0x51, 0x02], 5_000_000, vec![1, 2, 3], 0)
+            .unwrap();
+        assert_eq!(
+            vault.verify_withdrawal_x3_proof(0, &ExactWithdrawalProof(vec![9, 9, 9])),
+            Err(BtcVaultError::InvalidStateTransition)
+        );
+        assert_eq!(
+            vault.pending_withdrawals[0].status,
+            BtcWithdrawalStatus::PendingX3Proof
+        );
+
+        vault
+            .verify_withdrawal_x3_proof(0, &ExactWithdrawalProof(vec![1, 2, 3]))
+            .unwrap();
+        assert_eq!(
+            vault.pending_withdrawals[0].status,
+            BtcWithdrawalStatus::PendingSignerApproval {
+                approvals: 0,
+                threshold: 3,
+            }
+        );
+        assert_eq!(
+            vault.verify_withdrawal_x3_proof(0, &ExactWithdrawalProof(vec![1, 2, 3])),
+            Err(BtcVaultError::InvalidStateTransition)
+        );
+        assert_eq!(
+            vault.verify_withdrawal_x3_proof(99, &ExactWithdrawalProof(vec![1, 2, 3])),
+            Err(BtcVaultError::WithdrawalNotFound)
+        );
+    }
+
+    #[test]
+    fn withdrawal_requires_distinct_verified_signer_threshold() {
+        let (mut vault, keys) = vault_with_spendable_utxo();
+        vault
+            .submit_withdrawal([7u8; 32], vec![0x51, 0x02], 5_000_000, vec![1, 2, 3], 0)
+            .unwrap();
+        vault
+            .verify_withdrawal_x3_proof(0, &ExactWithdrawalProof(vec![1, 2, 3]))
+            .unwrap();
+
+        let signer_ids = vault.config.signers.clone();
+        let withdrawal = vault.pending_withdrawals[0].clone();
+        let first = sign_withdrawal_approval(&keys[0], &withdrawal);
+        vault
+            .add_withdrawal_signer_approval(0, signer_ids[0], first.clone())
+            .unwrap();
+        assert_eq!(
+            vault.pending_withdrawals[0].status,
+            BtcWithdrawalStatus::PendingSignerApproval {
+                approvals: 1,
+                threshold: 3,
+            }
+        );
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(0, signer_ids[0], first),
+            Err(BtcVaultError::DuplicateSignature)
+        );
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(0, [0xAB; 32], vec![0; 64]),
+            Err(BtcVaultError::InvalidSigner)
+        );
+
+        let outsider = k256::ecdsa::SigningKey::from_bytes(&{
+            let mut scalar = [0u8; 32];
+            scalar[31] = 9;
+            scalar.into()
+        })
+        .unwrap();
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(
+                0,
+                signer_ids[1],
+                sign_withdrawal_approval(&outsider, &withdrawal),
+            ),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+
+        vault
+            .add_withdrawal_signer_approval(
+                0,
+                signer_ids[1],
+                sign_withdrawal_approval(&keys[1], &withdrawal),
+            )
+            .unwrap();
+        assert_eq!(
+            vault.pending_withdrawals[0].status,
+            BtcWithdrawalStatus::PendingSignerApproval {
+                approvals: 2,
+                threshold: 3,
+            }
+        );
+        vault
+            .add_withdrawal_signer_approval(
+                0,
+                signer_ids[2],
+                sign_withdrawal_approval(&keys[2], &withdrawal),
+            )
+            .unwrap();
+        assert_eq!(
+            vault.pending_withdrawals[0].status,
+            BtcWithdrawalStatus::Approved
+        );
+        assert_eq!(vault.pending_withdrawals[0].signatures.len(), 3);
+    }
+
+    #[test]
+    fn withdrawal_approval_is_bound_to_the_exact_payload() {
+        let (mut vault, keys) = vault_with_spendable_utxo();
+        vault
+            .submit_withdrawal([7u8; 32], vec![0x51, 0x02], 5_000_000, vec![1, 2, 3], 0)
+            .unwrap();
+        vault
+            .verify_withdrawal_x3_proof(0, &ExactWithdrawalProof(vec![1, 2, 3]))
+            .unwrap();
+        let signer = vault.config.signers[0];
+        let withdrawal = vault.pending_withdrawals[0].clone();
+
+        let mut changed_amount = withdrawal.clone();
+        changed_amount.amount += 1;
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(
+                0,
+                signer,
+                sign_withdrawal_approval(&keys[0], &changed_amount),
+            ),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+
+        let mut changed_recipient = withdrawal.clone();
+        changed_recipient.btc_recipient.push(0xFF);
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(
+                0,
+                signer,
+                sign_withdrawal_approval(&keys[0], &changed_recipient),
+            ),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+
+        let mut changed_proof = withdrawal.clone();
+        changed_proof.x3_proof.push(0xFF);
+        assert_eq!(
+            vault.add_withdrawal_signer_approval(
+                0,
+                signer,
+                sign_withdrawal_approval(&keys[0], &changed_proof),
+            ),
+            Err(BtcVaultError::InvalidApprovalSignature)
+        );
+
+        vault
+            .add_withdrawal_signer_approval(
+                0,
+                signer,
+                sign_withdrawal_approval(&keys[0], &withdrawal),
+            )
+            .unwrap();
     }
 
     #[test]
     fn test_insufficient_reserves_fails() {
         let mut vault = default_vault();
         assert_eq!(
-            vault.submit_withdrawal([1u8; 32], vec![0x03], 500_000, vec![]),
+            vault.submit_withdrawal([1u8; 32], vec![0x03], 500_000, vec![], 0),
             Err(BtcVaultError::InsufficientReserves)
         );
+    }
+
+    #[test]
+    fn pending_withdrawals_reserve_spendable_capacity() {
+        let (mut vault, _) = vault_with_spendable_utxo();
+        vault
+            .submit_withdrawal([1u8; 32], vec![0x03], 6_000_000, vec![1], 0)
+            .unwrap();
+        assert_eq!(
+            vault.submit_withdrawal([2u8; 32], vec![0x04], 6_000_000, vec![2], 0),
+            Err(BtcVaultError::InsufficientReserves),
+            "the first pending withdrawal must reserve its amount even before signing"
+        );
+    }
+
+    #[test]
+    fn daily_withdrawal_limit_accumulates_and_resets_only_forward() {
+        let (mut vault, _) = vault_with_spendable_utxo();
+        vault.utxos.add(BtcUtxoEntry {
+            txid: [0x43; 32],
+            vout: 0,
+            amount: 10_000_000,
+            script_pubkey: vec![],
+            spendable: true,
+        });
+        vault.config.daily_withdrawal_limit = 15_000_000;
+
+        vault
+            .submit_withdrawal([1u8; 32], vec![0x03], 10_000_000, vec![1], 7)
+            .unwrap();
+        assert_eq!(
+            vault.submit_withdrawal([2u8; 32], vec![0x04], 10_000_000, vec![2], 7),
+            Err(BtcVaultError::DailyWithdrawalLimitExceeded)
+        );
+        assert_eq!(
+            vault.submit_withdrawal([3u8; 32], vec![0x05], 1_000_000, vec![3], 6),
+            Err(BtcVaultError::WithdrawalDayRegression)
+        );
+        vault
+            .submit_withdrawal([4u8; 32], vec![0x06], 10_000_000, vec![4], 8)
+            .expect("the next day resets the daily allowance");
     }
 
     #[test]
@@ -1413,7 +1812,7 @@ mod tests {
         outsider_scalar[31] = 99;
         let outsider = SigningKey::from_bytes(&outsider_scalar.into()).unwrap();
         let outsider_pubkey_id = {
-            let point = outsider.verifying_key().to_encoded_point(true);
+            let point = outsider.verifying_key().to_sec1_point(true);
             let mut out = [0u8; 33];
             out.copy_from_slice(point.as_bytes());
             let mut id = [0u8; 32];

@@ -2948,5 +2948,168 @@ class ServerTests(unittest.TestCase):
             router.db.close()
 
 
+class TruncationTests(unittest.TestCase):
+    """A cut-off answer must be visible, and must not bench the provider.
+
+    The defect these pin: a response that stopped at its output allowance was
+    either booked as success (partial content) or read as a malformed body
+    (empty content, which is what thinking mode leaves behind). The second path
+    marked the provider failed, cooled it down for a request-side limit, and the
+    chain then answered from a cheaper model with nothing indicating it.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        ScriptedProvider.requests = []
+        ScriptedProvider.script = None
+        # `Provider` is shared with other test classes in this module; a snapshot
+        # is taken per test so an assertion about it cannot see their traffic.
+        Provider.requests = []
+        self.upstream = ThreadingHTTPServer(("127.0.0.1", 0), ScriptedProvider)
+        self.upstream.daemon_threads = True
+        threading.Thread(target=self.upstream.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{self.upstream.server_port}/v1"
+        self.config = {
+            "daily_budget_usd": 10, "agent_daily_budget_usd": 10,
+            "max_input_tokens": 100000, "max_request_bytes": 100000,
+            "routes": {"routine": ["cut"], "critical": ["cut"]},
+            "providers": {
+                "cut": {"base_url": base, "model": "cut-model", "critical_allowed": True,
+                        "input_usd_per_million": 1, "output_usd_per_million": 1},
+            },
+        }
+        self.router = router_module.Router(self.config, self.tmp.name + "/usage.db")
+
+    def tearDown(self):
+        self.upstream.shutdown()
+        self.upstream.server_close()
+        self.tmp.cleanup()
+
+    def chat_body(self, content, finish):
+        def respond(handler, body):
+            payload = json.dumps({"model": "cut-model",
+                                  "choices": [{"message": {"role": "assistant", "content": content},
+                                               "finish_reason": finish}],
+                                  "usage": {"prompt_tokens": 5, "completion_tokens": 5}}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        ScriptedProvider.script = respond
+
+    def ask(self, **extra):
+        return self.router.complete({"messages": [{"role": "user", "content": "review this"}],
+                                     "max_tokens": 64, **extra}, "alice")
+
+    def test_a_partial_answer_with_finish_reason_length_is_not_success(self):
+        self.chat_body("half an ans", "length")
+        status, body = self.ask()
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"]["type"], "output_truncated")
+        self.assertIn("64", body["error"]["message"], "the bound the caller has to raise is named")
+
+    def test_an_empty_truncated_answer_is_reported_as_truncation_not_a_bad_body(self):
+        # Thinking mode can spend the whole allowance before writing anything.
+        self.chat_body(None, "length")
+        status, body = self.ask()
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"]["type"], "output_truncated")
+        reasons = [p["reason"] for p in body["error"]["providers"]]
+        self.assertNotIn("ValueError", reasons,
+                         "an empty message at the bound is a capacity limit, not a malformed body")
+
+    def test_truncation_does_not_bench_or_cool_the_provider(self):
+        self.chat_body("half an ans", "length")
+        self.ask()
+        self.assertEqual(self.router.provider_cooldown("cut"), 0,
+                         "a capacity limit must not take a working provider out of rotation")
+        health = {row["provider"]: row for row in self.router.provider_health()}
+        self.assertEqual(health.get("cut", {}).get("failures", 0), 0)
+
+    def test_truncation_is_recorded_as_an_unsuccessful_attempt(self):
+        self.chat_body("half an ans", "length")
+        self.ask()
+        registry = {row["provider"]: row for row in self.router.provider_registry()}
+        self.assertEqual(registry["cut"]["attempts"], 1)
+        self.assertEqual(registry["cut"]["failures"], 1,
+                         "the answer was not usable, so the measured success rate stays honest")
+
+    def with_whole_provider(self):
+        """A second provider in the chain that would answer successfully."""
+        other = ThreadingHTTPServer(("127.0.0.1", 0), Provider)
+        other.daemon_threads = True
+        threading.Thread(target=other.serve_forever, daemon=True).start()
+        self.addCleanup(other.server_close)
+        self.addCleanup(other.shutdown)
+        self.config["routes"]["routine"] = ["cut", "whole"]
+        self.config["providers"]["whole"] = {
+            "base_url": f"http://127.0.0.1:{other.server_port}/v1", "model": "whole"}
+        return other
+
+    def test_a_truncated_answer_is_not_substituted_by_a_cheaper_model(self):
+        """The defect this exists for: a weaker model finishing is not the answer."""
+        self.with_whole_provider()
+        self.chat_body("half an ans", "length")
+        before = len(Provider.requests)
+        status, body = self.ask()
+        self.assertEqual(status, 502, "the caller is told, instead of being given another model's answer")
+        self.assertEqual(body["error"]["type"], "output_truncated")
+        self.assertEqual(len(Provider.requests), before,
+                         "the second provider must not be asked to finish a request that was cut off")
+        self.assertEqual(self.router.provider_cooldown("cut"), 0,
+                         "being cut off is a capacity limit, so this is not a bench either")
+
+    def test_an_operator_can_opt_into_failing_over_after_a_truncation(self):
+        self.with_whole_provider()
+        self.config["allow_truncated_failover"] = True
+        self.chat_body("half an ans", "length")
+        status, body = self.ask()
+        self.assertEqual(status, 200, "the opt-in restores the availability-first behaviour")
+        self.assertEqual(body["choices"][0]["message"]["content"], "ok")
+        self.assertEqual(self.router.provider_cooldown("cut"), 0)
+
+    def test_a_malformed_body_still_benches_the_provider(self):
+        def respond(handler, body):
+            payload = b'{"unexpected": true}'
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        ScriptedProvider.script = respond
+        status, body = self.ask()
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"]["type"], "no_provider_succeeded",
+                         "shape errors keep the generic failure, not the truncation type")
+        self.assertGreater(self.router.provider_cooldown("cut"), 0,
+                           "a genuinely malformed body is still a provider problem")
+
+    def test_a_responses_body_marked_incomplete_is_not_success(self):
+        def respond(handler, body):
+            payload = json.dumps({
+                "object": "response", "id": "resp_1", "status": "incomplete",
+                "incomplete_details": {"reason": "max_output_tokens"},
+                "output": [], "usage": {"input_tokens": 5, "output_tokens": 5}}).encode()
+            handler.send_response(200)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        ScriptedProvider.script = respond
+        self.config["providers"]["cut"]["protocol"] = "responses"
+        self.config["providers"]["cut"]["protocols"] = ["responses"]
+        # A Chat request is never handed to a Responses-only provider, so the
+        # Responses surface has to be modelled explicitly: that is what
+        # /v1/responses builds before it calls complete().
+        body = {"model": "cut-model", "input": "review this", "max_output_tokens": 64}
+        plan = router_module.UpstreamRequest(router_module.PROTOCOL_RESPONSES, body,
+                                             chat=None, responses=body)
+        status, body = self.router.complete(plan, "alice")
+        self.assertEqual(status, 502)
+        self.assertEqual(body["error"]["type"], "output_truncated")
+        self.assertEqual(self.router.provider_cooldown("cut"), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

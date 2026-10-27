@@ -225,6 +225,7 @@ fn verification_request_translation_for_each_chain() {
 
     // The same payload, but for Ethereum mainnet, must also work.
     let mut req2 = req;
+    req2.proof_id = [0x06u8; 32];
     req2.source_chain = ExternalChainId::EthereumMainnet;
     let res2 = router.route_verification_request(req2);
     assert!(

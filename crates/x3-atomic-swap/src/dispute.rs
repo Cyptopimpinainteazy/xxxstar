@@ -9,9 +9,6 @@
 //! - **Solver dispute**: Did the solver fill with a stale quote?
 //! - **Proof dispute**: Is the finality or transfer proof valid?
 //! - **Watcher dispute**: Did a watcher censor or fabricate events?
-#[cfg(not(feature = "std"))]
-use alloc::vec;
-
 use crate::error::SwapError;
 use crate::slashing::{SlashReason, SlashableActor, SlashingEngine};
 use alloc::collections::BTreeMap;
@@ -387,6 +384,7 @@ impl Default for DisputeEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     fn dummy_evidence() -> DisputeEvidence {
         DisputeEvidence {

@@ -1,6 +1,8 @@
 use crate::atomic_lock::{LockPhase, ReleaseReason};
 use crate::btc_gateway::{BtcAdaptorSignature, BtcHtlcParams, BtcSignature65, BtcSpvProof};
-use crate::mock::{new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB};
+use crate::mock::{
+    new_test_ext, new_test_ext_with_btc_checkpoints, Test, ALICE, BOB, SETTLEMENT_RELAYER,
+};
 use crate::mock::{RuntimeEvent, RuntimeOrigin};
 use crate::proof_fixtures::{receipt_trie, PROOF_HEIGHT, RECEIPT_INDEX};
 
@@ -532,9 +534,178 @@ fn create_solana_proof() -> SettlementProof {
     }
 }
 
+fn create_solana_v4_settlement_proof(
+    proof_id: [u8; 32],
+    expected_asset_id: [u8; 32],
+    expected_amount: u128,
+) -> SettlementProof {
+    let transaction = x3_verification_router::SolanaTransactionEvidence::from_raw(
+        42,
+        0,
+        true,
+        hex::decode(concat!(
+            "010ca9bbc1fd52fb8a2d08c512ccdb720fc3100804cb2fb8cba4bbc9ce4df7a7d0",
+            "567d96e7a21e7356e6f2b2b6d9efd725c6dd40bf4ad25dac00a27cb2dde3f509",
+            "01000001d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+            "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c00"
+        ))
+        .expect("signed transaction fixture"),
+    )
+    .expect("valid Solana transaction");
+    let envelope = x3_verification_router::ProofEnvelope {
+        proof_id,
+        strategy: x3_verification_router::VerificationStrategy::SolanaFinalizedProof,
+        source_chain: x3_verification_router::ChainKind::Solana,
+        destination_chain: x3_verification_router::ChainKind::X3,
+        payload: Vec::new(),
+        expected_asset_id,
+        expected_amount,
+        expected_sender: vec![3u8; 32],
+        expected_recipient: vec![2u8; 32],
+        expected_beneficiary: vec![1u8; 32],
+    };
+    let mut stakes = crate::mock::solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| x3_verification_router::SolanaValidatorStake {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+    stakes.sort_by_key(|entry| entry.pubkey);
+    let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
+    let message = x3_verification_router::solana_finality_message_v4(
+        x3_verification_router::SolanaCluster::Devnet,
+        42,
+        41,
+        &[7u8; 32],
+        &[6u8; 32],
+        &[5u8; 32],
+        &stake_digest,
+        &transaction,
+        &envelope,
+    )
+    .expect("V4 message");
+    let votes = crate::mock::solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| (pair.public().0, pair.sign(&message).0))
+        .collect::<Vec<_>>();
+    let finality_payload = x3_verification_router::encode_solana_finality_v4(
+        x3_verification_router::SolanaCluster::Devnet,
+        42,
+        41,
+        [7u8; 32],
+        [6u8; 32],
+        [5u8; 32],
+        stake_digest,
+        transaction.clone(),
+        &votes,
+    )
+    .expect("V4 payload");
+    let receipt_data =
+        x3_verification_router::encode_solana_settlement_evidence(&envelope, &finality_payload)
+            .expect("portable settlement evidence");
+
+    SettlementProof {
+        proof_type: ProofType::SolanaProof,
+        tx_hash: H256::from(transaction.commitment),
+        block_hash: H256::from([7u8; 32]),
+        chain_height: Some(42),
+        confirmations: 1,
+        merkle_proof: BoundedVec::default(),
+        receipt_data: receipt_data.try_into().expect("proof fits"),
+        receipt_index: Some(transaction.index),
+        trie_proof: None,
+    }
+}
+
 // ============================================================================
 // SETTLEMENT INTEGRATION TESTS
 // ============================================================================
+
+#[test]
+fn solana_v4_settlement_verifies_transaction_and_intent_economics() {
+    let mut ext = new_test_ext();
+    ext.execute_with(|| {
+        assert_ok!(Pallet::<Test>::create_intent(
+            RuntimeOrigin::signed(ALICE),
+            BOB,
+            AssetSpec {
+                chain: ExternalChainId::Ethereum,
+                token: TokenId::Native,
+                amount: 5_000,
+            },
+            AssetSpec {
+                chain: ExternalChainId::Solana,
+                token: TokenId::Native,
+                amount: 2_000,
+            },
+            H256::from([42u8; 32]),
+            Some(7_200),
+        ));
+        let (intent_id, intent) = SettlementIntents::<Test>::iter()
+            .find(|(_, intent)| intent.maker == ALICE)
+            .expect("intent");
+        let proof = create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [0u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &proof,
+                &intent
+            ),
+            Ok(true)
+        );
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(&ExternalChainId::Solana, &proof, &intent),
+            Ok(false),
+            "a devnet proof cannot claim the mainnet chain id"
+        );
+
+        let mut wrong_amount = proof.clone();
+        wrong_amount.receipt_data =
+            create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [0u8; 32], 1_999)
+                .receipt_data;
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_amount,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let wrong_asset =
+            create_solana_v4_settlement_proof(intent_id.to_fixed_bytes(), [1u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_asset,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let wrong_intent = create_solana_v4_settlement_proof([0x55u8; 32], [0u8; 32], 2_000);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_intent,
+                &intent
+            ),
+            Ok(false)
+        );
+
+        let mut wrong_transaction = proof;
+        wrong_transaction.tx_hash = H256::from([99u8; 32]);
+        assert_eq!(
+            Pallet::<Test>::verify_svm_proof_for_intent(
+                &ExternalChainId::SolanaDevnet,
+                &wrong_transaction,
+                &intent
+            ),
+            Ok(false)
+        );
+    });
+}
 
 #[test]
 fn settlement_lifecycle_evm_to_evm() {
@@ -3431,6 +3602,14 @@ fn submit_canonical_claim_proof_set(intent_id: H256) {
 /// `intent_id` with bundles for `operation` (a terminal `Finalized` needs Claim bundles, a
 /// terminal `Refunded` needs Refund bundles).
 fn submit_canonical_proof_set(intent_id: H256, operation: x3_atomic_swap::CrossDomainOperation) {
+    submit_canonical_proof_set_from(intent_id, operation, RuntimeOrigin::signed(ALICE));
+}
+
+fn submit_canonical_proof_set_from(
+    intent_id: H256,
+    operation: x3_atomic_swap::CrossDomainOperation,
+    origin: RuntimeOrigin,
+) {
     use x3_atomic_swap::{CrossDomainProofBundle, CrossDomainProofSet, FinalityProof, VmType};
 
     let runtime_intent_id = intent_id.to_fixed_bytes();
@@ -3492,9 +3671,7 @@ fn submit_canonical_proof_set(intent_id: H256, operation: x3_atomic_swap::CrossD
         bundles,
     };
     assert_ok!(Pallet::<Test>::submit_cross_domain_proof_set(
-        RuntimeOrigin::signed(ALICE),
-        intent_id,
-        proof_set,
+        origin, intent_id, proof_set,
     ));
 }
 
@@ -4197,6 +4374,101 @@ fn submit_btc_proof_refuses_a_header_that_was_never_admitted() {
                 0u32,
                 0u32,
                 1_000u64,
+                vec![],
+                forged,
+            ),
+            Error::<Test>::BtcHeaderNotAnchored
+        );
+    });
+}
+
+#[test]
+fn a_settlement_relayer_can_submit_proofs_but_cannot_claim_or_take_custody() {
+    new_test_ext().execute_with(|| {
+        let secret = H256::from([0x5Au8; 32]);
+        let intent_id = native_for_ethereum_intent(secret);
+
+        assert_noop!(
+            Pallet::<Test>::submit_proof(
+                RuntimeOrigin::signed(99),
+                intent_id,
+                ExternalChainId::Ethereum,
+                create_evm_receipt_proof(),
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        assert_ok!(Pallet::<Test>::submit_proof(
+            RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+            intent_id,
+            ExternalChainId::Ethereum,
+            create_evm_receipt_proof(),
+        ));
+        assert!(matches!(
+            crate::IntentStates::<Test>::get(intent_id),
+            IntentState::ExecutingExternal
+        ));
+
+        submit_canonical_proof_set_from(
+            intent_id,
+            CrossDomainOperation::Claim,
+            RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+        );
+
+        // Submitting evidence is not a custody right. The relayer cannot claim
+        // either party's escrow or trigger a refund.
+        assert_noop!(
+            Pallet::<Test>::claim_settlement(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+                secret,
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        past_timeout();
+        assert_noop!(
+            Pallet::<Test>::refund_settlement(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+            ),
+            Error::<Test>::NotAuthorized
+        );
+
+        // The BTC proof entry point uses the same authority rule. With the
+        // authorized relayer, authorization passes and the unanchored-header
+        // check is the first refusal; an ordinary third party is refused before
+        // proof verification.
+        let tx_bytes = b"not admitted to any bitcoin block".to_vec();
+        let txid = H256::from(double_sha256(&tx_bytes));
+        let forged = mine_btc_header(BtcBlockHeader {
+            version: 1,
+            prev_block_hash: H256::repeat_byte(0xEE),
+            merkle_root: txid,
+            timestamp: 1_700_000_000,
+            bits: 0x207f_ffff,
+            nonce: 0,
+            height: 700_000,
+        });
+        assert_noop!(
+            Pallet::<Test>::submit_btc_proof(
+                RuntimeOrigin::signed(99),
+                intent_id,
+                txid,
+                0,
+                0,
+                1_000,
+                vec![],
+                forged.clone(),
+            ),
+            Error::<Test>::NotAuthorized
+        );
+        assert_noop!(
+            Pallet::<Test>::submit_btc_proof(
+                RuntimeOrigin::signed(SETTLEMENT_RELAYER),
+                intent_id,
+                txid,
+                0,
+                0,
+                1_000,
                 vec![],
                 forged,
             ),

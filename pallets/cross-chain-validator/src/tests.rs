@@ -461,6 +461,15 @@ fn finalized_evm_and_svm_headers_require_distinct_attester_quorum() {
             Some((7, svm_block, svm_state))
         );
         assert_eq!(
+            crate::FinalizedSvmHeaders::<MockRuntime>::get(7).map(|header| (
+                header.slot,
+                header.block_hash,
+                header.state_root
+            )),
+            Some((7, svm_block, svm_state)),
+            "the finalized slot must remain available after newer slots finalize"
+        );
+        assert_eq!(
             crate::SvmValidatorSets::<MockRuntime>::get(7),
             Some(svm_validators)
         );
@@ -538,6 +547,59 @@ fn governance_can_revoke_header_attesters_and_the_path_fails_closed() {
                 vec![0u8; MAX_HEADER_CERTIFICATE_BYTES + 1],
             ),
             crate::Error::<MockRuntime>::PayloadTooLarge
+        );
+    });
+}
+
+#[test]
+fn delayed_finalized_headers_are_retained_without_regressing_the_head() {
+    new_test_ext().execute_with(|| {
+        use x3_verification_router::header_finality::HEADER_FINALITY_ETHEREUM;
+
+        let key = finality_key(3);
+        assert_ok!(crate::Pallet::<MockRuntime>::set_header_attesters(
+            RuntimeOrigin::root(),
+            vec![key.verifying_key().to_bytes()],
+            1,
+            Vec::new(),
+            0,
+        ));
+
+        let finalize = |height: u64, seed: u8| {
+            let block_hash = H256::repeat_byte(seed);
+            let state_root = H256::repeat_byte(seed.wrapping_add(1));
+            let receipts_root = H256::repeat_byte(seed.wrapping_add(2));
+            let certificate = finality_certificate(
+                HEADER_FINALITY_ETHEREUM,
+                height,
+                block_hash,
+                state_root,
+                receipts_root,
+                std::slice::from_ref(&key),
+            );
+            crate::Pallet::<MockRuntime>::validate_finalized_evm_header(
+                RuntimeOrigin::signed(99),
+                height,
+                block_hash,
+                state_root,
+                receipts_root,
+                certificate,
+            )
+        };
+
+        assert_ok!(finalize(44, 0x10));
+        assert_ok!(finalize(43, 0x20));
+        assert_eq!(
+            crate::LastFinalizedEvmHeader::<MockRuntime>::get().map(|header| header.block_number),
+            Some(44)
+        );
+        assert_eq!(
+            crate::FinalizedEvmHeaders::<MockRuntime>::get(43).map(|header| header.block_hash),
+            Some(H256::repeat_byte(0x20))
+        );
+        assert_eq!(
+            crate::FinalizedEvmHeaders::<MockRuntime>::get(44).map(|header| header.block_hash),
+            Some(H256::repeat_byte(0x10))
         );
     });
 }
@@ -797,7 +859,7 @@ fn the_anchor_reports_the_attested_root_and_head() {
         let block_hash = H256::from([1u8; 32]);
         let state_root = H256::from([2u8; 32]);
         let merkle_root = H256::from([4u8; 32]);
-        crate::LastFinalizedEvmHeader::<MockRuntime>::put(crate::EvmHeaderInfo {
+        let header = crate::EvmHeaderInfo {
             block_number,
             block_hash,
             state_root,
@@ -805,7 +867,9 @@ fn the_anchor_reports_the_attested_root_and_head() {
             validator_set_hash: H256::from([3u8; 32]),
             verified_at_block: 1,
             validation_proof: Vec::new(),
-        });
+        };
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(header.clone());
+        crate::FinalizedEvmHeaders::<MockRuntime>::insert(block_number, header);
         crate::EvmHeaderFinalitySource::<MockRuntime>::put(
             crate::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
         );
@@ -826,9 +890,31 @@ fn the_anchor_reports_the_attested_root_and_head() {
             "depth is measured from the attested head"
         );
 
+        // A newer finalized header does not hide the full evidence for an older
+        // deposit.
+        let newer = crate::EvmHeaderInfo {
+            block_number: block_number + 1,
+            block_hash: H256::from([0x11u8; 32]),
+            state_root: H256::from([0x12u8; 32]),
+            merkle_root: H256::from([0x13u8; 32]),
+            validator_set_hash: H256::from([0x14u8; 32]),
+            verified_at_block: 2,
+            validation_proof: Vec::new(),
+        };
+        crate::LastFinalizedEvmHeader::<MockRuntime>::put(newer.clone());
+        crate::FinalizedEvmHeaders::<MockRuntime>::insert(block_number + 1, newer);
+        assert_eq!(
+            crate::Pallet::<MockRuntime>::attested_head(),
+            Some(block_number + 1)
+        );
+        let older = crate::Pallet::<MockRuntime>::anchored_header(block_number)
+            .expect("the older finalized header remains anchored");
+        assert_eq!(older.block_hash, block_hash.0);
+        assert_eq!(older.state_root, state_root.0);
+
         // A height nobody attested has no anchor, so a proof for it is refused
         // rather than checked against the header it carries.
-        assert!(crate::Pallet::<MockRuntime>::anchored_header(block_number + 1).is_none());
+        assert!(crate::Pallet::<MockRuntime>::anchored_header(block_number + 2).is_none());
     });
 }
 

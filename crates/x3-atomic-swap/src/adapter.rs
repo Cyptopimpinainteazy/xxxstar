@@ -7,13 +7,7 @@
 //! implements the [`X3VmAdapter`] trait so the relayer and swap pipeline can
 //! interact uniformly across execution environments.
 #[cfg(not(feature = "std"))]
-use alloc::borrow::ToOwned;
-#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
-#[cfg(not(feature = "std"))]
-use alloc::format;
-#[cfg(not(feature = "std"))]
-use alloc::string::{String, ToString};
 #[cfg(not(feature = "std"))]
 use alloc::vec;
 use alloc::vec::Vec;

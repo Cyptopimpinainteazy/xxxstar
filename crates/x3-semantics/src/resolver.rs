@@ -663,11 +663,11 @@ impl Resolver {
         self.resolve_expression(&unary.expr);
     }
 
-    /// Cross-VM intrinsics the HIR names (`VmIntrinsic`) that the chain cannot serve. On the production
-    /// (WASM) runtime the kernel's EVM is `mini_evm` and its SVM runs the program in the payload: both
-    /// start from empty state every execution, so there is no deployed contract, account or balance for
-    /// one of these to reach. A program using one is refused by name, with that reason, rather than as
-    /// an unknown identifier (X3-LANG-001).
+    /// Cross-VM intrinsics the HIR names (`VmIntrinsic`) that the chain has no call ABI for. The
+    /// production EVM adapter persists account and storage state, but the SVM adapter currently runs
+    /// a payload without an account context and the language has no route to either adapter. A
+    /// program using one is refused by name, with that reason, rather than as an unknown identifier
+    /// (X3-LANG-001).
     const UNAVAILABLE_CROSS_VM_CALLS: &[&str] = &[
         "evm_call",
         "evm_static_call",

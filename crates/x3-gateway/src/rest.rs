@@ -26,7 +26,9 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use x3_bridge::bitcoin_htlc::{HTLCContract, HTLCState, Preimage};
 use x3_orchestra_control_plane::{ControlPlaneClient, DispatchEvidenceRequest, VoteTally};
-use x3_relayer::types::{EvmProof, SvmProof, ValidatorSignature};
+use x3_relayer::types::{
+    EvmProof, SolanaCluster, SolanaTransactionEvidence, SvmProof, ValidatorSignature,
+};
 use x3_rpc::benchmark::{BenchmarkProfile, BenchmarkReport};
 
 /// Application state.
@@ -368,6 +370,18 @@ pub struct ValidatorAttestationWire {
     pub signature: Vec<u8>,
 }
 
+/// Transaction-inclusion evidence accepted by the SVM proof-summary endpoint.
+///
+/// The transaction signature, recent blockhash, and raw-transaction commitment
+/// are derived from `raw_transaction`; callers cannot choose them independently.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SolanaTransactionEvidenceWire {
+    pub slot: u64,
+    pub index: u32,
+    pub succeeded: bool,
+    pub raw_transaction: Vec<u8>,
+}
+
 fn into_validator_signatures(
     wires: &[ValidatorAttestationWire],
 ) -> Result<Vec<ValidatorSignature>, GatewayError> {
@@ -398,21 +412,37 @@ fn into_validator_signatures(
 pub enum RelayerProofRequest {
     Svm {
         source_domain: u32,
+        proof_id: [u8; 32],
+        cluster: String,
         slot: u64,
+        parent_slot: u64,
         blockhash: [u8; 32],
+        bank_hash: [u8; 32],
+        parent_bank_hash: [u8; 32],
+        stake_table_digest: [u8; 32],
+        expected_asset_id: [u8; 32],
+        expected_amount: String,
+        expected_sender: Vec<u8>,
+        expected_recipient: Vec<u8>,
+        expected_beneficiary: Vec<u8>,
+        transaction: SolanaTransactionEvidenceWire,
         validator_signatures: Vec<ValidatorAttestationWire>,
         required_signatures: u32,
     },
     Evm {
         source_domain: u32,
+        proof_id: [u8; 32],
         block_hash: [u8; 32],
         state_root: [u8; 32],
         finalized_block: u64,
         proof_nonce: u32,
         /// Canonical receipt proof bytes; presence is not proof of validity.
         proof_payload: Vec<u8>,
-        /// Exact on-chain recipient bound by the deposit event.
-        expected_recipient: Vec<u8>,
+        source_asset: Vec<u8>,
+        expected_sender: Vec<u8>,
+        expected_contract: Vec<u8>,
+        expected_beneficiary: Vec<u8>,
+        expected_nonce: u64,
         /// String-encoded to preserve the full unsigned 128-bit value.
         expected_amount: String,
     },
@@ -439,8 +469,20 @@ async fn post_relayer_proof_summary(
     match req {
         RelayerProofRequest::Svm {
             source_domain,
+            proof_id,
+            cluster,
             slot,
+            parent_slot,
             blockhash,
+            bank_hash,
+            parent_bank_hash,
+            stake_table_digest,
+            expected_asset_id,
+            expected_amount,
+            expected_sender,
+            expected_recipient,
+            expected_beneficiary,
+            transaction,
             validator_signatures,
             required_signatures,
         } => {
@@ -451,19 +493,78 @@ async fn post_relayer_proof_summary(
             }
             let attestations = validator_signatures.len();
             let validators = into_validator_signatures(&validator_signatures)?;
+            let expected_amount = expected_amount.parse::<u128>().map_err(|error| {
+                GatewayError::BadRequest(format!("invalid SVM proof amount: {error}"))
+            })?;
+            let cluster = match cluster.to_ascii_lowercase().as_str() {
+                "mainnet-beta" | "mainnet_beta" | "mainnet" => SolanaCluster::MainnetBeta,
+                "testnet" => SolanaCluster::Testnet,
+                "devnet" => SolanaCluster::Devnet,
+                _ => {
+                    return Err(GatewayError::BadRequest(
+                        "unknown Solana cluster in proof".into(),
+                    ))
+                }
+            };
+            if proof_id == [0u8; 32]
+                || blockhash == [0u8; 32]
+                || bank_hash == [0u8; 32]
+                || parent_bank_hash == [0u8; 32]
+                || stake_table_digest == [0u8; 32]
+            {
+                return Err(GatewayError::BadRequest(
+                    "SVM proof contains a zero identity".into(),
+                ));
+            }
+            if parent_slot >= slot {
+                return Err(GatewayError::BadRequest(
+                    "SVM parent slot must precede the finalized slot".into(),
+                ));
+            }
+            if expected_beneficiary.is_empty() || expected_beneficiary.len() > 128 {
+                return Err(GatewayError::BadRequest(
+                    "SVM beneficiary must be between 1 and 128 bytes".into(),
+                ));
+            }
+            let transaction = SolanaTransactionEvidence::from_raw(
+                transaction.slot,
+                transaction.index,
+                transaction.succeeded,
+                transaction.raw_transaction,
+            )
+            .map_err(|error| {
+                GatewayError::BadRequest(format!("invalid SVM transaction evidence: {error}"))
+            })?;
+            if transaction.slot != slot {
+                return Err(GatewayError::BadRequest(
+                    "SVM transaction slot does not match the finalized slot".into(),
+                ));
+            }
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
             // this deserialization would have failed already.
             let _proof = SvmProof {
                 source_domain,
+                proof_id,
+                cluster,
                 slot,
+                parent_slot,
                 blockhash,
+                bank_hash,
+                parent_bank_hash,
+                stake_table_digest,
+                expected_asset_id,
+                expected_amount,
+                expected_sender,
+                expected_recipient,
+                expected_beneficiary,
+                transaction,
                 validator_signatures: validators,
                 required_signatures,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "svm",
-                proof_id_hex: hex::encode(blockhash),
+                proof_id_hex: hex::encode(proof_id),
                 validator_attestations: attestations,
                 required_signatures,
                 // A well-shaped 64-byte blob is not a verified signature,
@@ -474,45 +575,68 @@ async fn post_relayer_proof_summary(
         }
         RelayerProofRequest::Evm {
             source_domain,
+            proof_id,
             block_hash,
             state_root,
             finalized_block,
             proof_nonce,
             proof_payload,
-            expected_recipient,
+            source_asset,
+            expected_sender,
+            expected_contract,
+            expected_beneficiary,
+            expected_nonce,
             expected_amount,
         } => {
-            let expected_amount = expected_amount
-                .parse::<u128>()
-                .map_err(|_| GatewayError::BadRequest("invalid EVM proof amount".into()))?;
+            let expected_amount = expected_amount.parse::<u128>().map_err(|error| {
+                GatewayError::BadRequest(format!("invalid EVM proof amount: {error}"))
+            })?;
+            let source_asset: [u8; 20] = source_asset.try_into().map_err(|_| {
+                GatewayError::BadRequest("EVM source asset must be 20 bytes".into())
+            })?;
+            let expected_sender: [u8; 20] = expected_sender
+                .try_into()
+                .map_err(|_| GatewayError::BadRequest("EVM depositor must be 20 bytes".into()))?;
+            let expected_contract: [u8; 20] = expected_contract.try_into().map_err(|_| {
+                GatewayError::BadRequest("EVM gateway contract must be 20 bytes".into())
+            })?;
             if proof_payload.is_empty() || proof_payload.len() > 1_048_576 {
                 return Err(GatewayError::BadRequest(
                     "EVM receipt proof must contain 1 to 1048576 bytes".into(),
                 ));
             }
-            if expected_recipient.is_empty() || expected_recipient.len() > 128 {
+            if expected_beneficiary.is_empty() || expected_beneficiary.len() > 128 {
                 return Err(GatewayError::BadRequest(
-                    "EVM recipient must contain 1 to 128 bytes".into(),
+                    "EVM beneficiary must be between 1 and 128 bytes".into(),
                 ));
             }
-            if expected_amount == 0 || block_hash == [0u8; 32] || state_root == [0u8; 32] {
+            if expected_amount == 0
+                || proof_id == [0u8; 32]
+                || block_hash == [0u8; 32]
+                || state_root == [0u8; 32]
+            {
                 return Err(GatewayError::BadRequest(
-                    "EVM receipt amount, block hash and state root must be nonzero".into(),
+                    "EVM proof id, amount, block hash and state root must be nonzero".into(),
                 ));
             }
             let _proof = EvmProof {
                 source_domain,
+                proof_id,
                 block_hash,
                 state_root,
                 finalized_block,
                 proof_nonce,
-                proof_payload,
-                expected_recipient,
+                proof_payload: proof_payload.clone(),
+                source_asset,
+                expected_sender,
+                expected_contract,
+                expected_beneficiary,
+                expected_nonce,
                 expected_amount,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "evm",
-                proof_id_hex: hex::encode(block_hash),
+                proof_id_hex: hex::encode(proof_id),
                 validator_attestations: 0,
                 required_signatures: 0,
                 // This endpoint only checks shape. It does not independently
@@ -1742,26 +1866,41 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn svm_proof_summary_does_not_treat_unverified_signatures_as_quorum() {
-        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
-            source_domain: 1,
-            slot: 100,
-            blockhash: [1u8; 32],
+    async fn svm_proof_summary_refuses_unverifiable_transaction_bytes() {
+        let request = RelayerProofRequest::Svm {
+            source_domain: 200,
+            proof_id: [8u8; 32],
+            cluster: "devnet".into(),
+            slot: 42,
+            parent_slot: 41,
+            blockhash: [7u8; 32],
+            bank_hash: [6u8; 32],
+            parent_bank_hash: [5u8; 32],
+            stake_table_digest: [4u8; 32],
+            expected_asset_id: [3u8; 32],
+            expected_amount: "5000".into(),
+            expected_sender: vec![2u8; 32],
+            expected_recipient: vec![1u8; 32],
+            expected_beneficiary: vec![9u8; 32],
+            transaction: SolanaTransactionEvidenceWire {
+                slot: 42,
+                index: 0,
+                succeeded: true,
+                raw_transaction: vec![1, 2, 3],
+            },
             validator_signatures: vec![ValidatorAttestationWire {
-                validator_pubkey: [2u8; 32],
-                // Correct byte length is not an authenticated validator signature.
-                signature: vec![0u8; 64],
+                validator_pubkey: [10u8; 32],
+                signature: vec![11u8; 64],
             }],
             required_signatures: 1,
-        }))
-        .await;
-        let Ok(Json(summary)) = result else {
-            panic!("summary should expose the count without asserting finality");
         };
-        assert_eq!(summary.validator_attestations, 1);
+
+        let error = post_relayer_proof_summary(Json(request))
+            .await
+            .expect_err("syntactically invalid transaction bytes are not evidence");
         assert!(
-            !summary.meets_quorum,
-            "unverified signatures cannot establish quorum"
+            format!("{error:?}").contains("invalid SVM transaction evidence"),
+            "{error:?}"
         );
     }
 
@@ -1769,9 +1908,26 @@ mod tests {
     async fn svm_proof_summary_refuses_zero_signature_threshold() {
         let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
             source_domain: 1,
+            proof_id: [8u8; 32],
+            cluster: "devnet".into(),
             slot: 100,
-            blockhash: [1u8; 32],
-            validator_signatures: vec![],
+            parent_slot: 99,
+            blockhash: [7u8; 32],
+            bank_hash: [6u8; 32],
+            parent_bank_hash: [5u8; 32],
+            stake_table_digest: [4u8; 32],
+            expected_asset_id: [3u8; 32],
+            expected_amount: "25".into(),
+            expected_sender: vec![2u8; 32],
+            expected_recipient: vec![1u8; 32],
+            expected_beneficiary: vec![9u8; 32],
+            transaction: SolanaTransactionEvidenceWire {
+                slot: 100,
+                index: 0,
+                succeeded: true,
+                raw_transaction: vec![1, 2, 3],
+            },
+            validator_signatures: Vec::new(),
             required_signatures: 0,
         }))
         .await;
@@ -1779,38 +1935,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn evm_proof_summary_never_reports_unverified_quorum() {
-        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
-            source_domain: 1,
-            block_hash: [1u8; 32],
-            state_root: [2u8; 32],
-            finalized_block: 100,
-            proof_nonce: 7,
-            proof_payload: vec![1, 2, 3],
-            expected_recipient: vec![3u8; 32],
-            expected_amount: "25".to_string(),
-        }))
-        .await;
-        let Ok(Json(summary)) = result else {
-            panic!("well-shaped proof summary must not fail");
-        };
-        assert_eq!(summary.kind, "evm");
-        assert!(
-            !summary.meets_quorum,
-            "a shape check is not finalized receipt verification"
-        );
-    }
-
-    #[tokio::test]
     async fn evm_proof_summary_refuses_empty_proof_evidence() {
         let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
             source_domain: 1,
+            proof_id: [9u8; 32],
             block_hash: [1u8; 32],
             state_root: [2u8; 32],
             finalized_block: 100,
             proof_nonce: 7,
             proof_payload: Vec::new(),
-            expected_recipient: vec![3u8; 32],
+            source_asset: vec![2u8; 20],
+            expected_sender: vec![3u8; 20],
+            expected_contract: vec![4u8; 20],
+            expected_beneficiary: vec![5u8; 32],
+            expected_nonce: 1,
             expected_amount: "25".to_string(),
         }))
         .await;
@@ -2205,11 +2343,21 @@ mod tests {
         let evm_proof = json!({
             "kind": "evm",
             "source_domain": 1,
+            "proof_id": vec![9u8; 32],
             "block_hash": vec![1u8; 32],
-            "state_root": vec![0u8; 32],
+            "state_root": vec![6u8; 32],
             "finalized_block": 42,
             "proof_nonce": 0u32,
+            "proof_payload": vec![1u8; 96],
+            "source_asset": vec![2u8; 20],
+            "expected_sender": vec![3u8; 20],
+            "expected_contract": vec![4u8; 20],
+            "expected_beneficiary": vec![5u8; 32],
+            "expected_nonce": 1u64,
+            "expected_amount": "1000",
         });
+        serde_json::from_value::<RelayerProofRequest>(evm_proof.clone())
+            .expect("the documented EVM proof shape must deserialize");
         let proof_resp = client
             .post(format!("{base}/api/v1/relayer/proof-summary"))
             .json(&evm_proof)
@@ -2219,7 +2367,56 @@ mod tests {
         assert_eq!(proof_resp.status().as_u16(), 200);
         let proof: Value = proof_resp.json().await.expect("proof-summary json");
         assert_eq!(proof["kind"], json!("evm"));
-        assert_eq!(proof["meets_quorum"], json!(true));
+        assert_eq!(proof["meets_quorum"], json!(false));
+
+        let raw_transaction = hex::decode(concat!(
+            "010ca9bbc1fd52fb8a2d08c512ccdb720fc3100804cb2fb8cba4bbc9ce4df7a7d0",
+            "567d96e7a21e7356e6f2b2b6d9efd725c6dd40bf4ad25dac00a27cb2dde3f509",
+            "01000001d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737",
+            "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c00"
+        ))
+        .expect("signed Solana transaction fixture");
+        let svm_proof = json!({
+            "kind": "svm",
+            "source_domain": 200,
+            "proof_id": vec![8u8; 32],
+            "cluster": "devnet",
+            "slot": 42,
+            "parent_slot": 41,
+            "blockhash": vec![7u8; 32],
+            "bank_hash": vec![6u8; 32],
+            "parent_bank_hash": vec![6u8; 32],
+            "stake_table_digest": vec![5u8; 32],
+            "expected_asset_id": vec![4u8; 32],
+            "expected_amount": "5000",
+            "expected_sender": vec![3u8; 32],
+            "expected_recipient": vec![2u8; 32],
+            "expected_beneficiary": vec![1u8; 32],
+            "transaction": {
+                "slot": 42,
+                "index": 0,
+                "succeeded": true,
+                "raw_transaction": raw_transaction
+            },
+            "validator_signatures": [{
+                "validator_pubkey": vec![9u8; 32],
+                "signature": vec![10u8; 64]
+            }],
+            "required_signatures": 1u32
+        });
+        serde_json::from_value::<RelayerProofRequest>(svm_proof.clone())
+            .expect("the documented SVM V4 proof shape must deserialize");
+        let svm_resp = client
+            .post(format!("{base}/api/v1/relayer/proof-summary"))
+            .json(&svm_proof)
+            .send()
+            .await
+            .expect("SVM proof-summary request");
+        assert_eq!(svm_resp.status().as_u16(), 200);
+        let svm_summary: Value = svm_resp.json().await.expect("SVM proof-summary json");
+        assert_eq!(svm_summary["kind"], json!("svm"));
+        assert_eq!(svm_summary["proof_id_hex"], json!(hex::encode([8u8; 32])));
+        assert_eq!(svm_summary["meets_quorum"], json!(false));
 
         // The GraphQL endpoint is served and answers a real query.
         let gql = client

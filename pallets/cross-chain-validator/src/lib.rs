@@ -174,6 +174,25 @@ pub mod pallet {
     pub type EvmMerkleRoots<T: Config> =
         StorageMap<_, frame_support::Blake2_128Concat, u64, H256, OptionQuery>;
 
+    /// Full finalized EVM header evidence retained per block number.
+    ///
+    /// Receipt verification binds the block hash and state root as well as the
+    /// receipts root, so retaining only the newest header would make older
+    /// deposits unprovable.
+    #[pallet::storage]
+    pub type FinalizedEvmHeaders<T: Config> =
+        StorageMap<_, frame_support::Blake2_128Concat, u64, EvmHeaderInfo, OptionQuery>;
+
+    /// Full finalized SVM header evidence retained per slot.
+    ///
+    /// Settlement and external-root verification need the exact bank/state
+    /// commitment that was certified for the proof's slot. Keeping only the
+    /// newest finalized slot would make an older finalized transfer
+    /// unprovable as soon as another slot finalizes.
+    #[pallet::storage]
+    pub type FinalizedSvmHeaders<T: Config> =
+        StorageMap<_, frame_support::Blake2_128Concat, u64, SvmHeaderInfo, OptionQuery>;
+
     /// Validator set cache for SVM slots (slot -> validator_set_hash)
     #[pallet::storage]
     pub type SvmValidatorSets<T: Config> =
@@ -494,6 +513,15 @@ pub mod pallet {
                     break;
                 }
             }
+            loop {
+                let removed = FinalizedEvmHeaders::<T>::clear(u32::MAX, None);
+                if removed.unique == 0 && removed.loops == 0 {
+                    break;
+                }
+                if removed.maybe_cursor.is_none() {
+                    break;
+                }
+            }
             LastFinalizedEvmHeader::<T>::kill();
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::Unset);
             EthereumFinalizedCheckpoints::<T>::insert(
@@ -576,14 +604,16 @@ pub mod pallet {
                 )
                 .map_err(|_| Error::<T>::InvalidEthereumExecutionProof)?;
 
-            if let Some(last) = LastFinalizedEvmHeader::<T>::get() {
+            if let Some(existing) = FinalizedEvmHeaders::<T>::get(verified.block_number) {
                 ensure!(
-                    verified.block_number > last.block_number,
-                    Error::<T>::NonMonotonicTimestamp
+                    existing.block_hash == verified.block_hash
+                        && existing.state_root == verified.state_root
+                        && existing.merkle_root == verified.receipts_root,
+                    Error::<T>::InvalidEvmHeader
                 );
             }
             let proof_bytes = proof.encode();
-            LastFinalizedEvmHeader::<T>::put(EvmHeaderInfo {
+            let header_info = EvmHeaderInfo {
                 block_number: verified.block_number,
                 block_hash: verified.block_hash,
                 state_root: verified.state_root,
@@ -592,7 +622,13 @@ pub mod pallet {
                 verified_at_block: frame_system::Pallet::<T>::block_number()
                     .saturated_into::<u32>(),
                 validation_proof: proof_bytes,
-            });
+            };
+            if LastFinalizedEvmHeader::<T>::get()
+                .is_none_or(|last| verified.block_number > last.block_number)
+            {
+                LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            }
+            FinalizedEvmHeaders::<T>::insert(verified.block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::BeaconSyncCommittee);
             EvmMerkleRoots::<T>::insert(verified.block_number, verified.receipts_root);
             ValidationStats::<T>::mutate(|stats| {
@@ -652,13 +688,15 @@ pub mod pallet {
                 &certificate,
             )
             .map_err(|_| Error::<T>::InvalidHeaderCertificate)?;
-            if let Some(last) = LastFinalizedEvmHeader::<T>::get() {
+            if let Some(existing) = FinalizedEvmHeaders::<T>::get(block_number) {
                 ensure!(
-                    block_number > last.block_number,
-                    Error::<T>::NonMonotonicTimestamp
+                    existing.block_hash == block_hash
+                        && existing.state_root == state_root
+                        && existing.merkle_root == receipts_root,
+                    Error::<T>::InvalidEvmHeader
                 );
             }
-            LastFinalizedEvmHeader::<T>::put(EvmHeaderInfo {
+            let header_info = EvmHeaderInfo {
                 block_number,
                 block_hash,
                 state_root,
@@ -667,7 +705,13 @@ pub mod pallet {
                 verified_at_block: frame_system::Pallet::<T>::block_number()
                     .saturated_into::<u32>(),
                 validation_proof: certificate,
-            });
+            };
+            if LastFinalizedEvmHeader::<T>::get()
+                .is_none_or(|last| block_number > last.block_number)
+            {
+                LastFinalizedEvmHeader::<T>::put(header_info.clone());
+            }
+            FinalizedEvmHeaders::<T>::insert(block_number, header_info);
             EvmHeaderFinalitySource::<T>::put(EvmHeaderFinalitySourceKind::AttesterQuorum);
             EvmMerkleRoots::<T>::insert(block_number, receipts_root);
             ValidationStats::<T>::mutate(|stats| {
@@ -725,7 +769,7 @@ pub mod pallet {
             if let Some(last) = LastFinalizedSvmHeader::<T>::get() {
                 ensure!(slot > last.slot, Error::<T>::InvalidSvmHeader);
             }
-            LastFinalizedSvmHeader::<T>::put(SvmHeaderInfo {
+            let header_info = SvmHeaderInfo {
                 slot,
                 block_hash,
                 state_root,
@@ -734,7 +778,9 @@ pub mod pallet {
                     .saturated_into::<u32>(),
                 validation_proof: certificate,
                 parent_slot_hashes: Vec::new(),
-            });
+            };
+            LastFinalizedSvmHeader::<T>::put(header_info.clone());
+            FinalizedSvmHeaders::<T>::insert(slot, header_info);
             SvmValidatorSets::<T>::insert(slot, validator_set_hash);
             ValidationStats::<T>::mutate(|stats| {
                 stats.svm_headers_validated = stats.svm_headers_validated.saturating_add(1);
@@ -1120,7 +1166,7 @@ pub mod pallet {
             {
                 return false;
             }
-            LastFinalizedEvmHeader::<T>::get().is_some_and(|stored_header| {
+            FinalizedEvmHeaders::<T>::get(block_number).is_some_and(|stored_header| {
                 stored_header.block_number == block_number
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
@@ -1137,7 +1183,7 @@ pub mod pallet {
             validator_set_hash: H256,
         ) -> bool {
             // Check if header exists and all fields match
-            if let Some(stored_header) = LastFinalizedSvmHeader::<T>::get() {
+            if let Some(stored_header) = FinalizedSvmHeaders::<T>::get(slot) {
                 stored_header.slot == slot
                     && stored_header.block_hash == block_hash
                     && stored_header.state_root == state_root
@@ -1207,18 +1253,12 @@ pub mod pallet {
             {
                 return None;
             }
-            let receipts_root = EvmMerkleRoots::<T>::get(block_number)?;
-            // The state root and block hash are only known for the newest header
-            // this pallet stores; for an older height the receipts root is what
-            // the proof is checked against, and the other two are left zeroed
-            // rather than filled in from something unrelated.
-            let newest = LastFinalizedEvmHeader::<T>::get()
-                .filter(|header| header.block_number == block_number);
+            let finalized = FinalizedEvmHeaders::<T>::get(block_number)?;
             Some(x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number: block_number,
-                receipts_root: receipts_root.0,
-                state_root: newest.as_ref().map(|h| h.state_root.0).unwrap_or_default(),
-                block_hash: newest.as_ref().map(|h| h.block_hash.0).unwrap_or_default(),
+                receipts_root: finalized.merkle_root.0,
+                state_root: finalized.state_root.0,
+                block_hash: finalized.block_hash.0,
             })
         }
 

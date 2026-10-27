@@ -595,7 +595,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 72,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "pallets/x3-settlement-engine/src/btc_gateway.rs",
@@ -607,16 +607,16 @@
         "note: FEATURE_REGISTRY btc_fortress_gateway re-pointed at the on-chain path and raised 25->45 on 2026-09-22; raised 45->72 on 2026-09-27 (85/90/50) when the header source (`scripts/btc/push-headers.py`, a real Esplora/`bitcoin-cli` reader that checks the run links and emits the `submitBtcHeaders` payload without needing a signer) landed with a live drill and a pallet test over its own output"
       ],
       "id": "X3-XCHAIN-001",
-      "implemented": 85,
+      "implemented": 90,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 50,
+      "mainnet_ready": 53,
       "missing_work": [
         "Regtest is real and the header source now runs against public testnet; mainnet and a live deposit are not: a Bitcoin Core v28.1.0 regtest node mined the blocks, transaction and merkle path the pallet's tests verify (`scripts/btc/capture-regtest-spv.py`), `scripts/btc/push-headers.py` reads real testnet3 headers and `scripts/testnet/btc-header-source-drill.sh` proves it live and proves it refuses a tampered answer \u2014 but no X3 chain has admitted a public-network header and no coin has ever moved on a network anyone else can see",
         "A chain can be born anchored \u2014 `X3SettlementEngine`'s genesis carries `btc_checkpoints`, pins `(height, hash)` and admits the header, and `X3_BTC_CHECKPOINTS=<header hex>@<height>` puts one in a spec (`scripts/testnet/btc-checkpoint-genesis-drill.sh`, 12/12) \u2014 and the missing *source* half now exists, but no *public* network has a checkpoint pinned, the relayer is an operator-run script rather than a node feature, and nothing bonds it for withholding (TICKET-095 stays open until there is more than one)",
         "The sender runs unattended (`push-headers.mjs --loop --cursor \u2026`) and the source half is now scripted and drilled, but nothing runs against a public chain yet, the push needs a root origin because `BtcHeaderOrigin = EnsureRoot`, and no bond prices withholding",
         "The pallet's difficulty rule is mainnet's: `btc_bits_follow_parent` requires a child to carry its parent's `nBits` off a retarget boundary, so testnet3's minimum-difficulty blocks \u2014 which alternate `nBits` mid-epoch after a twenty-minute gap \u2014 are refused. The relayer only emits a uniform-`nBits` run, so the path cannot track testnet as it actually mines without modelling that rule",
-        "No BTC signer quorum for withdrawals",
+        "The vault now verifies an injected X3 proof authority, reserves aggregate spendable capacity, enforces cumulative daily limits, and requires a threshold of distinct secp256k1 signer approvals bound to the exact withdrawal payload. Transaction-level outpoint locking and the runtime/pallet withdrawal-release path remain open, so the live bridge cannot yet exercise this vault flow.",
         "BTC mainnet disabled by feature flag; no external audit"
       ],
       "name": "BTC Fortress gateway",
@@ -631,8 +631,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 90,
-      "tests": "tested score 90% (no named test list on this row)"
+      "tested": 92,
+      "tests": "tested score 92% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -654,7 +654,7 @@
       "missing_work": [
         "No live Bitcoin run beyond regtest: the script builder, the merkle walk and the header chain are now exercised against a real regtest node's blocks (block 121's header, its merkle path and a confirmed transaction), and a dev chain can be born anchored on that block, but nothing has run against testnet or mainnet",
         "The header chain the SPV check reads now bootstraps from a governance-anchored checkpoint (`anchor_btc_checkpoint`, spec_version 14) and extends only under Bitcoin's height/difficulty/timestamp rules, but no chain has anchored one yet, so the path is fail-closed and unexercised end to end",
-        "No signer quorum for withdrawals; no external audit",
+        "The vault now has verifier-gated, exact-payload threshold approvals and reserve accounting for withdrawals; the runtime/pallet release path and external audit remain open.",
         "Three SPV implementations still exist \u2014 this pallet's `btc_gateway`, `crates/x3-crosschain-intent/src/proof/btc.rs` and `crates/x3-bitcoin-vault` \u2014 and only the pallet's is on the runtime path. They are now *tested against each other* on a real regtest block (`the_three_bitcoin_header_implementations_agree`), which is how the vault's merkle walk was found to be verifying a different tree (it ordered each pair by byte value instead of by the transaction's position, and is now position-aware). Consolidating them into one would remove the drift risk rather than detect it"
       ],
       "name": "Bitcoin HTLC script logic",
@@ -675,63 +675,89 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 60,
+      "composite": 65,
       "confidence": "high",
       "evidence": [
         "crates/x3-relayer/src/submitter.rs",
+        "crates/x3-relayer/src/types.rs",
+        "crates/x3-relayer/src/vote_exchange.rs",
         "crates/x3-relayer/src/watchers/evm.rs",
         "crates/x3-relayer/src/watchers/svm.rs",
+        "crates/x3-verification-router/src/solana_finality.rs",
         "crates/x3-validator-attestation/src/lib.rs",
         "crates/x3-bridge/src/cross_chain_proofs.rs",
-        "note: watchers compare confirmations to the configured finality threshold; EVM receipt proofs are produced by crates/x3-relayer/src/evm_receipt_proof.rs and verified through x3-verification-router; the submission path refuses with the origin rule rather than posting a payload no node accepts"
+        "audit-artifacts/evidence/2026-10-25-solana-v3-blockhash-bank-hash.json",
+        "audit-artifacts/evidence/2026-10-25-solana-v4-transaction-inclusion.json",
+        "audit-artifacts/evidence/2026-10-25-solana-v4-settlement-submission.json",
+        "audit-artifacts/evidence/2026-10-25-solana-durable-vote-exchange.json",
+        "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json",
+        "audit-artifacts/evidence/2026-10-25-evm-settlement-submission.json",
+        "note: watchers produce receipt or V4 evidence from chain data; the library converts and signs the exact settlement proof, the vote exchange collects independent validator signatures, and the settlement engine rebinds transaction/finality identifiers and the signed proof id to the intent economics before execution"
       ],
       "id": "X3-XCHAIN-003",
-      "implemented": 85,
+      "implemented": 90,
       "launch_scope": "core",
-      "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "live_tested": "SIM_TESTNET",
+      "mainnet_ready": 30,
       "missing_work": [
-        "**CLOSED 2026-09-26 \u2014 the single-key quorum is gone, and the crate refuses what it cannot back.** `svm_required_signatures: 1` (with the comment that quorum enforcement \"belongs at the aggregator layer\") is deleted. `x3-validator-attestation` now owns the one definition of the bar \u2014 `supermajority_threshold(n) = floor(2n/3)+1`, never zero, monotonic in `n` \u2014 and `crates/x3-relayer` has an `AuthorizedValidatorSet` that decodes the configured keys (optional `0x`, malformed / wrong-length / repeated entries refused at startup rather than trimmed), derives the required signature count from the set, and counts *distinct authorized* signers. `acquire_svm_proof` refuses with typed `SvmQuorumUnreachable` / `NoAuthorizedValidatorSet` instead of emitting a proof it cannot back, and both proof legs refuse with `UnauthorizedSubmitter`. Measured: `cargo test -p x3-relayer -p x3-validator-attestation` -> 58 + 5 + 15 passed; with the policy check removed, `safety_pipeline_refuses_a_one_of_three_proof_that_declares_itself_satisfied` fails by accepting a one-of-three proof, and restoring it returns 9/9.",
-        "It cannot submit at all: the settlement engine accepts a proof only from the intent's maker or taker, so a relayer signature is refused (`NotAuthorized`) \u2014 the authority path is an open decision",
+        "**CLOSED 2026-10-24 \u2014 Solana finality separated the blockhash and bank hash.** The earlier evidence labelled the RPC blockhash as a bank hash. V3 carried the finalized Solana blockhash and validator-attested bank hash as separate commitments, plus finalized/parent slots, the parent bank hash, the complete stake-table digest, the gateway transfer identity/intent, and independently signed votes. `RpcSubmitter::acquire_svm_proof` verified every supplied Ed25519 vote over the full message, rejected duplicates/unauthorized keys/tampered finality fields, and refused unless the configured stake supermajority verified. `SvmHeaderWatcher` durably stored the highest observed finalized slot and the safety pipeline passed that floor into the verifier. That format is retained only as historical encoding evidence and is now refused for settlement because it lacked transaction inclusion.",
+        "**CLOSED 2026-10-25 \u2014 Solana V4 proves transaction inclusion and bank state together.** V4 carries the raw serialized transaction, transaction slot/index, success status, recent blockhash, raw-transaction commitment, final blockhash, bank hash, parent bank hash, stake-table digest, and transfer intent under the same stake-weighted validator signatures. The verifier parses the transaction, enforces raw packet/shortvec bounds, verifies the fee-payer Ed25519 signature, derives the signature and commitment from the bytes, and rejects V3 bank-only payloads. The watcher now polls finalized commitment rather than inferring finality from slot age. The proof queue independently calls finalized `getTransaction` and `getBlock`; mainnet startup requires at least three distinct non-empty RPC endpoints and proof production requires a two-thirds provider quorum reporting identical evidence. The shipped mainnet YAML is parsed by a regression test and keeps its validator committee empty until governance supplies it. The gateway proof-summary wire contract requires and parses the raw transaction before summarizing a proof. Measured with 70 verification-router tests, 75 relayer library tests plus 6 executable tests, 66 gateway-pallet tests, 79 gateway-pallet benchmark-feature tests, and real HTTP plus malformed-transaction tests in `x3-gateway`; strict clippy passes across all affected crates.",
+        "**CLOSED 2026-10-25 \u2014 the EVM and Solana typed submission paths exist.** The settlement engine accepts either an intent party or the governance-managed `Settlement` gateway for all external proof-entry calls; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` carries the runtime intent id, converts a receipt proof into the exact settlement type, signs the runtime-monomorphized extrinsic, and submits it through `author_submitExtrinsic`. `RpcSubmitter::submit_svm_proof` now does the same for portable Solana V4 evidence. The settlement engine decodes the V4 transaction/bank package, compares its slot, blockhash, transaction index, and commitment with the enclosing proof, binds its chain, asset, and amount to an intent leg, obtains the governance-configured stake verifier through the runtime, and persists the accepted finalized-slot floor. The signer account must match the configured relayer account. The legacy executable still refuses EVM deposit/release and its old SVM route.",
         "No live external-chain operation: the watchers have never run against a public chain, and the proof producer is exercised against anvil and solana-test-validator in local gates only",
-        "No multi-operator relayer set *in production*: the quorum policy is enforced in the library and refuses an unreachable bar, but `RelayerService` has no production constructor in this workspace \u2014 `node` and `x3-gateway` depend on the crate and consume only its types \u2014 and signature aggregation across validators still has no host. That is why mainnet readiness moves **down** (35 -> 25) even as implementation and tests move up: the previous 35 credited a single-signature path that could not have produced a quorum at all.",
-        "`crates/x3-relayer/src/main.rs` is a separate monolith with its own config and SVM path whose proof signer defaults to `//Alice` (`X3_RELAY_PROOF_SIGNER`); it does not use `RpcSubmitter`/`RelayerService` and was not rewritten (TICKET-148)."
+        "The durable Solana vote exchange is implemented and exercised over real HTTP, including persistence, reload verification, equivocation, independent aggregation, and runtime-intent binding, but it has not been deployed as separately operated validator and aggregator services and no public-chain quorum has used it.",
+        "All nine `pallet-cross-chain-validator` dispatchables now have executable `runtime-benchmarks` cases, including the beacon checkpoint, sync-committee update, and execution proof over the repository's real Ethereum fixtures; the benchmark test suite passes 36/36. The cross-chain-gateway deposit/release benchmarks use a real two-validator Solana V4 transaction-and-bank proof, and the gateway benchmark suite passes 79/79. The settlement benchmark suite now passes 247/247 after its BTC setup was corrected to populate a contiguous best chain at the configured confirmation depth. Weight regeneration is still blocked on this host by insufficient release-benchmark build capacity.",
+        "`crates/x3-relayer/src/main.rs` is still a separate monolith with its own config and does not use the V2 `RelayerService`. Its legacy EVM deposit/release and old SVM settlement paths fail closed, while the library now has real typed EVM and Solana submission paths; the executable still needs to be replaced by the library service before mainnet."
       ],
       "name": "Relayer framework",
       "paths": [
+        "crates/x3-relayer/src/main.rs",
+        "crates/x3-relayer/src/types.rs",
         "crates/x3-relayer/src/submitter.rs",
         "crates/x3-relayer/src/relayer.rs",
         "crates/x3-relayer/src/quorum.rs",
+        "crates/x3-relayer/src/vote_exchange.rs",
         "crates/x3-relayer/src/watchers",
+        "crates/x3-verification-router/src/solana_finality.rs",
         "crates/x3-validator-attestation/src/lib.rs",
-        "crates/x3-bridge/src/cross_chain_proofs.rs"
+        "crates/x3-bridge/src/cross_chain_proofs.rs",
+        "crates/x3-gateway/src/rest.rs",
+        "pallets/x3-crosschain-gateway/src/tests.rs",
+        "pallets/x3-settlement-engine/src/lib.rs",
+        "pallets/x3-settlement-engine/src/tests.rs",
+        "runtime/src/tests.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 80,
-      "tests": "tested score 80% (no named test list on this row)"
+      "tested": 85,
+      "tests": "26 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 64,
+      "composite": 73,
       "confidence": "high",
       "evidence": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
         "crates/x3-verification-router/src/evm_receipt.rs",
         "crates/x3-relayer/src/evm_receipt_proof.rs",
-        "note: the 5-of-7 path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 and the external proof the row called missing exists: anvil-backed EVM lifecycles run in the cross-domain gates, dev and strict posture, with receipts-trie inclusion and typed receipts verified through x3-verification-router"
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs",
+        "audit-artifacts/evidence/2026-10-26-ethereum-lock-mint-burn-release.json",
+        "audit-artifacts/evidence/2026-10-27-gateway-route-exposure-hardening.json",
+        "note: the production deposit path verifies the EVM receipt through x3-verification-router, gates it through the governed gateway, and then mints through the wrapped-asset ledger; proof id, chain, asset, beneficiary, amount, supply cap and replay state are bound before the gateway reports X3Credited",
+        "note: the 5-of-7 model path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 while the public production path uses the gateway's receipt verifier"
       ],
       "id": "X3-XCHAIN-004",
-      "implemented": 80,
+      "implemented": 92,
       "launch_scope": "core",
-      "live_tested": "not a registered launch feature",
-      "mainnet_ready": 45,
+      "live_tested": "GUARDED_TESTNET",
+      "mainnet_ready": 50,
       "missing_work": [
-        "The lock-mint adapter is not wired into anything: `crates/x3-bridge/src/ethereum_bridge.rs` has no caller outside its own module, so no pallet or service enforces its checks in production yet",
+        "**CLOSED 2026-10-26 \u2014 verified EVM deposits now mint the X3 representation atomically.** The gateway's `credit_x3_representation` calls the runtime-configured `DepositMinter`; the production implementation decodes the proof-bound 32-byte X3 beneficiary, calls `pallet-x3-wrapped`, and refuses to mark the transfer credited unless the wrapped asset, cap, balance, supply, and full 32-byte proof-id replay checks pass. A mint refusal rolls the status update back. The standalone `EthereumBridge` remains a model with no public-chain caller; the production path is now the gateway/verifier/wrapped/runtime chain above.",
         "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
         "The production signer policy for the 5-of-7 keys is the same gap as X3-L1-002 (no ceremony, rotation or HSM guidance)",
         "No external audit"
@@ -740,15 +766,18 @@
       "paths": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
         "crates/x3-verification-router/src/evm_receipt.rs",
-        "crates/x3-relayer/src/evm_receipt_proof.rs"
+        "crates/x3-relayer/src/evm_receipt_proof.rs",
+        "pallets/x3-crosschain-gateway/src/lib.rs",
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs"
       ],
       "priority": "P0",
       "source": "master",
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 84,
+      "tests": "6 named tests in FEATURE_REGISTRY"
     },
     {
       "benchmark": "\u2014",
@@ -849,22 +878,27 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 75,
+      "composite": 84,
       "confidence": "high",
       "evidence": [
         "crates/x3-crosschain-gateway/src/lib.rs",
         "pallets/x3-crosschain-gateway/src/lib.rs",
-        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, and refuses unregistered/disabled routes; the off-chain crate mirrors the lifecycle with a circuit breaker, insurance and risk engine"
+        "pallets/x3-wrapped/src/lib.rs",
+        "runtime/src/lib.rs",
+        "audit-artifacts/evidence/2026-10-27-gateway-route-exposure-hardening.json",
+        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter",
+        "note: withdrawal requests and release proofs are bound to the exact route id, route state, destination chain, X3 asset, external asset, gateway contract, recipient, amount and full withdrawal id; burned withdrawals are capped by the route pending limit, and releases consume a separate per-route daily withdrawal window"
       ],
       "id": "X3-XCHAIN-008",
-      "implemented": 80,
+      "implemented": 92,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 70,
+      "mainnet_ready": 75,
       "missing_work": [
+        "**CLOSED 2026-10-26 \u2014 `credit_x3_representation` now mints instead of only emitting an event.** The runtime binds `DepositMinter` to the wrapped-asset pallet; the mint uses a full proof-id replay guard and rolls back with the gateway's status on any refusal.",
         "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
         "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
-        "The withdrawal-id change (XOR \u2192 Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
+        "The withdrawal-id and route-binding change takes effect for new withdrawals only after this runtime is deployed (`spec_version` 26)",
         "No external audit of the gateway crate or pallet"
       ],
       "name": "General external gateway",
@@ -878,8 +912,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 75,
-      "tests": "tested score 75% (no named test list on this row)"
+      "tested": 86,
+      "tests": "tested score 86% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -1003,21 +1037,22 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 83,
+      "composite": 85,
       "confidence": "high",
       "evidence": [
         "crates/x3-atomic-swap/src/secret_release.rs",
-        "note: PR #162 adds src/secret_release.rs domain/finality/refund/replay validation; #163 hardens permit capability",
-        "pr #162 merged 2026-09-13, pr #163 merged 2026-09-17; provenance recorded 2026-09-22; tests measured on master 2026-09-23"
+        "crates/x3-atomic-swap/src/ethereum_tx.rs",
+        "note: PR #162 adds domain/finality/refund/replay validation; #163 hardens permit capability",
+        "note: 2026-10-25 adds policy-authorized Ed25519 RPC provider observations and fixes the k256 prehash signing API"
       ],
       "id": "X3-XCHAIN-013",
-      "implemented": 92,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 72,
       "missing_work": [
-        "**NARROWED 2026-09-27 \u2014 the constructed part that mattered is gone; the live runs are real and the identities are not.** The evidence for this row *was* constructed in the place that decided the outcome: the quorum attestation carried its own `provider_count` and `required_quorum`, so the firewall's RPC-quorum gate was satisfied by numbers the evidence chose for itself, and the live EVM/SVM tests typed `provider_count: 3, required_quorum: 2` against a single anvil or solana-test-validator endpoint. The bar is now `SecretReleaseRequirement::min_providers` (policy; zero refused) and the attestation is a list of distinct provider ids the firewall counts itself \u2014 so the failure modes are duplicates, blank ids, and a policy bar the evidence cannot lower, all four of which have tests (`the_evidence_cannot_set_its_own_quorum_bar`, `one_provider_listed_twice_is_one_provider`, `an_unnamed_provider_does_not_count`, `a_zero_provider_policy_is_refused`). The live lifecycles still run against real chains and real contracts (`real_x3vm_evm_lock_claim_atomic_lifecycle`, `real_local_node_lock_finalized_claim_lifecycle`, and the SVM pair), and their requirements now say `min_providers: 1` with a comment, because one endpoint is what exists in those harnesses \u2014 the honest number instead of a typed two-of-three.",
-        "Still open on TICKET-095: the provider ids are **unauthenticated**. A caller can name three providers that never answered and clear `min_providers: 3`; what stops that is a signature over each observation from a key the verifier knows, which is the relayer's `x3-validator-attestation` model and is not wired here. The finality side has the same shape in miniature: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
+        "**CLOSED 2026-10-25 \u2014 provider identities and the quorum bar are authenticated policy inputs.** `SecretReleaseRequirement` now owns both `min_providers` and the authorized Ed25519 provider keys. Each `RpcProviderObservation` carries its key and signature over a canonical statement binding the provider id, chain, VM, transaction, block, and finalized result. The firewall counts only distinct authorized keys whose signatures pass `verify_strict`, so a caller cannot invent provider names, relabel another provider's observation, substitute a self-generated key, or change the observation without invalidating the signature. The prior constructed-count failure and all new identity-binding failures have named tests, and the real EVM/SVM/X3 live harnesses now produce signed observations through the same API.",
+        "Still open on TICKET-095: no production RPC collector obtains and relays signatures from independent external providers yet; the live harnesses exercise the verification boundary with one operator-controlled key. The finality side also remains narrower than mainnet: the live tests build the `FinalityProof` from the observed lock rather than reading it back with a proof of inclusion, and the EVM leg's `finalized: true` is justified by anvil's instant finality in a comment rather than by a depth read.",
         "No live BTC release: the EVM and SVM paths have live lifecycles, Bitcoin does not."
       ],
       "name": "Secret-release firewall",
@@ -1029,8 +1064,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -1065,20 +1100,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 79,
+      "composite": 86,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/persistence.rs",
-        "note: PR #166 tests exact persistence crash window",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "crates/cross-vm-coordinator/src/state_machine.rs",
+        "note: 2026-10-25 injected a panic between secret-ownership writes and the session write, reconstructed the coordinator from durable state, and completed the retry without duplicate journal entries"
       ],
       "id": "X3-XCHAIN-015",
-      "implemented": 88,
+      "implemented": 90,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 70,
+      "mainnet_ready": 76,
       "missing_work": [
-        "Needs merge plus long-running persistence fault injection"
+        "A deterministic in-process split-write failure now recovers correctly, but the path still needs long-running filesystem/database fault injection and an independently operated process restart before mainnet."
       ],
       "name": "Split-write crash recovery",
       "paths": [
@@ -1089,26 +1124,26 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 82,
-      "tests": "tested score 82% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/state_machine.rs",
         "note: PR #166 returns IdempotencyConflict for mismatched evidence",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"
       ],
       "id": "X3-XCHAIN-016",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending production-gate proof"
+        "A live multi-process/network retry drill remains: the current proof is the complete coordinator crate suite, not independently operated coordinators racing against restarted production storage and RPC."
       ],
       "name": "Conflicting retry rejection",
       "paths": [
@@ -1116,29 +1151,29 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/persistence.rs",
         "note: secret hash -> owning session id",
-        "PR #166 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "note: 2026-10-25 nested-workspace `cargo test` ran 119 library tests plus 41 security regressions with 0 failures, and strict clippy passed"
       ],
       "id": "X3-XCHAIN-017",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending production-gate proof"
+        "The global ownership registry is proven in-memory and through the suite; it has not yet been exercised across independently operated production nodes with storage failover."
       ],
       "name": "Cross-session secret ownership",
       "paths": [
@@ -1146,11 +1181,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -1185,20 +1220,21 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 82,
+      "composite": 89,
       "confidence": "high",
       "evidence": [
-        "crates/x3-atomic-swap",
-        "note: PR #162 src/secret_release.rs prevents one proof from satisfying multiple required domains",
-        "PR #162 merged 2026-09-13; recorded as master provenance on 2026-09-22; PR #163 merged 2026-09-17; recorded as master provenance on 2026-09-22"
+        "crates/cross-vm-coordinator/src/lease.rs",
+        "crates/x3-atomic-swap/src/secret_release.rs",
+        "note: PR #162 prevents one proof from satisfying multiple required domains",
+        "note: 2026-10-25 coordinator suite (119 library + 41 security regressions) and x3-atomic-swap suite (719 std library tests) passed with 0 failures"
       ],
       "id": "X3-XCHAIN-019",
-      "implemented": 90,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 72,
+      "mainnet_ready": 82,
       "missing_work": [
-        "Pending merge/exact-head proof"
+        "No live multi-node release attempt has exercised fencing-epoch reuse and proof replay against production storage; the current evidence is the merged coordinator and firewall suites."
       ],
       "name": "Secret-release proof reuse rejection",
       "paths": [
@@ -1206,11 +1242,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "FUNCTIONAL BUT UNHARDENED",
-      "state_rule": "mainnet_ready >= 60",
+      "state": "COMPLETE",
+      "state_rule": "implemented >= 80 and tested >= 80 and mainnet_ready >= 80",
       "subsystem": "cross_chain",
-      "tested": 88,
-      "tests": "tested score 88% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -1426,6 +1462,7 @@
         "pallets/x3-cross-vm-router/src/lib.rs",
         "programs/svm/x3_atomic_swap/src/lib.rs",
         "scripts/cross-domain-svm-gate.sh",
+        "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json",
         "note: network-level external execution proof added 2026-09-22 \u2014 solana-test-validator + cargo build-sbf + the deployed SBF program, in dev and in strict posture (X3_STRICT_CROSS_DOMAIN_PROOFS=1, which refuses to start unless the chain reports the strict value)"
       ],
       "id": "X3-XVM-005",
@@ -1435,7 +1472,7 @@
       "mainnet_ready": 78,
       "missing_work": [
         "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-        "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+        "**CLOSED 2026-10-25 \u2014 the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
         "No external audit of the SVM program or of this route"
       ],
       "name": "EVM \u2192 SVM route",
@@ -1548,6 +1585,7 @@
         "pallets/x3-cross-vm-router/src/lib.rs",
         "programs/svm/x3_atomic_swap/src/lib.rs",
         "scripts/cross-domain-svm-gate.sh",
+        "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json",
         "note: network-level external execution proof added 2026-09-22 \u2014 the same validator-backed lifecycle that covers EVM \u2192 SVM, run in dev and strict posture; the SVM program is the one the gate builds with cargo build-sbf and deploys"
       ],
       "id": "X3-XVM-009",
@@ -1557,7 +1595,7 @@
       "mainnet_ready": 78,
       "missing_work": [
         "The SVM leg is proven against a real local validator and the deployed program, but nothing has been deployed to devnet or mainnet",
-        "A production relayer cannot submit the proof yet: pallets/x3-settlement-engine requires the intent party (who == intent.maker || who == intent.taker, NotAuthorized otherwise), so the submitting authority is an open decision",
+        "**CLOSED 2026-10-25 \u2014 the EVM proof can be submitted by the governed relayer.** `pallet-x3-settlement-engine` accepts either an intent party or the governance-managed `Settlement` gateway; claims and refunds remain party-only. `RpcSubmitter::submit_evm_proof` binds the runtime intent, converts the portable receipt proof to the runtime type, signs the runtime-monomorphized extrinsic and submits it. The SVM leg still refuses until it has independent slot inclusion and bank-state evidence",
         "No external audit of the SVM program or of this route"
       ],
       "name": "SVM \u2192 EVM route",
@@ -1732,6 +1770,7 @@
         "pallets/x3-cross-vm-router/src/lib.rs",
         "programs/svm/x3_atomic_swap/src/lib.rs",
         "scripts/cross-domain-svm-gate.sh",
+        "audit-artifacts/evidence/2026-10-25-settlement-proof-authority.json",
         "note: the external boundary this row called separate is now exercised \u2014 X3VM lock + SVM HTLC lock/claim/refund against solana-test-validator with the deployed program, in dev and strict posture (2026-09-22)"
       ],
       "id": "X3-XVM-015",
@@ -1741,7 +1780,7 @@
       "mainnet_ready": 82,
       "missing_work": [
         "The X3-side lock and the SVM-side lock are both exercised end to end against a real validator, but nothing has been deployed to devnet or mainnet",
-        "A production relayer cannot submit the settlement proof yet: the settlement engine requires the intent party, so the submitting authority is an open decision",
+        "**CLOSED 2026-10-25 \u2014 proof submission has a configured authority.** The settlement engine admits the governance-managed `Settlement` gateway alongside intent parties, but still restricts claims and refunds to those parties. The relayer now binds runtime intents and submits typed EVM extrinsics; this X3-to-SVM row remains open because its SVM evidence does not yet prove transaction inclusion and bank state independently of validator attestations",
         "No external audit"
       ],
       "name": "X3 \u2192 SVM route",
@@ -1802,7 +1841,7 @@
       "live_tested": "LIVE_TESTNET",
       "mainnet_ready": 90,
       "missing_work": [
-        "**CLOSED 2026-09-26 \u2014 the root-registration path asks a verifier, not a byte count.** `register_external_root` did `ensure!(!proof.is_empty())` under a comment saying a production version \"would verify SPV proofs, Merkle roots, etc.\", and then wrote the caller's `root_hash` into `BridgeRoots`, where the bridge surface reads it as the state of a foreign chain \u2014 a well-formed byte string treated as a proof, the same class as the settlement verifier's fabricated acceptance and worse in consequence. It now calls `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so no root can be established at all until a per-chain light client exists; the refusal is its own error (`ExternalRootVerificationUnavailable`), distinct from the scope-freeze (`ExternalBridgesDisabled`, checked earlier) and from the data-shape `InvalidProof` it replaced. Pinned by `an_external_root_cannot_be_registered_without_a_verifier` (an enabled bridge surface, a 64-byte proof, `BridgeRoots` still untouched) and by `register_external_root_works_only_after_governance_enables`, whose second half now asserts the verifier's refusal where it used to assert a raw `vec![1u8; 8]` was accepted. Load-bearing, measured: restoring the byte-count check turns the first test red on the error variant, then the file was restored byte-identically.",
+        "**CLOSED 2026-10-25 \u2014 the root-registration path is bound to stored finalized headers.** `register_external_root` no longer treats proof bytes as evidence. `RuntimeExternalRootVerifier` requires the requested EVM root to be bound to a beacon-finalized header, the Solana root to a stored finalized SVM header, and the Bitcoin root to an admitted header on the best chain; the proof envelope must name the same chain, block, and root kind. The refusal for an unavailable native EVM anchor is distinct from the governance scope freeze and from malformed proof data. Runtime tests pin EVM, SVM, and Bitcoin bindings plus wrong-root rejection. The call now charges two verifier storage reads alongside its declared compute; its generic pallet benchmark remains an explicit exception because fabricated runtime-finalized headers would bypass the production verifier.",
         "Operational governance activation process still required"
       ],
       "name": "External bridge pause-at-genesis",
@@ -2306,7 +2345,8 @@
       "confidence": "high",
       "evidence": [
         "GPU_VALIDATOR_HONEST_AUDIT.md",
-        "note: Honest audit explicitly forbids GPU acceleration claim without real device"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "note: physical kernels now pass CPU parity and throughput measurement, but the honest audit still forbids presenting kernel operations per second as finalized-chain TPS"
       ],
       "id": "X3-GPU-001",
       "implemented": 10,
@@ -2314,7 +2354,7 @@
       "live_tested": "not a registered launch feature",
       "mainnet_ready": 5,
       "missing_work": [
-        "No physical GPU benchmark showing finalized-TPS improvement"
+        "No benchmark crosses consensus and finality: physical hash and signature kernels are measured, but accelerator task/hash throughput is not finalized-chain TPS."
       ],
       "name": "GPU finalized-TPS proof",
       "paths": [
@@ -2398,7 +2438,7 @@
       "missing_work": [
         "**CLOSED 2026-09-28 \u2014 every pallet that charged a typed weight is measured, and the count is 4, all `low`.** The burndown started at 25 `pallet-call-without-weights` sites. Twenty-one pallets are measured by this repository's own CLI now, and the four findings that remain are the documented `T::DbWeight::get().reads_writes` estimate \u2014 a stated storage-access count, not an invented cost \u2014 in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance. There is no `high` finding left. The last pass also fixed the defect that had made the whole burndown impossible: `pallet-x3-settlement-engine` enabled its optional `rlp` with default features, so the runtime's `runtime-benchmarks` build dragged `bytes/std` and `rustc-hex/std` into the `wasm32v1-none` blob and died with E0463 before any weights could be regenerated",
         "**CLOSED 2026-09-28 \u2014 a gate now says when a weight file has gone stale.** `scripts/check-weights-freshness.py` runs in the default gate set and answers the two questions the tree can answer without a per-pallet node build: an entry no call charges (a renamed call, or a call that went back to a literal) is drift and fails, and a `weights.rs` with no benchmark CLI record line was never produced by a run, so it is unmeasured \u2014 ratcheted shrink-only by `docs/reports/weights-unmeasured-baseline.json` (22 files on 2026-09-28, down from every file being one). What it deliberately does *not* do is re-run a benchmark on change, so a number can still be stale while the file agrees with the pallet; that needs a CI runner with a benchmark-featured node build",
-        "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root` (this runtime's `RefuseExternalRoots` verifier refuses every root by policy). Measuring either would report a cost *below* the real one for the calls that gate the atomic kernel"
+        "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root`, whose production verifier reads runtime-specific finalized EVM/SVM/Bitcoin state that a generic pallet benchmark cannot fabricate without bypassing verification. The root-registration call now charges two verifier storage reads and 200,000 ps of declared compute; it remains an explicit exception until a runtime benchmark can install real finalized evidence"
       ],
       "name": "FRAME benchmarking",
       "paths": [
@@ -2420,19 +2460,23 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 68,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: ParityMismatch and CPU recomputation architecture exists"
+        "crates/x3-accel-wgpu/src/lib.rs",
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+        "note: 2026-10-25 physical gate passed on GTX 1070 and RTX 2060 SUPER: SHA-256 and Keccak-256 matched CPU over 4,354,871 vectors per card, both results were deterministic, ordered multi-GPU merge matched CPU, and secp256k1 verdicts matched the CPU reference."
       ],
       "id": "X3-GPU-004",
-      "implemented": 80,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 55,
+      "mainnet_ready": 70,
       "missing_work": [
-        "Needs real hardware equivalence evidence"
+        "Hardware Ed25519 verification still needs a device kernel. Launch-target parity has not been repeated on the eventual validator hardware."
       ],
       "name": "GPU/CPU parity checking",
       "paths": [
@@ -2440,11 +2484,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 70,
-      "tests": "tested score 70% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2507,19 +2551,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 38,
+      "composite": 76,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: WGPU backend currently KernelUnavailable; the CPU reference and the parity contract are real as of 241e9d033"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "note: physical WGPU Keccak batch kernel executed on both installed GPUs"
       ],
       "id": "X3-GPU-007",
-      "implemented": 50,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 15,
+      "mainnet_ready": 55,
       "missing_work": [
-        "A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it returned. What is still missing is the accelerator itself \u2014 this host has no compute device, the WGPU backend reports `KernelUnavailable`, and no GPU kernel has been run for this primitive. No GPU batching throughput has been measured anywhere in this repository."
+        "The accelerator is real, but small batches are slower than CPU and no consensus caller or launch-target benchmark yet proves a net production benefit."
       ],
       "name": "GPU Keccak256 batching",
       "paths": [
@@ -2530,8 +2575,8 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "gpu_performance",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2565,19 +2610,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 37,
+      "composite": 78,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel/src/lib.rs",
-        "note: Honest audit says no production GPU secp256k1 kernel; the CPU reference and parity contract are real as of 241e9d033, the kernel is not"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+        "note: physical secp256k1 WGPU kernel and CPU reference execute on both installed GPUs"
       ],
       "id": "X3-GPU-009",
-      "implemented": 45,
+      "implemented": 85,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 15,
+      "mainnet_ready": 60,
       "missing_work": [
-        "A `secp256k1_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with a divergent answer refused. What is still missing is the accelerator \u2014 the WGPU backend reports `KernelUnavailable`, this host has no compute device, and no GPU kernel has run for this primitive. Nothing on a chain calls this path yet either, so the parity contract currently protects a caller that does not exist."
+        "Physical secp256k1 verification now runs and matches CPU, but no chain-critical caller uses it yet and the launch target has not been re-benchmarked."
       ],
       "name": "GPU secp256k1 verification",
       "paths": [
@@ -2585,11 +2631,11 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "STUB",
-      "state_rule": "implemented >= 20",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 60,
-      "tests": "tested score 60% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2623,19 +2669,20 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 54,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel-wgpu",
-        "note: Honest audit confirms real WGSL/wgpu device code compiles"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+        "note: both installed GPUs executed the Vulkan/WGPU backend on 2026-10-25"
       ],
       "id": "X3-GPU-011",
-      "implemented": 70,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 40,
+      "mainnet_ready": 70,
       "missing_work": [
-        "Needs real physical GPU CI/run evidence"
+        "Physical execution is proven on this workstation, but there is no automated physical-GPU CI runner for launch hardware."
       ],
       "name": "WGPU accelerator backend",
       "paths": [
@@ -2643,28 +2690,29 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 55,
-      "tests": "tested score 55% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 57,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-accel-wgpu",
-        "note: Real SHA-256 compute path called out by honest audit"
+        "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+        "note: SHA-256 matched CPU over 4,354,871 vectors per GPU; 65,536 x 32-byte hashes measured 12.89M/s on GTX 1070 and 18.60M/s on RTX 2060 SUPER"
       ],
       "id": "X3-GPU-012",
-      "implemented": 75,
+      "implemented": 90,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 42,
+      "mainnet_ready": 70,
       "missing_work": [
-        "No production validator GPU benchmark yet"
+        "The SHA-256 kernel is physically benchmarked, but no validator on the launch target has run this path under consensus load."
       ],
       "name": "WGPU SHA-256 compute kernel",
       "paths": [
@@ -2672,11 +2720,11 @@
       ],
       "priority": "P1",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "gpu_performance",
-      "tested": 55,
-      "tests": "tested score 55% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -2830,7 +2878,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 66,
+      "composite": 83,
       "confidence": "high",
       "evidence": [
         "crates/x3-integration/tests/compiler_bridge.rs",
@@ -2838,12 +2886,14 @@
         "note: Trading Core v1 gap #10"
       ],
       "id": "X3-LANG-001",
-      "implemented": 88,
+      "implemented": 94,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 30,
+      "mainnet_ready": 65,
       "missing_work": [
-        "Re-measured 2026-09-29. Proven source -> X3BC -> std engine, mini_x3 and execute_on_chain (all three agreeing) for the swept operand kinds, the fixture corpus (loops, `break`/`continue`, if-chains, recursion, floats refused on chain), host calls (`evm_sload`/`evm_sstore`), top-level constants, strings (bound, passed and returned; an operator on one refused at compile time), and now **`emit`**. `emit` was refused at lowering, and the refusal understated the tree: neither engine implemented opcode `0xA2`, the `std` VM held an `EventBuffer` no instruction filled, the HIR lowering named *every* event the literal string \"event\", the backend minted event ids from a per-compilation counter no engine could resolve, the `std` VM committed pending events on no path (only rolled them back), and the receipt`s `logs` field was hard-coded empty. All six are fixed; the event`s topic is SHA-256 of its name, its payload is each argument as `[tag][len][data]` (`x3_common::value_tags`, now one definition both engines read), and `tests/events.rs` requires the two engines and the on-chain path to journal the same events for a compiled program. Break-it-first: never committing (5 red), the hard-coded name (4 red), and dropping the payload length in one engine only (5 red, the divergence). `match` is not a construct of the chain language (no AST node, no keyword). **Scope decided 2026-09-29 (owner): cross-VM calls from `.x3` are a documented non-goal for now.** Measured: the production (WASM) runtime runs the kernel EVM as `mini_evm` and its SVM as the payload own program, and the SVM executes the payload program without deployed-account persistence. The kernel EVM now retains trie-backed state across authenticated executions (`the_chains_evm_keeps_state_between_executions`); deployed-target cross-VM calls remain refused until their dispatch interface is implemented. `pallet_evm` is wired in only for a native build with the non-default `frontier` feature, so `test runtime frontier` is evidence about that build, not about the chain; the adapter selection in runtime/src/lib.rs and that gate now say so. The compiler refuses a cross-VM intrinsic by name with that reason (`UnavailableCrossVmCall`, `a_cross_vm_call_is_refused_with_the_reason_it_cannot_run`; removing the check reverts it to an unknown-identifier error, red). Making these calls real still requires deployed-target dispatch and compiler integration; persistent EVM state alone does not prove cross-VM calls. Mutable module state other than storage slots is not expressible by design: `evm_sload`/`evm_sstore` are the persistent state."
+        "The local three-validator path is now proven end to end, but it has not run on the public testnet or the launch validator set.",
+        "Cross-VM calls from `.x3` remain a documented non-goal for this row and are refused at compile time until deployed-target dispatch and compiler integration exist.",
+        "Mutable module state other than `evm_sload`/`evm_sstore` storage slots is not expressible by design."
       ],
       "name": "Compile\u2192encode\u2192decode\u2192execute\u2192receipt E2E",
       "paths": [
@@ -2858,11 +2908,11 @@
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "language_trading",
-      "tested": 92,
-      "tests": "tested score 92% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -3179,36 +3229,40 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 42,
+      "composite": 81,
       "confidence": "high",
       "evidence": [
         "crates/cross-vm-coordinator/src/settlement_finality.rs",
-        "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md",
-        "crates/cross-vm-coordinator"
+        "crates/cross-vm-coordinator/src/settlement_outbox.rs",
+        "crates/cross-vm-coordinator/src/valkey.rs",
+        "crates/x3-release-beacon/src/lib.rs",
+        "crates/x3-release-beacon/src/exchange.rs",
+        "crates/x3-release-beacon/src/publisher.rs",
+        "docs/CROSS_DOMAIN_MEV_THREAT_MODEL.md"
       ],
       "id": "X3-MEV-001",
-      "implemented": 55,
+      "implemented": 92,
       "launch_scope": "guarded",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 25,
+      "mainnet_ready": 62,
       "missing_work": [
-        "**Ordering is still relayer-chosen (surface S4).** `settlement_outbox` records the attempts it makes and `crates/x3-order-window` implements a commit-reveal ordering lane, but that lane is *inside the X3 domain*; nothing binds a cross-domain release order to an ordering beacon, so a relayer can hold settlement A and deliver B first. Closing it means deriving a release order key from the X3 block hash and refusing an out-of-order release, the way `x3-order-window` does locally. Not attempted here.",
+        "**NARROWED 2026-10-25 \u2014 raw, replayed and unpublished ordering beacons are closed in code.** `VerifiedReleaseBeacon` has private fields and no public constructor. Callers must pass a `ReleaseBeaconPolicy` with policy-owned Ed25519 keys and threshold; every counted attestation signs a statement binding block height, block hash, and attestor identity. `x3-release-beacon` now supplies the dedicated validator signer/publisher, a real HTTP attestation exchange with durable restart state and equivocation removal, and shared statement/policy primitives used by both producer and coordinator. Broadcast records persist a monotonic beacon floor, and the in-memory and Valkey stores atomically combine the floor check with the record append. Still open: deploy the publisher and exchange to the seven independent validators, prove them against the live finalized network, and execute a governance-approved key rotation with recorded evidence.",
         "**Withholding is undetectable at this layer (S5).** A relayer who never delivers a settlement cannot be caught by a release gate; the intent runs to its timeout/refund path, so the attacker's gain is the delay itself. `recovery`/`settlement_reconcile` bound the damage; nothing removes the attack.",
         "**The gate enforces the policy against the evidence it is handed, not the adapter's honesty (S6).** `confirmations` and `safe_to_reveal_secret` are fields of the bundle. What is proven is that the coordinator cannot be talked into releasing *too early by evidence that says it is too early* \u2014 a fabricated deep-enough proof is the adapter's and the runtime's problem (`verify_runtime_binding`, `verify_claim_set`, matrix rows X3-XVM-*).",
-        "**No live evidence.** Every test is crate-level with the repo's own typed proof structures. Nothing has run on a multi-node network, and `crates/cross-vm-coordinator` is not in the runtime dependency graph, so this changes what the coordinator *asks* the runtime to release, not what the runtime enforces.",
-        "**`cargo clippy --features canonical-proofs --all-targets -- -D warnings` is red on this crate for two pre-existing lints** (`src/attempt_ledger.rs:156` too-many-arguments, `src/settlement_outbox.rs:273` map_or simplification), so the new code is verified warning-free rather than the crate being clippy-clean."
+        "**No multi-node chain evidence.** The release ordering and restart behavior now pass against a real local Valkey service, but no independently operated coordinator set has raced settlements against a live X3 validator network. `crates/cross-vm-coordinator` is not in the runtime dependency graph, so this changes what the coordinator submits, not what the runtime enforces."
       ],
       "name": "Cross-domain MEV protection",
       "paths": [
-        "crates/cross-vm-coordinator"
+        "crates/cross-vm-coordinator",
+        "crates/x3-release-beacon"
       ],
       "priority": "P0",
       "source": "master",
-      "state": "PARTIAL",
-      "state_rule": "implemented >= 50",
+      "state": "FUNCTIONAL BUT UNHARDENED",
+      "state_rule": "mainnet_ready >= 60",
       "subsystem": "mev_privacy",
-      "tested": 50,
-      "tests": "tested score 50% (no named test list on this row)"
+      "tested": 95,
+      "tests": "tested score 95% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -4955,19 +5009,19 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "66095a6aa1cfb2001d79c5176a6e17f1f7f41f9b075cb24b7b418e10aa21eb81",
+    "source_digest": "1baa9ac406013305c3b5778773a6973c17570ab1df194b62f9dca6c9fe1b11ae",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
-      "FEATURE_REGISTRY.toml": "196757d51564d2e4196afcff6fcf128cf5c205089480e741c1ebaeb6ca7581e6",
+      "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "4d5713a5add61ba6626a01912289f2c3cc896eee1e5a16b6d109bf32f76aac33",
-      "feature-matrix/cross-vm-atomic.toml": "fbdff02c83cc0ad11ac0f2f1db38daf7f39eb47ae4cdcceb9c3399c674eef022",
+      "feature-matrix/cross-chain.toml": "777ae6881bbdd0ebf90fb0503d8c08f2280325b840f35aec5935003e96992ed6",
+      "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
-      "feature-matrix/gpu-performance.toml": "89a70d0bccede76c243d62e50dd42dd4f9c5de9beee40c5eb2ff64e10adc65bc",
-      "feature-matrix/language-trading.toml": "dc70f2bd7b9228a5d685649345c116554dcbf52dd78d52808f20210d1898f2d4",
-      "feature-matrix/mev-privacy.toml": "5d228aa5060ca642fd26ad4e8d15cadc8bd7362f389e9776a57879ab7d5e308d",
+      "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",
+      "feature-matrix/language-trading.toml": "d25316c78fc6c434744246aa5ba94289782d09f7e353e62e6583c40ab4d4530b",
+      "feature-matrix/mev-privacy.toml": "c9c149f4bff941bae90b054d5ea836f7e67288912aae725c229679413e4b1f79",
       "feature-matrix/operations-user-tools.toml": "09d1bd89a8066adf336cfef1632f28add490ea5b087e6fe6c3f1eab85b9090f8",
       "feature-matrix/runtime-core.toml": "4b03c2edb17eebf343714786fcc695c58f0fb8ece4e39f187fdf668f06cbbdae",
       "feature-matrix/security-proofgate.toml": "e068bac58eb1ef680f457bcea1d8ad794ba65d89a410c7871b89d5edac2c9f37"
@@ -5126,7 +5180,7 @@
     },
     {
       "blockers": [
-        "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` refuses without an operator, a clean tree, a Live spec whose Aura set is exactly the expected validator count, a raw twin, and an RC log carrying the gate's own `PASSED` marker. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (10 checks), gate `launch record`",
+        "The launch decision is a human approval by design, and it now has to be recorded: `scripts/mainnet/launch_record.py build` compiles schema 2 from the exact commit and artifacts, current feature-matrix digest and P0 snapshot, test-gate logs, two independent audit scopes, bounty and public-testnet windows, bridge routes and caps, seven validator identities, and commit-bound approvals. No live run has produced a record yet. Evidence: `tests/test_launch_record.py` (25 checks), gate `launch record`",
         "Neither gate has run end to end: `fresh_build_check.sh` plus the 7-validator public testnet criteria in `scripts/mainnet/public_testnet_gate.sh` need hardware that does not exist yet. Evidence: `tests/test_rc_gates.py` (18 checks, gated), gate `rc gate scripts`"
       ],
       "crate_or_service": "scripts/mainnet/mainnet_rc_gate.sh",
@@ -5524,12 +5578,12 @@
   "summary": {
     "by_state": {
       "BROKEN": 0,
-      "COMPLETE": 10,
-      "FUNCTIONAL BUT UNHARDENED": 63,
+      "COMPLETE": 13,
+      "FUNCTIONAL BUT UNHARDENED": 66,
       "NOT INTEGRATED": 9,
       "NOT STARTED": 0,
-      "PARTIAL": 70,
-      "STUB": 1
+      "PARTIAL": 65,
+      "STUB": 0
     },
     "matrix_features": 153,
     "registry_features": 23,

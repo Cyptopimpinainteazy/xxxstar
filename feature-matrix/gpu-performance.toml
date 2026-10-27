@@ -13,8 +13,12 @@ priority = "P0"
 confidence = "high"
 launch_scope = "research"
 claim_risk = false
-blockers = ["No physical GPU benchmark showing finalized-TPS improvement"]
-evidence = ["GPU_VALIDATOR_HONEST_AUDIT.md", "note: Honest audit explicitly forbids GPU acceleration claim without real device"]
+blockers = ["No benchmark crosses consensus and finality: physical hash and signature kernels are measured, but accelerator task/hash throughput is not finalized-chain TPS."]
+evidence = [
+  "GPU_VALIDATOR_HONEST_AUDIT.md",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+  "note: physical kernels now pass CPU parity and throughput measurement, but the honest audit still forbids presenting kernel operations per second as finalized-chain TPS",
+]
 
 [[feature]]
 id = "X3-GPU-002"
@@ -202,7 +206,7 @@ claim_risk = false
 blockers = [
   "**CLOSED 2026-09-28 — every pallet that charged a typed weight is measured, and the count is 4, all `low`.** The burndown started at 25 `pallet-call-without-weights` sites. Twenty-one pallets are measured by this repository's own CLI now, and the four findings that remain are the documented `T::DbWeight::get().reads_writes` estimate — a stated storage-access count, not an invented cost — in depin-marketplace, private-execution, x3-jury-anchor and x3-rebalance. There is no `high` finding left. The last pass also fixed the defect that had made the whole burndown impossible: `pallet-x3-settlement-engine` enabled its optional `rlp` with default features, so the runtime's `runtime-benchmarks` build dragged `bytes/std` and `rustc-hex/std` into the `wasm32v1-none` blob and died with E0463 before any weights could be regenerated",
   "**CLOSED 2026-09-28 — a gate now says when a weight file has gone stale.** `scripts/check-weights-freshness.py` runs in the default gate set and answers the two questions the tree can answer without a per-pallet node build: an entry no call charges (a renamed call, or a call that went back to a literal) is drift and fails, and a `weights.rs` with no benchmark CLI record line was never produced by a run, so it is unmeasured — ratcheted shrink-only by `docs/reports/weights-unmeasured-baseline.json` (22 files on 2026-09-28, down from every file being one). What it deliberately does *not* do is re-run a benchmark on change, so a number can still be stale while the file agrees with the pallet; that needs a CI runner with a benchmark-featured node build",
-  "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root` (this runtime's `RefuseExternalRoots` verifier refuses every root by policy). Measuring either would report a cost *below* the real one for the calls that gate the atomic kernel",
+  "**Five calls cannot be benchmarked and are recorded, not fabricated.** `docs/reports/benchmark-exceptions.md` and `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py` hold them, with a tripwire that fails if one becomes measurable: `pallet-x3-cross-vm-router`'s four custody-origin-gated calls (`X3LangOrigin = EnsureAuthorizedGateway` returns `Err` from `try_successful_origin` by design, and the router's `Config` has no custody bound, so its benchmark cannot authorize an account) and `register_external_root`, whose production verifier reads runtime-specific finalized EVM/SVM/Bitcoin state that a generic pallet benchmark cannot fabricate without bypassing verification. The root-registration call now charges two verifier storage reads and 200,000 ps of declared compute; it remains an explicit exception until a runtime benchmark can install real finalized evidence",
 ]
 evidence = [
   ".github/workflows/frame-benchmarking.yml",
@@ -227,15 +231,29 @@ name = "GPU/CPU parity checking"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 80
-tested = 70
-mainnet_ready = 55
+implemented = 90
+tested = 95
+mainnet_ready = 70
 priority = "P0"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Needs real hardware equivalence evidence"]
-evidence = ["crates/x3-accel/src/lib.rs", "note: ParityMismatch and CPU recomputation architecture exists"]
+blockers = [
+  "Hardware Ed25519 verification still needs a device kernel. Launch-target parity has not been repeated on the eventual validator hardware.",
+]
+evidence = [
+  "crates/x3-accel/src/lib.rs",
+  "crates/x3-accel-wgpu/src/lib.rs",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+  "note: 2026-10-25 physical gate passed on GTX 1070 and RTX 2060 SUPER: SHA-256 and Keccak-256 matched CPU over 4,354,871 vectors per card, both results were deterministic, ordered multi-GPU merge matched CPU, and secp256k1 verdicts matched the CPU reference.",
+]
+test_evidence = [
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json",
+  "note: `./scripts/gpu-production-gate.sh` passed all six steps at fc18d6bb0; X3_REQUIRE_GPU=1 x3-accel-wgpu tests were 8/8 and X3_REQUIRE_MULTI_GPU=1 secp256k1 parity tests were 3/3.",
+  "note: `cargo clippy -p x3-accel-wgpu --all-targets --no-deps -- -D warnings` -> PASS.",
+]
 
 [[feature]]
 id = "X3-GPU-005"
@@ -277,15 +295,15 @@ name = "GPU Keccak256 batching"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 50
-tested = 60
-mainnet_ready = 15
+implemented = 85
+tested = 95
+mainnet_ready = 55
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "A `keccak256_with_parity` wrapper and its CPU reference exist as of `241e9d033`: every accelerated answer is compared against the reference and a divergent one is refused, so an accelerator can no longer be accepted merely because it returned. What is still missing is the accelerator itself — this host has no compute device, the WGPU backend reports `KernelUnavailable`, and no GPU kernel has been run for this primitive. No GPU batching throughput has been measured anywhere in this repository.",
+  "The accelerator is real, but small batches are slower than CPU and no consensus caller or launch-target benchmark yet proves a net production benefit.",
 ]
 required_tests = [
   "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
@@ -295,10 +313,10 @@ required_tests = [
 ]
 test_evidence = [
   "crates/x3-accel/src/lib.rs",
-  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
-  "note: the parity wrapper compares every primitive's accelerated answer against the CPU reference and refuses a divergent one; with no device, every primitive is refused rather than answered, so \"no device\" is not a pass",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json",
+  "note: 2026-10-25 Keccak-256 matched CPU over 4,354,871 vectors on each physical GPU; 65,536 x 32-byte hashes measured 8.97M/s on GTX 1070 and 18.13M/s on RTX 2060 SUPER, while small batches were CPU-dominated.",
 ]
-evidence = ["crates/x3-accel/src/lib.rs", "note: WGPU backend currently KernelUnavailable; the CPU reference and the parity contract are real as of 241e9d033"]
+evidence = ["crates/x3-accel/src/lib.rs", "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json", "note: physical WGPU Keccak batch kernel executed on both installed GPUs"]
 
 [[feature]]
 id = "X3-GPU-008"
@@ -335,15 +353,15 @@ name = "GPU secp256k1 verification"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel/src/lib.rs"]
-implemented = 45
-tested = 60
-mainnet_ready = 15
+implemented = 85
+tested = 95
+mainnet_ready = 60
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
 blockers = [
-  "A `secp256k1_with_parity` wrapper and its CPU reference exist as of `241e9d033`, with a divergent answer refused. What is still missing is the accelerator — the WGPU backend reports `KernelUnavailable`, this host has no compute device, and no GPU kernel has run for this primitive. Nothing on a chain calls this path yet either, so the parity contract currently protects a caller that does not exist.",
+  "Physical secp256k1 verification now runs and matches CPU, but no chain-critical caller uses it yet and the launch target has not been re-benchmarked.",
 ]
 required_tests = [
   "the_parity_wrapper_refuses_a_divergent_backend_through_the_trait",
@@ -352,10 +370,10 @@ required_tests = [
 ]
 test_evidence = [
   "crates/x3-accel/src/lib.rs",
-  "note: `cargo test -p x3-accel` -> 17 passed, 0 failed on commit 241e9d033 (re-run by the primary agent)",
-  "note: divergence is refused through the trait, so an accelerator cannot answer with a wrong verification result; with no device every primitive is refused rather than answered",
+  "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json",
+  "note: 2026-10-25 physical parity passed on both GPUs; 65,536-job throughput was 82,222 verifies/s on GTX 1070, 107,897/s on RTX 2060 SUPER, and 175,590/s split across both adapters.",
 ]
-evidence = ["crates/x3-accel/src/lib.rs", "note: Honest audit says no production GPU secp256k1 kernel; the CPU reference and parity contract are real as of 241e9d033, the kernel is not"]
+evidence = ["crates/x3-accel/src/lib.rs", "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/secp256k1-bench.json", "note: physical secp256k1 WGPU kernel and CPU reference execute on both installed GPUs"]
 
 [[feature]]
 id = "X3-GPU-010"
@@ -380,15 +398,16 @@ name = "WGPU accelerator backend"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel-wgpu"]
-implemented = 70
-tested = 55
-mainnet_ready = 40
+implemented = 90
+tested = 95
+mainnet_ready = 70
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["Needs real physical GPU CI/run evidence"]
-evidence = ["crates/x3-accel-wgpu", "note: Honest audit confirms real WGSL/wgpu device code compiles"]
+blockers = ["Physical execution is proven on this workstation, but there is no automated physical-GPU CI runner for launch hardware."]
+evidence = ["crates/x3-accel-wgpu", "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json", "note: both installed GPUs executed the Vulkan/WGPU backend on 2026-10-25"]
+test_evidence = ["audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/summary.json", "note: `./scripts/gpu-production-gate.sh` passed GPU enumeration, x3-accel-wgpu tests, hash parity, secp256k1 parity, and per-adapter benchmarks"]
 
 [[feature]]
 id = "X3-GPU-012"
@@ -396,15 +415,16 @@ name = "WGPU SHA-256 compute kernel"
 subsystem = "gpu_performance"
 source = "master"
 paths = ["crates/x3-accel-wgpu"]
-implemented = 75
-tested = 55
-mainnet_ready = 42
+implemented = 90
+tested = 95
+mainnet_ready = 70
 priority = "P1"
 confidence = "high"
 launch_scope = "guarded"
 claim_risk = false
-blockers = ["No production validator GPU benchmark yet"]
-evidence = ["crates/x3-accel-wgpu", "note: Real SHA-256 compute path called out by honest audit"]
+blockers = ["The SHA-256 kernel is physically benchmarked, but no validator on the launch target has run this path under consensus load."]
+evidence = ["crates/x3-accel-wgpu", "audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json", "note: SHA-256 matched CPU over 4,354,871 vectors per GPU; 65,536 x 32-byte hashes measured 12.89M/s on GTX 1070 and 18.60M/s on RTX 2060 SUPER"]
+test_evidence = ["audit-artifacts/gpu-production/fc18d6bb08c9d2f9649406b5b55b01a03472f3eb/hash-parity.json", "note: physical SHA-256 parity, determinism, batch throughput, and ordered multi-GPU execution all passed on 2026-10-25"]
 
 [[feature]]
 id = "X3-GPU-013"

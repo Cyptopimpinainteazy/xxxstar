@@ -1652,6 +1652,19 @@ fn verify_svm_transaction_proof(
         });
     }
     let message = hex_to_bytes(expect_str(proof, "message")?, "message")?;
+    let decoded_message = decode_solana_legacy_message(&message)?;
+    let expected_blockhash: [u8; 32] = hex_to_bytes(expect_str(proof, "blockhash")?, "blockhash")?
+        .try_into()
+        .map_err(|_| BridgeError {
+            code: "X3_SVM_TX_BLOCKHASH_INVALID",
+            message: "blockhash must be 32 bytes".into(),
+        })?;
+    if decoded_message.recent_blockhash != expected_blockhash {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_BLOCKHASH_MISMATCH",
+            message: "transaction recent blockhash does not match the proof blockhash".into(),
+        });
+    }
     let transaction_hash = hex_prefixed(&Sha256::digest(&message));
     if let Some(expected_hash) = proof.get("transaction_hash").and_then(Value::as_str) {
         if normalize_hex_string(expected_hash) != transaction_hash {
@@ -1674,29 +1687,267 @@ fn verify_svm_transaction_proof(
             message: "transaction proof has no signatures".into(),
         });
     }
+    let mut signed_signers = BTreeSet::new();
     for signature in signatures {
-        verify_ed25519_signature(signature, &message)?;
+        let pubkey = verify_ed25519_signature_with_pubkey(signature, &message)?;
+        let signer_index = decoded_message
+            .account_keys
+            .iter()
+            .take(decoded_message.required_signatures)
+            .position(|key| key == &pubkey)
+            .ok_or_else(|| BridgeError {
+                code: "X3_SVM_TX_SIGNER_NOT_IN_MESSAGE",
+                message: "transaction signature key is not a required message signer".into(),
+            })?;
+        if !signed_signers.insert(signer_index) {
+            return Err(BridgeError {
+                code: "X3_SVM_TX_SIGNATURE_DUPLICATE",
+                message: "transaction proof repeats a signer".into(),
+            });
+        }
+    }
+    if signed_signers.len() != decoded_message.required_signatures {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_SIGNATURES_INCOMPLETE",
+            message: format!(
+                "transaction proof verified {} of {} required signatures",
+                signed_signers.len(),
+                decoded_message.required_signatures
+            ),
+        });
     }
 
-    let tx = json!({
-        "transaction": {
-            "message": {
-                "instructions": proof.get("instructions").cloned().unwrap_or(Value::Array(vec![]))
-            }
-        },
-        "meta": {
-            "innerInstructions": []
-        }
-    });
-    if !svm_transaction_has_parsed_transfer(&tx, request, expected_program_id)? {
+    if !decoded_message.contains_transfer_checked(request, expected_program_id)? {
         return Err(BridgeError {
             code: "X3_SVM_TRANSFER_INSTRUCTION_MISMATCH",
             message:
-                "transaction proof does not contain a parsed transfer matching program, receiver, mint, and amount"
+                "signed transaction message does not contain transferChecked matching program, receiver, mint, and amount"
                     .into(),
         });
     }
     Ok(VerifiedSvmTransaction { transaction_hash })
+}
+
+struct DecodedSolanaInstruction {
+    program_id: [u8; 32],
+    accounts: Vec<[u8; 32]>,
+    data: Vec<u8>,
+}
+
+struct DecodedSolanaLegacyMessage {
+    required_signatures: usize,
+    account_keys: Vec<[u8; 32]>,
+    recent_blockhash: [u8; 32],
+    instructions: Vec<DecodedSolanaInstruction>,
+}
+
+impl DecodedSolanaLegacyMessage {
+    fn contains_transfer_checked(
+        &self,
+        request: &BridgeTransferRequest,
+        expected_program_id: Option<&str>,
+    ) -> Result<bool, BridgeError> {
+        let requested_receiver = std::str::from_utf8(&request.receiver).map_err(|_| BridgeError {
+            code: "X3_SVM_RECEIVER_NOT_UTF8",
+            message: "receiver is not a UTF-8 Solana address".into(),
+        })?;
+        let requested_receiver = solana_pubkey_from_base58(requested_receiver, "receiver")?;
+        let requested_mint = solana_pubkey_from_base58(&request.from_asset, "from_asset")?;
+        let expected_program = expected_program_id
+            .map(|program_id| solana_pubkey_from_base58(program_id, "expected_program_id"))
+            .transpose()?;
+
+        for instruction in &self.instructions {
+            if instruction.data.len() != 10 || instruction.data[0] != 12 {
+                continue;
+            }
+            if let Some(expected) = expected_program {
+                if instruction.program_id != expected {
+                    continue;
+                }
+            } else if !is_solana_token_program(&instruction.program_id) {
+                continue;
+            }
+            if instruction.accounts.len() < 4 {
+                continue;
+            }
+            let amount = u128::from(u64::from_le_bytes(
+                instruction.data[1..9]
+                    .try_into()
+                    .expect("transferChecked length was checked"),
+            ));
+            if instruction.accounts[1] == requested_mint
+                && instruction.accounts[2] == requested_receiver
+                && amount == request.amount
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
+fn decode_solana_legacy_message(message: &[u8]) -> Result<DecodedSolanaLegacyMessage, BridgeError> {
+    let header = message.get(..3).ok_or_else(|| BridgeError {
+        code: "X3_SVM_TX_MESSAGE_MALFORMED",
+        message: "Solana message has no three-byte header".into(),
+    })?;
+    if header[0] & 0x80 != 0 {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_VERSION_UNSUPPORTED",
+            message: "versioned Solana messages and address-table lookups are not supported".into(),
+        });
+    }
+    let required_signatures = header[0] as usize;
+    if required_signatures == 0 {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana message requires no signer".into(),
+        });
+    }
+
+    let mut offset = 3usize;
+    let account_count = read_solana_shortvec(message, &mut offset)?;
+    if account_count == 0 || account_count > 256 {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana message account count is invalid".into(),
+        });
+    }
+    if required_signatures > account_count {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana message requires more signatures than account keys".into(),
+        });
+    }
+    let mut account_keys = Vec::with_capacity(account_count);
+    for _ in 0..account_count {
+        let key: [u8; 32] = message
+            .get(offset..offset + 32)
+            .ok_or_else(|| BridgeError {
+                code: "X3_SVM_TX_MESSAGE_MALFORMED",
+                message: "Solana account-key list is truncated".into(),
+            })?
+            .try_into()
+            .expect("slice length is 32");
+        account_keys.push(key);
+        offset += 32;
+    }
+    let recent_blockhash: [u8; 32] = message
+        .get(offset..offset + 32)
+        .ok_or_else(|| BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana recent blockhash is truncated".into(),
+        })?
+        .try_into()
+        .expect("slice length is 32");
+    offset += 32;
+
+    let instruction_count = read_solana_shortvec(message, &mut offset)?;
+    if instruction_count == 0 || instruction_count > 256 {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana instruction count is invalid".into(),
+        });
+    }
+    let mut instructions = Vec::with_capacity(instruction_count);
+    for _ in 0..instruction_count {
+        let program_id_index = *message.get(offset).ok_or_else(|| BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana instruction has no program-id index".into(),
+        })? as usize;
+        offset += 1;
+        let program_id = *account_keys.get(program_id_index).ok_or_else(|| BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana instruction program-id index is out of range".into(),
+        })?;
+
+        let account_index_count = read_solana_shortvec(message, &mut offset)?;
+        if account_index_count > account_count {
+            return Err(BridgeError {
+                code: "X3_SVM_TX_MESSAGE_MALFORMED",
+                message: "Solana instruction account count is out of range".into(),
+            });
+        }
+        let mut accounts = Vec::with_capacity(account_index_count);
+        for _ in 0..account_index_count {
+            let index = *message.get(offset).ok_or_else(|| BridgeError {
+                code: "X3_SVM_TX_MESSAGE_MALFORMED",
+                message: "Solana instruction account list is truncated".into(),
+            })? as usize;
+            offset += 1;
+            accounts.push(*account_keys.get(index).ok_or_else(|| BridgeError {
+                code: "X3_SVM_TX_MESSAGE_MALFORMED",
+                message: "Solana instruction account index is out of range".into(),
+            })?);
+        }
+        let data_len = read_solana_shortvec(message, &mut offset)?;
+        let data = message
+            .get(offset..offset + data_len)
+            .ok_or_else(|| BridgeError {
+                code: "X3_SVM_TX_MESSAGE_MALFORMED",
+                message: "Solana instruction data is truncated".into(),
+            })?
+            .to_vec();
+        offset += data_len;
+        instructions.push(DecodedSolanaInstruction {
+            program_id,
+            accounts,
+            data,
+        });
+    }
+    if offset != message.len() {
+        return Err(BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana legacy message has trailing bytes".into(),
+        });
+    }
+
+    Ok(DecodedSolanaLegacyMessage {
+        required_signatures,
+        account_keys,
+        recent_blockhash,
+        instructions,
+    })
+}
+
+fn read_solana_shortvec(data: &[u8], offset: &mut usize) -> Result<usize, BridgeError> {
+    let mut value = 0usize;
+    for shift in [0usize, 7, 14] {
+        let byte = *data.get(*offset).ok_or_else(|| BridgeError {
+            code: "X3_SVM_TX_MESSAGE_MALFORMED",
+            message: "Solana compact length is truncated".into(),
+        })?;
+        *offset += 1;
+        value |= usize::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            return Ok(value);
+        }
+    }
+    Err(BridgeError {
+        code: "X3_SVM_TX_MESSAGE_MALFORMED",
+        message: "Solana compact length exceeds u16".into(),
+    })
+}
+
+fn solana_pubkey_from_base58(value: &str, field: &str) -> Result<[u8; 32], BridgeError> {
+    let bytes = bs58::decode(value).into_vec().map_err(|error| BridgeError {
+        code: "X3_SVM_PUBKEY_INVALID",
+        message: format!("{field} is not valid base58: {error}"),
+    })?;
+    bytes.try_into().map_err(|_| BridgeError {
+        code: "X3_SVM_PUBKEY_INVALID",
+        message: format!("{field} must decode to 32 bytes"),
+    })
+}
+
+fn is_solana_token_program(program_id: &[u8; 32]) -> bool {
+    [
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+        "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+    ]
+    .iter()
+    .any(|program| solana_pubkey_from_base58(program, "token program").is_ok_and(|decoded| &decoded == program_id))
 }
 
 fn require_proof_type(proof: &Value, expected: &str) -> Result<(), BridgeError> {
@@ -2439,6 +2690,10 @@ fn stake_threshold(total_stake: u128, threshold_bps: u64) -> Result<u128, Bridge
 }
 
 fn verify_ed25519_signature(signature: &Value, message: &[u8]) -> Result<(), BridgeError> {
+    verify_ed25519_signature_with_pubkey(signature, message).map(|_| ())
+}
+
+fn verify_ed25519_signature_with_pubkey(signature: &Value, message: &[u8]) -> Result<[u8; 32], BridgeError> {
     let public_key = hex_to_bytes(expect_str(signature, "public_key")?, "public_key")?;
     let signature = hex_to_bytes(expect_str(signature, "signature")?, "signature")?;
     let public_key: [u8; 32] = public_key.try_into().map_err(|_| BridgeError {
@@ -2457,7 +2712,8 @@ fn verify_ed25519_signature(signature: &Value, message: &[u8]) -> Result<(), Bri
     verifying_key.verify(message, &signature).map_err(|err| BridgeError {
         code: "X3_ED25519_SIGNATURE_INVALID",
         message: err.to_string(),
-    })
+    })?;
+    Ok(public_key)
 }
 
 fn evm_receipt_has_erc20_transfer(
@@ -4322,6 +4578,48 @@ mod tests {
         )
     }
 
+    fn solana_shortvec(mut value: usize) -> Vec<u8> {
+        let mut out = Vec::new();
+        loop {
+            let mut byte = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0x80;
+            }
+            out.push(byte);
+            if value == 0 {
+                return out;
+            }
+        }
+    }
+
+    fn solana_transfer_checked_message(
+        signer: [u8; 32],
+        source: [u8; 32],
+        mint: [u8; 32],
+        receiver: [u8; 32],
+        token_program: [u8; 32],
+        blockhash: [u8; 32],
+        amount: u64,
+    ) -> Vec<u8> {
+        let accounts = [signer, source, mint, receiver, token_program];
+        let mut message = vec![1, 0, 1];
+        message.extend_from_slice(&solana_shortvec(accounts.len()));
+        for account in accounts {
+            message.extend_from_slice(&account);
+        }
+        message.extend_from_slice(&blockhash);
+        message.extend_from_slice(&solana_shortvec(1));
+        message.push(4);
+        message.extend_from_slice(&solana_shortvec(4));
+        message.extend_from_slice(&[1, 2, 3, 0]);
+        message.extend_from_slice(&solana_shortvec(10));
+        message.push(12);
+        message.extend_from_slice(&amount.to_le_bytes());
+        message.push(6);
+        message
+    }
+
     #[test]
     fn svm_light_client_verifier_checks_bank_and_transaction_signatures() {
         let bank_signing_key = SigningKey::from_bytes(&[7u8; 32]);
@@ -4331,12 +4629,24 @@ mod tests {
         let slot = 123u64;
         let bank_message = format!("{SVM_BANK_PROOF_TYPE}:{slot}:{bank_hash}:{parent_bank_hash}");
         let bank_signature = bank_signing_key.sign(bank_message.as_bytes());
-        let tx_message = b"compiled-solana-transaction-message";
-        let tx_signature = tx_signing_key.sign(tx_message);
+        let mint = [0x44u8; 32];
+        let receiver = [0x55u8; 32];
+        let token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+        let blockhash = [0x66u8; 32];
+        let tx_message = solana_transfer_checked_message(
+            tx_signing_key.verifying_key().to_bytes(),
+            [0x33u8; 32],
+            mint,
+            receiver,
+            solana_pubkey_from_base58(token_program, "token program").expect("token program"),
+            blockhash,
+            42,
+        );
+        let tx_signature = tx_signing_key.sign(&tx_message);
         let mut req = BridgeTransferRequest {
             from_chain: "solana".into(),
-            from_asset: "Mint111111111111111111111111111111111111111".into(),
-            receiver: b"Receiver11111111111111111111111111111111111".to_vec(),
+            from_asset: bs58::encode(mint).into_string(),
+            receiver: bs58::encode(receiver).into_string().into_bytes(),
             ..request("solana")
         };
         req.source_finality_proof = serde_json::to_vec(&json!({
@@ -4354,31 +4664,19 @@ mod tests {
             "proof_type": SVM_TRANSACTION_PROOF_TYPE,
             "slot": slot,
             "bank_hash": bank_hash,
-            "message": hex_prefixed(tx_message),
-            "transaction_hash": hex_prefixed(&Sha256::digest(tx_message)),
+            "blockhash": hex_prefixed(&blockhash),
+            "message": hex_prefixed(&tx_message),
+            "transaction_hash": hex_prefixed(&Sha256::digest(&tx_message)),
             "signatures": [{
                 "public_key": hex_prefixed(tx_signing_key.verifying_key().as_bytes()),
                 "signature": hex_prefixed(&tx_signature.to_bytes())
-            }],
-            "instructions": [{
-                "programId": "Tokenkeg1111111111111111111111111111111111",
-                "parsed": {
-                    "type": "transferChecked",
-                    "info": {
-                        "mint": "Mint111111111111111111111111111111111111111",
-                        "destination": "Receiver11111111111111111111111111111111111",
-                        "tokenAmount": {
-                            "amount": "42"
-                        }
-                    }
-                }
             }]
         }))
         .expect("transaction proof JSON");
 
         let verifier = SolanaLightClientVerifier::new(bank_hash)
             .with_validator_pubkeys(vec![hex_prefixed(bank_signing_key.verifying_key().as_bytes())])
-            .with_expected_program_id("Tokenkeg1111111111111111111111111111111111");
+            .with_expected_program_id(token_program);
         let finality = verifier.verify_svm_finality(&req).expect("bank proof verifies");
         let transfer = verifier
             .verify_svm_transfer_proof(&req, &finality)
@@ -4386,15 +4684,58 @@ mod tests {
         let transfer: Value = serde_json::from_slice(&transfer).expect("transfer proof JSON");
         assert_eq!(
             transfer.get("transaction_hash").and_then(Value::as_str),
-            Some(hex_prefixed(&Sha256::digest(tx_message)).as_str())
+            Some(hex_prefixed(&Sha256::digest(&tx_message)).as_str())
         );
 
         let mut wrong = req.clone();
-        wrong.receiver = b"OtherReceiver111111111111111111111111111".to_vec();
+        wrong.receiver = bs58::encode([0x77u8; 32]).into_string().into_bytes();
         let err = verifier
             .verify_svm_transfer_proof(&wrong, &finality)
             .expect_err("wrong receiver must fail parsed transfer validation");
         assert_eq!(err.code, "X3_SVM_TRANSFER_INSTRUCTION_MISMATCH");
+
+        let mut detached = req.clone();
+        detached.amount = 43;
+        let mut detached_proof: Value = serde_json::from_slice(&req.transfer_proof).expect("transaction proof JSON");
+        detached_proof["instructions"] = json!([{
+            "programId": token_program,
+            "parsed": {
+                "type": "transferChecked",
+                "info": {
+                    "mint": bs58::encode(mint).into_string(),
+                    "destination": bs58::encode(receiver).into_string(),
+                    "tokenAmount": { "amount": "43" }
+                }
+            }
+        }]);
+        detached.transfer_proof = serde_json::to_vec(&detached_proof).expect("detached proof JSON");
+        let err = verifier
+            .verify_svm_transfer_proof(&detached, &finality)
+            .expect_err("caller-supplied instructions cannot replace signed message contents");
+        assert_eq!(err.code, "X3_SVM_TRANSFER_INSTRUCTION_MISMATCH");
+
+        let mut wrong_blockhash = req.clone();
+        let mut wrong_blockhash_proof: Value =
+            serde_json::from_slice(&req.transfer_proof).expect("transaction proof JSON");
+        wrong_blockhash_proof["blockhash"] = json!(hex_prefixed(&[0x67u8; 32]));
+        wrong_blockhash.transfer_proof =
+            serde_json::to_vec(&wrong_blockhash_proof).expect("wrong-blockhash proof JSON");
+        let err = verifier
+            .verify_svm_transfer_proof(&wrong_blockhash, &finality)
+            .expect_err("the proof blockhash must match the signed message");
+        assert_eq!(err.code, "X3_SVM_TX_BLOCKHASH_MISMATCH");
+
+        let mut versioned = req.clone();
+        let mut versioned_message = tx_message.clone();
+        versioned_message[0] = 0x80;
+        let mut versioned_proof: Value = serde_json::from_slice(&req.transfer_proof).expect("transaction proof JSON");
+        versioned_proof["message"] = json!(hex_prefixed(&versioned_message));
+        versioned_proof["transaction_hash"] = json!(hex_prefixed(&Sha256::digest(&versioned_message)));
+        versioned.transfer_proof = serde_json::to_vec(&versioned_proof).expect("versioned proof JSON");
+        let err = verifier
+            .verify_svm_transfer_proof(&versioned, &finality)
+            .expect_err("unresolved address-table messages must be refused");
+        assert_eq!(err.code, "X3_SVM_TX_MESSAGE_VERSION_UNSUPPORTED");
     }
 
     #[test]

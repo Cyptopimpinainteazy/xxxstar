@@ -93,6 +93,7 @@ pub mod pallet {
 
     use crate::weights::WeightInfo;
     use alloc::vec::Vec;
+    use codec::Encode;
     use frame_support::{
         pallet_prelude::*,
         traits::{BuildGenesisConfig, StorageVersion},
@@ -111,7 +112,30 @@ pub mod pallet {
         X3InternalVerifier,
     };
 
-    const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+    const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+
+    pub(crate) fn evm_address_bytes(value: &[u8]) -> Option<[u8; 20]> {
+        let value = value.strip_prefix(b"0x").unwrap_or(value);
+        if value.len() != 40 {
+            return None;
+        }
+        let mut address = [0u8; 20];
+        for (index, byte) in address.iter_mut().enumerate() {
+            let high = hex_nibble(value[index * 2])?;
+            let low = hex_nibble(value[index * 2 + 1])?;
+            *byte = (high << 4) | low;
+        }
+        Some(address)
+    }
+
+    fn hex_nibble(value: u8) -> Option<u8> {
+        match value {
+            b'0'..=b'9' => Some(value - b'0'),
+            b'a'..=b'f' => Some(value - b'a' + 10),
+            b'A'..=b'F' => Some(value - b'A' + 10),
+            _ => None,
+        }
+    }
 
     // ── Chain / asset types (self-contained, Substrate-codec friendly) ──
 
@@ -146,12 +170,36 @@ pub mod pallet {
     }
 
     impl ExternalChainId {
+        /// Stable numeric id used by `pallet-x3-wrapped` supply accounting.
+        ///
+        /// EVM routes use their EIP-155 chain id. Non-EVM families are tagged
+        /// above the high bit so they cannot collide with EVM chain ids.
+        pub fn wrapped_chain_id(self) -> Option<u32> {
+            const NON_EVM_TAG: u32 = 0x8000_0000;
+            match self {
+                ExternalChainId::EthereumMainnet => Some(1),
+                ExternalChainId::EthereumSepolia => Some(11_155_111),
+                ExternalChainId::BaseMainnet => Some(8_453),
+                ExternalChainId::BaseSepolia => Some(84_532),
+                ExternalChainId::SolanaMainnet => Some(NON_EVM_TAG | 0x0200_0001),
+                ExternalChainId::SolanaDevnet => Some(NON_EVM_TAG | 0x0200_0002),
+                ExternalChainId::BitcoinMainnet => Some(NON_EVM_TAG | 0x0300_0000),
+                ExternalChainId::BitcoinTestnet => Some(NON_EVM_TAG | 0x0300_0001),
+                ExternalChainId::Custom(chain_id) => {
+                    let chain_id = u32::try_from(chain_id).ok()?;
+                    (chain_id != 0 && chain_id & NON_EVM_TAG == 0).then_some(chain_id)
+                }
+            }
+        }
+
         pub fn to_chain_kind(self) -> ChainKind {
             match self {
-                ExternalChainId::EthereumMainnet
-                | ExternalChainId::EthereumSepolia
-                | ExternalChainId::BaseMainnet
-                | ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 1 },
+                ExternalChainId::EthereumMainnet => ChainKind::Evm { chain_id: 1 },
+                ExternalChainId::EthereumSepolia => ChainKind::Evm {
+                    chain_id: 11_155_111,
+                },
+                ExternalChainId::BaseMainnet => ChainKind::Evm { chain_id: 8_453 },
+                ExternalChainId::BaseSepolia => ChainKind::Evm { chain_id: 84_532 },
                 ExternalChainId::Custom(chain_id) => ChainKind::Evm { chain_id },
                 ExternalChainId::SolanaMainnet | ExternalChainId::SolanaDevnet => ChainKind::Solana,
                 ExternalChainId::BitcoinMainnet | ExternalChainId::BitcoinTestnet => {
@@ -180,6 +228,40 @@ pub mod pallet {
     pub type ProofId = [u8; 32];
     pub type WithdrawalId = [u8; 32];
     pub type Balance = u128;
+
+    /// Trusted cross-pallet boundary for the verified lock-mint and
+    /// burn-release path.
+    ///
+    /// The gateway calls this only after the route's external proof has passed
+    /// verification and every replay/limit check. Returning an error rolls the
+    /// whole dispatch back, including the gateway's own storage writes.
+    pub trait DepositMinter {
+        fn credit_verified_deposit(
+            chain_id: u32,
+            asset_id: X3AssetId,
+            recipient: &[u8],
+            amount: Balance,
+            proof_id: ProofId,
+        ) -> DispatchResult;
+
+        fn burn_verified_withdrawal(
+            chain_id: u32,
+            asset_id: X3AssetId,
+            account: &[u8],
+            amount: Balance,
+            withdrawal_id: WithdrawalId,
+        ) -> DispatchResult;
+
+        #[cfg(feature = "runtime-benchmarks")]
+        fn prepare_benchmark(
+            _chain_id: u32,
+            _asset_id: X3AssetId,
+            _account: &[u8],
+            _seed_balance: Balance,
+        ) -> DispatchResult {
+            Ok(())
+        }
+    }
 
     /// Verification level for a route. Discriminates which verifier the
     /// pallet uses when verifying deposit proofs.
@@ -454,6 +536,11 @@ pub mod pallet {
         /// `x3_verification_router::NoBtcHeaderAnchor` refuses every Bitcoin proof.
         type BtcHeaderAnchor: x3_verification_router::BtcHeaderAnchor;
 
+        /// Cross-pallet mint/burn of the X3 wrapped representation. It must
+        /// fail closed when the asset or account is invalid; the gateway never
+        /// reports `X3Credited` or a completed burn without it.
+        type DepositMinter: DepositMinter;
+
         /// Measured weights, generated by the FRAME benchmark CLI.
         type WeightInfo: WeightInfo;
     }
@@ -501,6 +588,11 @@ pub mod pallet {
     pub type Withdrawals<T: Config> =
         StorageMap<_, Blake2_128Concat, WithdrawalId, WithdrawalRecord, OptionQuery>;
 
+    /// Exact route selected when a withdrawal was requested.
+    #[pallet::storage]
+    pub type WithdrawalRoutes<T: Config> =
+        StorageMap<_, Blake2_128Concat, WithdrawalId, RouteId, OptionQuery>;
+
     #[pallet::storage]
     pub type UsedProofs<T: Config> = StorageMap<_, Blake2_128Concat, ProofId, (), OptionQuery>;
 
@@ -527,6 +619,21 @@ pub mod pallet {
     #[pallet::getter(fn pending_withdrawals)]
     pub type PendingWithdrawals<T: Config> =
         StorageMap<_, Blake2_128Concat, X3AssetId, Balance, ValueQuery>;
+
+    /// Count of burned but not yet released withdrawals per route.
+    #[pallet::storage]
+    pub type PendingWithdrawalCounts<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, u32, ValueQuery>;
+
+    /// Released value per route in the current daily limit window.
+    #[pallet::storage]
+    pub type RouteDailyWithdrawals<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, Balance, ValueQuery>;
+
+    /// Block at which a route's release-limit window last reset.
+    #[pallet::storage]
+    pub type RouteWithdrawalWindowStarts<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, u64, ValueQuery>;
 
     // ── Genesis config ──────────────────────────────────────────────────
 
@@ -817,6 +924,8 @@ pub mod pallet {
         RouteDisabled,
         /// Route is in a mode that does not allow credits (e.g. DryRun).
         ModeBlocksCredit,
+        /// Route is in a mode that does not allow withdrawal settlement.
+        ModeBlocksRelease,
         /// Asset is not registered.
         AssetNotRegistered,
         /// Proof is a replay of a previously verified one.
@@ -825,6 +934,8 @@ pub mod pallet {
         ExternalNonceReplay,
         /// Proof chain does not match the route.
         WrongChain,
+        /// Withdrawal was requested through a different route.
+        WrongRoute,
         /// Proof asset does not match the route.
         WrongToken,
         /// Amount below route minimum.
@@ -835,6 +946,10 @@ pub mod pallet {
         DailyLimitExceeded,
         /// Recipient is empty.
         EmptyRecipient,
+        /// The external chain cannot be represented in wrapped-supply accounting.
+        UnsupportedMintChain,
+        /// The verified beneficiary bytes are not a canonical X3 account.
+        InvalidBeneficiary,
         /// Proof is unfinalized or has invalid finalization.
         UnfinalizedProof,
         /// Proof verification failed.
@@ -845,6 +960,8 @@ pub mod pallet {
         TransferNotFound,
         /// Withdrawal not found.
         WithdrawalNotFound,
+        /// A withdrawal predates exact route binding and cannot be settled.
+        WithdrawalRouteMissing,
         /// Withdrawal already released.
         WithdrawalAlreadyReleased,
         /// Withdrawal not yet burned.
@@ -920,6 +1037,10 @@ pub mod pallet {
         pub fn enable_route(origin: OriginFor<T>, mut config: RouteConfig) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
             ensure!(
+                config.verification_level != RouteVerificationLevel::X3Internal,
+                Error::<T>::InternalVerificationOnExternalRoute
+            );
+            ensure!(
                 Assets::<T>::contains_key(
                     config.external_chain_id,
                     &config.external_asset.token_address_or_mint
@@ -932,13 +1053,12 @@ pub mod pallet {
                 config.min_amount <= config.max_amount,
                 Error::<T>::AmountAboveMaximum
             );
-            ensure!(
-                config.verification_level != RouteVerificationLevel::X3Internal,
-                Error::<T>::InternalVerificationOnExternalRoute
-            );
             match config.mode {
                 GatewayMode::Disabled | GatewayMode::DryRun => {}
-                _ => ensure!(config.daily_limit > 0, Error::<T>::AmountBelowMinimum),
+                _ => {
+                    ensure!(config.daily_limit > 0, Error::<T>::AmountBelowMinimum);
+                    ensure!(config.pending_limit > 0, Error::<T>::PendingLimitExceeded);
+                }
             }
             config.enabled = true;
             config.daily_deposited = 0;
@@ -1043,7 +1163,7 @@ pub mod pallet {
             // pallet's own router is constructed per-call (the router
             // is stateless w.r.t. the route's verifier, so this is OK
             // and keeps storage simple).
-            let router = Self::build_router(&route);
+            let router = Self::build_router(&route, Some(proof.nonce));
             let envelope = Self::envelope_from_deposit(&proof, &route);
             let outcome = router
                 .route(&envelope)
@@ -1084,10 +1204,11 @@ pub mod pallet {
         }
 
         /// Operational: credit the X3 representation to the recipient
-        /// after the dispute window (if any) has closed. The actual
-        /// minting is performed by the asset-kernel / supply-ledger
-        /// pallet — this dispatch only flips the on-chain transfer
-        /// status and emits the accounting event.
+        /// after the dispute window (if any) has closed.
+        ///
+        /// The configured `DepositMinter` performs the wrapped-asset mint in
+        /// the same dispatch. A mint refusal rolls the transfer status and all
+        /// gateway writes back.
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::credit_x3_representation())]
         pub fn credit_x3_representation(
@@ -1096,7 +1217,7 @@ pub mod pallet {
         ) -> DispatchResult {
             T::OperationalOrigin::ensure_origin(origin)?;
             let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
-            let (x3_asset_id, recipient, amount) = {
+            let (mint_chain_id, x3_asset_id, recipient, amount, proof_id) = {
                 let transfer =
                     Transfers::<T>::get(transfer_id).ok_or(Error::<T>::TransferNotFound)?;
                 ensure!(
@@ -1112,11 +1233,23 @@ pub mod pallet {
                     );
                 }
                 (
+                    route
+                        .external_chain_id
+                        .wrapped_chain_id()
+                        .ok_or(Error::<T>::UnsupportedMintChain)?,
                     transfer.x3_asset_id,
                     transfer.recipient.clone(),
                     transfer.amount,
+                    transfer.proof_id,
                 )
             };
+            T::DepositMinter::credit_verified_deposit(
+                mint_chain_id,
+                x3_asset_id,
+                &recipient,
+                amount,
+                proof_id,
+            )?;
             Transfers::<T>::try_mutate(transfer_id, |maybe| -> DispatchResult {
                 let t = maybe.as_mut().ok_or(Error::<T>::TransferNotFound)?;
                 t.status = GatewayTransferStatus::X3Credited;
@@ -1127,12 +1260,8 @@ pub mod pallet {
                 recipient,
                 amount,
             });
-            // The external_locked counter continues to back the
-            // represented supply until the user withdraws (and burns).
-            // The minting step is delegated to the asset-kernel pallet
-            // by listening for the `X3RepresentationCredited` event.
-            // We keep the invariant check here to be defensive.
-            let _ = x3_asset_id;
+            // The external_locked counter continues to back the represented
+            // supply until the user withdraws and burns the wrapped balance.
             Ok(())
         }
 
@@ -1141,16 +1270,30 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::request_withdrawal())]
         pub fn request_withdrawal(
             origin: OriginFor<T>,
+            route_id: RouteId,
             x3_asset_id: X3AssetId,
             destination_chain: ExternalChainId,
             recipient: BoundedVec<u8, ConstU32<128>>,
             amount: Balance,
         ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(
+                route.external_chain_id == destination_chain,
+                Error::<T>::WrongChain
+            );
+            ensure!(route.x3_asset_id == x3_asset_id, Error::<T>::WrongToken);
             ensure!(!recipient.is_empty(), Error::<T>::EmptyRecipient);
-            ensure!(amount > 0, Error::<T>::AmountBelowMinimum);
+            ensure!(amount >= route.min_amount, Error::<T>::AmountBelowMinimum);
+            ensure!(amount <= route.max_amount, Error::<T>::AmountAboveMaximum);
             let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
-            let withdrawal_id = Self::derive_withdrawal_id(x3_asset_id, &recipient, amount, now);
+            let withdrawal_id =
+                Self::derive_withdrawal_id(route_id, x3_asset_id, &recipient, amount, now);
             let record = WithdrawalRecord {
                 withdrawal_id,
                 x3_asset_id,
@@ -1163,6 +1306,7 @@ pub mod pallet {
                 created_at: now,
             };
             Withdrawals::<T>::insert(withdrawal_id, record);
+            WithdrawalRoutes::<T>::insert(withdrawal_id, route_id);
             Self::deposit_event(Event::WithdrawalRequested {
                 withdrawal_id,
                 x3_asset_id,
@@ -1180,15 +1324,49 @@ pub mod pallet {
             origin: OriginFor<T>,
             withdrawal_id: WithdrawalId,
         ) -> DispatchResult {
-            let _who = ensure_signed(origin)?;
-            let (x3_asset_id, amount) = {
+            let who = ensure_signed(origin)?;
+            let (mint_chain_id, x3_asset_id, amount) = {
                 let withdrawal =
                     Withdrawals::<T>::get(withdrawal_id).ok_or(Error::<T>::WithdrawalNotFound)?;
                 ensure!(!withdrawal.burned, Error::<T>::WithdrawalAlreadyReleased);
-                (withdrawal.x3_asset_id, withdrawal.amount)
+                (
+                    withdrawal
+                        .destination_chain
+                        .wrapped_chain_id()
+                        .ok_or(Error::<T>::UnsupportedMintChain)?,
+                    withdrawal.x3_asset_id,
+                    withdrawal.amount,
+                )
             };
+            let route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(
+                PendingWithdrawalCounts::<T>::get(route_id) < route.pending_limit,
+                Error::<T>::PendingLimitExceeded
+            );
+            T::DepositMinter::burn_verified_withdrawal(
+                mint_chain_id,
+                x3_asset_id,
+                &who.encode(),
+                amount,
+                withdrawal_id,
+            )?;
             PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
                 *v = v.saturating_add(amount);
+                Ok(())
+            })?;
+            PendingWithdrawalCounts::<T>::try_mutate(route_id, |count| -> DispatchResult {
+                ensure!(
+                    *count < route.pending_limit,
+                    Error::<T>::PendingLimitExceeded
+                );
+                *count = count.saturating_add(1);
                 Ok(())
             })?;
             Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
@@ -1222,22 +1400,15 @@ pub mod pallet {
                 ensure!(withdrawal.burned, Error::<T>::WithdrawalNotBurned);
                 (withdrawal.x3_asset_id, withdrawal.amount)
             };
-            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
-                let w = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
-                w.released = true;
-                Ok(())
-            })?;
-            ExternalLocked::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            Self::check_collateral_invariant(x3_asset_id)?;
-            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
-            Ok(())
+            let route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            Self::settle_release(&route, withdrawal_id, x3_asset_id, amount)
         }
 
         /// Relayer: submit a withdrawal-release proof. Verifies the
@@ -1259,9 +1430,16 @@ pub mod pallet {
                 Withdrawals::<T>::get(withdrawal_id).ok_or(Error::<T>::WithdrawalNotFound)?;
             ensure!(!withdrawal.released, Error::<T>::WithdrawalAlreadyReleased);
             ensure!(withdrawal.burned, Error::<T>::WithdrawalNotBurned);
+            let bound_route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
 
             let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
             ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(bound_route_id == route_id, Error::<T>::WrongRoute);
             ensure!(
                 withdrawal.destination_chain == route.external_chain_id,
                 Error::<T>::WrongChain
@@ -1269,6 +1447,14 @@ pub mod pallet {
             ensure!(
                 withdrawal.x3_asset_id == route.x3_asset_id,
                 Error::<T>::WrongToken
+            );
+            ensure!(
+                withdrawal.amount >= route.min_amount,
+                Error::<T>::AmountBelowMinimum
+            );
+            ensure!(
+                withdrawal.amount <= route.max_amount,
+                Error::<T>::AmountAboveMaximum
             );
 
             let router = Self::build_release_router(&route);
@@ -1291,24 +1477,12 @@ pub mod pallet {
                 .map_err(|_| Error::<T>::VerificationFailed)?;
             Self::record_solana_finalized_slot(&route, outcome.verified_at_height);
 
-            let x3_asset_id = withdrawal.x3_asset_id;
-            let amount = withdrawal.amount;
-            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
-                let w = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
-                w.released = true;
-                Ok(())
-            })?;
-            ExternalLocked::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            Self::check_collateral_invariant(x3_asset_id)?;
-            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
-            Ok(())
+            Self::settle_release(
+                &route,
+                withdrawal_id,
+                withdrawal.x3_asset_id,
+                withdrawal.amount,
+            )
         }
 
         /// Governance: install (or replace) the authorized SVM validator set for
@@ -1508,7 +1682,7 @@ pub mod pallet {
         /// configured verification level. The router is created
         /// per-call because the verifier set is small and the pallet
         /// does not need to keep the router's state across calls.
-        fn build_router(route: &RouteConfig) -> VerificationRouter {
+        fn build_router(route: &RouteConfig, expected_nonce: Option<u64>) -> VerificationRouter {
             let mut router = VerificationRouter::new();
             match route.verification_level {
                 RouteVerificationLevel::ValidatorQuorum { threshold, total } => {
@@ -1517,10 +1691,19 @@ pub mod pallet {
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::EvmReceiptProof => {
-                    let v: Arc<dyn Verifier> =
-                        Arc::new(ProductionEvmReceiptVerifier::anchored_by::<
-                            T::EvmHeaderAnchor,
-                        >(route.finality_requirement));
+                    let Some(source_asset) =
+                        evm_address_bytes(&route.external_asset.token_address_or_mint)
+                    else {
+                        return router;
+                    };
+                    let mut verifier = ProductionEvmReceiptVerifier::anchored_by::<
+                        T::EvmHeaderAnchor,
+                    >(route.finality_requirement)
+                    .with_source_asset(source_asset);
+                    if let Some(nonce) = expected_nonce {
+                        verifier = verifier.with_expected_nonce(nonce);
+                    }
+                    let v: Arc<dyn Verifier> = Arc::new(verifier);
                     router.register_verifier(v);
                 }
                 RouteVerificationLevel::SolanaFinalizedProof => {
@@ -1581,15 +1764,21 @@ pub mod pallet {
             let mut router = VerificationRouter::new();
             match route.verification_level {
                 RouteVerificationLevel::EvmReceiptProof => {
+                    let Some(source_asset) =
+                        evm_address_bytes(&route.external_asset.token_address_or_mint)
+                    else {
+                        return router;
+                    };
                     let v: Arc<dyn Verifier> = Arc::new(
                         ProductionEvmReceiptVerifier::anchored_by::<T::EvmHeaderAnchor>(
                             route.finality_requirement,
                         )
+                        .with_source_asset(source_asset)
                         .with_selector(withdrawal_released_selector()),
                     );
                     router.register_verifier(v);
                 }
-                _ => return Self::build_router(route),
+                _ => return Self::build_router(route, None),
             }
             router
         }
@@ -1613,6 +1802,7 @@ pub mod pallet {
         }
 
         pub(crate) fn derive_withdrawal_id(
+            route_id: RouteId,
             x3_asset_id: X3AssetId,
             recipient: &[u8],
             amount: Balance,
@@ -1628,15 +1818,67 @@ pub mod pallet {
             // the same id. This id is the key of `Withdrawals` and the relayer's
             // processed-withdrawal set, so a collision means one withdrawal is
             // treated as another.
-            let mut preimage =
-                Vec::with_capacity(43 + x3_asset_id.len() + 8 + recipient.len() + 8 + 8);
-            preimage.extend_from_slice(b"x3-crosschain-gateway-withdrawal-v1");
+            let mut preimage = Vec::with_capacity(
+                43 + route_id.len() + x3_asset_id.len() + 8 + recipient.len() + 8 + 8,
+            );
+            preimage.extend_from_slice(b"x3-crosschain-gateway-withdrawal-v2");
+            preimage.extend_from_slice(&route_id);
             preimage.extend_from_slice(&x3_asset_id);
             preimage.extend_from_slice(&(recipient.len() as u64).to_le_bytes());
             preimage.extend_from_slice(recipient);
             preimage.extend_from_slice(&amount.to_le_bytes());
             preimage.extend_from_slice(&block.to_le_bytes());
             sp_io::hashing::blake2_256(&preimage)
+        }
+
+        fn settle_release(
+            route: &RouteConfig,
+            withdrawal_id: WithdrawalId,
+            x3_asset_id: X3AssetId,
+            amount: Balance,
+        ) -> DispatchResult {
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            let window: u64 = T::DailyLimitWindowBlocks::get().saturated_into();
+            let mut released_today = RouteDailyWithdrawals::<T>::get(route.route_id);
+            let mut window_start = RouteWithdrawalWindowStarts::<T>::get(route.route_id);
+            if window_start == 0 || now.saturating_sub(window_start) >= window {
+                released_today = 0;
+                window_start = now;
+            }
+            let next_released = released_today.saturating_add(amount);
+            ensure!(
+                next_released <= route.daily_limit,
+                Error::<T>::DailyLimitExceeded
+            );
+
+            RouteDailyWithdrawals::<T>::insert(route.route_id, next_released);
+            RouteWithdrawalWindowStarts::<T>::insert(route.route_id, window_start);
+            PendingWithdrawalCounts::<T>::try_mutate(route.route_id, |count| -> DispatchResult {
+                *count = count
+                    .checked_sub(1)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |pending| -> DispatchResult {
+                *pending = pending
+                    .checked_sub(amount)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            ExternalLocked::<T>::try_mutate(x3_asset_id, |locked| -> DispatchResult {
+                *locked = locked
+                    .checked_sub(amount)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
+                let withdrawal = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
+                withdrawal.released = true;
+                Ok(())
+            })?;
+            Self::check_collateral_invariant(x3_asset_id)?;
+            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
+            Ok(())
         }
 
         fn check_collateral_invariant(x3_asset_id: X3AssetId) -> DispatchResult {

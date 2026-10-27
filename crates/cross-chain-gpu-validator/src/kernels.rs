@@ -206,7 +206,8 @@ mod tests {
         let kernel = Secp256k1Kernel::new(32, false);
 
         // Create a valid signature for testing
-        let signing_key = SigningKey::random(&mut rand::thread_rng());
+        let signing_key =
+            SigningKey::from_slice(&[0x42; 32]).expect("valid deterministic secp256k1 key");
         let verifying_key = signing_key.verifying_key();
 
         let message = b"test message";

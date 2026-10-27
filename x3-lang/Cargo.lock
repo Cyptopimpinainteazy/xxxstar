@@ -4686,6 +4686,7 @@ name = "x3-lang-vm"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "bs58",
  "ed25519-dalek",
  "proptest",
  "reqwest",

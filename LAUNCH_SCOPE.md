@@ -51,7 +51,7 @@ These features are **intentionally disabled** for RC-1 and MUST remain off until
 
 | Feature | Guard Mechanism | Target Phase |
 |---|---|---|
-| `external-gateway` — External EVM/SVM/Bitcoin bridge gateway | Compile-time `compile_error!` with `mainnet-rc1` | Post-audit |
+| `external-gateway` — External EVM/SVM/Bitcoin bridge gateway | Compile-time `compile_error!` unless `mainnet-v1`, **and** the runtime `ExternalBridgesEnabled` switch for any route with a non-X3 leg (default false; governance: `set_external_bridge_audit_gate` then `set_external_bridges_enabled`) | Post-audit |
 | `parallel-executor` — Parallel block execution | Compile-time `compile_error!` with `mainnet-rc1` | Post-audit |
 | `appzone-factory` — Application zone contract factory | Compile-time guard | Post-audit |
 | `pq-experimental` — Post-quantum experimental features | Compile-time guard | Post-audit |
@@ -100,6 +100,13 @@ The following claims in `CURRENT_MAINNET_STATUS.md` are **INCORRECT** for the cu
 - Bitcoin vault and SPV verifier
 - Relayer infrastructure
 - All external bridge deposit/withdrawal flows
+
+> The runtime half of the `external-gateway` guard is `ExternalBridgesEnabled`. It is a
+> `StorageValue<_, bool, ValueQuery>` with no `#[pallet::genesis_config]` on the router
+> pallet, so **no chain spec can set it** — it is false on every surface until governance
+> enables it, and `do_initiate_transfer` refuses any route with a non-X3 leg while it is
+> false. Earlier wording here and in the audit artifacts said "disabled at genesis", which
+> implied a genesis field that does not exist.
 
 ### Requires Manual Trigger
 - Signed release tag (run `bash scripts/create-rc1-release.sh`)

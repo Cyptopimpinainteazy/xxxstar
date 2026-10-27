@@ -1,8 +1,9 @@
 #![cfg(feature = "valkey")]
 
 use x3_cross_vm_coordinator::{
-    CoordinatorOperation, OperationAttemptLedger, OperationAttemptStatus, DistributedLeaseStore,
-    ValkeyAttemptStore, ValkeyCasStore, ValkeyLeaseAuthority, ValkeySecretRegistry,
+    CoordinatorOperation, DistributedLeaseStore, OperationAttemptLedger, OperationAttemptStart,
+    OperationAttemptStatus, ValkeyAttemptStore, ValkeyCasStore, ValkeyLeaseAuthority,
+    ValkeySecretRegistry,
 };
 
 #[cfg(feature = "canonical-proofs")]
@@ -10,15 +11,20 @@ use std::sync::{Arc, Barrier};
 #[cfg(feature = "canonical-proofs")]
 use std::thread;
 #[cfg(feature = "canonical-proofs")]
-use x3_cross_vm_coordinator::{
-    ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
-    SessionPersistence, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
-};
+use ed25519_dalek::{Signer, SigningKey};
 #[cfg(feature = "canonical-proofs")]
 use x3_atomic_swap::{
     adapter::{FinalityProof, VmType},
     intent::{AtomicIntentBuilder, ChainKind, RefundPath},
     CrossDomainOperation, CrossDomainProofBundle,
+};
+#[cfg(feature = "canonical-proofs")]
+use x3_cross_vm_coordinator::{
+    ConcurrentSwapCoordinator, CoordinatorConfig, HtlcHash, InMemoryPersistence,
+    ReleaseBeaconAttestation, ReleaseBeaconEvidence, ReleaseBeaconPolicy, SessionPersistence,
+    SettlementOutboxRecord, SettlementOutboxStatus, SettlementOutboxStore,
+    SettlementSubmissionOutbox, SwapPhase, SwapSession, ValkeyDistributedCoordinator,
+    ValkeySettlementOutboxStore, VerifiedReleaseBeacon,
 };
 
 fn test_url() -> Option<String> {
@@ -33,6 +39,29 @@ fn test_url() -> Option<String> {
 
 fn namespace(suffix: &str) -> String {
     format!("x3-ci-{}-{suffix}", std::process::id())
+}
+
+#[cfg(feature = "canonical-proofs")]
+fn verified_release_beacon(block_number: u64, block_hash: [u8; 32]) -> VerifiedReleaseBeacon {
+    let key = SigningKey::from_bytes(&[1u8; 32]);
+    let statement = x3_cross_vm_coordinator::settlement_outbox::release_beacon_statement_hash(
+        "validator-a",
+        block_number,
+        block_hash,
+    );
+    let policy =
+        ReleaseBeaconPolicy::new(1, vec![key.verifying_key().to_bytes()]).unwrap();
+    policy
+        .verify(&ReleaseBeaconEvidence {
+            block_number,
+            block_hash,
+            attestations: vec![ReleaseBeaconAttestation {
+                attestor_id: "validator-a".into(),
+                public_key: key.verifying_key().to_bytes(),
+                signature: key.sign(&statement).to_bytes().to_vec(),
+            }],
+        })
+        .unwrap()
 }
 
 #[test]
@@ -96,15 +125,15 @@ fn live_valkey_attempt_history_survives_store_restart() {
             ValkeyAttemptStore::with_namespace(&url, &ns).unwrap(),
         );
         let started = ledger
-            .record_started(
-                "swap-ledger",
-                CoordinatorOperation::FastClaim,
-                "attempt-1",
-                "relayer-a",
-                7,
-                "ethereum",
-                100,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-ledger",
+                operation: CoordinatorOperation::FastClaim,
+                attempt_id: "attempt-1",
+                owner_id: "relayer-a",
+                fence: 7,
+                domain: "ethereum",
+                started_at: 100,
+            })
             .unwrap();
         ledger.record_broadcast(&started, "0xabc", 101).unwrap()
     };
@@ -135,29 +164,29 @@ fn live_valkey_canonical_proof_hash_cannot_be_replaced() {
     );
 
     let first = ledger
-        .record_started(
-            "swap-ledger",
-            CoordinatorOperation::SlowClaim,
-            "attempt-a",
-            "relayer-a",
-            8,
-            "solana",
-            100,
-        )
+        .record_started(OperationAttemptStart {
+            session_id: "swap-ledger",
+            operation: CoordinatorOperation::SlowClaim,
+            attempt_id: "attempt-a",
+            owner_id: "relayer-a",
+            fence: 8,
+            domain: "solana",
+            started_at: 100,
+        })
         .unwrap();
     let first = ledger.record_broadcast(&first, "sig-a", 101).unwrap();
     ledger.record_finalized(&first, [0x72; 32], 102).unwrap();
 
     let second = ledger
-        .record_started(
-            "swap-ledger",
-            CoordinatorOperation::SlowClaim,
-            "attempt-b",
-            "relayer-b",
-            9,
-            "solana",
-            103,
-        )
+        .record_started(OperationAttemptStart {
+            session_id: "swap-ledger",
+            operation: CoordinatorOperation::SlowClaim,
+            attempt_id: "attempt-b",
+            owner_id: "relayer-b",
+            fence: 9,
+            domain: "solana",
+            started_at: 103,
+        })
         .unwrap();
     let second = ledger.record_broadcast(&second, "sig-b", 104).unwrap();
     assert!(ledger.record_finalized(&second, [0x73; 32], 105).is_err());
@@ -312,6 +341,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             &intent,
             runtime_intent_id,
             &[("eth-mainnet".into(), VmType::Evm)],
+            &Default::default(),
         )
         .unwrap();
     assert_eq!(envelope.call_index(), 33);
@@ -324,6 +354,7 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             &intent,
             runtime_intent_id,
             &[("eth-mainnet".into(), VmType::Evm)],
+            &Default::default(),
             106,
         )
         .unwrap();
@@ -385,8 +416,9 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
 
     // Network send uses exactly signed.signed_extrinsic. Only after the RPC
     // send returns do we move durable state to Broadcast.
+    let beacon = verified_release_beacon(77, [0x91; 32]);
     let broadcast = coordinator
-        .record_settlement_submission_broadcast(&signed, 108)
+        .record_settlement_submission_broadcast(&signed, &beacon, 108)
         .unwrap();
     assert_eq!(
         coordinator
@@ -414,4 +446,143 @@ fn live_valkey_verified_bundle_becomes_settlement_ready_proof_set() {
             .unwrap(),
         Some(x3_cross_vm_coordinator::SettlementOutboxRecovery::Done)
     );
+}
+
+#[cfg(feature = "canonical-proofs")]
+fn settlement_record(
+    submission_id: [u8; 32],
+    runtime_intent_id: [u8; 32],
+    now: u64,
+) -> SettlementOutboxRecord {
+    SettlementOutboxRecord {
+        submission_id,
+        session_id: "swap-release-order".into(),
+        runtime_intent_id,
+        purpose: 0,
+        call_index: 33,
+        call_args_hash: [3u8; 32],
+        proof_hashes: vec![[4u8; 32]],
+        status: SettlementOutboxStatus::Prepared,
+        tx_id: None,
+        signed_extrinsic: None,
+        block_number: None,
+        owner_id: None,
+        fence: None,
+        release_beacon_number: None,
+        release_beacon_hash: None,
+        prepared_at: now,
+        updated_at: now,
+        error: None,
+    }
+}
+
+#[cfg(feature = "canonical-proofs")]
+#[test]
+fn live_valkey_cross_domain_release_order_survives_restart() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("settlement-release-order");
+    let first = settlement_record([0x11; 32], [0x21; 32], 100);
+    let second = settlement_record([0x12; 32], [0x22; 32], 101);
+
+    {
+        let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+        store
+            .compare_and_append(first.submission_id, None, &first)
+            .unwrap();
+        store
+            .compare_and_append(second.submission_id, None, &second)
+            .unwrap();
+        let outbox = SettlementSubmissionOutbox::new(store);
+        outbox
+            .record_signed(&first, "0xfirst", vec![1, 2, 3], "worker-a", 7, 102)
+            .unwrap();
+        outbox
+            .record_signed(&second, "0xsecond", vec![4, 5, 6], "worker-a", 7, 103)
+            .unwrap();
+    }
+
+    let restarted = SettlementSubmissionOutbox::new(
+        ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap(),
+    );
+    let beacon = verified_release_beacon(77, [0x91; 32]);
+    let order = restarted.canonical_release_order(&beacon).unwrap();
+    assert_eq!(order.len(), 2);
+
+    let second_signed = restarted
+        .latest(second.submission_id)
+        .unwrap()
+        .expect("second signed submission survives restart");
+    let later = if order[1] == second.submission_id {
+        second_signed
+    } else {
+        restarted
+            .latest(first.submission_id)
+            .unwrap()
+            .expect("first signed submission survives restart")
+    };
+    let error = restarted
+        .record_broadcast_ordered(&later, &beacon, 104)
+        .expect_err("a later release must remain refused after restart");
+    assert!(error
+        .to_string()
+        .contains("out-of-order settlement release"));
+
+    let canonical_first = restarted
+        .latest(order[0])
+        .unwrap()
+        .expect("canonical first submission survives restart");
+    restarted
+        .record_broadcast_ordered(&canonical_first, &beacon, 105)
+        .unwrap();
+    let canonical_second = restarted
+        .latest(order[1])
+        .unwrap()
+        .expect("canonical second submission survives restart");
+    let stale = verified_release_beacon(76, [0x90; 32]);
+    assert!(restarted
+        .record_broadcast_ordered(&canonical_second, &stale, 106)
+        .is_err());
+    restarted
+        .record_broadcast_ordered(&canonical_second, &beacon, 107)
+        .unwrap();
+}
+
+#[cfg(feature = "canonical-proofs")]
+#[test]
+fn live_valkey_release_floor_claim_is_atomic() {
+    let Some(url) = test_url() else { return };
+    let ns = namespace("settlement-release-floor-race");
+    let first = settlement_record([0x31; 32], [0x41; 32], 100);
+    let second = settlement_record([0x32; 32], [0x42; 32], 101);
+    let barrier = Arc::new(Barrier::new(3));
+
+    let contenders = [
+        (first.clone(), [0x91; 32]),
+        (second.clone(), [0x92; 32]),
+    ]
+    .into_iter()
+    .map(|(record, hash)| {
+        let url = url.clone();
+        let ns = ns.clone();
+        let barrier = Arc::clone(&barrier);
+        thread::spawn(move || {
+            let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+            barrier.wait();
+            store.compare_and_append_release(record.submission_id, None, &record, 77, hash)
+        })
+    })
+    .collect::<Vec<_>>();
+    barrier.wait();
+
+    let accepted = contenders
+        .into_iter()
+        .map(|worker| worker.join().unwrap().is_ok())
+        .filter(|accepted| *accepted)
+        .count();
+    assert_eq!(accepted, 1, "one conflicting Valkey beacon must win");
+
+    let store = ValkeySettlementOutboxStore::with_namespace(&url, &ns).unwrap();
+    let floor = store.release_beacon_floor().unwrap().unwrap();
+    assert_eq!(floor.0, 77);
+    assert!(floor.1 == [0x91; 32] || floor.1 == [0x92; 32]);
 }

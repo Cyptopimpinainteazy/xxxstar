@@ -1159,4 +1159,115 @@ mod tests {
 
         assert_eq!(gpu_outputs, cpu_outputs);
     }
+
+    /// Exercise the same hash kernels on every hardware adapter this host
+    /// exposes, not only whichever adapter the high-performance selector
+    /// happens to choose. This is the two-GPU parity check: each device must
+    /// independently produce the CPU reference bytes for every input.
+    #[test]
+    fn every_hardware_adapter_matches_cpu_hashes() {
+        let adapters = WgpuBackend::hardware_adapters();
+        if adapters.is_empty() {
+            assert!(
+                std::env::var("X3_REQUIRE_GPU").as_deref() != Ok("1"),
+                "X3_REQUIRE_GPU=1 but no hardware adapter was enumerated"
+            );
+            eprintln!("every_hardware_adapter_matches_cpu_hashes: SKIPPED, no hardware adapter");
+            return;
+        }
+
+        let inputs = vec![
+            Vec::new(),
+            b"x3-mainnet".to_vec(),
+            vec![0x11; 135],
+            vec![0x22; 136],
+            vec![0x33; 1024],
+        ];
+        for (index, adapter) in adapters.iter().enumerate() {
+            let backend = WgpuBackend::initialize_adapter(index).unwrap_or_else(|error| {
+                panic!(
+                    "adapter {index} ({:?}, {:?}) did not initialize: {error}",
+                    adapter.name, adapter.backend
+                )
+            });
+            eprintln!(
+                "every_hardware_adapter_matches_cpu_hashes: adapter {} = {} ({:?})",
+                index,
+                backend.adapter_name(),
+                backend.adapter_info().backend
+            );
+            assert_eq!(
+                backend.sha256_batch(&inputs).unwrap(),
+                inputs
+                    .iter()
+                    .map(|input| Sha256::digest(input).into())
+                    .collect::<Vec<[u8; 32]>>(),
+                "SHA-256 parity failed on adapter {index}"
+            );
+            assert_eq!(
+                backend.keccak256_batch(&inputs).unwrap(),
+                inputs
+                    .iter()
+                    .map(|input| keccak_hash::keccak(input).0)
+                    .collect::<Vec<[u8; 32]>>(),
+                "Keccak-256 parity failed on adapter {index}"
+            );
+        }
+    }
+
+    /// Verify real ECDSA signatures on every hardware adapter and require the
+    /// reference library's verdicts exactly: the genuine signature is valid,
+    /// while the same signature over another digest is not.
+    #[test]
+    fn every_hardware_adapter_verifies_ecdsa_with_reference_verdicts() {
+        use ::secp256k1::{Message, Secp256k1, SecretKey};
+
+        let adapters = WgpuBackend::hardware_adapters();
+        if adapters.is_empty() {
+            assert!(
+                std::env::var("X3_REQUIRE_GPU").as_deref() != Ok("1"),
+                "X3_REQUIRE_GPU=1 but no hardware adapter was enumerated"
+            );
+            eprintln!(
+                "every_hardware_adapter_verifies_ecdsa_with_reference_verdicts: SKIPPED, no hardware adapter"
+            );
+            return;
+        }
+
+        let secp = Secp256k1::new();
+        let secret = SecretKey::from_slice(&[7u8; 32]).unwrap();
+        let public_key =
+            ::secp256k1::PublicKey::from_secret_key(&secp, &secret).serialize_uncompressed();
+        let signed_digest = [9u8; 32];
+        let message = Message::from_digest_slice(&signed_digest).unwrap();
+        let signature = secp.sign_ecdsa(&message, &secret).serialize_compact();
+        let prepared = |z| Secp256k1Prepared {
+            r: signature[..32].try_into().unwrap(),
+            s: signature[32..].try_into().unwrap(),
+            z,
+            qx: public_key[1..33].try_into().unwrap(),
+            qy: public_key[33..65].try_into().unwrap(),
+        };
+        let jobs = [prepared(signed_digest), prepared([10u8; 32])];
+
+        for (index, adapter) in adapters.iter().enumerate() {
+            let backend = WgpuBackend::initialize_adapter(index).unwrap_or_else(|error| {
+                panic!(
+                    "adapter {index} ({:?}, {:?}) did not initialize: {error}",
+                    adapter.name, adapter.backend
+                )
+            });
+            eprintln!(
+                "every_hardware_adapter_verifies_ecdsa_with_reference_verdicts: adapter {} = {} ({:?})",
+                index,
+                backend.adapter_name(),
+                backend.adapter_info().backend
+            );
+            assert_eq!(
+                backend.secp256k1_verify_prepared(&jobs).unwrap(),
+                vec![true, false],
+                "ECDSA verdict parity failed on adapter {index}"
+            );
+        }
+    }
 }

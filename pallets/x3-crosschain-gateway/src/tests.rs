@@ -3,7 +3,9 @@ use crate::pallet::Error;
 use crate::{
     ExternalAssetRef, ExternalChainId, GatewayMode, GatewayTransferStatus, Pallet, RouteConfig,
 };
+use codec::Encode;
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::DispatchError;
 
 // ── SVM validator-set helpers ──────────────────────────────────────────────
 
@@ -60,12 +62,13 @@ fn solana_deposit_proof_v2(
     proof_id: [u8; 32],
     amount: u128,
     nonce: u64,
-    finality: (u64, u64, [u8; 32], [u8; 32]),
+    finality: (u64, u64, [u8; 32], [u8; 32], [u8; 32]),
     keys: &[(&ed25519_dalek::SigningKey, u64)],
 ) -> crate::DepositProof {
     use ed25519_dalek::Signer;
 
-    let (finalized_slot, parent_slot, finalized_bank_hash, parent_bank_hash) = finality;
+    let (finalized_slot, parent_slot, finalized_blockhash, finalized_bank_hash, parent_bank_hash) =
+        finality;
     let mut proof = deposit_proof_with(
         proof_id,
         amount,
@@ -87,13 +90,31 @@ fn solana_deposit_proof_v2(
         .collect::<Vec<_>>();
     stakes.sort_by_key(|entry| entry.pubkey);
     let stake_digest = x3_verification_router::solana_stake_table_digest(&stakes);
-    let message = x3_verification_router::solana_finality_message_v2(
+    let transaction_key = keys.first().expect("at least one signing key").0;
+    let recent_blockhash = [0x33u8; 32];
+    let mut transaction_message = vec![1, 0, 0, 1];
+    transaction_message.extend_from_slice(&transaction_key.verifying_key().to_bytes());
+    transaction_message.extend_from_slice(&recent_blockhash);
+    transaction_message.push(0);
+    let mut raw_transaction = vec![1];
+    raw_transaction.extend_from_slice(&transaction_key.sign(&transaction_message).to_bytes());
+    raw_transaction.extend_from_slice(&transaction_message);
+    let transaction = x3_verification_router::SolanaTransactionEvidence::from_raw(
+        finalized_slot,
+        1,
+        true,
+        raw_transaction,
+    )
+    .expect("signed transaction evidence");
+    let message = x3_verification_router::solana_finality_message_v4(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
+        &finalized_blockhash,
         &finalized_bank_hash,
         &parent_bank_hash,
         &stake_digest,
+        &transaction,
         &envelope,
     )
     .expect("test proof intent fits");
@@ -106,13 +127,15 @@ fn solana_deposit_proof_v2(
             )
         })
         .collect::<Vec<_>>();
-    let payload = x3_verification_router::encode_solana_finality_v2(
+    let payload = x3_verification_router::encode_solana_finality_v4(
         x3_verification_router::SolanaCluster::Devnet,
         finalized_slot,
         parent_slot,
+        finalized_blockhash,
         finalized_bank_hash,
         parent_bank_hash,
         stake_digest,
+        transaction,
         &votes,
     )
     .expect("test proof fits");
@@ -134,14 +157,14 @@ fn expected_withdrawal_id(amount: u128) -> [u8; 32] {
     //
     // `new_test_ext` starts at block 1 and the test asset/recipient below are the
     // ones the callers use.
-    x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", amount, 1)
+    x3_crosschain_gateway::gateway_withdrawal_id([1u8; 32], [9u8; 32], "0xRECIPIENT", amount, 1)
 }
 
 fn register_and_enable() {
     assert_ok!(X3CrosschainGateway::register_asset(
         RuntimeOrigin::root(),
         ExternalChainId::BaseSepolia,
-        bounded("0xTOKEN"),
+        bounded(TOKEN_ADDRESS),
         [9u8; 32],
     ));
     assert_ok!(X3CrosschainGateway::enable_route(
@@ -182,6 +205,7 @@ fn request_burn_withdrawal(amount: u128) -> [u8; 32] {
     let w_id = expected_withdrawal_id(amount);
     assert_ok!(X3CrosschainGateway::request_withdrawal(
         RuntimeOrigin::signed(2),
+        [1u8; 32],
         [9u8; 32],
         ExternalChainId::BaseSepolia,
         bounded("0xRECIPIENT"),
@@ -200,9 +224,52 @@ fn register_asset_works() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
+    });
+}
+
+#[test]
+fn external_chain_kinds_keep_their_eip155_ids() {
+    use x3_verification_router::ChainKind;
+
+    assert_eq!(
+        ExternalChainId::EthereumMainnet.to_chain_kind(),
+        ChainKind::Evm { chain_id: 1 }
+    );
+    assert_eq!(
+        ExternalChainId::EthereumSepolia.to_chain_kind(),
+        ChainKind::Evm {
+            chain_id: 11_155_111
+        }
+    );
+    assert_eq!(
+        ExternalChainId::BaseMainnet.to_chain_kind(),
+        ChainKind::Evm { chain_id: 8_453 }
+    );
+    assert_eq!(
+        ExternalChainId::BaseSepolia.to_chain_kind(),
+        ChainKind::Evm { chain_id: 84_532 }
+    );
+}
+
+#[test]
+fn an_evm_route_with_an_invalid_asset_address_fails_closed() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        let mut malformed_route = evm_route();
+        malformed_route.external_asset.token_address_or_mint = bounded("0xTOKEN");
+        enable_route_for(malformed_route);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
+        attest_header(receipts_root, number, head);
+        let mut proof = evm_deposit_proof([1u8; 32], 100, payload);
+        proof.external_asset.token_address_or_mint = bounded("0xTOKEN");
+
+        assert_noop!(
+            X3CrosschainGateway::submit_deposit_proof(RuntimeOrigin::signed(1), [5u8; 32], proof,),
+            Error::<Test>::VerificationFailed
+        );
     });
 }
 
@@ -284,7 +351,7 @@ fn submit_deposit_proof_rejects_disabled_route() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
         // Don't enable; route lookup itself will fail first.
@@ -305,7 +372,7 @@ fn submit_deposit_proof_rejects_dry_run_mode() {
         assert_ok!(X3CrosschainGateway::register_asset(
             RuntimeOrigin::root(),
             ExternalChainId::BaseSepolia,
-            bounded("0xTOKEN"),
+            bounded(TOKEN_ADDRESS),
             [9u8; 32],
         ));
         let mut r = route();
@@ -359,6 +426,7 @@ fn request_and_burn_withdrawal_preserves_invariant() {
         // 2. Request a withdrawal.
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -397,6 +465,7 @@ fn collateral_invariant_holds_after_burn_and_release() {
         ));
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -435,6 +504,7 @@ fn double_release_fails() {
         ));
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -542,6 +612,7 @@ fn submit_release_proof_without_burn_fails() {
         let w_id = expected_withdrawal_id(40);
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -593,13 +664,12 @@ fn submit_release_proof_wrong_chain_fails() {
         register_and_enable();
         deposit_and_credit([1u8; 32], [1u8; 32], 100);
 
-        // Request withdrawal with a different destination chain (EthereumSepolia
-        // instead of BaseSepolia)
         let w_id = expected_withdrawal_id(40);
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
-            ExternalChainId::EthereumSepolia,
+            ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
             40,
         ));
@@ -608,8 +678,15 @@ fn submit_release_proof_wrong_chain_fails() {
             w_id,
         ));
 
-        // Route [1u8;32] has external_chain_id = BaseSepolia — mismatches
-        // withdrawal's EthereumSepolia
+        // Governance repoints the same stored route after the request. The
+        // withdrawal stays bound to route 1 but its destination chain no longer
+        // matches, so release must fail with WrongChain rather than WrongRoute.
+        register_asset(ExternalChainId::EthereumSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut repointed_route = route();
+        repointed_route.external_chain_id = ExternalChainId::EthereumSepolia;
+        repointed_route.external_asset.chain_id = ExternalChainId::EthereumSepolia;
+        enable_route_for(repointed_route);
+
         assert_noop!(
             X3CrosschainGateway::submit_release_proof(
                 RuntimeOrigin::signed(1),
@@ -647,6 +724,64 @@ fn submit_release_proof_disabled_route_fails() {
     });
 }
 
+#[test]
+fn release_proofs_enforce_and_reset_the_route_daily_limit() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 120);
+
+        let first = expected_withdrawal_id(60);
+        let second = expected_withdrawal_id(50);
+        for amount in [60, 50] {
+            assert_ok!(X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                amount,
+            ));
+        }
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            first,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            second,
+        ));
+
+        let mut narrow_route = route();
+        narrow_route.daily_limit = 100;
+        enable_route_for(narrow_route);
+        assert_ok!(X3CrosschainGateway::submit_release_proof(
+            RuntimeOrigin::signed(1),
+            first,
+            [1u8; 32],
+            bounded_payload("release_proof_data"),
+        ));
+        assert_noop!(
+            X3CrosschainGateway::submit_release_proof(
+                RuntimeOrigin::signed(1),
+                second,
+                [1u8; 32],
+                bounded_payload("release_proof_data"),
+            ),
+            Error::<Test>::DailyLimitExceeded
+        );
+
+        System::set_block_number(102);
+        assert_ok!(X3CrosschainGateway::submit_release_proof(
+            RuntimeOrigin::signed(1),
+            second,
+            [1u8; 32],
+            bounded_payload("release_proof_data"),
+        ));
+        assert_eq!(crate::RouteDailyWithdrawals::<Test>::get([1u8; 32]), 50);
+        assert_eq!(crate::PendingWithdrawalCounts::<Test>::get([1u8; 32]), 0);
+    });
+}
+
 // ═════════════════════════════════════════════════════════════════════════
 // Verifier integration — test each supported verifier strategy
 // ═════════════════════════════════════════════════════════════════════════
@@ -654,7 +789,7 @@ fn submit_release_proof_disabled_route_fails() {
 #[test]
 fn deposit_proof_validator_quorum_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(validator_route());
 
         assert_ok!(X3CrosschainGateway::submit_deposit_proof(
@@ -740,7 +875,7 @@ fn deposit_proof_different_chain_asset_works() {
 #[test]
 fn deposit_proof_evm_verifier_fails_on_malformed_proof() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
 
         // ProductionEvmReceiptVerifier will fail on a short random payload
@@ -767,7 +902,7 @@ fn release_proof_validator_quorum_works() {
     new_test_ext().execute_with(|| {
         // Two routes: one for deposit (X3Internal), one for release
         // (ValidatorQuorum) with matching chain + asset ids.
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let deposit_route = route();
         enable_route_for(deposit_route.clone());
         let mut release_route = validator_route();
@@ -776,7 +911,25 @@ fn release_proof_validator_quorum_works() {
         enable_route_for(release_route);
 
         deposit_and_credit([1u8; 32], [1u8; 32], 100);
-        let w_id = request_burn_withdrawal(40);
+        let w_id = x3_crosschain_gateway::gateway_withdrawal_id(
+            [2u8; 32],
+            [9u8; 32],
+            "0xRECIPIENT",
+            40,
+            1,
+        );
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [2u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            w_id,
+        ));
 
         assert_ok!(X3CrosschainGateway::submit_release_proof(
             RuntimeOrigin::signed(1),
@@ -828,7 +981,7 @@ fn enable_then_disable_then_re_enable_route() {
 #[test]
 fn enable_route_min_gt_max_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.min_amount = 200;
         r.max_amount = 100;
@@ -842,7 +995,7 @@ fn enable_route_min_gt_max_fails() {
 #[test]
 fn enable_route_zero_daily_limit_for_live_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.daily_limit = 0;
         // TestnetLive mode requires daily_limit > 0
@@ -928,13 +1081,13 @@ fn submit_deposit_proof_wrong_chain_fails() {
         register_and_enable();
         // Register a second asset on EthereumSepolia so AssetNotRegistered doesn't
         // fire before WrongChain.
-        register_asset(ExternalChainId::EthereumSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::EthereumSepolia, TOKEN_ADDRESS, [9u8; 32]);
         // Proof has EthereumSepolia, route is BaseSepolia
         let mut p = deposit_proof([1u8; 32], 100);
         p.source_chain = ExternalChainId::EthereumSepolia;
         p.external_asset = ExternalAssetRef {
             chain_id: ExternalChainId::EthereumSepolia,
-            token_address_or_mint: bounded("0xTOKEN"),
+            token_address_or_mint: bounded(TOKEN_ADDRESS),
         };
         assert_noop!(
             X3CrosschainGateway::submit_deposit_proof(RuntimeOrigin::signed(1), [1u8; 32], p),
@@ -1025,6 +1178,7 @@ fn request_withdrawal_empty_recipient_fails() {
         assert_noop!(
             X3CrosschainGateway::request_withdrawal(
                 RuntimeOrigin::signed(2),
+                [1u8; 32],
                 [9u8; 32],
                 ExternalChainId::BaseSepolia,
                 bounded(""),
@@ -1036,12 +1190,173 @@ fn request_withdrawal_empty_recipient_fails() {
 }
 
 #[test]
+fn request_withdrawal_requires_an_enabled_exact_route() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [99u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::RouteNotFound
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [8u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::WrongToken
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::EthereumSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::WrongChain
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100_001,
+            ),
+            Error::<Test>::AmountAboveMaximum
+        );
+
+        assert_ok!(X3CrosschainGateway::disable_route(
+            RuntimeOrigin::root(),
+            [1u8; 32],
+        ));
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::RouteDisabled
+        );
+    });
+}
+
+#[test]
+fn request_withdrawal_rejects_dry_run_route() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut dry_run = route();
+        dry_run.mode = GatewayMode::DryRun;
+        enable_route_for(dry_run);
+
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::ModeBlocksRelease
+        );
+    });
+}
+
+#[test]
+fn submit_release_proof_cannot_switch_to_another_route_with_the_same_asset() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+
+        let mut alternate_route = route();
+        alternate_route.route_id = [2u8; 32];
+        enable_route_for(alternate_route);
+        let withdrawal_id = request_burn_withdrawal(40);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_release_proof(
+                RuntimeOrigin::signed(1),
+                withdrawal_id,
+                [2u8; 32],
+                bounded_payload("release_proof_data"),
+            ),
+            Error::<Test>::WrongRoute
+        );
+    });
+}
+
+#[test]
+fn request_withdrawal_records_the_exact_route() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let withdrawal_id = expected_withdrawal_id(40);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+
+        assert_eq!(
+            crate::WithdrawalRoutes::<Test>::get(withdrawal_id).expect("route binding exists"),
+            [1u8; 32]
+        );
+    });
+}
+
+#[test]
+fn pre_route_binding_withdrawals_fail_closed() {
+    new_test_ext().execute_with(|| {
+        let withdrawal_id = [77u8; 32];
+        crate::Withdrawals::<Test>::insert(
+            withdrawal_id,
+            crate::WithdrawalRecord {
+                withdrawal_id,
+                x3_asset_id: [9u8; 32],
+                source_domain: crate::X3Domain::Native,
+                destination_chain: ExternalChainId::BaseSepolia,
+                recipient: bounded("0xRECIPIENT"),
+                amount: 40,
+                burned: false,
+                released: false,
+                created_at: 1,
+            },
+        );
+
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), withdrawal_id),
+            Error::<Test>::WithdrawalRouteMissing
+        );
+    });
+}
+
+#[test]
 fn request_withdrawal_zero_amount_fails() {
     new_test_ext().execute_with(|| {
         register_and_enable();
         assert_noop!(
             X3CrosschainGateway::request_withdrawal(
                 RuntimeOrigin::signed(2),
+                [1u8; 32],
                 [9u8; 32],
                 ExternalChainId::BaseSepolia,
                 bounded("0xRECIPIENT"),
@@ -1069,6 +1384,192 @@ fn credit_x3_representation_twice_fails() {
             X3CrosschainGateway::credit_x3_representation(RuntimeOrigin::signed(1), [1u8; 32]),
             Error::<Test>::InvalidTransferStatus
         );
+    });
+}
+
+#[test]
+fn credit_invokes_the_configured_mint_with_the_verified_binding() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let proof_id = [1u8; 32];
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [1u8; 32],
+            deposit_proof(proof_id, 100),
+        ));
+        assert!(take_credit_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::credit_x3_representation(
+            RuntimeOrigin::signed(1),
+            proof_id,
+        ));
+
+        assert_eq!(
+            take_credit_calls(),
+            vec![(
+                ExternalChainId::BaseSepolia
+                    .wrapped_chain_id()
+                    .expect("base sepolia id"),
+                [9u8; 32],
+                b"0xRECIPIENT".to_vec(),
+                100,
+                proof_id,
+            )]
+        );
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::X3Credited
+        );
+    });
+}
+
+#[test]
+fn mint_failure_rolls_the_credit_status_back_and_can_be_retried() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let proof_id = [1u8; 32];
+        assert_ok!(X3CrosschainGateway::submit_deposit_proof(
+            RuntimeOrigin::signed(1),
+            [1u8; 32],
+            deposit_proof(proof_id, 100),
+        ));
+
+        fail_next_credit();
+        assert_noop!(
+            X3CrosschainGateway::credit_x3_representation(RuntimeOrigin::signed(1), proof_id,),
+            DispatchError::Other("test deposit minter refused")
+        );
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::Verified
+        );
+        assert!(take_credit_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::credit_x3_representation(
+            RuntimeOrigin::signed(1),
+            proof_id,
+        ));
+        assert_eq!(take_credit_calls().len(), 1);
+        assert_eq!(
+            Pallet::<Test>::transfers(proof_id)
+                .expect("transfer")
+                .status,
+            GatewayTransferStatus::X3Credited
+        );
+    });
+}
+
+#[test]
+fn burn_invokes_the_configured_ledger_with_the_signed_account_and_withdrawal() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+
+        let withdrawal_id = request_burn_withdrawal(40);
+        assert_eq!(
+            take_burn_calls(),
+            vec![(
+                ExternalChainId::BaseSepolia
+                    .wrapped_chain_id()
+                    .expect("base sepolia id"),
+                [9u8; 32],
+                2u64.encode(),
+                40,
+                withdrawal_id,
+            )]
+        );
+    });
+}
+
+#[test]
+fn burn_failure_does_not_mark_the_withdrawal_burned_and_can_be_retried() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+        let withdrawal_id = expected_withdrawal_id(40);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+
+        fail_next_burn();
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), withdrawal_id,),
+            DispatchError::Other("test deposit minter refused burn")
+        );
+        assert!(
+            !crate::Withdrawals::<Test>::get(withdrawal_id)
+                .expect("withdrawal")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 0);
+        assert!(take_burn_calls().is_empty());
+
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            withdrawal_id,
+        ));
+        assert_eq!(take_burn_calls().len(), 1);
+        assert!(
+            crate::Withdrawals::<Test>::get(withdrawal_id)
+                .expect("withdrawal")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 40);
+    });
+}
+
+#[test]
+fn burn_respects_the_route_pending_limit() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut limited_route = route();
+        limited_route.pending_limit = 1;
+        enable_route_for(limited_route);
+        deposit_and_credit([1u8; 32], [1u8; 32], 200);
+
+        let first = expected_withdrawal_id(40);
+        let second = expected_withdrawal_id(50);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            50,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            first,
+        ));
+
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), second),
+            Error::<Test>::PendingLimitExceeded
+        );
+        assert!(
+            !crate::Withdrawals::<Test>::get(second)
+                .expect("second withdrawal still exists")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 40);
+        assert_eq!(crate::PendingWithdrawalCounts::<Test>::get([1u8; 32]), 1);
     });
 }
 
@@ -1110,7 +1611,7 @@ fn finalize_external_release_not_found_fails() {
 #[test]
 fn route_mode_guarded_live_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::GuardedLive;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1126,7 +1627,7 @@ fn route_mode_guarded_live_works() {
 #[test]
 fn route_mode_full_live_works() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::FullLive;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1142,7 +1643,7 @@ fn route_mode_full_live_works() {
 #[test]
 fn route_mode_disabled_blocks_deposit() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.mode = GatewayMode::Disabled;
         assert_ok!(X3CrosschainGateway::enable_route(RuntimeOrigin::root(), r));
@@ -1164,7 +1665,7 @@ fn route_mode_disabled_blocks_deposit() {
 #[test]
 fn credit_with_dispute_window_after_window() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.require_dispute_window = true;
         r.dispute_window_blocks = 10;
@@ -1190,7 +1691,7 @@ fn credit_with_dispute_window_after_window() {
 #[test]
 fn credit_with_dispute_window_before_close_fails() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         let mut r = route();
         r.require_dispute_window = true;
         r.dispute_window_blocks = 10;
@@ -1245,7 +1746,7 @@ fn register_asset_non_governance_fails() {
             X3CrosschainGateway::register_asset(
                 RuntimeOrigin::signed(1),
                 ExternalChainId::BaseSepolia,
-                bounded("0xTOKEN"),
+                bounded(TOKEN_ADDRESS),
                 [9u8; 32],
             ),
             sp_runtime::DispatchError::BadOrigin
@@ -1577,7 +2078,7 @@ fn stake_weighted_solana_finality_advances_and_enforces_the_slot_floor() {
                 [21u8; 32],
                 100,
                 21,
-                (400, 399, [8u8; 32], [7u8; 32]),
+                (400, 399, [6u8; 32], [8u8; 32], [7u8; 32]),
                 &[(&a, 60), (&b, 40)],
             ),
         ));
@@ -1595,7 +2096,7 @@ fn stake_weighted_solana_finality_advances_and_enforces_the_slot_floor() {
                     [22u8; 32],
                     100,
                     22,
-                    (399, 398, [6u8; 32], [5u8; 32]),
+                    (399, 398, [4u8; 32], [6u8; 32], [5u8; 32]),
                     &[(&a, 60), (&b, 40)],
                 ),
             ),
@@ -1626,7 +2127,7 @@ fn stake_weighted_solana_finality_rejects_less_than_two_thirds_stake() {
                     [23u8; 32],
                     100,
                     23,
-                    (400, 399, [8u8; 32], [7u8; 32]),
+                    (400, 399, [6u8; 32], [8u8; 32], [7u8; 32]),
                     &[(&a, 60)],
                 ),
             ),
@@ -1641,22 +2142,15 @@ fn stake_weighted_solana_finality_rejects_less_than_two_thirds_stake() {
 fn an_evm_route_refuses_a_proof_when_no_header_is_attested() {
     new_test_ext().execute_with(|| {
         forget_attested_header();
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, _, _, _) = evm_deposit_payload(100);
+        let (payload, _, _, _) = evm_deposit_payload([1u8; 32], 100);
 
         assert_noop!(
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );
@@ -1667,9 +2161,9 @@ fn an_evm_route_refuses_a_proof_when_no_header_is_attested() {
 #[test]
 fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
 
         // A different root attested at the same height: the receipt is real, the
         // trie is real, the walk is real — and it is not the chain's block.
@@ -1681,14 +2175,7 @@ fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );
@@ -1699,22 +2186,15 @@ fn an_evm_route_refuses_a_proof_for_a_header_the_chain_did_not_attest() {
 #[test]
 fn an_evm_route_verifies_a_proof_anchored_to_the_attested_header() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route());
-        let (payload, receipts_root, number, head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, head) = evm_deposit_payload([1u8; 32], 100);
         attest_header(receipts_root, number, head);
 
         assert_ok!(X3CrosschainGateway::submit_deposit_proof(
             RuntimeOrigin::signed(1),
             [5u8; 32],
-            deposit_proof_with(
-                [1u8; 32],
-                100,
-                ExternalChainId::BaseSepolia,
-                asset(),
-                1,
-                payload,
-            ),
+            evm_deposit_proof([1u8; 32], 100, payload),
         ));
         assert_eq!(Pallet::<Test>::external_locked([9u8; 32]), 100);
     });
@@ -1723,9 +2203,9 @@ fn an_evm_route_verifies_a_proof_anchored_to_the_attested_header() {
 #[test]
 fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
     new_test_ext().execute_with(|| {
-        register_asset(ExternalChainId::BaseSepolia, "0xTOKEN", [9u8; 32]);
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
         enable_route_for(evm_route()); // finality_requirement = 12
-        let (payload, receipts_root, number, _head) = evm_deposit_payload(100);
+        let (payload, receipts_root, number, _head) = evm_deposit_payload([1u8; 32], 100);
 
         // The payload claims a head 12 blocks past the header. The chain has
         // attested a head only 4 blocks past it, so the deposit is too shallow
@@ -1736,14 +2216,7 @@ fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
             X3CrosschainGateway::submit_deposit_proof(
                 RuntimeOrigin::signed(1),
                 [5u8; 32],
-                deposit_proof_with(
-                    [1u8; 32],
-                    100,
-                    ExternalChainId::BaseSepolia,
-                    asset(),
-                    1,
-                    payload,
-                ),
+                evm_deposit_proof([1u8; 32], 100, payload),
             ),
             Error::<Test>::VerificationFailed
         );
@@ -1752,9 +2225,15 @@ fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
 
 #[test]
 fn the_two_derivations_agree() {
-    let pallet_id =
-        crate::pallet::Pallet::<Test>::derive_withdrawal_id([9u8; 32], b"0xRECIPIENT", 1_000, 1);
-    let crate_id = x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", 1_000, 1);
+    let pallet_id = crate::pallet::Pallet::<Test>::derive_withdrawal_id(
+        [1u8; 32],
+        [9u8; 32],
+        b"0xRECIPIENT",
+        1_000,
+        1,
+    );
+    let crate_id =
+        x3_crosschain_gateway::gateway_withdrawal_id([1u8; 32], [9u8; 32], "0xRECIPIENT", 1_000, 1);
     assert_eq!(
         pallet_id, crate_id,
         "pallet {:?} vs crate {:?}",

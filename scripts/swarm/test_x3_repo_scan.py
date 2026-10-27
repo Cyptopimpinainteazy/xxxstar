@@ -420,10 +420,11 @@ def weight_exception_fixture(root: Path, *, measured: bool = False, other_litera
 def test_a_recorded_unmeasurable_weight_is_a_decision_not_a_finding(tmp_path: Path) -> None:
     """A call no benchmark can reach is rendered with its reason, not reported as a defect.
 
-    `register_external_root` fails at the runtime's `RefuseExternalRoots` verifier by policy, so no
-    benchmark can reach the stores the weight describes. The scanner has to tell that apart from a
-    literal somebody simply never measured — while still reporting every *other* literal in the same
-    pallet, and while failing the moment the recorded call becomes measurable.
+    `register_external_root` reaches a production verifier backed by runtime-specific finalized
+    header state, so the generic pallet benchmark cannot reach success without bypassing it. The
+    scanner has to tell that apart from a literal somebody simply never measured — while still
+    reporting every *other* literal in the same pallet, and while failing the moment the recorded
+    call becomes measurable.
     """
     weight_exception_fixture(tmp_path)
     assert by_kind(scan_findings(tmp_path), "pallet-call-without-weights") == []

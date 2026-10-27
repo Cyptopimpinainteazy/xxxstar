@@ -21,6 +21,7 @@ pub trait WeightInfo {
     fn claim_bonus() -> Weight;
     fn submit_cross_chain_operation() -> Weight;
     fn finalize_cross_chain_operation() -> Weight;
+    fn pay_validator_reward() -> Weight;
 }
 
 /// Weights for `pallet_x3_coin` using the Substrate node and recommended hardware.
@@ -116,6 +117,12 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
         Weight::from_parts(0, 0)
             .saturating_add(Weight::from_parts(0, 0))
             .saturating_add(T::DbWeight::get().writes(5_u64))
+    }
+    /// Conservative storage terms pending generated benchmarking on a release-build host.
+    fn pay_validator_reward() -> Weight {
+        Weight::from_parts(50_000_000, 4_096)
+            .saturating_add(T::DbWeight::get().reads(5_u64))
+            .saturating_add(T::DbWeight::get().writes(2_u64))
     }
 }
 
@@ -233,5 +240,11 @@ impl WeightInfo for () {
         Weight::from_parts(0, 0)
             .saturating_add(Weight::from_parts(0, 0))
             .saturating_add(DbWeight::get().writes(5_u64))
+    }
+    /// Conservative storage terms pending generated benchmarking on a release-build host.
+    fn pay_validator_reward() -> Weight {
+        Weight::from_parts(50_000_000, 4_096)
+            .saturating_add(DbWeight::get().reads(5_u64))
+            .saturating_add(DbWeight::get().writes(2_u64))
     }
 }

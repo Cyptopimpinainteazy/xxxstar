@@ -1,0 +1,76 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-24",
+  "candidate_commit": "3ee25e54ed77101e7560947aa1c2716b3aa0b164",
+  "commands": [
+    "cargo audit --json",
+    "cargo deny check advisories",
+    "cargo check -p x3-chain-node --lib",
+    "cargo test -p webpki-roots@0.25.5 --lib",
+    "cargo clippy -p webpki-roots@0.25.5 --all-targets --no-deps -- -D warnings"
+  ],
+  "before": {
+    "vulnerability_count": 10
+  },
+  "fixed": [
+    {
+      "advisory": "RUSTSEC-2026-0381",
+      "package": "webpki-roots 0.25.4",
+      "fix": "Added a 0.25.5 compatibility shim that re-exports the current 1.0.10 Mozilla root store using the 0.25 field names. It removes emSign ECC Root CA - G3.",
+      "verification": "The shim regression test passes, strict clippy passes, and x3-chain-node compiles through libp2p-websocket against the patched crate."
+    }
+  ],
+  "after": {
+    "vulnerability_count": 9,
+    "status": "BLOCKED",
+    "remaining": [
+      {
+        "advisory": "RUSTSEC-2026-0387",
+        "package": "crypto-bigint 0.5.5",
+        "path": "elliptic-curve 0.13 -> k256 0.13 / ecdsa 0.16",
+        "reason": "The patched release is crypto-bigint 0.7.6. Frontier and the ethers 2.x stack still require the 0.13 elliptic-curve/k256 line, so there is no semver-compatible lockfile fix."
+      },
+      {
+        "advisory": "RUSTSEC-2026-0349",
+        "package": "rustls 0.21.12",
+        "path": "ethers 2.x and legacy Solana websocket clients"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0346",
+        "package": "rustls 0.21.12",
+        "path": "ethers 2.x and legacy Solana websocket clients"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0382",
+        "package": "rustls-webpki 0.101.7",
+        "path": "rustls 0.21.12"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0381",
+        "package": "webpki-roots 0.24.0",
+        "path": "tungstenite 0.20.1"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0344",
+        "package": "ruzstd 0.8.3",
+        "path": "legacy smoldot"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0367",
+        "package": "zip 0.6.6",
+        "path": "svm-rs 0.3.5"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0368",
+        "package": "zip 0.6.6",
+        "path": "svm-rs 0.3.5"
+      },
+      {
+        "advisory": "RUSTSEC-2026-0369",
+        "package": "zip 0.6.6",
+        "path": "svm-rs 0.3.5"
+      }
+    ]
+  },
+  "launch_rule": "Any remaining reachable vulnerability is a launch blocker until it is upgraded, removed from the production graph, or covered by a reviewed advisory-scope record with an executable precondition."
+}

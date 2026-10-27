@@ -1,7 +1,7 @@
 use super::{IsolatedSigner, SignerError};
 use crate::wallet_core::ipc::{IntentDraft, Attestation, SignerCaps};
 use k256::ecdsa::{SigningKey, signature::Signer, Signature};
-use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::elliptic_curve::sec1::ToSec1Point;
 use sp_core::hashing::keccak_256;
 
 // In a real implementation this secret should be Zeroized on drop
@@ -24,7 +24,7 @@ impl EvmSigner {
 impl IsolatedSigner for EvmSigner {
     fn derive_address(&self, _path: &str) -> Result<String, SignerError> {
         let verifying_key = self.secret_key.verifying_key();
-        let encoded_point = verifying_key.to_encoded_point(false);
+        let encoded_point = verifying_key.to_sec1_point(false);
         let pubkey_bytes = &encoded_point.as_bytes()[1..]; // Remove the 0x04 format prefix
         let hash = keccak_256(pubkey_bytes);
         let address_bytes = &hash[12..32];

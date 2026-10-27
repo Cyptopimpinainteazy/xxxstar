@@ -429,10 +429,20 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // Same release: `submit_atomic_bundle` gains `execution_commitments` (one hash per
     // leg; a leg runs only the execution it committed to), so its encoding changed and
     // `transaction_version` goes to 2.
-    // 25: canonical X3Lang native trading, shared WASM verifier/interpreter,
-    // and appended asset/lender/venue registration calls. Existing call/event
-    // indices and transaction_version remain stable.
-    spec_version: 25,
+    // 25: canonical X3Lang native trading, shared WASM verifier/interpreter, and
+    // appended asset/lender/venue registration calls. Existing call/event indices and
+    // transaction_version remain stable.
+    // 26: `credit_x3_representation` completes the verified lock-mint path by
+    // calling the runtime's wrapped-asset minter atomically. The mint binds the route's
+    // numeric chain, X3 asset, 32-byte beneficiary, amount and full gateway proof id;
+    // a mint refusal rolls the transfer status back. One new wrapped-storage map, so no
+    // migration. No existing call encoding changed.
+    // 26: gateway withdrawals bind the exact route selected at request time. The
+    // route id lives in a new side map so existing withdrawal records keep their
+    // encoding; pre-upgrade records without a binding fail closed. Release proofs
+    // also consume per-route daily and pending limits. The request withdrawal call
+    // gains the route id argument.
+    spec_version: 26,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 2,
@@ -1246,9 +1256,7 @@ impl pallet_x3_automation::ActionDispatcher<AccountId> for RuntimeActionDispatch
             Action::TransferNative { recipient, amount } => {
                 let destination = AccountId::decode(&mut &recipient[..])
                     .map_err(|_| DispatchError::Other("AutomationRecipientUnavailable"))?;
-                let value: Balance = (*amount)
-                    .try_into()
-                    .map_err(|_| DispatchError::Other("AutomationAmountOutOfRange"))?;
+                let value: Balance = *amount;
                 Balances::transfer_keep_alive(
                     RuntimeOrigin::signed(owner.clone()),
                     sp_runtime::MultiAddress::Id(destination),
@@ -1975,12 +1983,14 @@ impl pallet_x3_kernel::Config for Runtime {
     // - WASM runtime / non-frontier: use inline interpreter adapters.
     //
     // These are two different EVMs, and the chain runs the second. Nodes execute the WASM runtime,
-    // which is built without `frontier`, so on chain the kernel's EVM is `mini_evm`: every execution
-    // starts from empty storage, with no deployed contract or account, and nothing it writes
-    // persists (`the_chains_evm_keeps_no_state_between_executions`). `pallet_evm` is wired in only
-    // for a native build with `frontier`, so a test run that way (`test runtime frontier`) is
-    // evidence about that build, not about the chain. This is also why `.x3` cannot make a
-    // cross-VM call: there is no stateful EVM or SVM for it to reach (X3-LANG-001).
+    // which is built without `frontier`, so on chain the kernel's EVM is the persistent `mini_evm`
+    // adapter: account, code, and storage state are read from and written to Substrate storage
+    // under the enclosing transaction. `pallet_evm` is wired in only for a native build with
+    // `frontier`, so a test run that way (`test runtime frontier`) is evidence about that build,
+    // not about the chain. The SVM adapter is a separate gap: it currently executes a payload as a
+    // standalone program with an empty account buffer, so it must not be described as stateful
+    // until account loading and write-back are wired. `.x3` cross-VM intrinsics therefore remain
+    // refused by name (X3-LANG-001), not silently routed to an interpreter without account state.
     #[cfg(all(feature = "std", feature = "frontier"))]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
     #[cfg(all(feature = "std", feature = "frontier"))]
@@ -3027,10 +3037,9 @@ impl pallet_x3_cross_vm_router::Config for Runtime {
     type Registry = X3AssetRegistry;
     type Ledger = RouterSupplyLedger;
     type ExternalExecutorOrigin = EnsureRootOrHalfCouncil;
-    // Refuses every external root: nothing in this runtime can bind a foreign chain's block
-    // root to that chain's consensus, and `register_external_root` writes a value the bridge
-    // surface later trusts. Wire a per-chain light client here and the extrinsic becomes usable;
-    // until then it fails closed with `ExternalRootVerificationUnavailable`.
+    // Binds external roots to finalized headers this runtime already verified.
+    // Ethereum requires the native beacon-sync-committee source; Solana and
+    // Bitcoin use their finalized header stores. Missing evidence fails closed.
     type ExternalRootVerifier = RuntimeExternalRootVerifier;
     type VmAdapterOrigin = EnsureX3LangGateway;
     type X3LangOrigin = EnsureX3LangGateway;
@@ -3133,8 +3142,10 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
                         "ExternalRootEvmNativeFinalityUnavailable",
                     ));
                 }
-                let header = pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::get()
-                    .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
+                let header = pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::get(
+                    u64::from(block_number),
+                )
+                .ok_or(DispatchError::Other("ExternalRootEvmHeaderUnavailable"))?;
                 verify_evm_root(
                     block_number as u64,
                     root_hash.0,
@@ -3148,8 +3159,10 @@ impl pallet_x3_cross_vm_router::ExternalRootVerifier<Runtime> for RuntimeExterna
                 )
             }
             EXTERNAL_ROOT_SOLANA => {
-                let header = pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::get()
-                    .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
+                let header = pallet_cross_chain_validator::FinalizedSvmHeaders::<Runtime>::get(
+                    u64::from(block_number),
+                )
+                .ok_or(DispatchError::Other("ExternalRootSvmHeaderUnavailable"))?;
                 verify_svm_root(
                     block_number as u64,
                     root_hash.0,
@@ -3215,6 +3228,57 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
         )
     }
 
+    fn solana_v4_verifier(
+        cluster: x3_verification_router::SolanaCluster,
+    ) -> Option<x3_verification_router::SolanaStakeWeightedVerifier> {
+        let chain = match cluster {
+            x3_verification_router::SolanaCluster::MainnetBeta => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaMainnet
+            }
+            x3_verification_router::SolanaCluster::Devnet => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet
+            }
+            x3_verification_router::SolanaCluster::Testnet => return None,
+        };
+        let committee = pallet_x3_crosschain_gateway::SolanaStakeCommittees::<Runtime>::get(chain)?;
+        let stakes = committee
+            .validators
+            .iter()
+            .map(|entry| x3_verification_router::SolanaValidatorStake {
+                pubkey: entry.pubkey,
+                stake: entry.stake,
+            })
+            .collect();
+        x3_verification_router::SolanaStakeWeightedVerifier::new(
+            cluster,
+            stakes,
+            committee.threshold_numerator,
+            committee.threshold_denominator,
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain),
+        )
+        .ok()
+    }
+
+    fn record_solana_v4_finalized_slot(
+        cluster: x3_verification_router::SolanaCluster,
+        slot: u64,
+    ) -> bool {
+        let chain = match cluster {
+            x3_verification_router::SolanaCluster::MainnetBeta => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaMainnet
+            }
+            x3_verification_router::SolanaCluster::Devnet => {
+                pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet
+            }
+            x3_verification_router::SolanaCluster::Testnet => return false,
+        };
+        let previous = pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain);
+        if slot > previous {
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::insert(chain, slot);
+        }
+        true
+    }
+
     fn get_latest_evm_header_hash() -> Option<H256> {
         pallet_cross_chain_validator::Pallet::<Runtime>::get_latest_evm_header_hash()
     }
@@ -3242,6 +3306,9 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x207f_ffff>;
     #[cfg(not(feature = "dev"))]
     type BtcPoWLimitBits = frame_support::traits::ConstU32<0x1d00_ffff>;
+    /// The governance-managed settlement gateway may submit verified external
+    /// proofs for any intent. Claims and refunds remain party-only.
+    type SettlementProofOrigin = EnsureSettlementGateway;
     /// Who may push Bitcoin headers in bulk (`x3SettlementEngine.submitBtcHeaders`).
     ///
     /// Root: this chain has no header relayer, and naming an account that does not exist yet
@@ -3253,19 +3320,18 @@ impl pallet_x3_settlement_engine::Config for Runtime {
     type ChallengePeriod = ChallengePeriod;
     type SettlementTimeoutBlocks = SettlementTimeoutBlocks;
     type CrossChainValidator = RuntimeCrossChainValidator;
-    /// `false`: the chain refuses an SVM settlement proof, because nothing binds
-    /// its transaction to the slot header it is checked against.
+    /// `false`: the chain refuses the legacy transaction-only SVM proof shape.
     ///
     /// The EVM path no longer needs this. It walks the receipt's Merkle-Patricia
     /// path to the header's receipts root — the one implementation of that check in
     /// the workspace, in `x3-verification-router`, shared with the relayer — and
     /// refuses a proof that does not carry one, so an EVM settlement stands on an
     /// inclusion proof rather than on a copy of the header's public fields
-    /// (TICKET-063). The SVM path verifies the transaction's signature and that it
-    /// names the attested blockhash, but nothing proves the transaction is *in* that
-    /// slot, so `RuntimeCrossChainValidator` cannot bind it and the chain says so
-    /// rather than settling it. Flip this to `true` only together with a validator
-    /// that binds the SVM evidence itself.
+    /// (TICKET-063). The stake-weighted V4 settlement path is independent of this
+    /// switch: it decodes the portable evidence, verifies the raw transaction and
+    /// finalized bank under the governance committee, binds intent economics, and
+    /// advances the persisted finalized-slot floor. This flag now controls only
+    /// the legacy slot-header path, which remains refused on the live runtime.
     type AllowUnboundSvmProofs = ConstBool<false>;
     // ── Protocol fee wiring ──────────────────────────────────────────────
     type SettlementFeeBps = SettlementProtocolFeeBps;
@@ -3276,6 +3342,89 @@ impl pallet_x3_settlement_engine::Config for Runtime {
 parameter_types! {
     /// 1-day rolling window expressed in 6-second blocks (~14400 blocks).
     pub const X3CrosschainDailyWindow: u64 = 14_400;
+}
+
+/// Couples the governed gateway's verified deposit to the wrapped-asset
+/// ledger. The gateway invokes this only after external proof verification,
+/// replay checks, and route limits have passed.
+pub struct GatewayDepositMinter;
+
+impl pallet_x3_crosschain_gateway::DepositMinter for GatewayDepositMinter {
+    fn credit_verified_deposit(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        recipient: &[u8],
+        amount: u128,
+        proof_id: [u8; 32],
+    ) -> sp_runtime::DispatchResult {
+        let beneficiary: [u8; 32] = recipient
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        pallet_x3_wrapped::Pallet::<Runtime>::credit_verified_deposit(
+            chain_id,
+            asset_id,
+            AccountId::from(beneficiary),
+            amount,
+            proof_id,
+        )
+    }
+
+    fn burn_verified_withdrawal(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        amount: u128,
+        withdrawal_id: [u8; 32],
+    ) -> sp_runtime::DispatchResult {
+        let account: [u8; 32] = account
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        pallet_x3_wrapped::Pallet::<Runtime>::burn_verified_withdrawal(
+            chain_id,
+            asset_id,
+            AccountId::from(account),
+            amount,
+            withdrawal_id,
+        )
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn prepare_benchmark(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        seed_balance: u128,
+    ) -> sp_runtime::DispatchResult {
+        let account: [u8; 32] = account
+            .try_into()
+            .map_err(|_| pallet_x3_crosschain_gateway::Error::<Runtime>::InvalidBeneficiary)?;
+        if !pallet_x3_wrapped::RegisteredWrappedAssets::<Runtime>::contains_key(asset_id) {
+            pallet_x3_wrapped::RegisteredWrappedAssets::<Runtime>::insert(
+                asset_id,
+                pallet_x3_wrapped::WrappedAssetConfig {
+                    native_asset_id: asset_id,
+                    max_wrapped_supply: u128::MAX,
+                    governance_weight_bps: 10_000,
+                    bridge_fee_bps: 0,
+                    status: pallet_x3_wrapped::WrappedAssetStatus::Active,
+                },
+            );
+        }
+        if seed_balance > 0 {
+            let account = AccountId::from(account);
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::insert(
+                (chain_id, asset_id, &account),
+                seed_balance,
+            );
+            pallet_x3_wrapped::WrappedSupply::<Runtime>::mutate(chain_id, asset_id, |supply| {
+                *supply = supply.saturating_add(seed_balance)
+            });
+            pallet_x3_wrapped::TotalWrappedSupply::<Runtime>::mutate(|supply| {
+                *supply = supply.saturating_add(seed_balance);
+            });
+        }
+        Ok(())
+    }
 }
 
 impl pallet_x3_crosschain_gateway::Config for Runtime {
@@ -3293,6 +3442,7 @@ impl pallet_x3_crosschain_gateway::Config for Runtime {
     /// difficulty checked — is what a Bitcoin deposit's block must be on, at its best chain's
     /// depth.
     type BtcHeaderAnchor = SettlementEngineBtcAnchor;
+    type DepositMinter = GatewayDepositMinter;
     type WeightInfo = pallet_x3_crosschain_gateway::weights::SubstrateWeight<Runtime>;
 }
 
@@ -4486,6 +4636,24 @@ mod benches {
     );
 }
 
+fn svm_program_data_for(svm_pubkey: &[u8]) -> Option<Vec<u8>> {
+    if svm_pubkey.len() != 32 {
+        return None;
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(svm_pubkey);
+    pallet_svm_runtime::ProgramData::<Runtime>::get(key).map(|data| data.into_inner())
+}
+
+fn svm_account_data_for(svm_pubkey: &[u8]) -> Option<Vec<u8>> {
+    if svm_pubkey.len() != 32 {
+        return None;
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(svm_pubkey);
+    pallet_svm_runtime::AccountData::<Runtime>::get(key).map(|data| data.into_inner())
+}
+
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
         fn version() -> sp_version::RuntimeVersion {
@@ -5076,37 +5244,11 @@ impl_runtime_apis! {
         }
 
         fn get_svm_program_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
-            // Get the SVM program bytecode for a deployed program address
-            // X3 (stable2512, RC-1 scope): pallet_evm is feature-gated under `frontier`.
-            #[cfg(feature = "frontier")]
-            {
-                use sp_core::H160;
-                if svm_pubkey.len() == 20 {
-                    let mut addr_bytes = [0u8; 20];
-                    addr_bytes.copy_from_slice(&svm_pubkey[..20]);
-                    let addr = H160::from(addr_bytes);
-                    let code = pallet_evm::AccountCodes::<Runtime>::get(addr);
-                    if !code.is_empty() {
-                        return Some(code);
-                    }
-                }
-            }
-            let _ = svm_pubkey;
-            None
+            svm_program_data_for(&svm_pubkey)
         }
 
         fn get_svm_account_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
-            // Get the SVM account data for a SVM address
-            use codec::Decode;
-            if svm_pubkey.len() != 32 { return None; }
-            let Ok(account_id) = AccountId::decode(&mut &svm_pubkey[..]) else { return None; };
-            // Return account data including balance and nonce
-            let balance = pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &0u32);
-            let nonce = frame_system::Pallet::<Runtime>::account_nonce(&account_id);
-            let mut data = Vec::new();
-            data.extend_from_slice(&balance.encode());
-            data.extend_from_slice(&nonce.encode());
-            Some(data)
+            svm_account_data_for(&svm_pubkey)
         }
 
         fn get_svm_slot_history(limit: u32) -> Vec<u64> {
@@ -5939,17 +6081,17 @@ mod settlement_proof_posture_tests {
     /// The EVM path binds the receipt itself now: it walks the receipt's
     /// Merkle-Patricia path to the header's receipts root (TICKET-063), so a proof
     /// without that path is refused as `Ok(false)` — a proof that is not evidence.
-    /// The SVM path has no such binding yet, so the runtime states that it cannot
-    /// verify one at all and the refusal says why; that is the flag's remaining
-    /// scope, and this test is the runtime's half of it.
+    /// The new SVM V4 path is bound by the stake-weighted transaction/bank
+    /// verifier. This test covers the legacy slot-header shape instead: the live
+    /// runtime must still refuse it unless an operator explicitly enables an
+    /// unbound validator that is not part of the mainnet posture.
     #[test]
-    fn the_chain_refuses_external_settlement_proofs_until_they_are_bound() {
+    fn the_chain_refuses_legacy_unbound_svm_settlement_proofs() {
         let svm_allowed: bool = <<Runtime as pallet_x3_settlement_engine::Config>::AllowUnboundSvmProofs
             as frame_support::traits::Get<bool>>::get();
         assert!(
             !svm_allowed,
-            "the chain runtime must state the safe value: setting it true is a claim that the \
-             configured validator binds the SVM evidence itself, and nothing in this workspace does"
+            "the live chain must keep the legacy unbound SVM path disabled"
         );
 
         // The SVM refusal happens before the proof is inspected, so a minimal
@@ -6009,6 +6151,40 @@ mod settlement_proof_posture_tests {
                 "an EVM proof that does not carry the receipt's trie path is not evidence, and the \
                  chain says so the same way it says any other proof is invalid"
             );
+        });
+    }
+}
+
+#[cfg(all(test, feature = "std"))]
+mod svm_runtime_api_storage_tests {
+    use super::*;
+
+    #[test]
+    fn svm_runtime_api_reads_svm_program_and_account_storage() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            let program_id = [0x11; 32];
+            let account_id = [0x22; 32];
+            let bytecode = vec![
+                0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x95, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00,
+            ];
+            let account_data = vec![0x42, 0x43, 0x44, 0x45];
+
+            pallet_svm_runtime::ProgramData::<Runtime>::insert(
+                program_id,
+                frame_support::BoundedVec::try_from(bytecode.clone())
+                    .expect("test program is within the bytecode bound"),
+            );
+            pallet_svm_runtime::AccountData::<Runtime>::insert(
+                account_id,
+                frame_support::BoundedVec::try_from(account_data.clone())
+                    .expect("test account data is within the bound"),
+            );
+
+            assert_eq!(svm_program_data_for(&program_id), Some(bytecode));
+            assert_eq!(svm_account_data_for(&account_id), Some(account_data));
+            assert_eq!(svm_program_data_for(&program_id[..20]), None);
+            assert_eq!(svm_account_data_for(&account_id[..31]), None);
         });
     }
 }
@@ -6074,15 +6250,19 @@ mod vm_adapter_tests {
             "the refusal has to name the reason, got: {message}"
         );
     }
+}
 
+#[cfg(all(test, feature = "std"))]
+mod adapter_selection_tests {
     #[test]
-    fn test_wasm_builds_use_mocks() {
-        // Verify WASM builds still use mock adapters
-        #[cfg(not(feature = "std"))]
-        {
-            // In WASM, adapters should be mocks
-            // This test ensures no_std compatibility
-        }
+    fn runtime_does_not_select_mock_vm_adapters() {
+        // The no-frontier runtime uses the inline interpreters, not the test mocks. Keep this
+        // assertion tied to the selected adapter types rather than to a comment: a future
+        // feature-gate change must not make a production runtime silently fall back to a mock.
+        assert!(
+            !super::runtime_uses_mock_vm_adapters(),
+            "production runtime selected a mock VM adapter"
+        );
     }
 }
 

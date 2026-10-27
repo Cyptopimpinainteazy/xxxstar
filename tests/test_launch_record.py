@@ -318,7 +318,6 @@ class LaunchRecord(unittest.TestCase):
         self.assertEqual(len(record["validators"]["entries"]), 7)
         self.assertEqual(len(record["approvals"]), 3)
         self.assertEqual(len(record["record_sha256"]), 64)
-
     def test_a_capability_at_94_is_refused(self) -> None:
         matrix = self.root / "FEATURE_MATRIX.toml"
         matrix.write_text(

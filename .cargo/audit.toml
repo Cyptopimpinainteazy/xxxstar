@@ -54,6 +54,25 @@ ignore = [
     # ---- h2 0.3.27 ------------------------------------------------------------
     "RUSTSEC-2026-0258",   # server-side DoS; this tree only runs the client half
 
+    # ---- stale 2026 lock entries no configured target builds ------------------
+    # cargo tree --target all --all-features resolves none of these; cargo-deny's
+    # graph therefore cannot encounter them. LOCK_ONLY_ADVISORIES in
+    # scripts/check-advisory-scope.py enforces the audit-only split.
+    "RUSTSEC-2026-0344",   # ruzstd 0.8.3
+    "RUSTSEC-2026-0346",   # rustls 0.21.12
+    "RUSTSEC-2026-0349",   # rustls 0.21.12
+    "RUSTSEC-2026-0367",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
+    "RUSTSEC-2026-0368",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
+    "RUSTSEC-2026-0369",   # zip 0.6.7 (vendored from 0.6.6; Windows-only target)
+    "RUSTSEC-2026-0381",   # webpki-roots 0.24.0
+    "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7
+
+    # ---- crypto-bigint 0.5.5 pinned by Substrate/Frontier ---------------------
+    # X3-owned k256 consumers are on 0.14 / crypto-bigint 0.7.8 and 0.7.10. The remaining
+    # 0.5.5 copy is upstream public-input verification/recovery; the accepted
+    # exposure and re-review trigger are recorded in security/advisory-scope.toml.
+    "RUSTSEC-2026-0387",
+
     # ---- unsound, with no upgrade path from this tree -------------------------
     # cargo-deny treats `unsound` as an error and offers no policy switch for it, so
     # these are named individually instead of waved through: a *new* unsound advisory
@@ -62,4 +81,21 @@ ignore = [
     "RUSTSEC-2026-0002",   # lru 0.12.5 IterMut aliasing; 0.12 is pinned by libp2p-identify 0.44/0.45
     "RUSTSEC-2026-0253",   # lru LruCache::pop panic safety; same pin
     "RUSTSEC-2026-0191",   # solana_rbpf 0.8.5 EbpfVm::invoke_function; dev/test-only path
+
+    # ---- ethers 2.x / solana 3.0.14 / stable2512 transitives, 2026-10-26 -------
+    # Accepted risk, recorded rather than fixed: every patched version below is a
+    # breaking major held by an upstream crate this workspace does not own, so the
+    # remedy is an upstream release or leaving ethers 2.x, not a version bump here.
+    # Each entry names the path found by `cargo tree -e all -i <crate>` and what
+    # bounds the exposure. Remove an entry the moment it stops matching; `-D
+    # advisory-not-detected` is what makes that happen automatically.
+    "RUSTSEC-2026-0344",   # ruzstd 0.8.3 (>=0.9.1) DoS via smoldot wasm decode; that caller caps output with BlockDecodingStrategy::UptoBytes(max_allowed), so the bomb is bounded where it is used
+    "RUSTSEC-2026-0346",   # rustls 0.21.12 (>=0.23.46) Debug leaks session secrets; only via reqwest 0.11 / hyper-rustls 0.24 (ethers 2.x, solana); needs the app to Debug-format a client session, which nothing here does
+    "RUSTSEC-2026-0349",   # rustls 0.21.12 (>=0.23.46) ServerHello can downgrade later connections to classical key exchange; same legacy client path, and TLS auth itself still holds (C:L, not a confidentiality break)
+    "RUSTSEC-2026-0367",   # zip 0.6.6 (>=9.0.0) SUID/SGID preserved on extract; zip reaches only x3-bot and x3-foundry-core via svm-rs, which extracts official solc archives fetched over HTTPS
+    "RUSTSEC-2026-0368",   # zip 0.6.6 (>=9.0.0) symlink target escapes destination on extract; same single svm-rs caller; ethers-solc never calls extract
+    "RUSTSEC-2026-0369",   # zip 0.6.6 (>=9.0.0) permissions applied through symlink; same caller and same bound
+    "RUSTSEC-2026-0381",   # webpki-roots 0.24.0/0.25.4 (>=1.0.10) bundled roots trust distrusted emSign intermediates; these two versions reach only tungstenite 0.20 / reqwest 0.11, while the current reqwest 0.12 and hyper-rustls 0.27 paths already use 1.0.10
+    "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7 (>=0.103.16) may accept distrusted intermediates; reached through rustls 0.21.12 and libp2p-tls 0.4/0.5; 0.103.16 is already resolved alongside and is the version the 0.23 chain verifies with
+    "RUSTSEC-2026-0387",   # crypto-bigint 0.5.5 (>=0.7.6) timing variability in constant-time ops; via elliptic-curve 0.13.8 -> ethers-signers secp256k1 signing, so it is a local side channel against key operations, not a remote break
 ]

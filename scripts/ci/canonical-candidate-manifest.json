@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "purpose": "Reproducible file provenance for one X3 PUBLIC TESTNET integration candidate; not launch authorization",
+  "execution_parent_sha": "b4f1dab956a19871c46605507ba7853aa98cb55a",
+  "required_upstream_security_commit": "754ad4687f8b227e776a7a639064d1499dd06682",
+  "release_profile": "mainnet-rc1",
+  "external_bridges_must_remain_disabled": true,
+  "source_overlays": [
+    {
+      "pr": 681,
+      "head_sha": "b3bb21ee3ecb39ad29039473d04968e0e2642b80",
+      "files": [
+        {
+          "path": ".github/workflows/testnet-checker.yml",
+          "blob_sha": "bed7cea9dcf3b9bb5368863a731b4d8212a45884"
+        },
+        {
+          "path": "tests/testnet/check_seven_validators.py",
+          "blob_sha": "ab98c6a60cb523457265abbca2aec7e4c2145344"
+        },
+        {
+          "path": "tests/testnet/README.md",
+          "blob_sha": "e27802ed42075005b9d01999ae7f8df18084dfc3"
+        },
+        {
+          "path": "tests/testnet/test_checker.py",
+          "blob_sha": "4272c20897465e32e4faf80b7a601a82762c6cf1"
+        }
+      ]
+    },
+    {
+      "pr": 683,
+      "head_sha": "e59e7189ec0473b523caeafdb787c6c304e0e833",
+      "files": [
+        {
+          "path": ".github/workflows/x3-ci-autopilot.yml",
+          "blob_sha": "046377046ad5221e604814695863b98699bac4db"
+        },
+        {
+          "path": "scripts/ci/autopilot_capacity.py",
+          "blob_sha": "8ca32b2e977da8bb38cc23faaad5f995f9134bb7"
+        },
+        {
+          "path": "scripts/ci/autopilot_triage.py",
+          "blob_sha": "bf0bce35ab30dfc226514515d1f2c7bbe046ffe2"
+        },
+        {
+          "path": "scripts/ci/AUTOPILOT.md",
+          "blob_sha": "4fef4bce38aceba46258c81b65ab676f88bb9711"
+        },
+        {
+          "path": "scripts/ci/autopilot.py",
+          "blob_sha": "ef48de63f102c28faaf1a99602f47a555e76e621"
+        },
+        {
+          "path": "scripts/ci/github_evidence.py",
+          "blob_sha": "6bf8ed4511d993357f486badf6a44c73d411697d"
+        },
+        {
+          "path": "scripts/ci/integration_audit.py",
+          "blob_sha": "2a9a28a188411fc13a781c949a1ca67651af21a8"
+        },
+        {
+          "path": "scripts/ci/integration_e2e.py",
+          "blob_sha": "ba067777d6c82f93dee9c5c4cf87ccfae603efde"
+        },
+        {
+          "path": "scripts/ci/integration_join.py",
+          "blob_sha": "b9f2b7af6f734ccf08995bc898fc0ac51ab2c08f"
+        },
+        {
+          "path": "scripts/ci/PR_AGENT_INTEGRATION.md",
+          "blob_sha": "559f9334a469dbf1af30a3c613ea0714af2ae403"
+        },
+        {
+          "path": "scripts/ci/review_evidence.py",
+          "blob_sha": "e318041f6a38bc6ad2641316a04989086b4b6a5c"
+        },
+        {
+          "path": "scripts/ci/test_autopilot_capacity.py",
+          "blob_sha": "59ec8fbae7761d04ebf59b98aca84d972e787aba"
+        },
+        {
+          "path": "scripts/ci/test_autopilot_triage.py",
+          "blob_sha": "6adecee137e8861eb8e663da488c651bda325d4d"
+        },
+        {
+          "path": "scripts/ci/test_autopilot.py",
+          "blob_sha": "00ad9db66c3be1f9bdfb0b6f82814730191ccde4"
+        },
+        {
+          "path": "scripts/ci/test_github_evidence.py",
+          "blob_sha": "205f28fbad0f558adbae97fd5fa4db9a4cf19e30"
+        },
+        {
+          "path": "scripts/ci/test_integration_audit.py",
+          "blob_sha": "18cfe7922024ff49befce113c3c57ffe0c3dc076"
+        },
+        {
+          "path": "scripts/ci/test_integration_e2e.py",
+          "blob_sha": "ee9a6d3b2936718c571341a97d6e3f079c81a06f"
+        },
+        {
+          "path": "scripts/ci/test_integration_join.py",
+          "blob_sha": "365f9f64e570c902df930bdbbc9bc795e8602703"
+        },
+        {
+          "path": "scripts/ci/test_review_evidence.py",
+          "blob_sha": "5ab0f247af5be79e7fd7e8a447b5bcfc39790576"
+        }
+      ]
+    },
+    {
+      "pr": 691,
+      "head_sha": "b1910d79efddf9c4c5b3c0fdedc0837861ca38c2",
+      "files": [
+        {
+          "path": ".github/workflows/local-ci.yml",
+          "blob_sha": "266ea661597f3e6bb3dfcb7cef2451e48e74d530"
+        },
+        {
+          "path": ".github/workflows/x3-python-preflight.yml",
+          "blob_sha": "b2b3e269931bdc71e6933e7b1d676767ddfee125"
+        },
+        {
+          "path": "requirements-dev.txt",
+          "blob_sha": "10145228e3ba6908a1bdadb9a94325549a87d10b"
+        },
+        {
+          "path": "tests/test_ci_python_preflight.py",
+          "blob_sha": "96f9e7790adb4ba3dc88fe1c55c9e4d46c505fb2"
+        }
+      ]
+    },
+    {
+      "pr": 700,
+      "head_sha": "b7a175409391579427c6b320705b3705c422f274",
+      "files": [
+        {
+          "path": ".github/workflows/x3-public-launch-guardian.yml",
+          "blob_sha": "bdbd9c1f68e89bf5897360063085e24f0dc2da79"
+        },
+        {
+          "path": "scripts/ci/PUBLIC_LAUNCH_GUARDIAN.md",
+          "blob_sha": "f25f57cff93846f3e62d8e7763eb637b3e22259c"
+        },
+        {
+          "path": "scripts/ci/public_launch_guardian.py",
+          "blob_sha": "983a2da7584b38d49d742da0fad7ad1e0e9b6bb4"
+        },
+        {
+          "path": "scripts/ci/public-launch-policy.json",
+          "blob_sha": "9bd8b7a2765d90a4949d005b220cde50e287c293"
+        },
+        {
+          "path": "scripts/ci/test_public_launch_guardian.py",
+          "blob_sha": "05a7c767a31d168cbb95c98b2713618bc1d24576"
+        }
+      ]
+    },
+    {
+      "pr": 701,
+      "head_sha": "29e1972d148d02ab9ab4dd3f0e0dea7b28497ff6",
+      "files": [
+        {
+          "path": ".github/workflows/x3-automation-consensus.yml",
+          "blob_sha": "efda6d32261b445ef4a441b11cdd45bea3e4f74c"
+        }
+      ]
+    },
+    {
+      "pr": 702,
+      "head_sha": "15a56beb229f252a4a5ab13e9980a79e53fe1e0b",
+      "files": [
+        {
+          "path": ".github/workflows/queue-drain.yml",
+          "blob_sha": "3b356d673bca99b79d196af41789bd43086e55e4"
+        },
+        {
+          "path": "scripts/ci/queue_audit.py",
+          "blob_sha": "c3d2384ce5180fa841409551f814f8b10889ff82"
+        },
+        {
+          "path": "scripts/ci/test_queue_audit.py",
+          "blob_sha": "5c32b9fcde1d27563827c3e933750c47e5addb33"
+        }
+      ]
+    }
+  ],
+  "explicit_exclusions": [
+    {
+      "pr": 701,
+      "files": [
+        "pallets/x3-automation/src/lib.rs",
+        "pallets/x3-automation/src/tests.rs"
+      ],
+      "reason": "Older Action::Noop API conflicts with integrated Action::NoChange execution; integration's own fail-closed behavior retained"
+    }
+  ],
+  "required_proofs": [
+    {
+      "gate": "atomic_execution",
+      "evidence": "real runtime rollback, conservation, authorization and replay tests"
+    },
+    {
+      "gate": "real_dex_liquidity",
+      "evidence": "registered on-chain reserves; no fabricated pool fallback"
+    },
+    {
+      "gate": "stateful_evm",
+      "evidence": "live persistent storage, correct transaction origin, metered gas and deployed contract tests"
+    },
+    {
+      "gate": "svm_onchain",
+      "evidence": "actual on-chain program execution with cross-VM rollback and state checks"
+    },
+    {
+      "gate": "external_bridges",
+      "evidence": "disabled for candidate; enabling later requires finality proof, signer quorum, refunds and independent audit"
+    },
+    {
+      "gate": "validator_economics",
+      "evidence": "staking/slashing policy, reward payout results and security budget"
+    },
+    {
+      "gate": "security",
+      "evidence": "exact-head scanner results and independent consensus/runtime/custody/contract reviews"
+    },
+    {
+      "gate": "operations",
+      "evidence": "seven physically independent validators, upgrade/restore/fault drills, monitoring and incident response"
+    }
+  ],
+  "release_authorized": false
+}

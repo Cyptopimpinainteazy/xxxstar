@@ -398,6 +398,8 @@ mod tests {
             block_number: None,
             owner_id: Some("worker-a".into()),
             fence: Some(7),
+            release_beacon_number: None,
+            release_beacon_hash: None,
             prepared_at: 100,
             updated_at: 101,
             error: None,

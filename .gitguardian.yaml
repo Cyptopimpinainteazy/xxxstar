@@ -1,0 +1,8 @@
+version: 2
+
+secret:
+  ignored_matches:
+    - name: public-solana-spl-token-program-id
+      # SHA256 of the canonical public SPL Token program address in the historical
+      # Solana bridge fixture. This is a protocol identifier, not an API key or secret.
+      match: 3df99733e34ba92be4040448ef74357301e4e05f072dad52fc401f17e9834285

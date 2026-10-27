@@ -2,7 +2,7 @@
 //! Run with: cargo run -p x3-atomic-swap --features std --bin gen_wallet
 
 use k256::ecdsa::SigningKey;
-use rand::rngs::OsRng;
+use k256::elliptic_curve::Generate;
 use sha3::Digest;
 
 fn main() {
@@ -11,8 +11,7 @@ fn main() {
     println!("=============================================\n");
 
     // Generate random private key
-    let mut rng = OsRng;
-    let signing_key = SigningKey::random(&mut rng);
+    let signing_key = SigningKey::try_generate().expect("OS cryptographic randomness");
 
     // Get private key bytes
     let private_key_bytes = signing_key.to_bytes();
@@ -20,7 +19,7 @@ fn main() {
 
     // Derive address
     let verifying_key = signing_key.verifying_key();
-    let public_key_bytes = verifying_key.to_encoded_point(false);
+    let public_key_bytes = verifying_key.to_sec1_point(false);
     let public_key = public_key_bytes.as_bytes();
     let hash = sha3::Keccak256::digest(&public_key[1..]);
     let address_bytes = &hash[12..];

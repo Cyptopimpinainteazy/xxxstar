@@ -1,0 +1,74 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-26",
+  "candidate_commit": "cdee9080e",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-p0-integration-20261025",
+  "scope": "Ethereum lock-mint and burn-release production wiring",
+  "issue_fixed": "The governed gateway verified an EVM deposit and emitted X3RepresentationCredited, but no on-chain minter consumed that event; burn_x3_representation likewise marked a withdrawal burned without debiting the wrapped balance. The gateway therefore did not complete the lock-mint or burn-release lifecycle.",
+  "implementation": [
+    "Add a runtime-configured DepositMinter boundary for the governed gateway.",
+    "Bind gateway credit to pallet-x3-wrapped with the route chain id, X3 asset id, proof-bound 32-byte beneficiary, amount, and full gateway proof id.",
+    "Bind gateway burn to the signed caller's account, route chain id, X3 asset id, amount, and withdrawal id.",
+    "Add full 32-byte proof-id and withdrawal-id replay maps instead of truncating ids into the existing u64 nonce space.",
+    "Keep mint and burn failures atomic with gateway status, pending-withdrawal, collateral, and event writes.",
+    "Add runtime-benchmark preparation for the wrapped asset and caller balance.",
+    "Move spec_version to 25 and regenerate runtime WASM hashes with two agreeing srtool builds."
+  ],
+  "verification": [
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --locked -p pallet-x3-wrapped -p pallet-x3-crosschain-gateway -p x3-chain-runtime --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 193,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy --locked -p pallet-x3-wrapped -p pallet-x3-crosschain-gateway -p x3-chain-runtime --all-targets -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check --locked -p pallet-x3-crosschain-gateway -p pallet-x3-wrapped -p x3-chain-runtime --features runtime-benchmarks",
+      "result": "PASS"
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo test --locked -p pallet-cross-chain-validator --features runtime-benchmarks --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 36,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo check --locked -p x3-chain-node --features mainnet-v1",
+      "result": "PASS"
+    },
+    {
+      "command": "bash scripts/update-runtime-hashes.sh",
+      "result": "PASS",
+      "detail": "Two from-scratch srtool builds against cdee9080e agreed on x3-chain-25 compact and compressed artifacts."
+    },
+    {
+      "command": "python3 scripts/feature_matrix.py check",
+      "result": "PASS",
+      "features": 153,
+      "warnings": 42
+    },
+    {
+      "command": "python3 scripts/x3_audit_matrix.py --check",
+      "result": "PASS"
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "A mint failure leaves the gateway transfer Verified and allows a later retry.",
+    "A burn failure leaves the withdrawal unburned, pending supply unchanged, and allows a later retry.",
+    "A second mint with the same 32-byte proof id is refused.",
+    "A second burn with the same withdrawal id is refused.",
+    "A non-32-byte X3 beneficiary is refused with the gateway's typed error.",
+    "The wrapped balance and per-chain/global supply move together on mint and burn.",
+    "Unsupported or non-representable external chain ids fail closed."
+  ],
+  "limitations": [
+    "This proves the on-chain gateway-to-wrapped lifecycle with real dispatch and storage transitions; it does not prove a public-chain transaction.",
+    "The gateway weight for the new cross-pallet mint and burn is conservative and must be regenerated with the FRAME benchmark CLI before mainnet.",
+    "The production 5-of-7 signer ceremony, HSM policy, rotation, and external audit remain open.",
+    "No public Ethereum canary has moved value."
+  ]
+}

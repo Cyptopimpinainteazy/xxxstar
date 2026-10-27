@@ -1,6 +1,34 @@
 {
   "_comment": "npm advisories this project has looked at and accepted. Written by scripts/check-npm-audit.py --update. critical and high findings can never appear here -- the gate fails on them unconditionally. An entry that stops being reported fails too, so the file cannot outlive the exposure it describes. Every entry was measured, not assumed: see .ai/reports/npm-audit-20260925.md.",
   "allowed": {
+    "apps/explorer": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/inferstructor-dashboard": {
+      "@vitest/mocker": "moderate",
+      "@vitest/ui": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/x3-desktop": {
+      "@vitest/coverage-v8": "moderate",
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "apps/x3-studio": {
+      "@vitest/mocker": "moderate"
+    },
+    "infra-structure/services/blockchain-tps": {
+      "nodemailer": "moderate"
+    },
+    "packages/atomic-swap-sdk": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
+    "packages/blockchain-connector": {
+      "@vitest/mocker": "moderate",
+      "vitest": "moderate"
+    },
     "packages/polkawallet-bridge-adapter": {
       "@acala-network/eth-providers": "low",
       "@acala-network/eth-transactions": "low",
@@ -28,6 +56,9 @@
       "elliptic": "low",
       "ethers": "low",
       "pontem-types-bundle": "low"
+    },
+    "packages/polkawallet-plugin": {
+      "fast-uri": "moderate"
     }
   }
 }

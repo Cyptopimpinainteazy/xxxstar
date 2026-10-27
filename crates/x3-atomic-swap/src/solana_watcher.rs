@@ -11,7 +11,6 @@
 //! 3. Parse the transaction instructions to extract Lock/Claim/Refund events.
 //! 4. Return decoded `HtlcEvent` records for the relayer to consume.
 use alloc::string::ToString;
-use alloc::vec;
 
 use crate::error::SwapError;
 use crate::event_watcher::HtlcEvent;

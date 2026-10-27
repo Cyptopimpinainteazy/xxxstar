@@ -7,7 +7,7 @@ use frame_system as system;
 use sp_core::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
-    BuildStorage,
+    BuildStorage, DispatchError, DispatchResult,
 };
 
 pub type AccountId = u64;
@@ -16,6 +16,73 @@ pub type _BlockNumber = u64;
 
 pub type _UncheckedExtrinsic = system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = system::mocking::MockBlock<Test>;
+pub type CreditCall = (u32, [u8; 32], Vec<u8>, u128, [u8; 32]);
+pub type BurnCall = (u32, [u8; 32], Vec<u8>, u128, [u8; 32]);
+
+thread_local! {
+    static CREDIT_CALLS: std::cell::RefCell<Vec<CreditCall>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static BURN_CALLS: std::cell::RefCell<Vec<BurnCall>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+    static FAIL_NEXT_CREDIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FAIL_NEXT_BURN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+pub struct TestDepositMinter;
+
+impl DepositMinter for TestDepositMinter {
+    fn credit_verified_deposit(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        recipient: &[u8],
+        amount: u128,
+        proof_id: [u8; 32],
+    ) -> DispatchResult {
+        if FAIL_NEXT_CREDIT.with(|flag| flag.replace(false)) {
+            return Err(DispatchError::Other("test deposit minter refused"));
+        }
+        CREDIT_CALLS.with(|calls| {
+            calls
+                .borrow_mut()
+                .push((chain_id, asset_id, recipient.to_vec(), amount, proof_id));
+        });
+        Ok(())
+    }
+
+    fn burn_verified_withdrawal(
+        chain_id: u32,
+        asset_id: [u8; 32],
+        account: &[u8],
+        amount: u128,
+        withdrawal_id: [u8; 32],
+    ) -> DispatchResult {
+        if FAIL_NEXT_BURN.with(|flag| flag.replace(false)) {
+            return Err(DispatchError::Other("test deposit minter refused burn"));
+        }
+        BURN_CALLS.with(|calls| {
+            calls
+                .borrow_mut()
+                .push((chain_id, asset_id, account.to_vec(), amount, withdrawal_id));
+        });
+        Ok(())
+    }
+}
+
+pub fn take_credit_calls() -> Vec<CreditCall> {
+    CREDIT_CALLS.with(|calls| std::mem::take(&mut *calls.borrow_mut()))
+}
+
+pub fn fail_next_credit() {
+    FAIL_NEXT_CREDIT.with(|flag| flag.set(true));
+}
+
+pub fn take_burn_calls() -> Vec<BurnCall> {
+    BURN_CALLS.with(|calls| std::mem::take(&mut *calls.borrow_mut()))
+}
+
+pub fn fail_next_burn() {
+    FAIL_NEXT_BURN.with(|flag| flag.set(true));
+}
 
 construct_runtime!(
     pub enum Test
@@ -74,6 +141,7 @@ impl pallet_x3_crosschain_gateway::Config for Test {
     type DailyLimitWindowBlocks = DailyWindow;
     type EvmHeaderAnchor = MockEvmAnchor;
     type BtcHeaderAnchor = MockBtcAnchor;
+    type DepositMinter = TestDepositMinter;
     type WeightInfo = ();
 }
 
@@ -113,13 +181,16 @@ impl x3_verification_router::evm_receipt::EvmHeaderAnchor for MockEvmAnchor {
 /// Record what this chain has attested: a receipts root at a height, and the
 /// attested head it is measured against.
 pub fn attest_header(receipts_root: [u8; 32], number: u64, head: u64) {
+    let header_rlp = evm_header_rlp(receipts_root, number);
+    let header = x3_verification_router::evm_receipt::EvmBlockHeader::decode(&header_rlp)
+        .expect("test header");
     ATTESTED.with(|cell| {
         *cell.borrow_mut() = Some((
             x3_verification_router::evm_receipt::AnchoredEvmHeader {
                 number,
                 receipts_root,
-                state_root: [0u8; 32],
-                block_hash: [0u8; 32],
+                state_root: header.state_root,
+                block_hash: x3_verification_router::evm_receipt::keccak256_32(&header_rlp),
             },
             head,
         ))
@@ -131,6 +202,10 @@ pub fn forget_attested_header() {
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
+    take_credit_calls();
+    take_burn_calls();
+    FAIL_NEXT_CREDIT.with(|flag| flag.set(false));
+    FAIL_NEXT_BURN.with(|flag| flag.set(false));
     let t = frame_system::GenesisConfig::<Test>::default()
         .build_storage()
         .unwrap();
@@ -147,10 +222,17 @@ pub fn bounded_payload(s: &str) -> BoundedVec<u8, ConstU32<4096>> {
     BoundedVec::try_from(s.as_bytes().to_vec()).unwrap()
 }
 
+pub const TOKEN_ADDRESS: &str = "0x1111111111111111111111111111111111111111";
+pub const EVM_GATEWAY: [u8; 20] = [0xaa; 20];
+pub const EVM_SENDER: [u8; 20] = [0xbb; 20];
+pub const EVM_BENEFICIARY: [u8; 32] = [0xcc; 32];
+pub const EVM_NONCE: u64 = 1;
+pub const BASE_SEPOLIA_CHAIN_ID: u64 = 84_532;
+
 pub fn asset() -> ExternalAssetRef {
     ExternalAssetRef {
         chain_id: ExternalChainId::BaseSepolia,
-        token_address_or_mint: bounded("0xTOKEN"),
+        token_address_or_mint: bounded(TOKEN_ADDRESS),
     }
 }
 
@@ -179,7 +261,7 @@ pub fn route() -> RouteConfig {
         mode: GatewayMode::TestnetLive,
         require_dispute_window: false,
         dispute_window_blocks: 0,
-        contract_address: bounded("0xGATEWAY"),
+        contract_address: bounded20(EVM_GATEWAY),
     }
 }
 
@@ -281,7 +363,7 @@ pub fn evm_route() -> RouteConfig {
         route_id: [5u8; 32],
         x3_asset_id: [9u8; 32],
         verification_level: RouteVerificationLevel::EvmReceiptProof,
-        contract_address: bounded20([0xaa; 20]),
+        contract_address: bounded20(EVM_GATEWAY),
         ..route()
     }
 }
@@ -298,17 +380,35 @@ pub fn valid_proof_payload() -> BoundedVec<u8, ConstU32<4096>> {
 ///
 /// Returns `(payload, receipts_root, block_number, head)` — the caller attests
 /// that root at that height (or does not, to prove the route refuses).
-pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
+pub fn evm_deposit_payload(
+    proof_id: [u8; 32],
+    amount: u128,
+) -> (BoundedVec<u8, ConstU32<4096>>, [u8; 32], u64, u64) {
     use x3_verification_router::evm_receipt::{
         deposit_locked_selector, encode_proof_payload, receipt_trie_key,
     };
 
-    let contract = [0xaa; 20]; // `evm_route().contract_address`
-    let mut log_data = [0u8; 32];
-    log_data[16..].copy_from_slice(&amount.to_be_bytes());
+    let mut log_data = vec![0u8; 192];
+    log_data[31] = 128;
+    log_data[48..64].copy_from_slice(&amount.to_be_bytes());
+    log_data[88..96].copy_from_slice(&EVM_NONCE.to_be_bytes());
+    log_data[120..128].copy_from_slice(&BASE_SEPOLIA_CHAIN_ID.to_be_bytes());
+    log_data[159] = EVM_BENEFICIARY.len() as u8;
+    log_data[160..].copy_from_slice(&EVM_BENEFICIARY);
+    let token =
+        crate::pallet::evm_address_bytes(TOKEN_ADDRESS.as_bytes()).expect("test token address");
+    let mut token_topic = [0u8; 32];
+    token_topic[12..].copy_from_slice(&token);
+    let mut sender_topic = [0u8; 32];
+    sender_topic[12..].copy_from_slice(&EVM_SENDER);
     let log = rlp_list(&[
-        rlp_bytes(&contract),
-        rlp_list(&[rlp_bytes(&deposit_locked_selector())]),
+        rlp_bytes(&EVM_GATEWAY),
+        rlp_list(&[
+            rlp_bytes(&deposit_locked_selector()),
+            rlp_bytes(&proof_id),
+            rlp_bytes(&token_topic),
+            rlp_bytes(&sender_topic),
+        ]),
         rlp_bytes(&log_data),
     ]);
     // Post-Byzantium receipt: [status, cumulative_gas_used, logs].
@@ -329,6 +429,24 @@ pub fn evm_deposit_payload(amount: u128) -> (BoundedVec<u8, ConstU32<4096>>, [u8
         block_number,
         head,
     )
+}
+
+pub fn evm_deposit_proof(
+    proof_id: [u8; 32],
+    amount: u128,
+    payload: BoundedVec<u8, ConstU32<4096>>,
+) -> DepositProof {
+    let mut proof = deposit_proof_with(
+        proof_id,
+        amount,
+        ExternalChainId::BaseSepolia,
+        asset(),
+        EVM_NONCE,
+        payload,
+    );
+    proof.sender = bounded20(EVM_SENDER);
+    proof.recipient = BoundedVec::try_from(EVM_BENEFICIARY.to_vec()).expect("beneficiary fits");
+    proof
 }
 
 fn rlp_bytes(bytes: &[u8]) -> Vec<u8> {

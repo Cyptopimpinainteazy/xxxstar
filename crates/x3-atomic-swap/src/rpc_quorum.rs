@@ -13,8 +13,6 @@
 //!
 //! The per-provider attestation [`RpcQuorumProof`] defined in the ledger module
 //! is used directly — this module does **not** redefine it.
-#[cfg(not(feature = "std"))]
-use alloc::vec;
 
 use crate::error::SwapError;
 use crate::intent::ChainKind;
@@ -302,6 +300,7 @@ impl ConsolidatedQuorum {
 mod tests {
     use super::*;
     use crate::ledger::TxStatus;
+    use alloc::vec;
 
     fn make_proof(provider: &str, agreement_count: u32, required_quorum: u32) -> RpcQuorumProof {
         RpcQuorumProof {

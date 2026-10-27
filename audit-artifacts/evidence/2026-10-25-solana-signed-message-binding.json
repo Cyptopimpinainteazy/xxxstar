@@ -1,0 +1,46 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-25",
+  "candidate_commit": "affed59d2540822e10b3a714f18d059ef532e033",
+  "scope": "x3-lang Solana transaction proof",
+  "issue_fixed": "The transaction verifier checked Ed25519 signatures over message bytes but read transfer instructions from a caller-supplied JSON array that was not covered by those bytes. A valid signature could therefore be combined with detached transfer claims.",
+  "implementation": [
+    "Decode the serialized legacy Solana message directly.",
+    "Require every signer declared by the message header and reject signatures from non-signer account keys.",
+    "Bind the proof blockhash to the recent blockhash embedded in the signed message.",
+    "Decode instruction program ids, account keys, and data from the signed message.",
+    "Require SPL Token or Token-2022 transferChecked data whose mint, destination, and amount match the bridge request.",
+    "Refuse versioned messages that require unresolved address-table account keys.",
+    "Ignore caller-supplied instruction JSON for authorization."
+  ],
+  "verification": [
+    {
+      "command": "cargo test -p x3-lang-vm",
+      "workdir": "x3-lang",
+      "result": "PASS",
+      "unit_tests_passed": 107,
+      "integration_results": "All integration test binaries passed"
+    },
+    {
+      "command": "cargo clippy -p x3-lang-vm --all-targets -- -D warnings",
+      "workdir": "x3-lang",
+      "result": "PASS"
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "workdir": "x3-lang",
+      "result": "PASS"
+    }
+  ],
+  "negative_tests": [
+    "A request for a different receiver is refused.",
+    "Caller-supplied instructions claiming a different amount are refused.",
+    "A proof blockhash that differs from the signed message is refused.",
+    "A versioned message requiring address-table resolution is refused."
+  ],
+  "limitations": [
+    "The verifier intentionally supports legacy Solana messages only until resolved address-table keys can be authenticated.",
+    "No live Solana devnet or mainnet-beta RPC run was performed.",
+    "This binds transfer instructions to the signed transaction message; it does not independently reconstruct Solana bank state."
+  ]
+}

@@ -148,6 +148,17 @@ pub struct OperationAttemptLedger<S: AttemptStore> {
     store: S,
 }
 
+/// Identity and lease context for a newly started operation attempt.
+pub struct OperationAttemptStart<'a> {
+    pub session_id: &'a str,
+    pub operation: CoordinatorOperation,
+    pub attempt_id: &'a str,
+    pub owner_id: &'a str,
+    pub fence: u64,
+    pub domain: &'a str,
+    pub started_at: u64,
+}
+
 impl<S: AttemptStore> OperationAttemptLedger<S> {
     pub fn new(store: S) -> Self {
         Self { store }
@@ -155,26 +166,20 @@ impl<S: AttemptStore> OperationAttemptLedger<S> {
 
     pub fn record_started(
         &self,
-        session_id: &str,
-        operation: CoordinatorOperation,
-        attempt_id: &str,
-        owner_id: &str,
-        fence: u64,
-        domain: &str,
-        now: u64,
+        start: OperationAttemptStart<'_>,
     ) -> Result<OperationAttempt, CoordinatorError> {
         let attempt = OperationAttempt {
-            session_id: session_id.to_string(),
-            operation,
-            attempt_id: attempt_id.to_string(),
-            owner_id: owner_id.to_string(),
-            fence,
-            domain: domain.to_string(),
+            session_id: start.session_id.to_string(),
+            operation: start.operation,
+            attempt_id: start.attempt_id.to_string(),
+            owner_id: start.owner_id.to_string(),
+            fence: start.fence,
+            domain: start.domain.to_string(),
             status: OperationAttemptStatus::Started,
             tx_id: None,
             proof_hash: None,
-            started_at: now,
-            updated_at: now,
+            started_at: start.started_at,
+            updated_at: start.started_at,
             error: None,
         };
         self.store.append_attempt(&attempt)?;
@@ -319,15 +324,15 @@ mod tests {
     fn attempt_history_records_started_broadcast_and_finalized() {
         let ledger = ledger();
         let started = ledger
-            .record_started(
-                "swap-a",
-                CoordinatorOperation::FastClaim,
-                "attempt-1",
-                "relayer-a",
-                7,
-                "ethereum",
-                100,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-a",
+                operation: CoordinatorOperation::FastClaim,
+                attempt_id: "attempt-1",
+                owner_id: "relayer-a",
+                fence: 7,
+                domain: "ethereum",
+                started_at: 100,
+            })
             .unwrap();
         let broadcast = ledger.record_broadcast(&started, "0xabc", 101).unwrap();
         let canonical = ledger
@@ -351,29 +356,29 @@ mod tests {
     fn canonical_proof_hash_is_immutable() {
         let ledger = ledger();
         let first = ledger
-            .record_started(
-                "swap-a",
-                CoordinatorOperation::FastClaim,
-                "attempt-1",
-                "relayer-a",
-                7,
-                "ethereum",
-                100,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-a",
+                operation: CoordinatorOperation::FastClaim,
+                attempt_id: "attempt-1",
+                owner_id: "relayer-a",
+                fence: 7,
+                domain: "ethereum",
+                started_at: 100,
+            })
             .unwrap();
         let first = ledger.record_broadcast(&first, "0xaaa", 101).unwrap();
         ledger.record_finalized(&first, [0x22; 32], 102).unwrap();
 
         let second = ledger
-            .record_started(
-                "swap-a",
-                CoordinatorOperation::FastClaim,
-                "attempt-2",
-                "relayer-b",
-                8,
-                "ethereum",
-                103,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-a",
+                operation: CoordinatorOperation::FastClaim,
+                attempt_id: "attempt-2",
+                owner_id: "relayer-b",
+                fence: 8,
+                domain: "ethereum",
+                started_at: 103,
+            })
             .unwrap();
         let second = ledger.record_broadcast(&second, "0xbbb", 104).unwrap();
         let err = ledger
@@ -393,15 +398,15 @@ mod tests {
     fn failed_attempt_is_retained_without_becoming_canonical() {
         let ledger = ledger();
         let started = ledger
-            .record_started(
-                "swap-a",
-                CoordinatorOperation::RefundBoth,
-                "attempt-1",
-                "relayer-a",
-                4,
-                "solana",
-                100,
-            )
+            .record_started(OperationAttemptStart {
+                session_id: "swap-a",
+                operation: CoordinatorOperation::RefundBoth,
+                attempt_id: "attempt-1",
+                owner_id: "relayer-a",
+                fence: 4,
+                domain: "solana",
+                started_at: 100,
+            })
             .unwrap();
         ledger
             .record_failed(&started, "rpc timeout", 101)

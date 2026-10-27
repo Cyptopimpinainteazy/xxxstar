@@ -9,9 +9,10 @@
 //! The other five are recorded in `docs/reports/benchmark-exceptions.md` and enforced by
 //! `UNMEASURABLE_CALL_WEIGHTS` in `scripts/swarm/x3_repo_scan.py`. Four are gated on the
 //! custody-backed gateway origin, whose `try_successful_origin` returns `Err` because no account is
-//! always authorized; the fifth (`register_external_root`) fails at this runtime's
-//! `RefuseExternalRoots` verifier by policy, so no benchmark can reach the stores its weight
-//! describes. Measuring a path the chain never executes would report a cost *below* the real one.
+//! always authorized. The fifth (`register_external_root`) reaches a verifier whose evidence is
+//! runtime-specific finalized-header state; the generic pallet benchmark cannot fabricate that
+//! state without bypassing the production verifier, so the call charges its declared compute plus
+//! the verifier's storage reads rather than pretending to measure a path the chain never executes.
 
 #![cfg(feature = "runtime-benchmarks")]
 

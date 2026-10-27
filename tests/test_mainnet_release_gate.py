@@ -146,6 +146,22 @@ def test_p0_capability_and_claim_hygiene_counts_cannot_drift(tmp_path):
     ]
 
 
+def test_claim_hygiene_scanner_failure_blocks_release(tmp_path, monkeypatch):
+    matrix, _ = matrix_fixture(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts/x3_audit_matrix.py").write_text("# fixture checker\n")
+    monkeypatch.setattr(gate, "audit_artifact_errors", lambda root: [])
+    monkeypatch.setattr(
+        gate,
+        "claims_hygiene_errors",
+        lambda root: ["claims hygiene scanner failed: forbidden claim reintroduced"],
+    )
+
+    errors = gate.check_p0_scope(matrix_path=matrix, repo_root=tmp_path)
+
+    assert errors == ["claims hygiene scanner failed: forbidden claim reintroduced"]
+
+
 def test_one_p0_row_at_94_fails(tmp_path):
     matrix, _ = matrix_fixture(tmp_path)
     features = gate.load_matrix(matrix)["feature"]
@@ -162,6 +178,28 @@ def test_a_nonempty_p0_blocker_list_fails(tmp_path):
     assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == [
         "X3-P0-000: P0 release has 1 open blocker: "
         "External mainnet proof is still pending"
+    ]
+
+
+def test_a_closed_blocker_is_not_open_launch_work(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    features = gate.load_matrix(matrix)["feature"]
+    features[0]["blockers"] = [
+        "**CLOSED 2026-10-25 — the historical blocker was fixed and verified**"
+    ]
+    assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == []
+
+
+def test_a_closed_blocker_does_not_hide_a_separate_open_blocker(tmp_path):
+    matrix, _ = matrix_fixture(tmp_path)
+    features = gate.load_matrix(matrix)["feature"]
+    features[0]["blockers"] = [
+        "**CLOSED 2026-10-25 — the historical blocker was fixed and verified**",
+        "Live external-chain evidence is still pending",
+    ]
+    assert gate.evaluate_p0_scope({"feature": features}, tmp_path) == [
+        "X3-P0-000: P0 release has 1 open blocker: "
+        "Live external-chain evidence is still pending"
     ]
 
 

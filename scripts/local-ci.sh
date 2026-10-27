@@ -352,6 +352,11 @@ GATES_FAST=(
   # inside a window recorded in `security/advisory-scope.toml`, or if the resolved set drifts from
   # that record -- so a lockfile bump cannot quietly turn a verified judgement into a stale claim.
   "advisory scope:python3 scripts/check-advisory-scope.py"
+  # The security fix spans two semver-incompatible zstd API lines and a
+  # Windows-only zip dependency. Audit proves the lock has no affected version;
+  # this gate proves the vendored replacements compile and retain their
+  # failure-mode regressions.
+  "vendored zstd patch regressions:bash scripts/ci/test-zstd-patches.sh"
   # Every KV of the EVM/SVM *external* surface has to be either proven against a real
   # testnet or explicitly closed. None can be proven here, so this checks the closure:
   # the gate in the code, the behavioural refusal test behind it, and the flag in
@@ -486,6 +491,17 @@ GATES_FAST=(
   # include the Merkle-proof guards (`test_verify_empty_merkle_proof`,
   # `test_verify_too_short_merkle_proof`); a warm run is seconds, a cold one about a minute.
   "test x3-cross-vm-bridge:cargo test -p x3-cross-vm-bridge"
+  # The Bitcoin vault owns X3's threshold-signing state machine and SPV checks.
+  # It had no dedicated gate, so its signer and withdrawal tests only ran under
+  # the slow whole-workspace job.
+  "clippy x3-bitcoin-vault:cargo clippy --locked -p x3-bitcoin-vault --all-targets -- -D warnings"
+  "test x3-bitcoin-vault:cargo test --locked -p x3-bitcoin-vault"
+  # The coordinator verifies release beacons, but verification is only useful
+  # when the authority path can actually sign and exchange them. This gate
+  # covers the shared statement primitive, durable exchange, equivocation
+  # refusal, real HTTP round trip, finalized-head parser and signer.
+  "clippy x3-release-beacon:cargo clippy --locked -p x3-release-beacon --all-targets -- -D warnings"
+  "test x3-release-beacon:cargo test --locked -p x3-release-beacon"
   # `x3-gpu-validator-swarm` decides whether a GPU validator's attestation is acceptable, and
   # nothing ran its tests: no gate named it, and it is not a crate `FEATURE_REGISTRY.toml` cites, so
   # `registry tests are gated` did not reach it either. Its `UnifiedProof::validate()` accepted any
@@ -695,9 +711,9 @@ GATES_FAST=(
   # pre-guard false success measurable. Same feature set the `frontier` variant builds, whole suite
   # rather than one filter.
   # Note what this measures: `frontier` swaps the kernel's EVM to `pallet_evm` for a *native* build
-  # only. The chain runs the WASM runtime, whose kernel EVM is the stateless `mini_evm`, so a pass
-  # here is evidence about the frontier build, not about the chain's EVM (see the adapter selection
-  # in runtime/src/lib.rs and X3-LANG-001).
+  # only. The chain runs the WASM runtime, whose kernel EVM is the persistent `mini_evm` adapter,
+  # so a pass here is evidence about the frontier build, not about the chain's EVM (see the adapter
+  # selection in runtime/src/lib.rs and X3-LANG-001).
   "test runtime frontier:env SKIP_WASM_BUILD=1 cargo test -p x3-chain-runtime --no-default-features --features std,frontier"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:bash scripts/x3-failure-packet.sh --label settlement-engine -- cargo test -p pallet-x3-settlement-engine"

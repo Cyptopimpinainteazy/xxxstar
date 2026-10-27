@@ -71,8 +71,6 @@ def test_router_scope_guard_permits_only_the_explicit_mainnet_v1_exception() -> 
         source,
     )
 
-
-
 def test_the_bridge_kill_switch_is_never_set_at_genesis() -> None:
     """`ExternalBridgesEnabled` cannot be baked into a chain spec by any feature.
 

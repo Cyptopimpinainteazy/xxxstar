@@ -8,10 +8,6 @@
 //! provider. In this implementation, the adapter simulates on-chain behavior
 //! with full verification logic so the relayer and scoreboard can be tested
 //! end-to-end without a live chain.
-#[cfg(not(feature = "std"))]
-use alloc::borrow::ToOwned;
-#[cfg(not(feature = "std"))]
-use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;

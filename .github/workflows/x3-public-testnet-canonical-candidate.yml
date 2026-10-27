@@ -1,0 +1,147 @@
+name: X3 Canonical Public Testnet Candidate
+
+# Tests one exact candidate commit, never a synthetic PR merge, and never deploys.
+on:
+  pull_request:
+    branches:
+      - master
+      - fix/x3-public-testnet-integration-gates-20261026
+    paths:
+      - '.github/workflows/x3-public-testnet-canonical-candidate.yml'
+      - 'scripts/ci/canonical-candidate-manifest.json'
+      - 'scripts/ci/verify_canonical_candidate.py'
+      - 'scripts/ci/test_canonical_candidate.py'
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'crates/**'
+      - 'node/**'
+      - 'x3-lang/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x3-canonical-testnet-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  source-and-security-ancestry:
+    # Never run arbitrary fork code on a physical validator/CI worker.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 20
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable candidate head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+      - name: Isolate Python source-contract tests
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/x3-candidate-python"
+          "$RUNNER_TEMP/x3-candidate-python/bin/python" -m pip install --disable-pip-version-check -r requirements-dev.txt
+          echo "$RUNNER_TEMP/x3-candidate-python/bin" >> "$GITHUB_PATH"
+      - name: Verify release contract regressions
+        run: python3 -m unittest discover -s scripts/ci -p test_canonical_candidate.py -v
+      - name: Verify guardian and runner evidence regressions
+        run: |
+          python3 -m unittest discover -s scripts/ci -p test_public_launch_guardian.py -v
+          python3 -m unittest discover -s scripts/ci -p test_queue_audit.py -v
+      - name: Confirm frozen source files, disabled bridge profile and upstream security ancestor
+        run: |
+          python3 scripts/ci/verify_canonical_candidate.py \
+            --expected-head "$EXPECTED_HEAD" \
+            --output "$RUNNER_TEMP/x3-canonical-source-evidence.json"
+          {
+            echo '## Canonical source evidence'
+            echo '```json'
+            cat "$RUNNER_TEMP/x3-canonical-source-evidence.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish source evidence for review, not deployment
+        if: always()
+        # The verifier output above is also written to the job summary and log.
+        # Artifact quota or service failures must not turn a passed source gate
+        # into a false release failure or weaken the verification itself.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-source-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/x3-canonical-source-evidence.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  atomic-consensus-invariants:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      CARGO_BUILD_JOBS: '6'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact-head checkout and available toolchain
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          command -v cargo || test -x "$HOME/.cargo/bin/cargo"
+      - name: Format entire canonical workspace
+        run: cargo fmt --all -- --check
+      - name: Test canonical atomic kernel, router, settlement, real liquidity and validator slashing
+        run: |
+          cargo test --locked \
+            -p pallet-x3-atomic-kernel \
+            -p pallet-x3-cross-vm-router \
+            -p pallet-x3-settlement-engine \
+            -p pallet-atomic-trade-engine \
+            -p pallet-x3-consensus
+      - name: Verify trading receipt replay and language identity
+        run: cargo test --locked -p x3-x3-integration --test x3lang_trading_receipt_replay
+      - name: Verify nested X3Lang compiler tests
+        run: cargo test --locked --manifest-path x3-lang/Cargo.toml -p x3-lang-compiler
+
+  vm-and-economic-contracts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 120
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      CARGO_BUILD_JOBS: '6'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert exact-head checkout and available toolchain
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          command -v cargo || test -x "$HOME/.cargo/bin/cargo"
+      - name: Check narrowed public-testnet RC1 node separately
+        run: cargo check --locked -p x3-chain-node --features mainnet-rc1 --all-targets
+      - name: Check optional Frontier production profile separately (not RC1)
+        # The runtime has a separate post-RC1 construct_runtime! variant.
+        # Combining mainnet-rc1 and frontier would request a deliberately
+        # unsupported feature combination, not prove stateful EVM execution.
+        run: cargo check --locked -p x3-chain-node --features frontier --all-targets
+      - name: Run real EVM and SVM integration unit suites
+        run: cargo test --locked -p x3-evm-integration -p x3-svm-integration -p x3-gateway --lib
+      - name: Validate economics policy against actual genesis allocations
+        run: bash scripts/mainnet/x3_economic_model_gate.sh --quiet
+      - name: Record mandatory evidence not proved by unit tests
+        run: |
+          echo '::warning::Unit tests do not prove live stateful EVM, on-chain SVM, real seven-validator finality, independent security audit, fee payouts, external bridge finality or incident recovery.'
+          echo '## Public testnet proof scope' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This suite only verifies compilation, unit/integration tests and static economics policy on the exact candidate head.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**Release authorization remains denied** until live runtime, physical network, and independent audit artifacts are separately verified.' >> "$GITHUB_STEP_SUMMARY"

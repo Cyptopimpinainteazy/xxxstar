@@ -1,0 +1,35 @@
+[package]
+name = "x3-release-beacon"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+axum = { version = "0.8", optional = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true, features = ["std"] }
+reqwest = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive", "std"] }
+serde_json = { workspace = true, optional = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, optional = true }
+zeroize = { version = "1.7", optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[features]
+default = ["service"]
+service = [
+    "dep:axum",
+    "dep:reqwest",
+    "dep:serde_json",
+    "dep:tokio",
+    "dep:zeroize",
+]
+
+[[bin]]
+name = "x3-release-beacon"
+path = "src/main.rs"
+required-features = ["service"]

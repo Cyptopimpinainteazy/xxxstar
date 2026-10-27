@@ -12,17 +12,20 @@ path = "src/main.rs"
 tokio = { version = "1.35", features = ["full"] }
 tokio-util = "0.7"
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_bytes = "0.11"
 serde_json = "1.0"
 serde_yaml = "0.9"
 anyhow = "1.0"
 thiserror = "1.0"
 log = "0.4"
-blake2b_simd = "1.0"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand = "0.8"
 sha2 = "0.10"
+base64 = "0.22"
+bs58 = "0.5"
 env_logger = "0.11"
 reqwest = { version = "0.12", features = ["json", "blocking"] }
+axum = { version = "0.8", optional = true }
 hex = { version = "0.4", default-features = false }
 sha3 = "0.10"
 codec = { workspace = true, default-features = false }
@@ -30,6 +33,7 @@ sp-core = { workspace = true }
 x3-cross-vm-bridge = { path = "../cross-vm-bridge" }
 x3-finality-oracle = { path = "../x3-finality-oracle" }
 x3-verification-router = { path = "../x3-verification-router" }
+x3-runtime-signer = { path = "../x3-runtime-signer" }
 # RLP for the consensus encoding of a receipt — the leaf a receipts trie holds.
 rlp = { version = "0.5", default-features = false }
 # The settlement engine's proof type, which is what a produced proof has to
@@ -46,7 +50,7 @@ x3-gateway-risk-engine = { path = "../x3-gateway-risk-engine" }
 # gateway pallet can consume `ValidatorSignature` / `SvmProof` /
 # `EvmProof` without pulling in tokio.
 default = ["std"]
-std = []
+std = ["dep:axum"]
 
 [dev-dependencies]
 tokio-test = "0.4"

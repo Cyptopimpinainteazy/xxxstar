@@ -28,8 +28,9 @@
 use crate::types::EvmProof;
 use serde_json::{json, Value};
 use x3_verification_router::evm_receipt::{
-    encode_proof_payload, keccak256_32, receipt_trie_key, receipts_trie_proof, receipts_trie_root,
-    verify_merkle_patricia_proof, EvmBlockHeader,
+    deposit_locked_selector, encode_proof_payload, keccak256_32, receipt_trie_key,
+    receipts_trie_proof, receipts_trie_root, verify_merkle_patricia_proof, DecodedProof,
+    EvmBlockHeader, EvmReceipt, EvmReceiptExpectations,
 };
 
 /// A receipt's inclusion in a block's receipts trie, as the settlement engine
@@ -143,32 +144,197 @@ impl ReceiptInclusion {
         ))
     }
 
-    /// Bind this inclusion to a specific X3 deposit and relayer nonce.
-    pub fn evm_proof(
-        &self,
-        source_domain: u32,
-        expected_recipient: Vec<u8>,
-        expected_amount: u128,
-        proof_nonce: u32,
-        min_confirmations: u64,
-    ) -> Result<EvmProof, ProducerError> {
-        if expected_recipient.len() != 20 {
+    /// Bind this inclusion to the exact `DepositLocked` event the proof claims.
+    pub fn evm_proof(&self, binding: EvmProofBinding) -> Result<EvmProof, ProducerError> {
+        if binding.expected_beneficiary.is_empty() || binding.expected_beneficiary.len() > 128 {
             return Err(ProducerError::Malformed(format!(
-                "X3 EVM recipient is {} bytes, expected 20",
-                expected_recipient.len()
+                "X3 EVM beneficiary is {} bytes, expected 1..=128",
+                binding.expected_beneficiary.len()
             )));
         }
         Ok(EvmProof {
-            source_domain,
+            source_domain: binding.source_domain,
+            proof_id: binding.proof_id,
             block_hash: self.block_hash,
             state_root: self.state_root,
             finalized_block: self.block_number,
-            proof_nonce,
-            proof_payload: self.verification_payload(min_confirmations)?,
-            expected_recipient,
-            expected_amount,
+            proof_nonce: binding.proof_nonce,
+            proof_payload: self.verification_payload(binding.min_confirmations)?,
+            source_asset: binding.source_asset,
+            expected_sender: binding.expected_sender,
+            expected_contract: binding.expected_contract,
+            expected_beneficiary: binding.expected_beneficiary,
+            expected_nonce: binding.expected_nonce,
+            expected_amount: binding.expected_amount,
         })
     }
+
+    /// Derive a proof directly from the receipt's one matching
+    /// `DepositLocked` event. This is the production constructor: none of the
+    /// event fields are supplied by the caller except the configured gateway.
+    pub fn evm_proof_for_deposit(
+        &self,
+        source_domain: u32,
+        proof_nonce: u32,
+        min_confirmations: u64,
+        expected_gateway: [u8; 20],
+    ) -> Result<EvmProof, ProducerError> {
+        let receipt = EvmReceipt::decode(&self.receipt_rlp)
+            .map_err(|error| ProducerError::Malformed(error.to_string()))?;
+        let event = receipt
+            .deposit_locked_event(expected_gateway)
+            .map_err(|error| ProducerError::Malformed(error.to_string()))?;
+        if event.chain_id != u64::from(source_domain) {
+            return Err(ProducerError::Malformed(format!(
+                "DepositLocked chain id {} does not match source domain {}",
+                event.chain_id, source_domain
+            )));
+        }
+        self.evm_proof(EvmProofBinding {
+            source_domain,
+            proof_id: event.message_id,
+            source_asset: event.token,
+            expected_sender: event.depositor,
+            expected_contract: event.gateway,
+            expected_beneficiary: event.beneficiary,
+            expected_nonce: event.nonce,
+            proof_nonce,
+            expected_amount: event.amount,
+            min_confirmations,
+        })
+    }
+}
+
+/// Convert the relayer's portable EVM proof into the settlement engine's typed
+/// `SettlementProof`.
+///
+/// The portable proof carries the canonical verifier payload, not the runtime
+/// SCALE type. This function decodes that payload under the event fields the
+/// relayer claims and refuses any mismatch, then binds the resulting receipt,
+/// roots, block height, confirmations, and trie path into one runtime call.
+pub fn settlement_proof_from_evm_proof(
+    proof: &EvmProof,
+) -> Result<pallet_x3_settlement_engine::SettlementProof, ProducerError> {
+    use frame_support::{traits::ConstU32, BoundedVec};
+    use pallet_x3_settlement_engine::{
+        ProofType, SettlementProof, MAX_MERKLE_PROOF_DEPTH, MAX_RECEIPT_DATA_SIZE,
+        MAX_TRIE_PROOF_SIZE,
+    };
+
+    if proof.proof_payload.len() < 16 {
+        return Err(ProducerError::Malformed(
+            "EVM proof payload is shorter than its block-height header".to_string(),
+        ));
+    }
+    let current_block =
+        u64::from_le_bytes(proof.proof_payload[0..8].try_into().map_err(|_| {
+            ProducerError::Malformed("EVM proof current block is truncated".into())
+        })?);
+    let min_confirmations =
+        u64::from_le_bytes(proof.proof_payload[8..16].try_into().map_err(|_| {
+            ProducerError::Malformed("EVM proof confirmation bound is truncated".into())
+        })?);
+    let decoded = DecodedProof::decode(
+        &proof.proof_payload[16..],
+        EvmReceiptExpectations {
+            amount: proof.expected_amount,
+            contract: proof.expected_contract,
+            sender: proof.expected_sender.to_vec(),
+            beneficiary: proof.expected_beneficiary.clone(),
+            source_asset: Some(proof.source_asset),
+            nonce: Some(proof.expected_nonce),
+            proof_id: proof.proof_id,
+            selector: deposit_locked_selector(),
+            min_confirmations,
+            current_block_number: current_block,
+            chain_id: u64::from(proof.source_domain),
+        },
+    )
+    .map_err(|error| ProducerError::Malformed(format!("EVM proof payload: {error}")))?;
+    decoded
+        .validate()
+        .map_err(|error| ProducerError::Malformed(format!("EVM deposit proof: {error}")))?;
+
+    let header_hash = keccak256_32(&decoded.header_rlp);
+    if decoded.header.number != proof.finalized_block
+        || header_hash != proof.block_hash
+        || decoded.header.state_root != proof.state_root
+    {
+        return Err(ProducerError::Malformed(
+            "EVM proof payload does not match the claimed block header".to_string(),
+        ));
+    }
+    if proof.block_hash.iter().all(|byte| *byte == 0)
+        || proof.state_root.iter().all(|byte| *byte == 0)
+        || decoded.header.receipts_root.iter().all(|byte| *byte == 0)
+    {
+        return Err(ProducerError::Malformed(
+            "EVM proof block and roots must be non-zero".to_string(),
+        ));
+    }
+    let confirmations = current_block
+        .checked_sub(decoded.header.number)
+        .and_then(|depth| u32::try_from(depth).ok())
+        .ok_or_else(|| {
+            ProducerError::Malformed(
+                "EVM proof current block precedes the claimed block".to_string(),
+            )
+        })?;
+    let receipt_index = decoded
+        .receipt_index
+        .iter()
+        .try_fold(0u32, |value, byte| {
+            value
+                .checked_mul(256)
+                .and_then(|value| value.checked_add(u32::from(*byte)))
+        })
+        .ok_or_else(|| ProducerError::Malformed("EVM receipt index exceeds u32".to_string()))?;
+    let receipt_data =
+        BoundedVec::<u8, ConstU32<MAX_RECEIPT_DATA_SIZE>>::try_from(decoded.receipt_rlp.clone())
+            .map_err(|_| ProducerError::ProofTooLarge {
+                what: "receipt",
+                size: decoded.receipt_rlp.len(),
+                limit: MAX_RECEIPT_DATA_SIZE as usize,
+            })?;
+    let trie_proof = BoundedVec::<u8, ConstU32<MAX_TRIE_PROOF_SIZE>>::try_from(
+        decoded.proof.clone(),
+    )
+    .map_err(|_| ProducerError::ProofTooLarge {
+        what: "inclusion path",
+        size: decoded.proof.len(),
+        limit: MAX_TRIE_PROOF_SIZE as usize,
+    })?;
+    let merkle_proof = BoundedVec::<_, ConstU32<MAX_MERKLE_PROOF_DEPTH>>::try_from(vec![
+        sp_core::H256(decoded.header.state_root),
+        sp_core::H256(decoded.header.receipts_root),
+    ])
+    .map_err(|_| ProducerError::Malformed("two EVM roots always fit".to_string()))?;
+
+    Ok(SettlementProof {
+        proof_type: ProofType::MerkleTrie,
+        tx_hash: sp_core::H256(keccak256_32(&decoded.receipt_rlp)),
+        block_hash: sp_core::H256(header_hash),
+        chain_height: Some(decoded.header.number),
+        confirmations,
+        merkle_proof,
+        receipt_data,
+        receipt_index: Some(receipt_index),
+        trie_proof: Some(trie_proof),
+    })
+}
+
+/// All event and transfer fields a receipt inclusion must match.
+pub struct EvmProofBinding {
+    pub source_domain: u32,
+    pub proof_id: [u8; 32],
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
+    pub proof_nonce: u32,
+    pub expected_amount: u128,
+    pub min_confirmations: u64,
 }
 
 use pallet_x3_settlement_engine::{
@@ -276,6 +442,12 @@ fn hex32(value: &Value, what: &str) -> Result<[u8; 32], ProducerError> {
         .map_err(|_| ProducerError::Malformed(format!("{what} is not 32 bytes")))
 }
 
+fn fixed_hex<const N: usize>(value: &Value, what: &str) -> Result<[u8; N], ProducerError> {
+    hex_bytes(value, what)?
+        .try_into()
+        .map_err(|_| ProducerError::Malformed(format!("{what} is not {N} bytes")))
+}
+
 /// RLP-encode a quantity the way the consensus spec does: big-endian with
 /// leading zeros removed, and zero as the empty string.
 fn rlp_quantity(bytes: &[u8]) -> Vec<u8> {
@@ -301,6 +473,150 @@ fn rlp_value(bytes: &[u8]) -> Vec<u8> {
     let mut stream = rlp::RlpStream::new();
     stream.append(&bytes.to_vec());
     stream.out().to_vec()
+}
+
+fn header_field<'a>(block: &'a Value, name: &str) -> Result<&'a Value, ProducerError> {
+    block
+        .get(name)
+        .filter(|value| !value.is_null())
+        .ok_or_else(|| ProducerError::Malformed(format!("block header has no {name}")))
+}
+
+/// Reconstruct the canonical Ethereum header RLP from the JSON representation
+/// returned by `eth_getBlockByNumber`.
+///
+/// `debug_getRawHeader` is disabled by many public providers. The standard
+/// block representation carries every consensus header field, so the producer
+/// can encode the same field list without a debug namespace. The caller still
+/// checks the resulting Keccak hash against the block hash returned by the
+/// provider.
+fn canonical_header_rlp(block: &Value) -> Result<Vec<u8>, ProducerError> {
+    let mut fields = Vec::with_capacity(22);
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "parentHash")?,
+        "parentHash",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "sha3Uncles")?,
+        "sha3Uncles",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<20>(
+        header_field(block, "miner")?,
+        "miner",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "stateRoot")?,
+        "stateRoot",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "transactionsRoot")?,
+        "transactionsRoot",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "receiptsRoot")?,
+        "receiptsRoot",
+    )?));
+    let logs_bloom = hex_bytes(header_field(block, "logsBloom")?, "logsBloom")?;
+    if logs_bloom.len() != 256 {
+        return Err(ProducerError::Malformed(format!(
+            "logsBloom is {} bytes, not 256",
+            logs_bloom.len()
+        )));
+    }
+    fields.push(rlp_value(&logs_bloom));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "difficulty")?,
+        "difficulty",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "number")?,
+        "number",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "gasLimit")?,
+        "gasLimit",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "gasUsed")?,
+        "gasUsed",
+    )?));
+    fields.push(rlp_quantity(&hex_quantity_bytes(
+        header_field(block, "timestamp")?,
+        "timestamp",
+    )?));
+    fields.push(rlp_value(&hex_bytes(
+        header_field(block, "extraData")?,
+        "extraData",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<32>(
+        header_field(block, "mixHash")?,
+        "mixHash",
+    )?));
+    fields.push(rlp_value(&fixed_hex::<8>(
+        header_field(block, "nonce")?,
+        "nonce",
+    )?));
+
+    // Fork fields are a prefix: a later field cannot be present when an earlier
+    // one is absent, because that would describe a header no fork defines.
+    let optional_quantities = ["baseFeePerGas", "blobGasUsed", "excessBlobGas"];
+    let optional_hashes = ["withdrawalsRoot", "parentBeaconBlockRoot", "requestsHash"];
+    let optional_order = [
+        "baseFeePerGas",
+        "withdrawalsRoot",
+        "blobGasUsed",
+        "excessBlobGas",
+        "parentBeaconBlockRoot",
+        "requestsHash",
+    ];
+    let present: Vec<usize> = optional_order
+        .iter()
+        .enumerate()
+        .filter_map(|(index, name)| block.get(*name).filter(|v| !v.is_null()).map(|_| index))
+        .collect();
+    if present
+        .iter()
+        .copied()
+        .enumerate()
+        .any(|(expected, actual)| expected != actual)
+    {
+        return Err(ProducerError::Malformed(
+            "block header has a non-contiguous fork-field set".to_string(),
+        ));
+    }
+    for name in optional_order {
+        let Some(value) = block.get(name).filter(|value| !value.is_null()) else {
+            break;
+        };
+        if optional_quantities.contains(&name) {
+            fields.push(rlp_quantity(&hex_quantity_bytes(value, name)?));
+        } else if optional_hashes.contains(&name) {
+            fields.push(rlp_value(&hex32(value, name)?));
+        } else {
+            return Err(ProducerError::Malformed(format!(
+                "unhandled optional header field {name}"
+            )));
+        }
+    }
+
+    Ok(rlp_list(&fields))
+}
+
+async fn canonical_header_from_rpc(
+    client: &reqwest::Client,
+    rpc_url: &str,
+    block_tag: &str,
+    block: &Value,
+) -> Result<Vec<u8>, ProducerError> {
+    match rpc(client, rpc_url, "debug_getRawHeader", json!([block_tag])).await {
+        Ok(raw) => hex_bytes(&raw, "raw block header"),
+        // A public provider without the debug namespace is the common case, not
+        // a reason to fail when the standard block response is sufficient.
+        Err(ProducerError::Rpc { message, .. }) if message.contains("-32601") => {
+            canonical_header_rlp(block)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 /// The consensus encoding of one `eth_getTransactionReceipt` result.
@@ -514,8 +830,7 @@ pub async fn prove_evm_receipt(
             .ok_or_else(|| ProducerError::Malformed("header has no stateRoot".to_string()))?,
         "stateRoot",
     )?;
-    let raw_header = rpc(&client, rpc_url, "debug_getRawHeader", json!([block_tag])).await?;
-    let header_rlp = hex_bytes(&raw_header, "raw block header")?;
+    let header_rlp = canonical_header_from_rpc(&client, rpc_url, &block_tag, &header).await?;
     let decoded_header = EvmBlockHeader::decode(&header_rlp)
         .map_err(|error| ProducerError::Malformed(format!("raw header: {error}")))?;
     let header_hash = keccak256_32(&header_rlp);
@@ -674,11 +989,24 @@ mod tests {
             .expect("router payload")
             .is_empty());
         let proof = inclusion
-            .evm_proof(100, vec![0x42; 20], 1_000, 7, 12)
+            .evm_proof(EvmProofBinding {
+                source_domain: 100,
+                proof_id: [0x41; 32],
+                source_asset: [0x42; 20],
+                expected_sender: [0x43; 20],
+                expected_contract: [0x44; 20],
+                expected_beneficiary: vec![0x45; 32],
+                expected_nonce: 9,
+                proof_nonce: 7,
+                expected_amount: 1_000,
+                min_confirmations: 12,
+            })
             .expect("event-bound EVM proof");
         assert_eq!(proof.finalized_block, inclusion.block_number);
         assert_eq!(proof.proof_nonce, 7);
-        assert_eq!(proof.expected_recipient, vec![0x42; 20]);
+        assert_eq!(proof.proof_id, [0x41; 32]);
+        assert_eq!(proof.expected_contract, [0x44; 20]);
+        assert_eq!(proof.expected_beneficiary, vec![0x45; 32]);
         assert!(!proof.proof_payload.is_empty());
         // The producer already checks both of these internally; asserting them
         // here keeps the test honest about what it is relying on.
@@ -782,6 +1110,150 @@ mod tests {
             confirmations: 12,
             header_rlp: vec![0xC0],
         }
+    }
+
+    #[test]
+    fn a_deposit_proof_takes_every_event_field_from_the_receipt() {
+        use x3_verification_router::evm_receipt::deposit_locked_selector;
+
+        let gateway = [0xA1; 20];
+        let token = [0xA2; 20];
+        let depositor = [0xA3; 20];
+        let beneficiary = [0xA4; 32];
+        let message_id = [0xA5; 32];
+        let nonce = 17u64;
+        let chain_id = 84_532u64;
+        let amount = 123_456u128;
+
+        let mut data = vec![0u8; 192];
+        data[31] = 128;
+        data[48..64].copy_from_slice(&amount.to_be_bytes());
+        data[88..96].copy_from_slice(&nonce.to_be_bytes());
+        data[120..128].copy_from_slice(&chain_id.to_be_bytes());
+        data[159] = beneficiary.len() as u8;
+        data[160..].copy_from_slice(&beneficiary);
+        let mut token_topic = [0u8; 32];
+        token_topic[12..].copy_from_slice(&token);
+        let mut depositor_topic = [0u8; 32];
+        depositor_topic[12..].copy_from_slice(&depositor);
+        let deposit = rlp_list(&[
+            rlp_value(&gateway),
+            rlp_list(&[
+                rlp_value(&deposit_locked_selector()),
+                rlp_value(&message_id),
+                rlp_value(&token_topic),
+                rlp_value(&depositor_topic),
+            ]),
+            rlp_value(&data),
+        ]);
+        let receipt = rlp_list(&[rlp_value(&[0x01]), rlp_value(&[]), rlp_list(&[deposit])]);
+
+        let proof = inclusion(receipt, 4)
+            .evm_proof_for_deposit(chain_id as u32, 7, 12, gateway)
+            .expect("the receipt contains one gateway deposit");
+        assert_eq!(proof.proof_id, message_id);
+        assert_eq!(proof.source_asset, token);
+        assert_eq!(proof.expected_sender, depositor);
+        assert_eq!(proof.expected_contract, gateway);
+        assert_eq!(proof.expected_beneficiary, beneficiary);
+        assert_eq!(proof.expected_nonce, nonce);
+        assert_eq!(proof.expected_amount, amount);
+    }
+
+    fn settlement_test_header(receipts_root: [u8; 32]) -> Vec<u8> {
+        rlp_list(&[
+            rlp_value(&[0x11; 32]),
+            rlp_value(&[0x12; 32]),
+            rlp_value(&[0x13; 20]),
+            rlp_value(&[0x14; 32]),
+            rlp_value(&[0x15; 32]),
+            rlp_value(&receipts_root),
+            rlp_value(&[0u8; 256]),
+            rlp_quantity(&[]),
+            rlp_quantity(&[100]),
+            rlp_quantity(&[0x05, 0xf5, 0xe1]),
+            rlp_quantity(&[0x52, 0x08]),
+            rlp_quantity(&[0x65]),
+            rlp_value(&[]),
+            rlp_value(&[0x16; 32]),
+            rlp_value(&[0u8; 8]),
+            rlp_quantity(&[1]),
+        ])
+    }
+
+    #[test]
+    fn a_portable_evm_deposit_becomes_a_typed_settlement_proof() {
+        let gateway = [0xB1; 20];
+        let token = [0xB2; 20];
+        let depositor = [0xB3; 20];
+        let beneficiary = [0xB4; 32];
+        let message_id = [0xB5; 32];
+        let nonce = 19u64;
+        let chain_id = 84_532u64;
+        let amount = 654_321u128;
+
+        let mut data = vec![0u8; 192];
+        data[31] = 128;
+        data[48..64].copy_from_slice(&amount.to_be_bytes());
+        data[88..96].copy_from_slice(&nonce.to_be_bytes());
+        data[120..128].copy_from_slice(&chain_id.to_be_bytes());
+        data[159] = beneficiary.len() as u8;
+        data[160..].copy_from_slice(&beneficiary);
+        let mut token_topic = [0u8; 32];
+        token_topic[12..].copy_from_slice(&token);
+        let mut depositor_topic = [0u8; 32];
+        depositor_topic[12..].copy_from_slice(&depositor);
+        let deposit = rlp_list(&[
+            rlp_value(&gateway),
+            rlp_list(&[
+                rlp_value(&deposit_locked_selector()),
+                rlp_value(&message_id),
+                rlp_value(&token_topic),
+                rlp_value(&depositor_topic),
+            ]),
+            rlp_value(&data),
+        ]);
+        let receipt = rlp_list(&[rlp_value(&[0x01]), rlp_value(&[]), rlp_list(&[deposit])]);
+        let receipts_root = receipts_trie_root(std::slice::from_ref(&receipt)).unwrap();
+        let trie_proof = receipts_trie_proof(std::slice::from_ref(&receipt), 0).unwrap();
+        let header_rlp = settlement_test_header(receipts_root);
+        let block_hash = keccak256_32(&header_rlp);
+        let state_root = [0x14; 32];
+        let payload = encode_proof_payload(112, 12, &header_rlp, &receipt, &[], &trie_proof);
+        let proof = EvmProof {
+            source_domain: chain_id as u32,
+            proof_id: message_id,
+            block_hash,
+            state_root,
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: payload,
+            source_asset: token,
+            expected_sender: depositor,
+            expected_contract: gateway,
+            expected_beneficiary: beneficiary.to_vec(),
+            expected_nonce: nonce,
+            expected_amount: amount,
+        };
+
+        let settlement = settlement_proof_from_evm_proof(&proof).expect("typed settlement proof");
+        assert!(matches!(
+            settlement.proof_type,
+            pallet_x3_settlement_engine::ProofType::MerkleTrie
+        ));
+        assert_eq!(settlement.block_hash.0, block_hash);
+        assert_eq!(settlement.chain_height, Some(100));
+        assert_eq!(settlement.confirmations, 12);
+        assert_eq!(settlement.receipt_index, Some(0));
+        assert_eq!(
+            settlement.tx_hash.0,
+            <sha3::Keccak256 as sha3::Digest>::digest(&receipt).as_slice()
+        );
+        assert_eq!(settlement.receipt_data.as_slice(), receipt.as_slice());
+        assert_eq!(
+            settlement.trie_proof.as_ref().map(|proof| proof.as_slice()),
+            Some(trie_proof.as_slice())
+        );
     }
 
     #[test]

@@ -5,12 +5,13 @@ use frame_support::{
     derive_impl, parameter_types,
     traits::{ConstBool, ConstU32, ConstU64, Get},
 };
-use sp_core::{H160, H256};
+use sp_core::{ed25519, Pair, H160, H256};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup},
     BuildStorage,
 };
 use x3_asset_kernel_types::traits::NoEconomicHalt;
+use x3_verification_router::{SolanaCluster, SolanaStakeWeightedVerifier, SolanaValidatorStake};
 
 pub type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 pub type Block = frame_system::mocking::MockBlock<Test>;
@@ -35,6 +36,28 @@ where
 pub struct TestEmergencyHaltController;
 impl pallet_x3_kernel::EmergencyHaltController for TestEmergencyHaltController {
     fn trigger() {}
+}
+
+pub const SETTLEMENT_RELAYER: u64 = 77;
+
+pub struct MockSettlementProofOrigin;
+
+impl frame_support::traits::EnsureOrigin<RuntimeOrigin> for MockSettlementProofOrigin {
+    type Success = u64;
+
+    fn try_origin(origin: RuntimeOrigin) -> Result<Self::Success, RuntimeOrigin> {
+        let raw: Result<frame_system::RawOrigin<u64>, RuntimeOrigin> = origin.into();
+        match raw {
+            Ok(frame_system::RawOrigin::Signed(who)) if who == SETTLEMENT_RELAYER => Ok(who),
+            Ok(other) => Err(other.into()),
+            Err(origin) => Err(origin),
+        }
+    }
+
+    #[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+        Ok(RuntimeOrigin::signed(SETTLEMENT_RELAYER))
+    }
 }
 
 frame_support::construct_runtime!(
@@ -212,6 +235,7 @@ impl pallet_x3_settlement_engine::Config for Test {
     type MaxPendingIntents = frame_support::traits::ConstU32<10>;
     type DefaultSettlementTimeout = frame_support::traits::ConstU64<60>;
     type MinBtcConfirmations = frame_support::traits::ConstU32<1>;
+    type SettlementProofOrigin = MockSettlementProofOrigin;
     // Bitcoin's regtest `powLimit`. A test cannot mine a mainnet-difficulty header,
     // and the regtest limit is Bitcoin's own answer to "which limit may a chain that
     // mines its own headers use"; production runtimes carry `0x1d00ffff`.
@@ -249,6 +273,25 @@ thread_local! {
 /// keep passing through the same path) while making the height observable.
 pub struct RecordingCrossChainValidator;
 
+pub fn solana_v4_test_pairs() -> Vec<ed25519::Pair> {
+    vec![
+        ed25519::Pair::from_seed(&[1u8; 32]),
+        ed25519::Pair::from_seed(&[2u8; 32]),
+    ]
+}
+
+pub fn solana_v4_test_verifier(cluster: SolanaCluster) -> SolanaStakeWeightedVerifier {
+    let mut stakes = solana_v4_test_pairs()
+        .into_iter()
+        .map(|pair| SolanaValidatorStake {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+    stakes.sort_by_key(|entry| entry.pubkey);
+    SolanaStakeWeightedVerifier::new(cluster, stakes, 2, 3, 0).expect("test Solana stake table")
+}
+
 impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider
     for RecordingCrossChainValidator
 {
@@ -268,6 +311,14 @@ impl pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvide
 
     fn get_latest_svm_header_hash() -> Option<H256> {
         None
+    }
+
+    fn solana_v4_verifier(cluster: SolanaCluster) -> Option<SolanaStakeWeightedVerifier> {
+        Some(solana_v4_test_verifier(cluster))
+    }
+
+    fn record_solana_v4_finalized_slot(_cluster: SolanaCluster, _slot: u64) -> bool {
+        true
     }
 }
 

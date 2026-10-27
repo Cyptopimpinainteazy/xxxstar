@@ -117,9 +117,10 @@ UNMEASURABLE_CALL_WEIGHTS: dict[str, dict[str, str]] = {
     "pallet-x3-cross-vm-router::register_external_root": {
         "owner": "docs/reports/benchmark-exceptions.md",
         "reason": (
-            "the runtime wires `RefuseExternalRoots` as `ExternalRootVerifier` by policy, so every "
-            "call fails at the verifier and no benchmark can reach the success path that the weight "
-            "describes; it becomes measurable when a per-chain light client verifier is wired"
+            "the production verifier reads runtime-specific finalized EVM/SVM/Bitcoin state that a "
+            "generic pallet benchmark cannot fabricate without bypassing verification; the call "
+            "charges two verifier storage reads plus declared compute and becomes measurable when a "
+            "runtime benchmark helper can install real finalized evidence"
         ),
     },
     "pallet-x3-cross-vm-router::xvm_transfer": {

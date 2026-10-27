@@ -11,8 +11,6 @@
 //!
 //! 3. **Expiration handling**: expired swaps transition to REFUNDABLE or REFUNDED,
 //!    never FAILED_SILENTLY. Funds are never lost - they either get claimed or refunded.
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
 
 use crate::error::SwapError;
 use crate::intent::AtomicIntent;
@@ -165,6 +163,7 @@ impl TimeoutEngine {
 mod tests {
     use super::*;
     use crate::intent::{AtomicIntentBuilder, ChainKind, RefundPath};
+    use alloc::string::String;
 
     fn make_test_intent(dest_timeout: u64, source_timeout: u64, has_refund: bool) -> AtomicIntent {
         let mut builder = AtomicIntentBuilder::new()

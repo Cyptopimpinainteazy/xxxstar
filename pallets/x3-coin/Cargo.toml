@@ -36,6 +36,7 @@ std = [
   "serde?/std",
   "frame-support/std",
   "frame-system/std",
+  "frame-benchmarking?/std",
   "sp-runtime/std",
   "sp-api/std",
   "sp-std/std",

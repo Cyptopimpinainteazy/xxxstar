@@ -174,27 +174,13 @@ Rules:
   "proof_type": "solana-transaction-proof-v1",
   "slot": 123,
   "bank_hash": "0x...",
+  "blockhash": "0x...",
   "message": "0x...",
   "transaction_hash": "0x...",
   "signatures": [
     {
       "public_key": "0x...",
       "signature": "0x..."
-    }
-  ],
-  "instructions": [
-    {
-      "programId": "Tokenkeg...",
-      "parsed": {
-        "type": "transferChecked",
-        "info": {
-          "mint": "Mint...",
-          "destination": "Receiver...",
-          "tokenAmount": {
-            "amount": "42"
-          }
-        }
-      }
     }
   ]
 }
@@ -203,9 +189,17 @@ Rules:
 Rules:
 
 - `slot` and `bank_hash` must match the verified bank proof receipt.
+- `blockhash` must equal the recent blockhash decoded from `message`.
+- The verifier decodes the legacy Solana message itself; callers may not supply
+  a separate `instructions` array.
+- Versioned messages that require address-table lookup resolution are refused
+  rather than interpreted without their loaded account keys.
 - `transaction_hash`, when supplied, must equal `sha256(message)`.
-- Each transaction signature is Ed25519 over `message`.
-- Parsed transfer instruction fields must match the bridge request asset, receiver, amount, and optional program id.
+- The verified signatures must cover every signer required by the message
+  header, and each signer must be one of the message's required account keys.
+- The signed message must contain SPL Token or Token-2022 `transferChecked`
+  instruction data whose decoded mint, destination, and amount equal the bridge
+  request.
 
 ## Current Limits
 

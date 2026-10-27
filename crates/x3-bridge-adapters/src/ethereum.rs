@@ -5,6 +5,7 @@
 //! and block number retrieval via eth_blockNumber RPC calls.
 
 use crate::{make_json_rpc_call, BridgeAdapter, BridgeError};
+use sha3::{Digest, Keccak256};
 
 /// Ethereum Bridge Adapter
 pub struct EthereumBridgeAdapter {
@@ -67,6 +68,72 @@ impl EthereumBridgeAdapter {
         }
 
         Ok(events)
+    }
+
+    fn required_root(value: Option<&serde_json::Value>, what: &str) -> Result<String, BridgeError> {
+        let raw = value
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| BridgeError::Validation(format!("Ethereum block is missing {what}")))?;
+        let bytes = hex::decode(raw.trim_start_matches("0x")).map_err(|error| {
+            BridgeError::Validation(format!("Ethereum {what} is not hex: {error}"))
+        })?;
+        if bytes.len() != 32 {
+            return Err(BridgeError::Validation(format!(
+                "Ethereum {what} is {} bytes, expected 32",
+                bytes.len()
+            )));
+        }
+        if bytes.iter().all(|byte| *byte == 0) {
+            return Err(BridgeError::Validation(format!(
+                "Ethereum {what} is all zero"
+            )));
+        }
+        Ok(format!("0x{}", hex::encode(bytes)))
+    }
+
+    fn account_proof_from_rpc(
+        result: serde_json::Value,
+    ) -> Result<Vec<serde_json::Value>, BridgeError> {
+        let proof = result
+            .get("accountProof")
+            .and_then(|value| value.as_array())
+            .filter(|proof| !proof.is_empty())
+            .ok_or_else(|| {
+                BridgeError::Validation(
+                    "eth_getProof returned no accountProof for the configured escrow".to_string(),
+                )
+            })?;
+        if proof.iter().any(|node| node.as_str().is_none()) {
+            return Err(BridgeError::Validation(
+                "eth_getProof accountProof contains a non-string node".to_string(),
+            ));
+        }
+        Ok(proof.clone())
+    }
+
+    fn bound_header_rlp(
+        &self,
+        raw_header: &str,
+        expected_block_hash: &str,
+    ) -> Result<String, BridgeError> {
+        let header = hex::decode(raw_header.trim_start_matches("0x")).map_err(|error| {
+            BridgeError::Validation(format!("debug_getRawHeader is not hex: {error}"))
+        })?;
+        self.validate_header(&header)?;
+        let hash = Keccak256::digest(&header);
+        let expected = hex::decode(expected_block_hash.trim_start_matches("0x"))
+            .map_err(|error| BridgeError::Validation(format!("block hash is not hex: {error}")))?;
+        if expected.len() != 32 {
+            return Err(BridgeError::Validation(
+                "Ethereum block hash is not 32 bytes".to_string(),
+            ));
+        }
+        if hash.as_slice() != expected {
+            return Err(BridgeError::Validation(
+                "raw Ethereum header does not hash to the claimed block hash".to_string(),
+            ));
+        }
+        Ok(format!("0x{}", hex::encode(header)))
     }
 }
 
@@ -174,45 +241,44 @@ impl BridgeAdapter for EthereumBridgeAdapter {
             )));
         }
 
-        let state_root = block_result
-            .get("stateRoot")
-            .and_then(|v| v.as_str())
-            .unwrap_or("0x0");
+        let state_root = Self::required_root(block_result.get("stateRoot"), "stateRoot")?;
+        let receipts_root = Self::required_root(block_result.get("receiptsRoot"), "receiptsRoot")?;
+        let transactions_root =
+            Self::required_root(block_result.get("transactionsRoot"), "transactionsRoot")?;
 
         // Fetch Merkle-Patricia trie proofs for the canonical bridge escrow
         // account.  eth_getProof returns the account proof + storage proofs
         // that a verifier can check against state_root.
-        let escrow_addr = std::env::var("X3_ETH_ESCROW")
-            .unwrap_or_else(|_| "0x0000000000000000000000000000000000000000".to_string());
+        let escrow_addr = std::env::var("X3_ETH_ESCROW").map_err(|_| {
+            BridgeError::Validation(
+                "X3_ETH_ESCROW must name the escrow account before an Ethereum proof can be built"
+                    .to_string(),
+            )
+        })?;
+        let escrow_bytes = hex::decode(escrow_addr.trim_start_matches("0x")).map_err(|error| {
+            BridgeError::Validation(format!("X3_ETH_ESCROW is not hex: {error}"))
+        })?;
+        if escrow_bytes.len() != 20 || escrow_bytes.iter().all(|byte| *byte == 0) {
+            return Err(BridgeError::Validation(
+                "X3_ETH_ESCROW must be a non-zero 20-byte account".to_string(),
+            ));
+        }
+        let proof_result = make_json_rpc_call(
+            &self.rpc_url,
+            "eth_getProof",
+            serde_json::json!([escrow_addr, [], block_hex]),
+        )?;
+        let account_proofs = Self::account_proof_from_rpc(proof_result)?;
 
-        let account_proofs: Vec<serde_json::Value> = if escrow_addr.len() >= 42
-            && !escrow_addr.starts_with("0x0000000000000000000000000000000000000000")
-        {
-            match make_json_rpc_call(
-                &self.rpc_url,
-                "eth_getProof",
-                serde_json::json!([escrow_addr, [], block_hex]),
-            ) {
-                Ok(proof_result) => {
-                    let ap = proof_result
-                        .get("accountProof")
-                        .cloned()
-                        .unwrap_or(serde_json::Value::Array(vec![]));
-                    vec![ap]
-                }
-                Err(_) => vec![],
-            }
-        } else {
-            vec![]
-        };
-
-        let block_header_rlp = make_json_rpc_call(
+        let raw_header = make_json_rpc_call(
             &self.rpc_url,
             "debug_getRawHeader",
             serde_json::json!([block_hex]),
-        )
-        .ok()
-        .and_then(|v| v.as_str().map(|s| s.to_string()));
+        )?;
+        let raw_header = raw_header.as_str().ok_or_else(|| {
+            BridgeError::Validation("debug_getRawHeader returned a non-string".to_string())
+        })?;
+        let block_header_rlp = self.bound_header_rlp(raw_header, block_hash)?;
 
         // Build a verifiable proof envelope with block header, state root,
         // and Merkle-Patricia trie proofs for downstream verification.
@@ -222,8 +288,8 @@ impl BridgeAdapter for EthereumBridgeAdapter {
             "block_hash": block_hash,
             "block_number": format!("0x{:x}", block_number),
             "state_root": state_root,
-            "receipts_root": block_result.get("receiptsRoot").and_then(|v| v.as_str()).unwrap_or("0x0"),
-            "transactions_root": block_result.get("transactionsRoot").and_then(|v| v.as_str()).unwrap_or("0x0"),
+            "receipts_root": receipts_root,
+            "transactions_root": transactions_root,
             "block_header_rlp": block_header_rlp,
             "account_proofs": account_proofs,
             "storage_proofs": []
@@ -486,6 +552,88 @@ mod tests {
             format!("{:?}", result.unwrap_err()).contains("parentHash"),
             "Should reject zero parentHash"
         );
+    }
+
+    #[test]
+    fn proof_roots_must_exist_be_32_bytes_and_be_nonzero() {
+        let valid = serde_json::json!(format!("0x{}", "11".repeat(32)));
+        assert_eq!(
+            EthereumBridgeAdapter::required_root(Some(&valid), "stateRoot").unwrap(),
+            format!("0x{}", "11".repeat(32))
+        );
+
+        for invalid in [
+            serde_json::Value::Null,
+            serde_json::json!("0x0"),
+            serde_json::json!(format!("0x{}", "00".repeat(32))),
+        ] {
+            assert!(
+                EthereumBridgeAdapter::required_root(Some(&invalid), "stateRoot").is_err(),
+                "accepted invalid root {invalid}"
+            );
+        }
+        assert!(EthereumBridgeAdapter::required_root(None, "stateRoot").is_err());
+    }
+
+    #[test]
+    fn proof_requires_a_nonempty_string_account_proof() {
+        let valid = serde_json::json!({
+            "accountProof": ["0x01", "0x02"],
+            "storageProof": []
+        });
+        assert_eq!(
+            EthereumBridgeAdapter::account_proof_from_rpc(valid)
+                .expect("valid proof")
+                .len(),
+            2
+        );
+        for invalid in [
+            serde_json::json!({}),
+            serde_json::json!({"accountProof": []}),
+            serde_json::json!({"accountProof": ["0x01", 2]}),
+        ] {
+            assert!(
+                EthereumBridgeAdapter::account_proof_from_rpc(invalid).is_err(),
+                "accepted invalid account proof"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_header_is_bound_to_the_claimed_block_hash() {
+        let adapter = EthereumBridgeAdapter::new(1, "http://localhost:8545".to_string());
+        let mut body = Vec::new();
+        body.extend_from_slice(&rlp_encode_bytes(&[0x01; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x02; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x03; 20]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x04; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x05; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x06; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x07; 256]));
+        for quantity in [0x01, 0x02, 0x03, 0x04, 0x05] {
+            body.push(quantity);
+        }
+        body.push(0x80);
+        body.extend_from_slice(&rlp_encode_bytes(&[0x0b; 32]));
+        body.extend_from_slice(&rlp_encode_bytes(&[0x0c; 8]));
+        body.extend_from_slice(&rlp_encode_u64(30_000_000_000));
+        let mut raw = Vec::new();
+        let length = encode_length(body.len());
+        raw.push(0xf7 + length.len() as u8);
+        raw.extend_from_slice(&length);
+        raw.extend_from_slice(&body);
+
+        let hash = format!("0x{}", hex::encode(Keccak256::digest(&raw)));
+        let encoded = format!("0x{}", hex::encode(&raw));
+        assert_eq!(
+            adapter
+                .bound_header_rlp(&encoded, &hash)
+                .expect("matching header"),
+            encoded
+        );
+        assert!(adapter
+            .bound_header_rlp(&encoded, &format!("0x{}", "22".repeat(32)))
+            .is_err());
     }
 
     // Helper RLP encoders for tests

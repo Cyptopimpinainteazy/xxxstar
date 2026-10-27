@@ -560,6 +560,7 @@ export function BaseSwapInterface() {
           inputMode="decimal"
           autoComplete="off"
           aria-label={`Amount in ${sellToken.symbol}`}
+          placeholder={`0.00 (${sellToken.decimals} decimals)`}
           disabled={loading !== null}
           className="mt-2 w-full rounded-lg border border-gray-600 bg-gray-900 px-3 py-3 text-white outline-none focus:border-blue-400"
         />

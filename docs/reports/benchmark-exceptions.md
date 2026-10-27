@@ -18,7 +18,7 @@ The decisions live in `UNMEASURABLE_CALL_WEIGHTS`, keyed `<pallet entry>::<extri
 
 | Pallet | Call | Why no benchmark can reach it |
 | --- | --- | --- |
-| `pallet-x3-cross-vm-router` | `register_external_root` | The runtime wires `RefuseExternalRoots` as `ExternalRootVerifier` **by policy**: nothing in this repository can bind a foreign chain's block root to that chain's consensus, and the value written here is later trusted by the bridge surface. Every call therefore fails at the verifier before the stores the weight describes. It becomes measurable when a per-chain light client verifier is wired. |
+| `pallet-x3-cross-vm-router` | `register_external_root` | The production verifier binds EVM, Solana, and Bitcoin roots to runtime-specific finalized or best-chain header state. A generic pallet benchmark cannot fabricate that state through `T::ExternalRootVerifier` without bypassing the verifier, so a success benchmark would under-report exactly the cost this call needs. The call now charges two verifier storage reads plus 200,000 ps of declared compute. It becomes measurable when the runtime supplies a benchmark helper that installs real finalized evidence while the production verifier remains in the measured path. |
 | `pallet-x3-cross-vm-router` | `xvm_transfer` | Gated on `X3LangOrigin = pallet_x3_custody::EnsureAuthorizedGateway`, whose `try_successful_origin` returns `Err` deliberately — no account is *always* authorized, membership lives in genesis-configured storage. The router's `Config` requires no custody bound, so its benchmark has no way to authorize one. |
 | `pallet-x3-cross-vm-router` | `xvm_transfer_from_vm` | Same custody-backed gateway origin, checked twice (VM-adapter gate and x3-lang gate). |
 | `pallet-x3-cross-vm-router` | `complete_xvm_transfer` | Same custody-backed gateway origin. |
@@ -41,5 +41,5 @@ Until one of those exists, the alternative is a benchmark measuring an origin pa
 executes, which would report a cost *below* the real one for exactly the calls that gate the atomic
 kernel. A stated cost plus this record is the truthful option.
 
-The fifth entry is independent: wire a real per-chain light client as `ExternalRootVerifier` and the
-call becomes both usable and measurable.
+The fifth entry now has a real chain-bound verifier; what remains is a runtime benchmark helper that
+can install its finalized evidence without replacing that verifier.

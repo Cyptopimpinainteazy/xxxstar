@@ -3537,6 +3537,7 @@ dependencies = [
  "itoa",
  "percent-encoding",
  "ryu",
+ "sha1_smol",
  "socket2",
  "url",
  "xxhash-rust",
@@ -4206,6 +4207,12 @@ dependencies = [
  "cpufeatures 0.2.17",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"
@@ -6353,6 +6360,7 @@ name = "x3-atomic-swap"
 version = "0.1.0"
 dependencies = [
  "blake2",
+ "ed25519-dalek",
  "hex",
  "parity-scale-codec",
  "scale-info",
@@ -6411,7 +6419,19 @@ dependencies = [
  "tracing",
  "x3-atomic-swap",
  "x3-cross-vm-bridge",
+ "x3-release-beacon",
  "zeroize",
+]
+
+[[package]]
+name = "x3-release-beacon"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "serde",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

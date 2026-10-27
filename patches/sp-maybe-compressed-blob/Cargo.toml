@@ -1,0 +1,12 @@
+[package]
+name = "sp-maybe-compressed-blob"
+version = "11.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Handling of blobs, usually Wasm code, which may be compressed"
+
+[dependencies]
+thiserror = "1.0"
+zstd = { path = "../zstd" }
+
+[workspace]

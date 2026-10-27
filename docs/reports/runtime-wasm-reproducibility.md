@@ -222,8 +222,8 @@ bytes**:
 * `6ebdd35bd` — an external root needs a verifier, and the per-asset ledger gets a read
   surface. `register_external_root` accepted any non-empty byte string as "proof against chain
   consensus" and stored the caller's root where the bridge surface trusts it; it now calls
-  `Config::ExternalRootVerifier`, and this runtime wires `RefuseExternalRoots`, so the call
-  fails closed with `ExternalRootVerificationUnavailable` until a per-chain light client exists.
+  `Config::ExternalRootVerifier`. This historical revision wired `RefuseExternalRoots`; the current
+  runtime binds EVM/SVM roots to attested headers and Bitcoin roots to admitted best-chain headers.
   `AtlasKernelRuntimeApi::get_asset_supply_ledger(asset_id)` returns the ledger's own record, so
   the per-asset invariant has a read path over RPC. The bytes move: compact 8,512,083 bytes (was
   8,508,732), `set_code 0xfb92492d…`. Two from-scratch builds agree.
@@ -689,14 +689,46 @@ alters the runtime, so the record and the code land together.
   benchmarks for `set_external_bridge_audit_gate`, `set_external_bridges_enabled` and
   `emergency_pause_bridge`, and a new `UNMEASURABLE_CALL_WEIGHTS` record (with its own staleness
   tripwire and tests in `scripts/swarm/x3_repo_scan.py`) for the four custody-origin-gated calls plus
-  `register_external_root`, which this runtime refuses at its `RefuseExternalRoots` verifier by
-  policy. Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
+  `register_external_root`, which that revision refused at its `RefuseExternalRoots` verifier.
+  Scanner `pallet-call-without-weights` reached 4 from 5, and none of the four is high: the
   whole twelve-pallet burndown is closed, leaving only the documented
   `T::DbWeight::get().reads_writes` estimates. The bytes move: compact 8906533
   (`0x80f6336ce883c7b7602b2e14c197bd7b09e4b35258e5dda7d73ccd1848a993ca`) — was 8,905,964 — and
   compressed 1530390
   (`0x5efad00fe7ab70f779eeb0f16318ec43b7857e809c22397180b81bea256519ee`) — was 1,530,061, from two
   builds that agreed.
+
+* `54c840bb2` — **the public-testnet admission candidate and bridge hardening compile as
+  one runtime.** This merges the canonical X3Lang native-trading runtime, the exact-route
+  withdrawal lifecycle, pending and daily release limits, the master security baseline, and
+  the canonical admission workflow. Two from-scratch srtool builds against this commit agreed:
+  compact 10,564,128 bytes
+  (`0x852d8e4053d4992b255525150c2c98e8b9689bb424d39532e69b89a062f5390f`) and compressed
+  1,852,407 bytes
+  (`0x33302603814cc6d0727daf0076340ee3e5652fddfedff968e2c45cc6968d4826`).
+
+* `0c4d8ea98` — **withdrawals are bound to their exact route and exposure limits.**
+  `request_withdrawal` now requires the route chosen by the user, stores that binding in a side map,
+  and derives the withdrawal id over route, asset, recipient, amount, and block. Burn, proof release,
+  and operational finalization all re-check the exact route, mode, chain, asset, transfer window,
+  pending count, and collateral state. The separate map preserves the old withdrawal-record
+  encoding; pre-upgrade records without a binding fail closed. `spec_version` moves to 26. Two
+  from-scratch srtool builds against this commit agreed: compact 10,220,572 bytes
+  (`0x531c15e26a928f81e9e1b8c4bb819513c6219f86345200409a6ca88658e98316`) and compressed
+  1,785,249 bytes
+  (`0xa42216ff1a342056a517db03d9985259a320a4dcb60d4f083f60443412d17ebc`).
+
+* `cdee9080e` — **verified gateway deposits now mint and burns now debit the wrapped ledger
+  atomically.** The gateway's operational credit and user burn calls both cross a runtime-configured
+  `DepositMinter`; the production implementation binds the route chain id, X3 asset id, signed or
+  proof-bound account, amount and the full 32-byte proof/withdrawal id before changing wrapped
+  balances. Mint and burn failures roll the gateway status, pending counter and collateral check
+  back with the failed dispatch. Two new replay maps prevent proof-id mint and withdrawal-id burn
+  reuse. `spec_version` moves to 25. Two from-scratch srtool builds against this commit agreed:
+  compact 10,204,053 bytes
+  (`0x2edaedfaa1880e088b9e21a2cdfc9a2a77774d679ce41db4830591366baa2406`) and compressed
+  1,783,573 bytes
+  (`0xcb6e3c22116ca52b53f85c1be14243ff13689dbd7eac88f3db9a3e1f5800f60e`).
 
 * `7332aa279` — **the guardian pallets are attested.** `x3-app-registry`, `x3-security-gate` and
   `x3-trust-gate` (with their weights) are wired into the runtime; the record's exemption for

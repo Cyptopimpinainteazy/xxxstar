@@ -96,6 +96,26 @@ def test_p0_work_in_progress_can_record_80_because_release_gate_enforces_95(tmp_
     assert warnings == []
 
 
+def test_p0_rows_can_record_release_scores(tmp_path):
+    repo = repo_fixture(tmp_path)
+    errors, _ = fm.validate_matrix(
+        {
+            "feature": [
+                base_feature(
+                    priority="P0",
+                    implemented=95,
+                    tested=95,
+                    mainnet_ready=95,
+                    blockers=[],
+                )
+            ]
+        },
+        repo,
+        registry(),
+    )
+    assert errors == []
+
+
 def test_open_pr_at_80_mainnet_fails(tmp_path):
     repo = repo_fixture(tmp_path)
     errors, _ = fm.validate_matrix(
@@ -167,8 +187,7 @@ def test_generation_is_deterministic(tmp_path):
 
 def test_real_repository_matrix_validates():
     matrix_path = ROOT / "FEATURE_MATRIX.toml"
-    if not matrix_path.exists():
-        pytest.skip("matrix seed is added in task 2")
+    assert matrix_path.is_file(), f"release matrix is missing: {matrix_path}"
     matrix = fm.load_matrix(matrix_path)
     reg = fm.load_registry(ROOT / "FEATURE_REGISTRY.toml")
     errors, _ = fm.validate_matrix(matrix, ROOT, reg)

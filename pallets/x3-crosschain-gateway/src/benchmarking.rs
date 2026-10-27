@@ -18,21 +18,24 @@
 //! half the council, while the mock uses root and any signed account.
 
 use super::*;
+use codec::Encode;
 use frame_benchmarking::v2::*;
 use frame_support::traits::{ConstU32, EnsureOrigin};
 use frame_support::BoundedVec;
 use frame_system::RawOrigin;
+use sp_core::{ed25519, Pair};
 use sp_runtime::traits::SaturatedConversion;
 // A benchmark module also compiles into the runtime's `wasm32v1-none` build,
 // where `vec!` is not in the prelude.
 use sp_std::vec;
+use x3_verification_router::{ChainKind, ProofEnvelope, VerificationStrategy};
 
 #[benchmarks]
 mod benchmarks {
     use super::*;
 
-    const CHAIN: ExternalChainId = ExternalChainId::BaseSepolia;
     const SOLANA_CHAIN: ExternalChainId = ExternalChainId::SolanaDevnet;
+    const CHAIN: ExternalChainId = SOLANA_CHAIN;
     const ROUTE_ID: RouteId = [1u8; 32];
     const X3_ASSET: X3AssetId = [9u8; 32];
     const PROOF_ID: ProofId = [1u8; 32];
@@ -55,33 +58,40 @@ mod benchmarks {
         BoundedVec::try_from(b"0xTOKEN".to_vec()).map_err(|_| BenchmarkError::Weightless)
     }
 
-    fn recipient() -> Result<BoundedVec<u8, ConstU32<128>>, BenchmarkError> {
-        BoundedVec::try_from(b"0xRECIPIENT".to_vec()).map_err(|_| BenchmarkError::Weightless)
+    fn solana_token() -> Result<BoundedVec<u8, ConstU32<128>>, BenchmarkError> {
+        BoundedVec::try_from(b"0xSOLTOKEN".to_vec()).map_err(|_| BenchmarkError::Weightless)
     }
 
-    fn payload() -> Result<BoundedVec<u8, ConstU32<4096>>, BenchmarkError> {
-        BoundedVec::try_from(b"valid_payload".to_vec()).map_err(|_| BenchmarkError::Weightless)
+    fn recipient() -> Result<BoundedVec<u8, ConstU32<128>>, BenchmarkError> {
+        BoundedVec::try_from([0xCC; 32].to_vec()).map_err(|_| BenchmarkError::Weightless)
     }
 
     fn solana_stakes() -> Result<BoundedVec<SolanaStakeEntry, MaxSvmValidators>, BenchmarkError> {
-        BoundedVec::try_from(vec![SolanaStakeEntry {
-            pubkey: [3u8; 32],
-            stake: 100,
-        }])
-        .map_err(|_| BenchmarkError::Weightless)
+        let mut stakes = vec![
+            SolanaStakeEntry {
+                pubkey: ed25519::Pair::from_seed(&[1u8; 32]).public().0,
+                stake: 100,
+            },
+            SolanaStakeEntry {
+                pubkey: ed25519::Pair::from_seed(&[2u8; 32]).public().0,
+                stake: 100,
+            },
+        ];
+        stakes.sort_by_key(|entry| entry.pubkey);
+        BoundedVec::try_from(stakes).map_err(|_| BenchmarkError::Weightless)
     }
 
     fn external_asset() -> Result<ExternalAssetRef, BenchmarkError> {
         Ok(ExternalAssetRef {
-            chain_id: CHAIN,
-            token_address_or_mint: token()?,
+            chain_id: SOLANA_CHAIN,
+            token_address_or_mint: solana_token()?,
         })
     }
 
     fn route() -> Result<RouteConfig, BenchmarkError> {
         Ok(RouteConfig {
             route_id: ROUTE_ID,
-            external_chain_id: CHAIN,
+            external_chain_id: SOLANA_CHAIN,
             external_asset: external_asset()?,
             x3_asset_id: X3_ASSET,
             destination_domain: X3Domain::Native,
@@ -93,18 +103,13 @@ mod benchmarks {
             daily_reset_at_block: 0,
             pending_limit: 10,
             finality_requirement: 12,
-            // `X3Internal` is refused on a gateway route (it needs no external evidence). The
-            // quorum verifier accepts this payload only under `test-verifier`; in a production
-            // build it fails closed and the proof-dependent benchmarks report `Weightless`.
-            verification_level: RouteVerificationLevel::ValidatorQuorum {
-                threshold: 2,
-                total: 3,
-            },
+            // The one level whose verifier accepts a proof this repository can build.
+            verification_level: RouteVerificationLevel::SolanaFinalizedProof,
             fee_bps: 10,
             mode: GatewayMode::TestnetLive,
             require_dispute_window: false,
             dispute_window_blocks: 0,
-            contract_address: token()?,
+            contract_address: solana_token()?,
         })
     }
 
@@ -112,7 +117,7 @@ mod benchmarks {
         Ok(DepositProof {
             version: 1,
             proof_id: PROOF_ID,
-            source_chain: CHAIN,
+            source_chain: SOLANA_CHAIN,
             source_block: 100,
             source_tx_hash: [7u8; 32],
             event_index: 0,
@@ -123,21 +128,123 @@ mod benchmarks {
             nonce,
             observed_at_block: 110,
             finalized_at_block: 120,
-            proof_payload: payload()?,
+            proof_payload: BoundedVec::default(),
         })
+    }
+
+    fn solana_finality_payload(
+        envelope: &ProofEnvelope,
+    ) -> Result<BoundedVec<u8, ConstU32<4096>>, BenchmarkError> {
+        use x3_verification_router::{
+            encode_solana_finality_v4, solana_finality_message_v4, solana_stake_table_digest,
+            SolanaCluster, SolanaTransactionEvidence, SolanaValidatorStake,
+        };
+
+        let mut pairs = vec![
+            ed25519::Pair::from_seed(&[1u8; 32]),
+            ed25519::Pair::from_seed(&[2u8; 32]),
+        ];
+        pairs.sort_by_key(|pair| pair.public().0);
+        let stakes = pairs
+            .iter()
+            .map(|pair| SolanaValidatorStake {
+                pubkey: pair.public().0,
+                stake: 100,
+            })
+            .collect::<Vec<_>>();
+        let digest = solana_stake_table_digest(&stakes);
+        let transaction_key = &pairs[0];
+        let recent_blockhash = [5u8; 32];
+        let mut transaction_message = vec![1, 0, 0, 1];
+        transaction_message.extend_from_slice(&transaction_key.public().0);
+        transaction_message.extend_from_slice(&recent_blockhash);
+        transaction_message.push(0);
+        let mut raw_transaction = vec![1];
+        raw_transaction.extend_from_slice(&transaction_key.sign(&transaction_message).0);
+        raw_transaction.extend_from_slice(&transaction_message);
+        let transaction = SolanaTransactionEvidence::from_raw(42, 1, true, raw_transaction)
+            .map_err(|_| BenchmarkError::Weightless)?;
+        let message = solana_finality_message_v4(
+            SolanaCluster::Devnet,
+            42,
+            41,
+            &[6u8; 32],
+            &[8u8; 32],
+            &[7u8; 32],
+            &digest,
+            &transaction,
+            envelope,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
+        let votes = pairs
+            .iter()
+            .map(|pair| (pair.public().0, pair.sign(&message).0))
+            .collect::<Vec<_>>();
+        let payload = encode_solana_finality_v4(
+            SolanaCluster::Devnet,
+            42,
+            41,
+            [6u8; 32],
+            [8u8; 32],
+            [7u8; 32],
+            digest,
+            transaction,
+            &votes,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
+        BoundedVec::try_from(payload).map_err(|_| BenchmarkError::Weightless)
+    }
+
+    fn solana_deposit_proof<T: Config>(nonce: u64) -> Result<DepositProof, BenchmarkError> {
+        let route = route()?;
+        let mut proof = deposit_proof(nonce)?;
+        let envelope = Pallet::<T>::envelope_from_deposit(&proof, &route);
+        proof.proof_payload = solana_finality_payload(&envelope)?;
+        Ok(proof)
+    }
+
+    fn solana_release_payload(
+        withdrawal_id: WithdrawalId,
+        recipient: &[u8],
+    ) -> Result<BoundedVec<u8, ConstU32<4096>>, BenchmarkError> {
+        let route = route()?;
+        let envelope = ProofEnvelope {
+            proof_id: withdrawal_id,
+            strategy: VerificationStrategy::SolanaFinalizedProof,
+            source_chain: ChainKind::Solana,
+            destination_chain: ChainKind::X3,
+            payload: Vec::new(),
+            expected_asset_id: X3_ASSET,
+            expected_amount: WITHDRAW_AMOUNT,
+            expected_sender: recipient.to_vec(),
+            expected_recipient: route.contract_address.to_vec(),
+            expected_beneficiary: Vec::new(),
+        };
+        solana_finality_payload(&envelope)
     }
 
     /// Register the asset and open the route, through the pallet's own extrinsics.
     fn setup_route<T: Config>() -> Result<(), BenchmarkError> {
-        Pallet::<T>::register_asset(gov::<T>()?, CHAIN, token()?, X3_ASSET)
+        Pallet::<T>::register_asset(gov::<T>()?, SOLANA_CHAIN, solana_token()?, X3_ASSET)
             .map_err(|_| BenchmarkError::Weightless)?;
-        Pallet::<T>::enable_route(gov::<T>()?, route()?).map_err(|_| BenchmarkError::Weightless)
+        Pallet::<T>::enable_route(gov::<T>()?, route()?).map_err(|_| BenchmarkError::Weightless)?;
+        Pallet::<T>::set_solana_stake_committee(gov::<T>()?, SOLANA_CHAIN, solana_stakes()?, 2, 3)
+            .map_err(|_| BenchmarkError::Weightless)
     }
 
     /// A verified transfer, which `credit_x3_representation` requires.
     fn setup_verified_transfer<T: Config>() -> Result<(), BenchmarkError> {
         setup_route::<T>()?;
-        Pallet::<T>::submit_deposit_proof(relayer::<T>()?, ROUTE_ID, deposit_proof(1)?)
+        T::DepositMinter::prepare_benchmark(
+            SOLANA_CHAIN
+                .wrapped_chain_id()
+                .ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &recipient()?,
+            0,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
+        Pallet::<T>::submit_deposit_proof(relayer::<T>()?, ROUTE_ID, solana_deposit_proof::<T>(1)?)
             .map_err(|_| BenchmarkError::Weightless)
     }
 
@@ -153,6 +260,7 @@ mod benchmarks {
         let recipient = recipient()?;
         Pallet::<T>::request_withdrawal(
             RawOrigin::Signed(who.clone()).into(),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient.clone(),
@@ -160,7 +268,20 @@ mod benchmarks {
         )
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
-        let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        let id = Pallet::<T>::derive_withdrawal_id(
+            ROUTE_ID,
+            X3_ASSET,
+            &recipient[..],
+            WITHDRAW_AMOUNT,
+            now,
+        );
+        T::DepositMinter::prepare_benchmark(
+            CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &who.encode(),
+            WITHDRAW_AMOUNT,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
         Pallet::<T>::burn_x3_representation(RawOrigin::Signed(who).into(), id)
             .map_err(|_| BenchmarkError::Weightless)?;
         Ok(id)
@@ -177,7 +298,7 @@ mod benchmarks {
 
     #[benchmark]
     fn enable_route() -> Result<(), BenchmarkError> {
-        Pallet::<T>::register_asset(gov::<T>()?, CHAIN, token()?, X3_ASSET)
+        Pallet::<T>::register_asset(gov::<T>()?, SOLANA_CHAIN, solana_token()?, X3_ASSET)
             .map_err(|_| BenchmarkError::Weightless)?;
 
         #[extrinsic_call]
@@ -205,7 +326,7 @@ mod benchmarks {
         setup_route::<T>()?;
 
         #[extrinsic_call]
-        submit_deposit_proof(relayer::<T>()?, ROUTE_ID, deposit_proof(1)?);
+        submit_deposit_proof(relayer::<T>()?, ROUTE_ID, solana_deposit_proof::<T>(1)?);
 
         assert_eq!(
             Transfers::<T>::get(PROOF_ID).map(|t| t.status),
@@ -230,11 +351,13 @@ mod benchmarks {
 
     #[benchmark]
     fn request_withdrawal() -> Result<(), BenchmarkError> {
+        setup_route::<T>()?;
         let who: T::AccountId = whitelisted_caller();
 
         #[extrinsic_call]
         request_withdrawal(
             RawOrigin::Signed(who),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient()?,
@@ -252,6 +375,7 @@ mod benchmarks {
         let recipient = recipient()?;
         Pallet::<T>::request_withdrawal(
             RawOrigin::Signed(who.clone()).into(),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient.clone(),
@@ -259,7 +383,20 @@ mod benchmarks {
         )
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
-        let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        let id = Pallet::<T>::derive_withdrawal_id(
+            ROUTE_ID,
+            X3_ASSET,
+            &recipient[..],
+            WITHDRAW_AMOUNT,
+            now,
+        );
+        T::DepositMinter::prepare_benchmark(
+            CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
+            X3_ASSET,
+            &who.encode(),
+            WITHDRAW_AMOUNT,
+        )
+        .map_err(|_| BenchmarkError::Weightless)?;
 
         #[extrinsic_call]
         burn_x3_representation(RawOrigin::Signed(who), id);
@@ -284,9 +421,11 @@ mod benchmarks {
     #[benchmark]
     fn submit_release_proof() -> Result<(), BenchmarkError> {
         let id = setup_burned_withdrawal::<T>()?;
+        let recipient = recipient()?;
+        let payload = solana_release_payload(id, &recipient)?;
 
         #[extrinsic_call]
-        submit_release_proof(relayer::<T>()?, id, ROUTE_ID, payload()?);
+        submit_release_proof(relayer::<T>()?, id, ROUTE_ID, payload);
 
         assert!(Withdrawals::<T>::get(id)
             .map(|w| w.released)

@@ -212,9 +212,11 @@ fn an_operator_on_strings_is_refused_at_compile_time_not_at_run_time() {
 
 // ─── Cross-VM calls (X3-LANG-001) ───────────────────────────────────────────────────────────────
 
-/// The chain's EVM and SVM keep no state between executions (the production runtime runs
-/// `mini_evm` and the payload's own SVM program), so a cross-VM call has nothing to reach. It is
-/// refused by name with that reason, not reported as an unknown identifier.
+/// The language does not yet have a cross-VM calling convention for the chain adapters. The
+/// persistent EVM is reachable through its adapter, but the SVM adapter currently runs a payload
+/// without an account context, and neither is exposed as a `.x3` call ABI. The compiler therefore
+/// refuses these intrinsics by name rather than reporting an unknown identifier or pretending that
+/// a call was routed successfully.
 #[test]
 fn a_cross_vm_call_is_refused_with_the_reason_it_cannot_run() {
     for call in ["evm_call(1, 2, 3, 4)", "svm_invoke(1, 2)", "evm_balance(1)"] {

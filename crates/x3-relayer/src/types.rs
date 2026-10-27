@@ -9,6 +9,11 @@ use alloc::vec::Vec;
 use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
+use x3_verification_router::{
+    encode_solana_finality_v4, encode_solana_settlement_evidence, ChainKind, ProofEnvelope,
+    VerificationError, VerificationStrategy,
+};
+pub use x3_verification_router::{SolanaCluster, SolanaTransactionEvidence};
 
 /// Main relayer configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -55,6 +60,11 @@ pub struct SvmClusterConfig {
     pub cluster_name: String,
     pub x3_domain_id: u32,
     pub rpc_endpoint: String,
+    /// Additional independently operated RPC endpoints used as a provider
+    /// quorum when acquiring Solana transaction evidence. Mainnet requires at
+    /// least three distinct configured endpoints in total.
+    #[serde(default)]
+    pub rpc_quorum_endpoints: Vec<String>,
     pub finality_threshold: u32,
     pub slot_poll_interval_ms: u64,
     #[serde(default = "default_max_concurrent")]
@@ -136,14 +146,25 @@ pub struct HeaderInfo {
 #[derive(Clone, Debug)]
 pub struct EvmProof {
     pub source_domain: u32,
+    /// The gateway's `messageId`; this is the proof's replay identity, not the
+    /// containing block hash.
+    pub proof_id: [u8; 32],
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
     pub finalized_block: u64,
     pub proof_nonce: u32,
     /// Canonical payload for `ProductionEvmReceiptVerifier`.
     pub proof_payload: Vec<u8>,
-    /// Exact X3 recipient encoded in the deposit log.
-    pub expected_recipient: Vec<u8>,
+    /// ERC-20 contract named by the gateway event.
+    pub source_asset: [u8; 20],
+    /// Depositor named by the gateway event.
+    pub expected_sender: [u8; 20],
+    /// Exact gateway contract that emitted the event.
+    pub expected_contract: [u8; 20],
+    /// Exact X3 recipient encoded in the deposit event.
+    pub expected_beneficiary: Vec<u8>,
+    /// Gateway event nonce.
+    pub expected_nonce: u64,
     /// Exact deposit amount encoded in the deposit log.
     pub expected_amount: u128,
 }
@@ -151,17 +172,24 @@ pub struct EvmProof {
 /// Inputs required to bind a finalized EVM header to an event-specific receipt proof.
 #[derive(Clone, Debug)]
 pub struct EvmProofRequest {
+    /// Settlement-engine intent this proof is intended to advance.
+    pub runtime_intent_id: [u8; 32],
     pub source_domain: u32,
+    pub proof_id: [u8; 32],
     pub finalized_block: u64,
     pub block_hash: [u8; 32],
     pub state_root: [u8; 32],
     pub proof_payload: Vec<u8>,
-    pub expected_recipient: Vec<u8>,
+    pub source_asset: [u8; 20],
+    pub expected_sender: [u8; 20],
+    pub expected_contract: [u8; 20],
+    pub expected_beneficiary: Vec<u8>,
+    pub expected_nonce: u64,
     pub expected_amount: u128,
 }
 
-/// A single validator attestation: identity key and its Ed25519 signature
-/// over the SVM proof payload (BLAKE2b-256 hash of `slot || blockhash`).
+/// A single validator attestation over the complete Solana V4 transaction,
+/// finality, and transfer intent.
 #[derive(Clone, Debug)]
 pub struct ValidatorSignature {
     /// Compressed Ed25519 public key of the signing validator (32 bytes).
@@ -173,12 +201,108 @@ pub struct ValidatorSignature {
 #[derive(Clone, Debug)]
 pub struct SvmProof {
     pub source_domain: u32,
+    /// Gateway transfer identity bound into the validator-signed message.
+    pub proof_id: [u8; 32],
+    pub cluster: SolanaCluster,
     pub slot: u64,
+    pub parent_slot: u64,
+    /// Finalized Solana blockhash.
     pub blockhash: [u8; 32],
+    /// Finalized validator-attested bank hash for the same slot.
+    pub bank_hash: [u8; 32],
+    pub parent_bank_hash: [u8; 32],
+    pub stake_table_digest: [u8; 32],
+    pub transaction: SolanaTransactionEvidence,
+    pub expected_asset_id: [u8; 32],
+    pub expected_amount: u128,
+    pub expected_sender: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_beneficiary: Vec<u8>,
     /// Individual validator attestations (each carries a real 64-byte Ed25519 sig).
     pub validator_signatures: Vec<ValidatorSignature>,
     /// Number of distinct validators required for quorum (derived from runtime config).
     pub required_signatures: u32,
+}
+
+/// V4 evidence a relayer must obtain before it can produce a Solana proof.
+///
+/// The bank hashes, slots, stake-table digest, and transfer intent are signed
+/// by the validators. `existing_signatures` lets independent operators
+/// aggregate before the configured threshold is reachable.
+#[derive(Clone, Debug)]
+pub struct SvmProofRequest {
+    /// Settlement-engine intent this proof is intended to advance.
+    pub runtime_intent_id: [u8; 32],
+    pub source_domain: u32,
+    pub proof_id: [u8; 32],
+    pub cluster: SolanaCluster,
+    pub slot: u64,
+    pub parent_slot: u64,
+    /// Finalized Solana blockhash observed from the block.
+    pub blockhash: [u8; 32],
+    /// Finalized bank hash supplied by validator evidence.
+    pub bank_hash: [u8; 32],
+    pub parent_bank_hash: [u8; 32],
+    pub stake_table_digest: [u8; 32],
+    pub transaction: SolanaTransactionEvidence,
+    pub expected_asset_id: [u8; 32],
+    pub expected_amount: u128,
+    pub expected_sender: Vec<u8>,
+    pub expected_recipient: Vec<u8>,
+    pub expected_beneficiary: Vec<u8>,
+    pub existing_signatures: Vec<ValidatorSignature>,
+}
+
+impl SvmProof {
+    /// Build the complete V4 envelope the production verifier receives.
+    pub fn envelope(&self) -> ProofEnvelope {
+        ProofEnvelope {
+            proof_id: self.proof_id,
+            strategy: VerificationStrategy::SolanaFinalizedProof,
+            source_chain: ChainKind::Solana,
+            destination_chain: ChainKind::X3,
+            payload: Vec::new(),
+            expected_asset_id: self.expected_asset_id,
+            expected_amount: self.expected_amount,
+            expected_sender: self.expected_sender.clone(),
+            expected_recipient: self.expected_recipient.clone(),
+            expected_beneficiary: self.expected_beneficiary.clone(),
+        }
+    }
+
+    /// Encode the stake-weighted V4 Solana finality and transaction payload.
+    pub fn encode_payload(&self) -> Result<Vec<u8>, VerificationError> {
+        let votes = self
+            .validator_signatures
+            .iter()
+            .map(|vote| (vote.validator_pubkey, vote.signature))
+            .collect::<Vec<_>>();
+        encode_solana_finality_v4(
+            self.cluster,
+            self.slot,
+            self.parent_slot,
+            self.blockhash,
+            self.bank_hash,
+            self.parent_bank_hash,
+            self.stake_table_digest,
+            self.transaction.clone(),
+            &votes,
+        )
+    }
+
+    /// Envelope carrying the encoded V4 payload.
+    pub fn encoded_envelope(&self) -> Result<ProofEnvelope, VerificationError> {
+        let mut envelope = self.envelope();
+        envelope.payload = self.encode_payload()?;
+        Ok(envelope)
+    }
+
+    /// Encode the portable evidence accepted by the settlement engine.
+    pub fn settlement_evidence(&self) -> Result<Vec<u8>, VerificationError> {
+        let envelope = self.envelope();
+        let payload = self.encode_payload()?;
+        encode_solana_settlement_evidence(&envelope, &payload)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -210,6 +210,19 @@ pub mod pallet {
     pub type BridgeNonces<T: Config> =
         StorageDoubleMap<_, Twox64Concat, ChainId, Twox64Concat, u64, bool, ValueQuery>;
 
+    /// Deposit-proof replay protection for the gateway credit path.
+    ///
+    /// Gateway proofs carry a 32-byte proof id, so truncating it into the
+    /// u64 nonce space above would create a collision-based replay surface.
+    #[pallet::storage]
+    pub type BridgeMintedProofIds<T: Config> =
+        StorageDoubleMap<_, Twox64Concat, ChainId, Blake2_128Concat, [u8; 32], (), OptionQuery>;
+
+    /// Withdrawal-id replay protection for the gateway burn path.
+    #[pallet::storage]
+    pub type BridgeBurnedWithdrawalIds<T: Config> =
+        StorageDoubleMap<_, Twox64Concat, ChainId, Blake2_128Concat, [u8; 32], (), OptionQuery>;
+
     /// Global sum of all `WrappedSupply` entries.
     ///
     /// **Invariant**: `TotalWrappedSupply == Σ WrappedSupply[c][a]` for all
@@ -235,6 +248,22 @@ pub mod pallet {
             asset_id: AssetId,
             recipient: T::AccountId,
             amount: T::Balance,
+        },
+        /// A verified cross-chain gateway deposit credited wrapped tokens.
+        WrappedDepositCredited {
+            chain_id: ChainId,
+            asset_id: AssetId,
+            recipient: T::AccountId,
+            amount: T::Balance,
+            proof_id: [u8; 32],
+        },
+        /// A gateway withdrawal burned the caller's wrapped representation.
+        WrappedWithdrawalBurned {
+            chain_id: ChainId,
+            asset_id: AssetId,
+            who: T::AccountId,
+            amount: T::Balance,
+            withdrawal_id: [u8; 32],
         },
         /// Wrapped tokens were burned by `who` on `chain_id`.
         WrappedBurned {
@@ -529,6 +558,138 @@ pub mod pallet {
             WrappedSupply::<T>::iter()
                 .filter_map(|(_, aid, bal)| if aid == asset_id { Some(bal) } else { None })
                 .fold(T::Balance::zero(), |acc, b| acc.saturating_add(b))
+        }
+
+        /// Credit a deposit that another runtime pallet has already verified.
+        ///
+        /// This is an internal cross-pallet API, not a dispatchable. The runtime
+        /// must expose it only through a trait implementation bound to the
+        /// governed gateway; no origin can call it directly.
+        ///
+        /// Unlike `mint_wrapped`, replay protection uses the gateway's full
+        /// 32-byte proof id. The caller's dispatch transaction rolls every write
+        /// back if the gateway's later status update fails.
+        pub fn credit_verified_deposit(
+            chain_id: ChainId,
+            asset_id: AssetId,
+            recipient: T::AccountId,
+            amount: T::Balance,
+            proof_id: [u8; 32],
+        ) -> DispatchResult {
+            ensure!(amount > T::Balance::zero(), Error::<T>::InvalidAmount);
+            ensure!(
+                !BridgeMintedProofIds::<T>::contains_key(chain_id, proof_id),
+                Error::<T>::NonceAlreadyUsed
+            );
+
+            let config =
+                RegisteredWrappedAssets::<T>::get(asset_id).ok_or(Error::<T>::AssetNotFound)?;
+            ensure!(
+                config.status == WrappedAssetStatus::Active,
+                if config.status == WrappedAssetStatus::Paused {
+                    Error::<T>::AssetPaused
+                } else {
+                    Error::<T>::AssetDeprecated
+                }
+            );
+
+            let current_chain_supply = WrappedSupply::<T>::get(chain_id, asset_id);
+            let new_chain_supply = current_chain_supply
+                .checked_add(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+            let total_asset_supply = Self::total_asset_supply(asset_id);
+            let new_total_asset_supply = total_asset_supply
+                .checked_add(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+            ensure!(
+                new_total_asset_supply <= config.max_wrapped_supply,
+                Error::<T>::SupplyCapExceeded
+            );
+
+            let key = (chain_id, asset_id, recipient.clone());
+            let previous_balance = WrappedBalances::<T>::get(&key);
+            let new_balance = previous_balance
+                .checked_add(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+            let new_global_supply = TotalWrappedSupply::<T>::get()
+                .checked_add(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+
+            BridgeMintedProofIds::<T>::insert(chain_id, proof_id, ());
+            WrappedSupply::<T>::insert(chain_id, asset_id, new_chain_supply);
+            WrappedBalances::<T>::insert(&key, new_balance);
+            TotalWrappedSupply::<T>::put(new_global_supply);
+
+            Self::deposit_event(Event::WrappedDepositCredited {
+                chain_id,
+                asset_id,
+                recipient,
+                amount,
+                proof_id,
+            });
+            Ok(())
+        }
+
+        /// Burn a user's wrapped balance for a gateway withdrawal.
+        ///
+        /// This internal API is called only by the runtime's governed gateway.
+        /// The caller account comes from the signed gateway origin, never from a
+        /// proof field, and the withdrawal id provides replay protection beyond
+        /// the gateway's own record.
+        pub fn burn_verified_withdrawal(
+            chain_id: ChainId,
+            asset_id: AssetId,
+            who: T::AccountId,
+            amount: T::Balance,
+            withdrawal_id: [u8; 32],
+        ) -> DispatchResult {
+            ensure!(amount > T::Balance::zero(), Error::<T>::InvalidAmount);
+            ensure!(
+                !BridgeBurnedWithdrawalIds::<T>::contains_key(chain_id, withdrawal_id),
+                Error::<T>::NonceAlreadyUsed
+            );
+
+            let config =
+                RegisteredWrappedAssets::<T>::get(asset_id).ok_or(Error::<T>::AssetNotFound)?;
+            ensure!(
+                config.status != WrappedAssetStatus::Deprecated,
+                Error::<T>::AssetDeprecated
+            );
+
+            let key = (chain_id, asset_id, who.clone());
+            let current_balance = WrappedBalances::<T>::get(&key);
+            ensure!(
+                current_balance >= amount,
+                Error::<T>::InsufficientWrappedBalance
+            );
+            let new_balance = current_balance
+                .checked_sub(&amount)
+                .ok_or(Error::<T>::InsufficientWrappedBalance)?;
+            let current_chain_supply = WrappedSupply::<T>::get(chain_id, asset_id);
+            let new_chain_supply = current_chain_supply
+                .checked_sub(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+            let new_global_supply = TotalWrappedSupply::<T>::get()
+                .checked_sub(&amount)
+                .ok_or(Error::<T>::SupplyCapExceeded)?;
+
+            BridgeBurnedWithdrawalIds::<T>::insert(chain_id, withdrawal_id, ());
+            if new_balance.is_zero() {
+                WrappedBalances::<T>::remove(&key);
+            } else {
+                WrappedBalances::<T>::insert(&key, new_balance);
+            }
+            WrappedSupply::<T>::insert(chain_id, asset_id, new_chain_supply);
+            TotalWrappedSupply::<T>::put(new_global_supply);
+
+            Self::deposit_event(Event::WrappedWithdrawalBurned {
+                chain_id,
+                asset_id,
+                who,
+                amount,
+                withdrawal_id,
+            });
+            Ok(())
         }
 
         /// Compute the governance power for `account` by iterating all wrapped

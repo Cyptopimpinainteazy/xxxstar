@@ -18,6 +18,7 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
+#[cfg(test)]
 use x3_cross_vm_bridge::CrossVmOperation;
 
 // ── Configuration ───────────────────────────────────────────────────────────
@@ -336,7 +337,16 @@ const DEPOSIT_LOCKED_SIGNATURE: &str =
 // );
 const WITHDRAWAL_RELEASED_SIGNATURE: &str = "WithdrawalReleased(bytes32,address,address,uint256)";
 
+#[cfg(test)]
 const SIGNED_DEPOSIT_RELAY_MAGIC: &[u8] = b"X3DP1";
+
+fn legacy_relay_disabled(kind: &str) -> Box<dyn std::error::Error + Send + Sync> {
+    format!(
+        "legacy {kind} relay is disabled: event fields are not receipt-inclusion evidence; \
+         use RelayerService's typed proof path"
+    )
+    .into()
+}
 
 #[cfg(test)]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -345,6 +355,7 @@ struct SignedDepositRelayEnvelope {
     deposit_payload: Vec<u8>,
 }
 
+#[cfg(test)]
 fn build_deposit_proof_payload(event: &ExternalDepositEvent) -> Vec<u8> {
     let mut proof_payload = Vec::new();
 
@@ -374,6 +385,7 @@ fn build_deposit_proof_payload(event: &ExternalDepositEvent) -> Vec<u8> {
     proof_payload
 }
 
+#[cfg(test)]
 fn build_lock_proof(
     operation: &CrossVmOperation,
     signer_seed: &str,
@@ -394,6 +406,7 @@ fn build_lock_proof(
     Ok(proof)
 }
 
+#[cfg(test)]
 fn build_signed_deposit_relay_envelope(
     event: &ExternalDepositEvent,
     signer_seed: &str,
@@ -1122,143 +1135,36 @@ impl Relayer {
         &self,
         event: &SvmDepositEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!(
-            "[relayer] Submitting SVM deposit proof: cluster='{}', amount={}",
-            event.cluster_name, event.amount,
-        );
-
-        let proof_signer =
-            std::env::var("X3_RELAY_PROOF_SIGNER").unwrap_or_else(|_| "//Alice".to_string());
-
-        // Build the CrossVmOperation for SVM deposit — source is 32-byte SVM address
-        let operation = CrossVmOperation::TransferToSvm {
-            source: [0u8; 20], // placeholder — X3 chain expects 20-byte EVM compat source
-            destination: event.destination_address.to_vec(),
-            amount: event.amount,
-        };
-        let lock_proof = build_lock_proof(&operation, &proof_signer)?;
-
-        // Build deposit payload using SVM event fields
-        let mut deposit_payload = Vec::new();
-        deposit_payload.extend_from_slice(&event.source_address);
-        deposit_payload.extend_from_slice(&event.destination_address);
-        deposit_payload.extend_from_slice(&event.amount.to_le_bytes());
-        deposit_payload.extend_from_slice(&event.asset_id);
-        deposit_payload.extend_from_slice(&event.slot.to_le_bytes());
-        deposit_payload.extend_from_slice(event.cluster_name.as_bytes());
-
-        let proof_len: u32 = lock_proof
-            .len()
-            .try_into()
-            .map_err(|_| "lock proof too large for SVM deposit relay envelope")?;
-        let mut envelope = Vec::with_capacity(
-            SIGNED_DEPOSIT_RELAY_MAGIC.len() + 4 + lock_proof.len() + deposit_payload.len(),
-        );
-        envelope.extend_from_slice(SIGNED_DEPOSIT_RELAY_MAGIC);
-        envelope.extend_from_slice(&proof_len.to_le_bytes());
-        envelope.extend_from_slice(&lock_proof);
-        envelope.extend_from_slice(&deposit_payload);
-
-        let proof_hex = format!("0x{}", hex::encode(&envelope));
-
-        let resp = rpc_call_blocking(
-            &self.config.x3_rpc,
-            "x3_submitCrossVmTransaction",
-            serde_json::json!([proof_hex]),
-            30000,
-        )?;
-
-        if let Some(err) = resp.error {
-            return Err(format!("X3 RPC error: {:?}", err).into());
-        }
-
-        println!(
-            "[relayer] SVM deposit proof submitted successfully — cluster='{}'",
-            event.cluster_name
-        );
-        Ok(())
+        let _ = event;
+        Err(
+            "legacy SVM deposit relay is disabled: production requires the V2 \
+             stake-weighted evidence path; refusing to synthesize a compatibility source"
+                .into(),
+        )
     }
 
-    /// Submit a deposit proof to X3 via the gateway pallet.
+    /// Refuse the legacy deposit relay.
     ///
-    /// Builds a signed deposit relay envelope and submits it via
-    /// the `x3_submitCrossVmTransaction` RPC. The runtime verifies
-    /// the proof against the route's verifier and creates a GatewayTransfer.
+    /// The old envelope carried an operation signature but no receipt inclusion
+    /// proof. Production submission now belongs to `RelayerService` and
+    /// `RpcSubmitter::submit_evm_proof`.
     fn submit_deposit_proof_to_x3(
         &self,
         event: &ExternalDepositEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!(
-            "[relayer] Submitting deposit proof: chain={}, amount={}, msg_id=0x{}",
-            event.chain_id,
-            event.amount,
-            hex::encode(event.message_id)
-        );
-
-        let proof_signer =
-            std::env::var("X3_RELAY_PROOF_SIGNER").unwrap_or_else(|_| "//Alice".to_string());
-        let proof_envelope = build_signed_deposit_relay_envelope(event, &proof_signer)?;
-        let proof_hex = format!("0x{}", hex::encode(&proof_envelope));
-
-        // Submit via x3_submitCrossVmTransaction RPC
-        let resp = rpc_call_blocking(
-            &self.config.x3_rpc,
-            "x3_submitCrossVmTransaction",
-            serde_json::json!([proof_hex]),
-            30000,
-        )?;
-
-        if let Some(err) = resp.error {
-            return Err(format!("X3 RPC error: {:?}", err).into());
-        }
-
-        println!(
-            "[relayer] Deposit proof submitted successfully — msg_id=0x{}",
-            hex::encode(event.message_id)
-        );
-        Ok(())
+        let _ = event;
+        Err(legacy_relay_disabled("EVM deposit"))
     }
 
-    /// Submit a release proof to X3's gateway pallet.
+    /// Refuse the legacy release relay.
     ///
-    /// Builds a signed proof payload for the WithdrawalReleased event
-    /// and submits it via `x3_submitCrossVmTransaction`.
+    /// `WithdrawalReleased` event fields are not receipt-inclusion evidence.
     fn submit_release_proof_to_gateway(
         &self,
         event: &WithdrawalReleasedEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        println!(
-            "[relayer] Submitting release proof: chain={}, withdrawal_id=0x{}",
-            event.chain_id,
-            hex::encode(event.withdrawal_id)
-        );
-
-        // Encode the release proof payload.
-        // The runtime's submit_release_proof extrinsic expects the EVM
-        // receipt proof payload containing the WithdrawalReleased event data.
-        let mut proof_payload = Vec::new();
-        proof_payload.extend_from_slice(&event.withdrawal_id);
-        proof_payload.extend_from_slice(&event.recipient);
-        proof_payload.extend_from_slice(&event.amount.to_le_bytes());
-        let proof_hex = format!("0x{}", hex::encode(&proof_payload));
-
-        // Submit via x3_submitCrossVmTransaction RPC
-        let resp = rpc_call_blocking(
-            &self.config.x3_rpc,
-            "x3_submitCrossVmTransaction",
-            serde_json::json!([proof_hex]),
-            30000,
-        )?;
-
-        if let Some(err) = resp.error {
-            return Err(format!("X3 RPC error: {:?}", err).into());
-        }
-
-        println!(
-            "[relayer] Release proof submitted successfully — withdrawal=0x{}",
-            hex::encode(event.withdrawal_id)
-        );
-        Ok(())
+        let _ = event;
+        Err(legacy_relay_disabled("EVM release"))
     }
 }
 
@@ -1372,6 +1278,7 @@ fn parse_deposit_log(log: &serde_json::Value, chain_id: u64) -> Option<ExternalD
 ///   topics[3] = address relayer (left-padded to 32 bytes)
 ///   data = ABI-encoded (uint256 amount)
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Kept as parsed evidence for the typed receipt path.
 struct WithdrawalReleasedEvent {
     withdrawal_id: [u8; 32],
     recipient: [u8; 20],
@@ -1611,5 +1518,14 @@ mod tests {
         assert_eq!(event.amount, 500);
         assert_eq!(event.block_number, 32);
         assert_eq!(event.chain_id, 1);
+    }
+
+    #[test]
+    fn legacy_event_only_relays_are_refused() {
+        for kind in ["EVM deposit", "EVM release"] {
+            let error = legacy_relay_disabled(kind).to_string();
+            assert!(error.contains("receipt-inclusion evidence"), "{error}");
+            assert!(error.contains("RelayerService"), "{error}");
+        }
     }
 }

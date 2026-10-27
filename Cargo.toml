@@ -163,6 +163,7 @@ members = [
     "crates/x3-gateway-risk-engine",
     "crates/x3-gpu-validator-swarm",
     "crates/x3-readiness",
+    "crates/x3-release-beacon",
     "crates/x3-integration",
     "crates/x3-integration/fuzz",       # libFuzzer targets for the X3 language path (cargo fuzz, nightly)
     "crates/x3-ixl",
@@ -591,12 +592,19 @@ rustix = { path = "patches/rustix" }
 # Split deranged's macro-generated unchecked_neg call shape to avoid a rustc 1.90 ICE.
 deranged = { path = "patches/deranged" }
 digest = { path = "patches/digest" }
+zstd = { path = "patches/zstd" }
+zstd-v012 = { package = "zstd", path = "patches/zstd-v012" }
+zip = { path = "patches/zip" }
 # Stub icu_properties to avoid rustc ICE on string literal unescaping.
 # Disabled until the lockfile resolves a crate graph that actually uses it,
 # otherwise cargo warns on every workspace invocation that the patch is unused.
 # icu_properties = { path = "patches/icu_properties_stub" }
 # Patch idna_adapter to work with our icu_properties_stub GeneralCategory newtype
 idna_adapter = { path = "patches/idna_adapter" }
+# `libp2p-websocket` requires webpki-roots 0.25, whose bundled root store
+# contains trust anchors removed in 2026 (RUSTSEC-2026-0381). This 0.25.5 shim
+# retains the API while sourcing the current, cleaned 1.0.10 root store.
+webpki-roots = { path = "patches/webpki-roots" }
 # Force sp-io to use patched Substrate git version (don't use crates.io 23.0.0 which lacks wasm support)
 # NOTE: [patch] entries do not support default-features/features — those fields are silently ignored.
 sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk", branch = "stable2512" }
@@ -626,6 +634,7 @@ sp-debug-derive = { git = "https://github.com/paritytech/polkadot-sdk", branch =
 
 # Patch polkadot-sdk with local modifications required by this workspace.
 [patch."https://github.com/paritytech/polkadot-sdk"]
+sp-maybe-compressed-blob = { path = "patches/sp-maybe-compressed-blob" }
 substrate-prometheus-endpoint = { path = "patches/substrate-prometheus-endpoint" }
 # X3 patch: emit unconditional Serialize/Deserialize derives on pallet GenesisConfig structs so
 # that the BuildGenesisConfig trait bound `MaybeSerializeDeserialize` is satisfied in no_std

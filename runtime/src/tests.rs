@@ -9,8 +9,124 @@
 
 use super::*;
 use frame_support::{assert_err, assert_noop, assert_ok};
+use pallet_x3_settlement_engine::bridge_integration::CrossChainValidatorProvider;
 use pallet_x3_settlement_engine::types::{AssetSpec, ExternalChainId, TokenId};
 use sp_runtime::DispatchError;
+
+#[test]
+fn gateway_deposit_minter_credits_wrapped_balance_once_and_binds_the_full_proof_id() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        let asset_id = [0x42; 32];
+        let beneficiary = account(7);
+        let chain_id = pallet_x3_crosschain_gateway::ExternalChainId::EthereumMainnet
+            .wrapped_chain_id()
+            .expect("ethereum chain id");
+        let proof_id = [0x55; 32];
+
+        assert_ok!(X3Wrapped::register_wrapped_asset(
+            RuntimeOrigin::root(),
+            asset_id,
+            pallet_x3_wrapped::WrappedAssetConfig {
+                native_asset_id: asset_id,
+                max_wrapped_supply: 1_000,
+                governance_weight_bps: 10_000,
+                bridge_fee_bps: 0,
+                status: pallet_x3_wrapped::WrappedAssetStatus::Active,
+            },
+        ));
+
+        assert_ok!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                100,
+                proof_id,
+            )
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            100
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedSupply::<Runtime>::get(chain_id, asset_id),
+            100
+        );
+
+        assert!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                1,
+                proof_id,
+            )
+            .is_err(),
+            "the full 32-byte proof id must prevent a second mint"
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            100
+        );
+
+        let withdrawal_id = [0x66; 32];
+        assert_ok!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::burn_verified_withdrawal(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                40,
+                withdrawal_id,
+            )
+        );
+        assert_eq!(
+            pallet_x3_wrapped::WrappedBalances::<Runtime>::get((
+                chain_id,
+                asset_id,
+                &beneficiary,
+            )),
+            60
+        );
+        assert!(
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::burn_verified_withdrawal(
+                chain_id,
+                asset_id,
+                beneficiary.as_ref(),
+                1,
+                withdrawal_id,
+            )
+            .is_err(),
+            "a withdrawal id cannot burn twice"
+        );
+    });
+}
+
+#[test]
+fn gateway_deposit_minter_refuses_non_canonical_beneficiary_bytes() {
+    sp_io::TestExternalities::default().execute_with(|| {
+        let error =
+            <GatewayDepositMinter as pallet_x3_crosschain_gateway::DepositMinter>::credit_verified_deposit(
+                1,
+                [0x42; 32],
+                &[0x11; 31],
+                1,
+                [0x55; 32],
+            )
+            .expect_err("31-byte beneficiaries are not X3 accounts");
+        assert!(
+            matches!(error, DispatchError::Module(_)),
+            "the gateway's typed beneficiary refusal must reach the caller"
+        );
+    });
+}
 
 fn account(seed: u8) -> AccountId {
     AccountId::from([seed; 32])
@@ -37,6 +153,62 @@ fn runtime_genesis_config_builds() {
         !storage.top.is_empty(),
         "genesis produced an empty top-level trie"
     );
+}
+
+#[test]
+fn runtime_solana_v4_verifier_uses_the_gateway_committee() {
+    use sp_core::Pair;
+
+    sp_io::TestExternalities::default().execute_with(|| {
+        let chain = pallet_x3_crosschain_gateway::ExternalChainId::SolanaDevnet;
+        assert!(
+            RuntimeCrossChainValidator::solana_v4_verifier(
+                x3_verification_router::SolanaCluster::Devnet
+            )
+            .is_none(),
+            "no governance committee must fail closed"
+        );
+
+        let mut validators = vec![
+            sp_core::ed25519::Pair::from_seed(&[1u8; 32]),
+            sp_core::ed25519::Pair::from_seed(&[2u8; 32]),
+        ]
+        .into_iter()
+        .map(|pair| pallet_x3_crosschain_gateway::SolanaStakeEntry {
+            pubkey: pair.public().0,
+            stake: 100,
+        })
+        .collect::<Vec<_>>();
+        validators.sort_by_key(|entry| entry.pubkey);
+        pallet_x3_crosschain_gateway::SolanaStakeCommittees::<Runtime>::insert(
+            chain,
+            pallet_x3_crosschain_gateway::SolanaStakeCommittee {
+                threshold_numerator: 2,
+                threshold_denominator: 3,
+                validators: validators.try_into().expect("two validators fit"),
+            },
+        );
+        pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::insert(chain, 400);
+
+        let verifier = RuntimeCrossChainValidator::solana_v4_verifier(
+            x3_verification_router::SolanaCluster::Devnet,
+        )
+        .expect("configured verifier");
+        assert_eq!(
+            verifier.cluster(),
+            x3_verification_router::SolanaCluster::Devnet
+        );
+        assert_eq!(verifier.total_stake(), 200);
+        assert_eq!(verifier.required_stake(), 134);
+        assert!(RuntimeCrossChainValidator::record_solana_v4_finalized_slot(
+            x3_verification_router::SolanaCluster::Devnet,
+            500,
+        ));
+        assert_eq!(
+            pallet_x3_crosschain_gateway::SolanaFinalizedSlots::<Runtime>::get(chain),
+            500
+        );
+    });
 }
 
 /// The settlement engine must be reachable through the real runtime with a
@@ -78,7 +250,8 @@ fn external_root_verifier_binds_evm_svm_and_bitcoin_to_stored_headers() {
     sp_io::TestExternalities::default().execute_with(|| {
         let evm_block = H256::repeat_byte(0x11);
         let evm_root = H256::repeat_byte(0x22);
-        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(
+        pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::insert(
+            42,
             pallet_cross_chain_validator::EvmHeaderInfo {
                 block_number: 42,
                 block_hash: evm_block,
@@ -91,6 +264,17 @@ fn external_root_verifier_binds_evm_svm_and_bitcoin_to_stored_headers() {
         );
         pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::put(
             pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
+        );
+        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(
+            pallet_cross_chain_validator::EvmHeaderInfo {
+                block_number: 43,
+                block_hash: H256::repeat_byte(0x12),
+                state_root: H256::repeat_byte(0x13),
+                merkle_root: H256::repeat_byte(0x14),
+                validator_set_hash: H256::repeat_byte(0x15),
+                verified_at_block: 2,
+                validation_proof: Vec::new(),
+            },
         );
         let evm_proof = encode_root_proof(EXTERNAL_ROOT_ETHEREUM, RootKind::StateRoot, evm_block.0);
         assert_ok!(
@@ -109,16 +293,40 @@ fn external_root_verifier_binds_evm_svm_and_bitcoin_to_stored_headers() {
             >>::verify_root(EXTERNAL_ROOT_ETHEREUM, evm_root, 42, &wrong_evm_proof)
             .is_err()
         );
+        assert!(
+            <RuntimeExternalRootVerifier as pallet_x3_cross_vm_router::ExternalRootVerifier<
+                Runtime,
+            >>::verify_root(
+                EXTERNAL_ROOT_ETHEREUM,
+                H256::repeat_byte(0x99),
+                42,
+                &evm_proof,
+            )
+            .is_err(),
+            "a block number alone must not bind a different requested root"
+        );
 
         let svm_block = H256::repeat_byte(0x44);
         let svm_root = H256::repeat_byte(0x55);
-        pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(
+        pallet_cross_chain_validator::FinalizedSvmHeaders::<Runtime>::insert(
+            7,
             pallet_cross_chain_validator::SvmHeaderInfo {
                 slot: 7,
                 block_hash: svm_block,
                 state_root: svm_root,
                 validator_set_hash: H256::repeat_byte(0x56),
                 verified_at_block: 1,
+                validation_proof: Vec::new(),
+                parent_slot_hashes: Vec::new(),
+            },
+        );
+        pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(
+            pallet_cross_chain_validator::SvmHeaderInfo {
+                slot: 8,
+                block_hash: H256::repeat_byte(0x57),
+                state_root: H256::repeat_byte(0x58),
+                validator_set_hash: H256::repeat_byte(0x59),
+                verified_at_block: 2,
                 validation_proof: Vec::new(),
                 parent_slot_hashes: Vec::new(),
             },
@@ -156,7 +364,8 @@ fn register_external_root_uses_the_runtime_verifier_and_stores_only_verified_roo
     sp_io::TestExternalities::default().execute_with(|| {
         let block_hash = H256::repeat_byte(0x11);
         let state_root = H256::repeat_byte(0x22);
-        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(
+        pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::insert(
+            42,
             pallet_cross_chain_validator::EvmHeaderInfo {
                 block_number: 42,
                 block_hash,
@@ -280,31 +489,31 @@ fn settlement_verification_uses_only_finalized_external_headers() {
             None
         );
 
-        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(
-            pallet_cross_chain_validator::EvmHeaderInfo {
-                block_number: 43,
-                block_hash: H256::repeat_byte(0x66),
-                state_root: H256::repeat_byte(0x67),
-                merkle_root: H256::repeat_byte(0x68),
-                validator_set_hash: H256::repeat_byte(0x69),
-                verified_at_block: 2,
-                validation_proof: Vec::new(),
-            },
-        );
+        let evm_43 = pallet_cross_chain_validator::EvmHeaderInfo {
+            block_number: 43,
+            block_hash: H256::repeat_byte(0x66),
+            state_root: H256::repeat_byte(0x67),
+            merkle_root: H256::repeat_byte(0x68),
+            validator_set_hash: H256::repeat_byte(0x69),
+            verified_at_block: 2,
+            validation_proof: Vec::new(),
+        };
+        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(evm_43.clone());
+        pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::insert(43, evm_43);
         pallet_cross_chain_validator::EvmHeaderFinalitySource::<Runtime>::put(
             pallet_cross_chain_validator::EvmHeaderFinalitySourceKind::BeaconSyncCommittee,
         );
-        pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(
-            pallet_cross_chain_validator::SvmHeaderInfo {
-                slot: 8,
-                block_hash: H256::repeat_byte(0x70),
-                state_root: H256::repeat_byte(0x71),
-                validator_set_hash: H256::repeat_byte(0x72),
-                verified_at_block: 2,
-                validation_proof: Vec::new(),
-                parent_slot_hashes: Vec::new(),
-            },
-        );
+        let svm_8 = pallet_cross_chain_validator::SvmHeaderInfo {
+            slot: 8,
+            block_hash: H256::repeat_byte(0x70),
+            state_root: H256::repeat_byte(0x71),
+            validator_set_hash: H256::repeat_byte(0x72),
+            verified_at_block: 2,
+            validation_proof: Vec::new(),
+            parent_slot_hashes: Vec::new(),
+        };
+        pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(svm_8.clone());
+        pallet_cross_chain_validator::FinalizedSvmHeaders::<Runtime>::insert(8, svm_8);
 
         assert!(RuntimeCrossChainValidator::verify_evm_proof(
             43,
@@ -318,13 +527,60 @@ fn settlement_verification_uses_only_finalized_external_headers() {
             H256::repeat_byte(0x71),
             H256::repeat_byte(0x72),
         ));
+        // A later finalized header must not erase the evidence for an older
+        // transfer. The maps retain every finalized header; only the latest
+        // pointers advance.
+        let newer_evm = pallet_cross_chain_validator::EvmHeaderInfo {
+            block_number: 44,
+            block_hash: H256::repeat_byte(0x81),
+            state_root: H256::repeat_byte(0x82),
+            merkle_root: H256::repeat_byte(0x83),
+            validator_set_hash: H256::repeat_byte(0x84),
+            verified_at_block: 3,
+            validation_proof: Vec::new(),
+        };
+        pallet_cross_chain_validator::LastFinalizedEvmHeader::<Runtime>::put(newer_evm.clone());
+        pallet_cross_chain_validator::FinalizedEvmHeaders::<Runtime>::insert(44, newer_evm);
+        let newer_svm = pallet_cross_chain_validator::SvmHeaderInfo {
+            slot: 9,
+            block_hash: H256::repeat_byte(0x85),
+            state_root: H256::repeat_byte(0x86),
+            validator_set_hash: H256::repeat_byte(0x87),
+            verified_at_block: 3,
+            validation_proof: Vec::new(),
+            parent_slot_hashes: Vec::new(),
+        };
+        pallet_cross_chain_validator::LastFinalizedSvmHeader::<Runtime>::put(newer_svm.clone());
+        pallet_cross_chain_validator::FinalizedSvmHeaders::<Runtime>::insert(9, newer_svm);
+
+        assert!(RuntimeCrossChainValidator::verify_evm_proof(
+            43,
+            H256::repeat_byte(0x66),
+            H256::repeat_byte(0x67),
+            H256::repeat_byte(0x68),
+        ));
+        assert!(RuntimeCrossChainValidator::verify_svm_proof(
+            8,
+            H256::repeat_byte(0x70),
+            H256::repeat_byte(0x71),
+            H256::repeat_byte(0x72),
+        ));
+        assert!(
+            !RuntimeCrossChainValidator::verify_evm_proof(
+                42,
+                legacy_block,
+                legacy_state,
+                legacy_receipts,
+            ),
+            "an authorized-submitter-only header must remain non-finalized"
+        );
         assert_eq!(
             RuntimeCrossChainValidator::get_latest_evm_header_hash(),
-            Some(H256::repeat_byte(0x66))
+            Some(H256::repeat_byte(0x81))
         );
         assert_eq!(
             RuntimeCrossChainValidator::get_latest_svm_header_hash(),
-            Some(H256::repeat_byte(0x70))
+            Some(H256::repeat_byte(0x85))
         );
     });
 }

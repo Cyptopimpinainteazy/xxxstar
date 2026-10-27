@@ -80,15 +80,15 @@ supermajority and recovery.
 | **Node Service**        | In Progress       | Provides RPC, telemetry, and networking services with hooks for future Frontier JSON-RPC and SVM execution interfaces.                         |
 | **Tooling**             | In Progress       | CLI utilities cover chain specs and key handling; Comit crafting helpers and SDK improvements are scheduled next.                              |
 ### Developer Tools: BMAD Method
-The repository includes a small integration wrapper for BMAD Method under `crates/vibe-bmad`. BMAD is an AI-driven agile development tool that helps with planning, workflows and architecture decisions.
+BMAD Method v7 (preview) is installed at the repository root as skills for GitHub Copilot and Claude Code, under `.agents/skills/bmad-*` and `.claude/skills/bmad-*`. It provides planning and delivery workflows plus persona agents.
 
-Quick usage:
+Quick usage (from the repository root):
 ```sh
-cd crates/vibe-bmad
-npm run install-bmad
-npm run workflow-init
+npm run bmad:install   # install or reinstall
+npm run bmad:update    # update an existing install
+npm run bmad:status    # machine-readable install state
 ```
-BMAD requires Node.js >= 20. See `crates/vibe-bmad/docs/root/README.md` for more details.
+Then invoke the `bmad` skill in Copilot to get oriented. BMAD requires Node.js >= 20.12 and `uv`. See `docs/tools/bmad.md` for layout, configuration, known defects, and artifacts.
 
 ---
 
