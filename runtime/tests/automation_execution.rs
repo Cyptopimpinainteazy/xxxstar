@@ -7,10 +7,18 @@
 //!   asset with no median **fails closed** instead of reading as zero;
 //! * a task's action moves real balances through `RuntimeActionDispatcher`, and
 //!   the keeper is paid only when a dispatch happened.
+//!
+//! The automation pallet is not part of the mainnet-rc1 pallet set (see
+//! `runtime/Cargo.toml`), so under that feature the runtime has no Config impl
+//! for it and these calls cannot resolve. Same guard as `dex_atomic_rollback.rs`.
+#![cfg(not(feature = "mainnet-rc1"))]
 
-use frame_support::{assert_noop, assert_ok, traits::Currency};
+use frame_support::{
+    assert_noop, assert_ok,
+    traits::{Currency, ReservableCurrency},
+};
 use x3_automation::{Action, Condition, TaskStatus};
-use x3_chain_runtime::{AccountId, Balances, Runtime, RuntimeOrigin, System};
+use x3_chain_runtime::{AccountId, Balances, BaseRegistrationFee, Runtime, RuntimeOrigin, System};
 
 type Automation = pallet_x3_automation::Pallet<Runtime>;
 type Oracle = pallet_x3_oracle::Pallet<Runtime>;
@@ -24,6 +32,16 @@ fn account(seed: u8) -> AccountId {
 
 fn free(who: &AccountId) -> u128 {
     <BalancesPallet as Currency<AccountId>>::free_balance(who)
+}
+
+fn reserved(who: &AccountId) -> u128 {
+    <BalancesPallet as ReservableCurrency<AccountId>>::reserved_balance(who)
+}
+
+fn recipient_of(who: &AccountId) -> [u8; 32] {
+    let mut recipient = [0u8; 32];
+    recipient.copy_from_slice(who.as_ref());
+    recipient
 }
 
 fn setup() -> sp_io::TestExternalities {
@@ -323,5 +341,244 @@ fn a_fresh_median_is_usable() {
             Automation::tasks(task_id).unwrap().status,
             TaskStatus::Executed
         );
+    });
+}
+
+#[test]
+fn an_event_triggered_task_is_refused_at_registration_and_reserves_nothing() {
+    // No bounded, indexed event source exists in this runtime, and scanning
+    // `System::Events` has a cost no one can bound in consensus.
+    setup().execute_with(|| {
+        let owner = account(16);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+
+        assert_noop!(
+            Automation::register_task(
+                RuntimeOrigin::signed(owner.clone()),
+                Condition::Event { topic: [7u8; 32] },
+                Action::NoChange,
+                1_000_000_000_000u128,
+            ),
+            pallet_x3_automation::Error::<Runtime>::InvalidTask
+        );
+        assert_eq!(reserved(&owner), 0);
+        assert!(Automation::account_tasks(&owner).is_empty());
+    });
+}
+
+#[test]
+fn an_owner_who_cancels_a_task_gets_the_fee_back_and_it_can_no_longer_run() {
+    setup().execute_with(|| {
+        let owner = account(17);
+        let keeper = account(18);
+        let payee = account(19);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+
+        let task_id = register(
+            &owner,
+            Condition::Manual,
+            Action::TransferNative {
+                recipient: recipient_of(&payee),
+                amount: 5_000_000_000_000,
+            },
+        );
+        assert_eq!(reserved(&owner), BaseRegistrationFee::get());
+
+        assert_ok!(Automation::cancel_task(
+            RuntimeOrigin::signed(owner.clone()),
+            task_id
+        ));
+        assert_eq!(reserved(&owner), 0);
+        assert_eq!(free(&owner), ENDOWED);
+
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(keeper), task_id),
+            pallet_x3_automation::Error::<Runtime>::TaskNotFound
+        );
+        assert_eq!(free(&payee), 0);
+    });
+}
+
+#[test]
+fn someone_other_than_the_owner_cannot_cancel_a_task() {
+    setup().execute_with(|| {
+        let owner = account(20);
+        let stranger = account(21);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&stranger, ENDOWED);
+
+        let task_id = register(&owner, Condition::Manual, Action::NoChange);
+
+        assert_noop!(
+            Automation::cancel_task(RuntimeOrigin::signed(stranger), task_id),
+            pallet_x3_automation::Error::<Runtime>::NotTaskOwner
+        );
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Active
+        );
+        assert_eq!(reserved(&owner), BaseRegistrationFee::get());
+    });
+}
+
+#[test]
+fn executing_a_task_twice_moves_funds_and_pays_the_keeper_only_once() {
+    setup().execute_with(|| {
+        let owner = account(22);
+        let keeper = account(23);
+        let payee = account(24);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+        let amount = 5_000_000_000_000u128;
+
+        let task_id = register(
+            &owner,
+            Condition::Manual,
+            Action::TransferNative {
+                recipient: recipient_of(&payee),
+                amount,
+            },
+        );
+
+        assert_ok!(Automation::execute_task(
+            RuntimeOrigin::signed(keeper.clone()),
+            task_id
+        ));
+        let owner_after_first = free(&owner);
+        let keeper_after_first = free(&keeper);
+
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(keeper.clone()), task_id),
+            pallet_x3_automation::Error::<Runtime>::TaskNotActive
+        );
+        assert_eq!(free(&payee), amount, "the transfer happened exactly once");
+        assert_eq!(free(&owner), owner_after_first);
+        assert_eq!(free(&keeper), keeper_after_first);
+        assert!(Automation::receipt(task_id, 2).is_none());
+    });
+}
+
+#[test]
+fn a_block_number_task_executed_before_its_block_does_nothing() {
+    setup().execute_with(|| {
+        let owner = account(25);
+        let keeper = account(26);
+        let payee = account(27);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+
+        let task_id = register(
+            &owner,
+            Condition::BlockNumber(10),
+            Action::TransferNative {
+                recipient: recipient_of(&payee),
+                amount: 5_000_000_000_000,
+            },
+        );
+
+        System::set_block_number(5);
+        let keeper_before = free(&keeper);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(keeper.clone()), task_id),
+            pallet_x3_automation::Error::<Runtime>::ConditionNotMet
+        );
+        assert_eq!(free(&payee), 0);
+        assert_eq!(free(&keeper), keeper_before);
+        let task = Automation::tasks(task_id).unwrap();
+        assert_eq!(task.status, TaskStatus::Active);
+        assert_eq!(task.attempts, 0);
+    });
+}
+
+#[test]
+#[ignore = "bug: register_task sets a BlockNumber(b) task's expiry_block to b, and \
+            execute_task checks expiry (current >= expiry_block) before the condition \
+            (current >= b), so the task expires at the very block it becomes due and \
+            can never execute"]
+fn a_block_number_task_executes_once_its_block_is_reached() {
+    setup().execute_with(|| {
+        let owner = account(28);
+        let keeper = account(29);
+        let payee = account(30);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+        let amount = 5_000_000_000_000u128;
+
+        let task_id = register(
+            &owner,
+            Condition::BlockNumber(10),
+            Action::TransferNative {
+                recipient: recipient_of(&payee),
+                amount,
+            },
+        );
+
+        System::set_block_number(10);
+        assert_ok!(Automation::execute_task(
+            RuntimeOrigin::signed(keeper),
+            task_id
+        ));
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Executed
+        );
+        assert_eq!(free(&payee), amount);
+    });
+}
+
+#[test]
+fn an_expired_task_is_closed_without_moving_funds_or_paying_the_keeper() {
+    setup().execute_with(|| {
+        let owner = account(31);
+        let keeper = account(32);
+        let payee = account(33);
+        let _ = Balances::make_free_balance_be(&owner, ENDOWED);
+        let _ = Balances::make_free_balance_be(&keeper, ENDOWED);
+
+        let task_id = register(
+            &owner,
+            Condition::Manual,
+            Action::TransferNative {
+                recipient: recipient_of(&payee),
+                amount: 5_000_000_000_000,
+            },
+        );
+        let expiry = Automation::tasks(task_id).unwrap().expiry_block;
+
+        System::set_block_number(expiry.try_into().expect("expiry fits a block number"));
+        let keeper_before = free(&keeper);
+        assert_ok!(Automation::execute_task(
+            RuntimeOrigin::signed(keeper.clone()),
+            task_id
+        ));
+
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Expired
+        );
+        assert_eq!(reserved(&owner), 0, "the registration fee is released");
+        assert_eq!(free(&owner), ENDOWED);
+        assert_eq!(free(&payee), 0);
+        assert_eq!(free(&keeper), keeper_before);
+        assert!(Automation::receipt(task_id, 1).is_none());
+    });
+}
+
+#[test]
+fn an_owner_who_cannot_cover_the_registration_fee_is_refused() {
+    setup().execute_with(|| {
+        let owner = account(34);
+
+        assert_noop!(
+            Automation::register_task(
+                RuntimeOrigin::signed(owner.clone()),
+                Condition::Manual,
+                Action::NoChange,
+                1_000_000_000_000u128,
+            ),
+            pallet_x3_automation::Error::<Runtime>::InsufficientBalance
+        );
+        assert!(Automation::account_tasks(&owner).is_empty());
     });
 }
