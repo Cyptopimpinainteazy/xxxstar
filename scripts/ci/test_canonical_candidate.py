@@ -112,10 +112,43 @@ class CanonicalCandidateTests(unittest.TestCase):
                           "mainnet-v1": ["mainnet-rc1", "external-gateway"]}},
         ]
         with patch.object(candidate, "toml_document", side_effect=valid):
-            self.assertEqual(candidate.verify_bridge_feature_scope(Path("/tmp/unneeded")), [])
+            self.assertEqual(candidate.verify_bridge_feature_scope(candidate.ROOT), [])
         valid[1]["features"]["mainnet-rc1"] = ["external-gateway"]
         with patch.object(candidate, "toml_document", side_effect=valid):
-            self.assertTrue(candidate.verify_bridge_feature_scope(Path("/tmp/unneeded")))
+            self.assertTrue(candidate.verify_bridge_feature_scope(candidate.ROOT))
+
+    def test_rc1_runtime_contains_canonical_engine_without_frontier_or_experimental_dex(self):
+        # Inspect the actual selected runtime, rather than using a hand-written
+        # list of pallets as substitute for activation evidence.
+        source = (candidate.ROOT / "runtime/src/lib.rs").read_text(encoding="utf-8")
+        self.assertEqual(candidate.check_rc1_runtime_pallet_scope(source), [])
+        marker = "// ── default ("
+        section = source.split("// ── mainnet-rc1:", 1)[1].split(marker, 1)[0]
+        self.assertIn("AtomicTradeEngine: pallet_atomic_trade_engine", section)
+        self.assertIn("SvmRuntime: pallet_svm_runtime", section)
+        self.assertNotIn("X3Dex: pallet_x3_dex", section)
+        self.assertNotIn("Evm: pallet_evm", section)
+
+    def test_rc1_runtime_feature_surface_cannot_accidentally_enable_frontier(self):
+        source = (candidate.ROOT / "runtime/src/lib.rs").read_text(encoding="utf-8")
+        selected = source.replace(
+            "        X3AtomicKernel: pallet_x3_atomic_kernel,",
+            "        X3AtomicKernel: pallet_x3_atomic_kernel,\n        Evm: pallet_evm,",
+            1,
+        )
+        # This edit could hit an earlier dev variant; make a controlled change
+        # inside the RC-1 block only to test the parser itself.
+        prefix, remaining = source.split("// ── mainnet-rc1:", 1)
+        section, suffix = remaining.split("// ── default (", 1)
+        section = section.replace(
+            "        X3AtomicKernel: pallet_x3_atomic_kernel,",
+            "        X3AtomicKernel: pallet_x3_atomic_kernel,\n        Evm: pallet_evm,",
+            1,
+        )
+        self.assertTrue(any("experimental Evm" in item for item in
+                            candidate.check_rc1_runtime_pallet_scope(
+                                prefix + "// ── mainnet-rc1:" + section + "// ── default (" + suffix
+                            )))
 
     def test_corrupted_source_file_never_passes(self):
         spec = policy()
