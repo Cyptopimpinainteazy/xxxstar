@@ -1,0 +1,75 @@
+name: X3 Public Launch Guardian
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/ci/public_launch_guardian.py'
+      - 'scripts/ci/public-launch-policy.json'
+      - 'scripts/ci/test_public_launch_guardian.py'
+      - 'scripts/ci/PUBLIC_LAUNCH_GUARDIAN.md'
+      - '.github/workflows/x3-public-launch-guardian.yml'
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: 'Full 40-character lowercase commit SHA to assess; never deploys'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: public-launch-guardian-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  guardian-unit-tests:
+    # Never run untrusted fork PR code on physical self-hosted workers.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test fail-closed guardian policy
+        run: python3 -m unittest discover -s scripts/ci -p 'test_public_launch_guardian.py' -v
+      - name: Validate policy JSON
+        run: |
+          python3 -m json.tool scripts/ci/public-launch-policy.json >/dev/null
+
+  assess-public-candidate:
+    # Manual, read-only assessment. Always checks out the trusted workflow
+    # branch; never runs source from operator-supplied candidate_sha.
+    if: github.event_name == 'workflow_dispatch'
+    needs: [guardian-unit-tests]
+    runs-on: [self-hosted, Linux, X64, x3]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate candidate identity
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          [[ "$CANDIDATE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo "::error::expected full lowercase commit SHA"; exit 2; }
+      - name: Read exact-head Actions evidence and assess
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          python3 scripts/ci/public_launch_guardian.py \
+            --candidate-sha "$CANDIDATE_SHA" \
+            --fetch-github \
+            --output "$RUNNER_TEMP/x3-public-launch-assessment.json"
+      - name: Preserve assessment (missing artifact blocks release evidence)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x3-public-guardian-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/x3-public-launch-assessment.json
+          if-no-files-found: error
+          retention-days: 30
