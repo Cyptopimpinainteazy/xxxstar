@@ -145,10 +145,10 @@ def check_rc1_runtime_pallet_scope(source: str) -> list[str]:
         "AtomicTradeEngine", "X3AtomicKernel", "X3CrossVmRouter",
         "X3SettlementEngine", "X3SupplyLedger", "SvmRuntime",
     ):
-        if not re.search(r"^\\s*" + re.escape(component) + r"\\s*:", body, re.MULTILINE):
+        if not re.search(r"^\s*" + re.escape(component) + r"\s*:", body, re.MULTILINE):
             failures.append(f"runtime: required RC-1 pallet {component} is not active")
     for experimental in ("X3Dex", "X3Automation", "Evm", "Ethereum"):
-        if re.search(r"^\\s*" + re.escape(experimental) + r"\\s*:", body, re.MULTILINE):
+        if re.search(r"^\s*" + re.escape(experimental) + r"\s*:", body, re.MULTILINE):
             failures.append(f"runtime: experimental {experimental} unexpectedly active in RC-1")
     if 'not(feature = "frontier")' not in body:
         failures.append("runtime: RC-1 lacks explicit non-Frontier feature guard")
