@@ -11,7 +11,9 @@ endpoints, rotates keys, or starts paid infrastructure.
 The versioned policy is `scripts/ci/public-launch-policy.json`. It requires:
 - Latest completed-success GitHub Actions run for **the same full candidate SHA**
   for Local CI, production compiler, compiled storage, atomic trading,
-  security audit, production gate and Zombienet integration.
+  security audit, production gate and Zombienet integration, plus canonical
+  compiler bridge, control-flow parity, nested X3Lang workspace, and the
+  seven-validator checker unit workflow.
 - **Job-level** evidence: each required run must have the required count of
   completed-success jobs. Skipped, queued, cancelled, failed, zero-job and
   incomplete-paginated workflows are blocking. The latest rerun wins.
