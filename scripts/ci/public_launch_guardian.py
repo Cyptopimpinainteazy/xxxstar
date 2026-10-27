@@ -290,8 +290,22 @@ def fetch_required_jobs(repo, runs, policy, sha, token, max_pages=10):
                 break
         else:
             raise ValueError("GitHub jobs pagination limit reached; no partial admission")
-        # A rerun or forced update can race the metadata collection. Require
-        # the observed attempt to match the latest run attempt at the end.
+        # A rerun can race the job listing. Confirm GitHub still reports the
+        # exact run attempt and outcome captured before collecting its jobs.
+        current_request = urllib.request.Request(
+            f"https://api.github.com/repos/{repo}/actions/runs/{run['id']}",
+            headers={"Authorization": "Bearer " + token,
+                     "Accept": "application/vnd.github+json",
+                     "User-Agent": "x3-public-launch-guardian/1",
+                     "X-GitHub-Api-Version": "2022-11-28"},
+        )
+        with urllib.request.urlopen(current_request, timeout=20) as response:
+            current = json.load(response)
+        if not isinstance(current, dict) or any(
+            current.get(field) != run.get(field)
+            for field in ("id", "run_attempt", "head_sha", "status", "conclusion", "path")
+        ):
+            raise ValueError("workflow run changed while collecting jobs")
         run["jobs"] = jobs
     return runs
 
