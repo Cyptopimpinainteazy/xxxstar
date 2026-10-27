@@ -100,8 +100,8 @@ package = "crypto-bigint"
 status = "accepted_risk"
 published_range = "<0.7.6"
 vulnerable_range = "<0.7.6"
-expected_resolved = ["0.5.2", "0.5.5", "0.7.8"]
-accepted_reason = "X3-owned k256 consumers now resolve crypto-bigint 0.7.8. The remaining 0.5.5 copy is pinned by the unmodified polkadot-sdk stable2512 and Frontier k256 0.13 dependency lines and is used on public transaction/signature recovery and verification paths, not X3 private-key signing; see the evidence document for the path and re-review trigger."
+expected_resolved = ["0.5.2", "0.5.5", "0.7.8", "0.7.10"]
+accepted_reason = "X3-owned k256 consumers resolve crypto-bigint 0.7.8 and 0.7.10, both above the fixed 0.7.6 boundary. The remaining 0.5.5 copy is pinned by the unmodified polkadot-sdk stable2512 and Frontier k256 0.13 dependency lines and is used on public transaction/signature recovery and verification paths, not X3 private-key signing; see the evidence document for the path and re-review trigger."
 evidence = "docs/security/RUSTSEC-2026-0387-crypto-bigint.md"
 
 [[advisory]]

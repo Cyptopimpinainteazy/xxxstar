@@ -9,13 +9,14 @@ starts at `0.7.6`.
 
 The root workspace now resolves two copies:
 
-- `crypto-bigint 0.7.8` through `k256 0.14` for X3-owned signing and
-  verification crates.
+- `crypto-bigint 0.7.8` and `0.7.10` through `k256 0.14` for X3-owned
+  signing and verification crates.
 - `crypto-bigint 0.5.5` through the unmodified `polkadot-sdk` stable2512 and
   Frontier dependency lines, which pin `k256 0.13`.
 
 This split was measured with `cargo tree -i crypto-bigint@0.5.5` and
-`cargo tree -i crypto-bigint@0.7.8`. X3 directly updated every owning manifest
+`cargo tree -i crypto-bigint@0.7.8` and
+`cargo tree -i crypto-bigint@0.7.10`. X3 directly updated every owning manifest
 that it controls: `x3-atomic-swap`, `x3-bitcoin-vault`, `gpu-sig-verifier`,
 `cross-chain-gpu-validator`, `x3-mobile-sdk`, and the desktop Tauri wallet.
 

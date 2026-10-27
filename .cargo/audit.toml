@@ -68,7 +68,7 @@ ignore = [
     "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7
 
     # ---- crypto-bigint 0.5.5 pinned by Substrate/Frontier ---------------------
-    # X3-owned k256 consumers are on 0.14 / crypto-bigint 0.7.8. The remaining
+    # X3-owned k256 consumers are on 0.14 / crypto-bigint 0.7.8 and 0.7.10. The remaining
     # 0.5.5 copy is upstream public-input verification/recovery; the accepted
     # exposure and re-review trigger are recorded in security/advisory-scope.toml.
     "RUSTSEC-2026-0387",
@@ -98,7 +98,4 @@ ignore = [
     "RUSTSEC-2026-0381",   # webpki-roots 0.24.0/0.25.4 (>=1.0.10) bundled roots trust distrusted emSign intermediates; these two versions reach only tungstenite 0.20 / reqwest 0.11, while the current reqwest 0.12 and hyper-rustls 0.27 paths already use 1.0.10
     "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7 (>=0.103.16) may accept distrusted intermediates; reached through rustls 0.21.12 and libp2p-tls 0.4/0.5; 0.103.16 is already resolved alongside and is the version the 0.23 chain verifies with
     "RUSTSEC-2026-0387",   # crypto-bigint 0.5.5 (>=0.7.6) timing variability in constant-time ops; via elliptic-curve 0.13.8 -> ethers-signers secp256k1 signing, so it is a local side channel against key operations, not a remote break
-    "RUSTSEC-2026-0391",   # zstd 0.13.3 (>=0.14.3) abandoned stream leaks into the next on a reused context; via actix-http, solana-runtime and wasmtime-internal-cache
-    "RUSTSEC-2026-0398",   # zstd-safe 7.3.0 (>=8.2.0) Seekable::decompress sets a Vec length past capacity for an out-of-range offset; no workspace caller uses Seekable
-    "RUSTSEC-2026-0403",   # zstd-safe 5.0.2/6.0.6/7.3.0 (>=8.2.0) uninitialized memory on a failed legacy-frame stream; requires a deliberately malformed zstd v0.4-v0.7 frame and the legacy path
 ]
