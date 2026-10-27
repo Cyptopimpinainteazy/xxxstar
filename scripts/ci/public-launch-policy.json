@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "purpose": "Public testnet candidate triage; not autonomous release authorization",
+  "required_workflows": [
+    {
+      "gate": "local_ci",
+      "path": ".github/workflows/local-ci.yml"
+    },
+    {
+      "gate": "compiler_runtime",
+      "path": ".github/workflows/x3lang-production-unification.yml"
+    },
+    {
+      "gate": "compiled_storage",
+      "path": ".github/workflows/x3-compiled-storage-build.yml"
+    },
+    {
+      "gate": "atomic_trading",
+      "path": ".github/workflows/x3-atomic-trade-engine.yml"
+    },
+    {
+      "gate": "security_review",
+      "path": ".github/workflows/security-audit.yml"
+    },
+    {
+      "gate": "release_gates",
+      "path": ".github/workflows/production-gate.yml"
+    },
+    {
+      "gate": "consensus_integration",
+      "path": ".github/workflows/zombienet-integration.yml"
+    }
+  ],
+  "min_validators": 7,
+  "required_fleet_assertions": [
+    "finality_progress_verified",
+    "fault_recovery_verified",
+    "onchain_authority_set_verified",
+    "chain_spec_verified"
+  ],
+  "required_operator_assertions": [
+    "rpc_rate_limits_verified",
+    "keys_and_firewall_reviewed",
+    "monitoring_alerts_verified",
+    "rollback_rehearsed",
+    "faucet_abuse_controls_verified",
+    "independent_security_reviewed"
+  ]
+}
