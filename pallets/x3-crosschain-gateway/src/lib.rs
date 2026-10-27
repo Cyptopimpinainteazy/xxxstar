@@ -112,7 +112,7 @@ pub mod pallet {
         X3InternalVerifier,
     };
 
-    const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+    const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
     pub(crate) fn evm_address_bytes(value: &[u8]) -> Option<[u8; 20]> {
         let value = value.strip_prefix(b"0x").unwrap_or(value);
@@ -588,6 +588,11 @@ pub mod pallet {
     pub type Withdrawals<T: Config> =
         StorageMap<_, Blake2_128Concat, WithdrawalId, WithdrawalRecord, OptionQuery>;
 
+    /// Exact route selected when a withdrawal was requested.
+    #[pallet::storage]
+    pub type WithdrawalRoutes<T: Config> =
+        StorageMap<_, Blake2_128Concat, WithdrawalId, RouteId, OptionQuery>;
+
     #[pallet::storage]
     pub type UsedProofs<T: Config> = StorageMap<_, Blake2_128Concat, ProofId, (), OptionQuery>;
 
@@ -614,6 +619,21 @@ pub mod pallet {
     #[pallet::getter(fn pending_withdrawals)]
     pub type PendingWithdrawals<T: Config> =
         StorageMap<_, Blake2_128Concat, X3AssetId, Balance, ValueQuery>;
+
+    /// Count of burned but not yet released withdrawals per route.
+    #[pallet::storage]
+    pub type PendingWithdrawalCounts<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, u32, ValueQuery>;
+
+    /// Released value per route in the current daily limit window.
+    #[pallet::storage]
+    pub type RouteDailyWithdrawals<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, Balance, ValueQuery>;
+
+    /// Block at which a route's release-limit window last reset.
+    #[pallet::storage]
+    pub type RouteWithdrawalWindowStarts<T: Config> =
+        StorageMap<_, Blake2_128Concat, RouteId, u64, ValueQuery>;
 
     // ── Genesis config ──────────────────────────────────────────────────
 
@@ -904,6 +924,8 @@ pub mod pallet {
         RouteDisabled,
         /// Route is in a mode that does not allow credits (e.g. DryRun).
         ModeBlocksCredit,
+        /// Route is in a mode that does not allow withdrawal settlement.
+        ModeBlocksRelease,
         /// Asset is not registered.
         AssetNotRegistered,
         /// Proof is a replay of a previously verified one.
@@ -912,6 +934,8 @@ pub mod pallet {
         ExternalNonceReplay,
         /// Proof chain does not match the route.
         WrongChain,
+        /// Withdrawal was requested through a different route.
+        WrongRoute,
         /// Proof asset does not match the route.
         WrongToken,
         /// Amount below route minimum.
@@ -936,6 +960,8 @@ pub mod pallet {
         TransferNotFound,
         /// Withdrawal not found.
         WithdrawalNotFound,
+        /// A withdrawal predates exact route binding and cannot be settled.
+        WithdrawalRouteMissing,
         /// Withdrawal already released.
         WithdrawalAlreadyReleased,
         /// Withdrawal not yet burned.
@@ -1021,7 +1047,10 @@ pub mod pallet {
             );
             match config.mode {
                 GatewayMode::Disabled | GatewayMode::DryRun => {}
-                _ => ensure!(config.daily_limit > 0, Error::<T>::AmountBelowMinimum),
+                _ => {
+                    ensure!(config.daily_limit > 0, Error::<T>::AmountBelowMinimum);
+                    ensure!(config.pending_limit > 0, Error::<T>::PendingLimitExceeded);
+                }
             }
             config.enabled = true;
             config.daily_deposited = 0;
@@ -1233,16 +1262,30 @@ pub mod pallet {
         #[pallet::weight(T::WeightInfo::request_withdrawal())]
         pub fn request_withdrawal(
             origin: OriginFor<T>,
+            route_id: RouteId,
             x3_asset_id: X3AssetId,
             destination_chain: ExternalChainId,
             recipient: BoundedVec<u8, ConstU32<128>>,
             amount: Balance,
         ) -> DispatchResult {
             let _who = ensure_signed(origin)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(
+                route.external_chain_id == destination_chain,
+                Error::<T>::WrongChain
+            );
+            ensure!(route.x3_asset_id == x3_asset_id, Error::<T>::WrongToken);
             ensure!(!recipient.is_empty(), Error::<T>::EmptyRecipient);
-            ensure!(amount > 0, Error::<T>::AmountBelowMinimum);
+            ensure!(amount >= route.min_amount, Error::<T>::AmountBelowMinimum);
+            ensure!(amount <= route.max_amount, Error::<T>::AmountAboveMaximum);
             let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
-            let withdrawal_id = Self::derive_withdrawal_id(x3_asset_id, &recipient, amount, now);
+            let withdrawal_id =
+                Self::derive_withdrawal_id(route_id, x3_asset_id, &recipient, amount, now);
             let record = WithdrawalRecord {
                 withdrawal_id,
                 x3_asset_id,
@@ -1255,6 +1298,7 @@ pub mod pallet {
                 created_at: now,
             };
             Withdrawals::<T>::insert(withdrawal_id, record);
+            WithdrawalRoutes::<T>::insert(withdrawal_id, route_id);
             Self::deposit_event(Event::WithdrawalRequested {
                 withdrawal_id,
                 x3_asset_id,
@@ -1286,6 +1330,18 @@ pub mod pallet {
                     withdrawal.amount,
                 )
             };
+            let route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(
+                PendingWithdrawalCounts::<T>::get(route_id) < route.pending_limit,
+                Error::<T>::PendingLimitExceeded
+            );
             T::DepositMinter::burn_verified_withdrawal(
                 mint_chain_id,
                 x3_asset_id,
@@ -1295,6 +1351,14 @@ pub mod pallet {
             )?;
             PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
                 *v = v.saturating_add(amount);
+                Ok(())
+            })?;
+            PendingWithdrawalCounts::<T>::try_mutate(route_id, |count| -> DispatchResult {
+                ensure!(
+                    *count < route.pending_limit,
+                    Error::<T>::PendingLimitExceeded
+                );
+                *count = count.saturating_add(1);
                 Ok(())
             })?;
             Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
@@ -1328,22 +1392,15 @@ pub mod pallet {
                 ensure!(withdrawal.burned, Error::<T>::WithdrawalNotBurned);
                 (withdrawal.x3_asset_id, withdrawal.amount)
             };
-            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
-                let w = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
-                w.released = true;
-                Ok(())
-            })?;
-            ExternalLocked::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            Self::check_collateral_invariant(x3_asset_id)?;
-            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
-            Ok(())
+            let route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
+            let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
+            ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            Self::settle_release(&route, withdrawal_id, x3_asset_id, amount)
         }
 
         /// Relayer: submit a withdrawal-release proof. Verifies the
@@ -1365,9 +1422,16 @@ pub mod pallet {
                 Withdrawals::<T>::get(withdrawal_id).ok_or(Error::<T>::WithdrawalNotFound)?;
             ensure!(!withdrawal.released, Error::<T>::WithdrawalAlreadyReleased);
             ensure!(withdrawal.burned, Error::<T>::WithdrawalNotBurned);
+            let bound_route_id = WithdrawalRoutes::<T>::get(withdrawal_id)
+                .ok_or(Error::<T>::WithdrawalRouteMissing)?;
 
             let route = Routes::<T>::get(route_id).ok_or(Error::<T>::RouteNotFound)?;
             ensure!(route.enabled, Error::<T>::RouteDisabled);
+            ensure!(
+                !matches!(route.mode, GatewayMode::Disabled | GatewayMode::DryRun),
+                Error::<T>::ModeBlocksRelease
+            );
+            ensure!(bound_route_id == route_id, Error::<T>::WrongRoute);
             ensure!(
                 withdrawal.destination_chain == route.external_chain_id,
                 Error::<T>::WrongChain
@@ -1375,6 +1439,14 @@ pub mod pallet {
             ensure!(
                 withdrawal.x3_asset_id == route.x3_asset_id,
                 Error::<T>::WrongToken
+            );
+            ensure!(
+                withdrawal.amount >= route.min_amount,
+                Error::<T>::AmountBelowMinimum
+            );
+            ensure!(
+                withdrawal.amount <= route.max_amount,
+                Error::<T>::AmountAboveMaximum
             );
 
             let router = Self::build_release_router(&route);
@@ -1397,24 +1469,12 @@ pub mod pallet {
                 .map_err(|_| Error::<T>::VerificationFailed)?;
             Self::record_solana_finalized_slot(&route, outcome.verified_at_height);
 
-            let x3_asset_id = withdrawal.x3_asset_id;
-            let amount = withdrawal.amount;
-            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
-                let w = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
-                w.released = true;
-                Ok(())
-            })?;
-            ExternalLocked::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |v| -> DispatchResult {
-                *v = v.saturating_sub(amount);
-                Ok(())
-            })?;
-            Self::check_collateral_invariant(x3_asset_id)?;
-            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
-            Ok(())
+            Self::settle_release(
+                &route,
+                withdrawal_id,
+                withdrawal.x3_asset_id,
+                withdrawal.amount,
+            )
         }
 
         /// Governance: install (or replace) the authorized SVM validator set for
@@ -1734,6 +1794,7 @@ pub mod pallet {
         }
 
         pub(crate) fn derive_withdrawal_id(
+            route_id: RouteId,
             x3_asset_id: X3AssetId,
             recipient: &[u8],
             amount: Balance,
@@ -1749,15 +1810,67 @@ pub mod pallet {
             // the same id. This id is the key of `Withdrawals` and the relayer's
             // processed-withdrawal set, so a collision means one withdrawal is
             // treated as another.
-            let mut preimage =
-                Vec::with_capacity(43 + x3_asset_id.len() + 8 + recipient.len() + 8 + 8);
-            preimage.extend_from_slice(b"x3-crosschain-gateway-withdrawal-v1");
+            let mut preimage = Vec::with_capacity(
+                43 + route_id.len() + x3_asset_id.len() + 8 + recipient.len() + 8 + 8,
+            );
+            preimage.extend_from_slice(b"x3-crosschain-gateway-withdrawal-v2");
+            preimage.extend_from_slice(&route_id);
             preimage.extend_from_slice(&x3_asset_id);
             preimage.extend_from_slice(&(recipient.len() as u64).to_le_bytes());
             preimage.extend_from_slice(recipient);
             preimage.extend_from_slice(&amount.to_le_bytes());
             preimage.extend_from_slice(&block.to_le_bytes());
             sp_io::hashing::blake2_256(&preimage)
+        }
+
+        fn settle_release(
+            route: &RouteConfig,
+            withdrawal_id: WithdrawalId,
+            x3_asset_id: X3AssetId,
+            amount: Balance,
+        ) -> DispatchResult {
+            let now: u64 = <frame_system::Pallet<T>>::block_number().saturated_into();
+            let window: u64 = T::DailyLimitWindowBlocks::get().saturated_into();
+            let mut released_today = RouteDailyWithdrawals::<T>::get(route.route_id);
+            let mut window_start = RouteWithdrawalWindowStarts::<T>::get(route.route_id);
+            if window_start == 0 || now.saturating_sub(window_start) >= window {
+                released_today = 0;
+                window_start = now;
+            }
+            let next_released = released_today.saturating_add(amount);
+            ensure!(
+                next_released <= route.daily_limit,
+                Error::<T>::DailyLimitExceeded
+            );
+
+            RouteDailyWithdrawals::<T>::insert(route.route_id, next_released);
+            RouteWithdrawalWindowStarts::<T>::insert(route.route_id, window_start);
+            PendingWithdrawalCounts::<T>::try_mutate(route.route_id, |count| -> DispatchResult {
+                *count = count
+                    .checked_sub(1)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            PendingWithdrawals::<T>::try_mutate(x3_asset_id, |pending| -> DispatchResult {
+                *pending = pending
+                    .checked_sub(amount)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            ExternalLocked::<T>::try_mutate(x3_asset_id, |locked| -> DispatchResult {
+                *locked = locked
+                    .checked_sub(amount)
+                    .ok_or(Error::<T>::CollateralInvariantViolation)?;
+                Ok(())
+            })?;
+            Withdrawals::<T>::try_mutate(withdrawal_id, |maybe| -> DispatchResult {
+                let withdrawal = maybe.as_mut().ok_or(Error::<T>::WithdrawalNotFound)?;
+                withdrawal.released = true;
+                Ok(())
+            })?;
+            Self::check_collateral_invariant(x3_asset_id)?;
+            Self::deposit_event(Event::WithdrawalReleased { withdrawal_id });
+            Ok(())
         }
 
         fn check_collateral_invariant(x3_asset_id: X3AssetId) -> DispatchResult {

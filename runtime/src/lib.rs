@@ -434,7 +434,12 @@ pub const VERSION: sp_version::RuntimeVersion = sp_version::RuntimeVersion {
     // numeric chain, X3 asset, 32-byte beneficiary, amount and full gateway proof id;
     // a mint refusal rolls the transfer status back. One new wrapped-storage map, so no
     // migration. No existing call encoding changed.
-    spec_version: 25,
+    // 26: gateway withdrawals bind the exact route selected at request time. The
+    // route id lives in a new side map so existing withdrawal records keep their
+    // encoding; pre-upgrade records without a binding fail closed. Release proofs
+    // also consume per-route daily and pending limits. The request withdrawal call
+    // gains the route id argument.
+    spec_version: 26,
     impl_version: 1,
     apis: RUNTIME_API_VERSIONS,
     transaction_version: 2,

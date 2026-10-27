@@ -138,6 +138,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().reads(7_u64))
 			.saturating_add(T::DbWeight::get().writes(5_u64))
 	}
+	/// Storage: `X3CrosschainGateway::Routes` (r:1 w:0)
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn request_withdrawal() -> Weight {
@@ -146,6 +147,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Estimated: `0`
 		// Minimum execution time: 27_029_000 picoseconds.
 		Weight::from_parts(27_659_000, 0)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
@@ -158,9 +160,9 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	///
 	/// Conservative pre-regeneration bound for the cross-pallet burn call.
 	fn burn_x3_representation() -> Weight {
-		Weight::from_parts(150_000_000, 16_384)
-			.saturating_add(T::DbWeight::get().reads(8_u64))
-			.saturating_add(T::DbWeight::get().writes(6_u64))
+		Weight::from_parts(175_000_000, 16_384)
+			.saturating_add(T::DbWeight::get().reads(11_u64))
+			.saturating_add(T::DbWeight::get().writes(7_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -169,13 +171,10 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `X3CrosschainGateway::PendingWithdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::PendingWithdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn finalize_external_release() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `501`
-		//  Estimated: `3966`
-		// Minimum execution time: 63_026_000 picoseconds.
-		Weight::from_parts(63_820_000, 3966)
-			.saturating_add(T::DbWeight::get().reads(3_u64))
-			.saturating_add(T::DbWeight::get().writes(3_u64))
+		// Conservative pre-regeneration bound for route and daily-limit accounting.
+		Weight::from_parts(90_000_000, 8192)
+			.saturating_add(T::DbWeight::get().reads(7_u64))
+			.saturating_add(T::DbWeight::get().writes(5_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -186,13 +185,10 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `X3CrosschainGateway::PendingWithdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::PendingWithdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn submit_release_proof() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `813`
-		//  Estimated: `4278`
-		// Minimum execution time: 81_220_000 picoseconds.
-		Weight::from_parts(90_000_000, 4278)
-			.saturating_add(T::DbWeight::get().reads(6_u64))
-			.saturating_add(T::DbWeight::get().writes(4_u64))
+		// Conservative pre-regeneration bound for proof checking and release accounting.
+		Weight::from_parts(140_000_000, 8192)
+			.saturating_add(T::DbWeight::get().reads(11_u64))
+			.saturating_add(T::DbWeight::get().writes(7_u64))
 	}
 	/// Storage: `X3CrosschainGateway::SvmValidatorSets` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::SvmValidatorSets` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -296,6 +292,7 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().reads(7_u64))
 			.saturating_add(RocksDbWeight::get().writes(5_u64))
 	}
+	/// Storage: `X3CrosschainGateway::Routes` (r:1 w:0)
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn request_withdrawal() -> Weight {
@@ -304,6 +301,7 @@ impl WeightInfo for () {
 		//  Estimated: `0`
 		// Minimum execution time: 27_029_000 picoseconds.
 		Weight::from_parts(27_659_000, 0)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
@@ -313,9 +311,9 @@ impl WeightInfo for () {
 	/// Storage: `X3CrosschainGateway::ExternalLocked` (r:1 w:0)
 	/// Proof: `X3CrosschainGateway::ExternalLocked` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn burn_x3_representation() -> Weight {
-		Weight::from_parts(150_000_000, 16_384)
-			.saturating_add(RocksDbWeight::get().reads(8_u64))
-			.saturating_add(RocksDbWeight::get().writes(6_u64))
+		Weight::from_parts(175_000_000, 16_384)
+			.saturating_add(RocksDbWeight::get().reads(11_u64))
+			.saturating_add(RocksDbWeight::get().writes(7_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -324,13 +322,10 @@ impl WeightInfo for () {
 	/// Storage: `X3CrosschainGateway::PendingWithdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::PendingWithdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn finalize_external_release() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `501`
-		//  Estimated: `3966`
-		// Minimum execution time: 63_026_000 picoseconds.
-		Weight::from_parts(63_820_000, 3966)
-			.saturating_add(RocksDbWeight::get().reads(3_u64))
-			.saturating_add(RocksDbWeight::get().writes(3_u64))
+		// Conservative pre-regeneration bound for route and daily-limit accounting.
+		Weight::from_parts(90_000_000, 8192)
+			.saturating_add(RocksDbWeight::get().reads(7_u64))
+			.saturating_add(RocksDbWeight::get().writes(5_u64))
 	}
 	/// Storage: `X3CrosschainGateway::Withdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::Withdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
@@ -341,13 +336,10 @@ impl WeightInfo for () {
 	/// Storage: `X3CrosschainGateway::PendingWithdrawals` (r:1 w:1)
 	/// Proof: `X3CrosschainGateway::PendingWithdrawals` (`max_values`: None, `max_size`: None, mode: `Measured`)
 	fn submit_release_proof() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `813`
-		//  Estimated: `4278`
-		// Minimum execution time: 81_220_000 picoseconds.
-		Weight::from_parts(90_000_000, 4278)
-			.saturating_add(RocksDbWeight::get().reads(6_u64))
-			.saturating_add(RocksDbWeight::get().writes(4_u64))
+		// Conservative pre-regeneration bound for proof checking and release accounting.
+		Weight::from_parts(140_000_000, 8192)
+			.saturating_add(RocksDbWeight::get().reads(11_u64))
+			.saturating_add(RocksDbWeight::get().writes(7_u64))
 	}
 	/// Storage: `X3CrosschainGateway::SvmValidatorSets` (r:0 w:1)
 	/// Proof: `X3CrosschainGateway::SvmValidatorSets` (`max_values`: None, `max_size`: None, mode: `Measured`)

@@ -737,7 +737,7 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 70,
+      "composite": 73,
       "confidence": "high",
       "evidence": [
         "crates/x3-bridge/src/ethereum_bridge.rs",
@@ -751,10 +751,10 @@
         "note: the 5-of-7 model path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 while the public production path uses the gateway's receipt verifier"
       ],
       "id": "X3-XCHAIN-004",
-      "implemented": 90,
+      "implemented": 92,
       "launch_scope": "core",
       "live_tested": "GUARDED_TESTNET",
-      "mainnet_ready": 45,
+      "mainnet_ready": 50,
       "missing_work": [
         "**CLOSED 2026-10-26 \u2014 verified EVM deposits now mint the X3 representation atomically.** The gateway's `credit_x3_representation` calls the runtime-configured `DepositMinter`; the production implementation decodes the proof-bound 32-byte X3 beneficiary, calls `pallet-x3-wrapped`, and refuses to mark the transfer credited unless the wrapped asset, cap, balance, supply, and full 32-byte proof-id replay checks pass. A mint refusal rolls the status update back. The standalone `EthereumBridge` remains a model with no public-chain caller; the production path is now the gateway/verifier/wrapped/runtime chain above.",
         "No live Ethereum deployment: the receipt proof path is exercised against anvil (including strict posture) and nothing has run against a public chain",
@@ -775,7 +775,7 @@
       "state": "PARTIAL",
       "state_rule": "implemented >= 50",
       "subsystem": "cross_chain",
-      "tested": 80,
+      "tested": 84,
       "tests": "6 named tests in FEATURE_REGISTRY"
     },
     {
@@ -877,25 +877,26 @@
     {
       "benchmark": "\u2014",
       "claim_risk": false,
-      "composite": 78,
+      "composite": 84,
       "confidence": "high",
       "evidence": [
         "crates/x3-crosschain-gateway/src/lib.rs",
         "pallets/x3-crosschain-gateway/src/lib.rs",
         "pallets/x3-wrapped/src/lib.rs",
         "runtime/src/lib.rs",
-        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and now completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter"
+        "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter",
+        "note: withdrawal requests and release proofs are bound to the exact route id, route state, destination chain, X3 asset, external asset, gateway contract, recipient, amount and full withdrawal id; burned withdrawals are capped by the route pending limit, and releases consume a separate per-route daily withdrawal window"
       ],
       "id": "X3-XCHAIN-008",
-      "implemented": 85,
+      "implemented": 92,
       "launch_scope": "core",
       "live_tested": "not a registered launch feature",
-      "mainnet_ready": 70,
+      "mainnet_ready": 75,
       "missing_work": [
         "**CLOSED 2026-10-26 \u2014 `credit_x3_representation` now mints instead of only emitting an event.** The runtime binds `DepositMinter` to the wrapped-asset pallet; the mint uses a full proof-id replay guard and rolls back with the gateway's status on any refusal.",
         "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
         "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
-        "The withdrawal-id change (XOR \u2192 Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
+        "The withdrawal-id and route-binding change takes effect for new withdrawals only after this runtime is deployed (`spec_version` 26)",
         "No external audit of the gateway crate or pallet"
       ],
       "name": "General external gateway",
@@ -909,8 +910,8 @@
       "state": "FUNCTIONAL BUT UNHARDENED",
       "state_rule": "mainnet_ready >= 60",
       "subsystem": "cross_chain",
-      "tested": 80,
-      "tests": "tested score 80% (no named test list on this row)"
+      "tested": 86,
+      "tests": "tested score 86% (no named test list on this row)"
     },
     {
       "benchmark": "\u2014",
@@ -5006,14 +5007,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "828a8493b86062fbf8a84bfb0ce1e16c285055d9d963998c725a001777b57ce8",
+    "source_digest": "48ee4a280b279d257838c052bd20e0c1bff57a79a3ffad69f89d0afebfc75311",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "53c5d7f8af70113b230b8bd85a66bfc2e8028514b7cb2645adc07a53581d8547",
+      "feature-matrix/cross-chain.toml": "7ac38299bd485b814dd4b88d9e46177cc549a9a7c4f50d50678845310c4ee92c",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",

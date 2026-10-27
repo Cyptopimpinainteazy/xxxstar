@@ -43,6 +43,7 @@ pub struct GatewayTransfer {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WithdrawalRecord {
     pub withdrawal_id: WithdrawalId,
+    pub route_id: RouteId,
     pub x3_asset_id: AssetId,
     pub source_domain: String,
     pub destination_chain: ExternalChainId,
@@ -300,6 +301,7 @@ pub fn gateway_attestation_statement(
 /// the second withdrawal either overwrites the first record (losing its
 /// burned/released state) or is treated as already released.
 pub fn gateway_withdrawal_id(
+    route_id: RouteId,
     x3_asset_id: AssetId,
     recipient: &str,
     amount: Balance,
@@ -309,7 +311,8 @@ pub fn gateway_withdrawal_id(
     use blake2::{Blake2b, Digest};
 
     let mut hasher = Blake2b::<U32>::new();
-    hasher.update(b"x3-crosschain-gateway-withdrawal-v1");
+    hasher.update(b"x3-crosschain-gateway-withdrawal-v2");
+    hasher.update(route_id);
     hasher.update(x3_asset_id);
     hasher.update((recipient.len() as u64).to_le_bytes());
     hasher.update(recipient.as_bytes());
@@ -834,6 +837,7 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
 
     pub fn request_external_withdrawal(
         &mut self,
+        route_id: RouteId,
         x3_asset_id: AssetId,
         source_domain: impl Into<String>,
         destination_chain: ExternalChainId,
@@ -841,12 +845,18 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
         amount: Balance,
     ) -> WithdrawalId {
         let recipient = recipient.into();
-        let withdrawal_id =
-            Self::derive_withdrawal_id(x3_asset_id, &recipient, amount, self.current_block);
+        let withdrawal_id = Self::derive_withdrawal_id(
+            route_id,
+            x3_asset_id,
+            &recipient,
+            amount,
+            self.current_block,
+        );
         self.withdrawals.insert(
             withdrawal_id,
             WithdrawalRecord {
                 withdrawal_id,
+                route_id,
                 x3_asset_id,
                 source_domain: source_domain.into(),
                 destination_chain,
@@ -1015,12 +1025,13 @@ impl<L: SupplyLedgerGateway> CrosschainGateway<L> {
     }
 
     fn derive_withdrawal_id(
+        route_id: RouteId,
         asset_id: AssetId,
         recipient: &str,
         amount: Balance,
         block: BlockNumber,
     ) -> WithdrawalId {
-        gateway_withdrawal_id(asset_id, recipient, amount, block)
+        gateway_withdrawal_id(route_id, asset_id, recipient, amount, block)
     }
 }
 
@@ -1515,6 +1526,7 @@ mod tests {
             .unwrap();
 
         let withdrawal_id = gateway.request_external_withdrawal(
+            [1; 32],
             [9; 32],
             "Native",
             ExternalChainId::BaseSepolia,
@@ -1614,6 +1626,7 @@ mod tests {
                     4 => {
                         let amount = amount.min(gateway.ledger.balance([9; 32], "bob"));
                         let id = gateway.request_external_withdrawal(
+                            [1; 32],
                             [9; 32],
                             "Native",
                             ExternalChainId::BaseSepolia,
@@ -1686,40 +1699,45 @@ mod tests {
             "the XOR derivation collided for these recipients — that was the defect"
         );
         assert_ne!(
-            gateway_withdrawal_id(asset, &a, 1_000, 7),
-            gateway_withdrawal_id(asset, &b, 1_000, 7),
+            gateway_withdrawal_id([1; 32], asset, &a, 1_000, 7),
+            gateway_withdrawal_id([1; 32], asset, &b, 1_000, 7),
             "the hashed derivation must not"
         );
     }
 
     #[test]
     fn every_field_of_a_withdrawal_changes_its_id() {
-        let base = gateway_withdrawal_id([9u8; 32], "5Grwva", 1_000, 7);
+        let base = gateway_withdrawal_id([1u8; 32], [9u8; 32], "5Grwva", 1_000, 7);
         assert_ne!(
             base,
-            gateway_withdrawal_id([8u8; 32], "5Grwva", 1_000, 7),
+            gateway_withdrawal_id([2u8; 32], [9u8; 32], "5Grwva", 1_000, 7),
+            "route"
+        );
+        assert_ne!(
+            base,
+            gateway_withdrawal_id([1u8; 32], [8u8; 32], "5Grwva", 1_000, 7),
             "asset"
         );
         assert_ne!(
             base,
-            gateway_withdrawal_id([9u8; 32], "5FHneW", 1_000, 7),
+            gateway_withdrawal_id([1u8; 32], [9u8; 32], "5FHneW", 1_000, 7),
             "recipient"
         );
         assert_ne!(
             base,
-            gateway_withdrawal_id([9u8; 32], "5Grwva", 1_001, 7),
+            gateway_withdrawal_id([1u8; 32], [9u8; 32], "5Grwva", 1_001, 7),
             "amount"
         );
         assert_ne!(
             base,
-            gateway_withdrawal_id([9u8; 32], "5Grwva", 1_000, 8),
+            gateway_withdrawal_id([1u8; 32], [9u8; 32], "5Grwva", 1_000, 8),
             "block"
         );
 
         // Length-prefixed, so concatenation-shaped ambiguity cannot collide either.
         assert_ne!(
-            gateway_withdrawal_id([9u8; 32], "AB", 1_000, 7),
-            gateway_withdrawal_id([9u8; 32], "A", 1_000, 7),
+            gateway_withdrawal_id([1u8; 32], [9u8; 32], "AB", 1_000, 7),
+            gateway_withdrawal_id([1u8; 32], [9u8; 32], "A", 1_000, 7),
             "a different recipient of a different length"
         );
     }

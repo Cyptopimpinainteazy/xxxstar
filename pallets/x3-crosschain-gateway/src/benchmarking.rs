@@ -260,6 +260,7 @@ mod benchmarks {
         let recipient = recipient()?;
         Pallet::<T>::request_withdrawal(
             RawOrigin::Signed(who.clone()).into(),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient.clone(),
@@ -267,7 +268,13 @@ mod benchmarks {
         )
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
-        let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        let id = Pallet::<T>::derive_withdrawal_id(
+            ROUTE_ID,
+            X3_ASSET,
+            &recipient[..],
+            WITHDRAW_AMOUNT,
+            now,
+        );
         T::DepositMinter::prepare_benchmark(
             CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
             X3_ASSET,
@@ -344,11 +351,13 @@ mod benchmarks {
 
     #[benchmark]
     fn request_withdrawal() -> Result<(), BenchmarkError> {
+        setup_route::<T>()?;
         let who: T::AccountId = whitelisted_caller();
 
         #[extrinsic_call]
         request_withdrawal(
             RawOrigin::Signed(who),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient()?,
@@ -366,6 +375,7 @@ mod benchmarks {
         let recipient = recipient()?;
         Pallet::<T>::request_withdrawal(
             RawOrigin::Signed(who.clone()).into(),
+            ROUTE_ID,
             X3_ASSET,
             CHAIN,
             recipient.clone(),
@@ -373,7 +383,13 @@ mod benchmarks {
         )
         .map_err(|_| BenchmarkError::Weightless)?;
         let now: u64 = frame_system::Pallet::<T>::block_number().saturated_into();
-        let id = Pallet::<T>::derive_withdrawal_id(X3_ASSET, &recipient[..], WITHDRAW_AMOUNT, now);
+        let id = Pallet::<T>::derive_withdrawal_id(
+            ROUTE_ID,
+            X3_ASSET,
+            &recipient[..],
+            WITHDRAW_AMOUNT,
+            now,
+        );
         T::DepositMinter::prepare_benchmark(
             CHAIN.wrapped_chain_id().ok_or(BenchmarkError::Weightless)?,
             X3_ASSET,

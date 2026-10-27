@@ -101,15 +101,15 @@ pub trait CrossChainValidatorProvider {
 /// which left an accept-all proof validator in the production binary even though
 /// nothing wired it up: an unaudited `impl CrossChainValidatorProvider` is one
 /// trait-bound away from accepting forged bridge proofs. It is now compiled only
-/// for tests, or with the `dev-proofs` feature, which is off by default and must
-/// never be enabled in a runtime that settles real value.
+/// for tests. There is deliberately no build feature that can re-enable it in a
+/// release runtime.
 ///
 /// Production runtimes MUST implement the trait properly via
 /// pallet_cross_chain_validator integration.
-#[cfg(any(test, feature = "dev-proofs"))]
+#[cfg(test)]
 pub struct NoOpCrossChainValidator;
 
-#[cfg(any(test, feature = "dev-proofs"))]
+#[cfg(test)]
 impl CrossChainValidatorProvider for NoOpCrossChainValidator {
     fn verify_evm_proof(_: u64, _: H256, _: H256, _: H256) -> bool {
         // Accept all EVM proofs (dev/test only!)

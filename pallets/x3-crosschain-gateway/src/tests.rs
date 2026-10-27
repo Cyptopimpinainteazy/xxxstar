@@ -157,7 +157,7 @@ fn expected_withdrawal_id(amount: u128) -> [u8; 32] {
     //
     // `new_test_ext` starts at block 1 and the test asset/recipient below are the
     // ones the callers use.
-    x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", amount, 1)
+    x3_crosschain_gateway::gateway_withdrawal_id([1u8; 32], [9u8; 32], "0xRECIPIENT", amount, 1)
 }
 
 fn register_and_enable() {
@@ -205,6 +205,7 @@ fn request_burn_withdrawal(amount: u128) -> [u8; 32] {
     let w_id = expected_withdrawal_id(amount);
     assert_ok!(X3CrosschainGateway::request_withdrawal(
         RuntimeOrigin::signed(2),
+        [1u8; 32],
         [9u8; 32],
         ExternalChainId::BaseSepolia,
         bounded("0xRECIPIENT"),
@@ -425,6 +426,7 @@ fn request_and_burn_withdrawal_preserves_invariant() {
         // 2. Request a withdrawal.
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -463,6 +465,7 @@ fn collateral_invariant_holds_after_burn_and_release() {
         ));
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -501,6 +504,7 @@ fn double_release_fails() {
         ));
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -608,6 +612,7 @@ fn submit_release_proof_without_burn_fails() {
         let w_id = expected_withdrawal_id(40);
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -659,13 +664,12 @@ fn submit_release_proof_wrong_chain_fails() {
         register_and_enable();
         deposit_and_credit([1u8; 32], [1u8; 32], 100);
 
-        // Request withdrawal with a different destination chain (EthereumSepolia
-        // instead of BaseSepolia)
         let w_id = expected_withdrawal_id(40);
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
-            ExternalChainId::EthereumSepolia,
+            ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
             40,
         ));
@@ -674,8 +678,15 @@ fn submit_release_proof_wrong_chain_fails() {
             w_id,
         ));
 
-        // Route [1u8;32] has external_chain_id = BaseSepolia — mismatches
-        // withdrawal's EthereumSepolia
+        // Governance repoints the same stored route after the request. The
+        // withdrawal stays bound to route 1 but its destination chain no longer
+        // matches, so release must fail with WrongChain rather than WrongRoute.
+        register_asset(ExternalChainId::EthereumSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut repointed_route = route();
+        repointed_route.external_chain_id = ExternalChainId::EthereumSepolia;
+        repointed_route.external_asset.chain_id = ExternalChainId::EthereumSepolia;
+        enable_route_for(repointed_route);
+
         assert_noop!(
             X3CrosschainGateway::submit_release_proof(
                 RuntimeOrigin::signed(1),
@@ -710,6 +721,64 @@ fn submit_release_proof_disabled_route_fails() {
             ),
             Error::<Test>::RouteDisabled
         );
+    });
+}
+
+#[test]
+fn release_proofs_enforce_and_reset_the_route_daily_limit() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 120);
+
+        let first = expected_withdrawal_id(60);
+        let second = expected_withdrawal_id(50);
+        for amount in [60, 50] {
+            assert_ok!(X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                amount,
+            ));
+        }
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            first,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            second,
+        ));
+
+        let mut narrow_route = route();
+        narrow_route.daily_limit = 100;
+        enable_route_for(narrow_route);
+        assert_ok!(X3CrosschainGateway::submit_release_proof(
+            RuntimeOrigin::signed(1),
+            first,
+            [1u8; 32],
+            bounded_payload("release_proof_data"),
+        ));
+        assert_noop!(
+            X3CrosschainGateway::submit_release_proof(
+                RuntimeOrigin::signed(1),
+                second,
+                [1u8; 32],
+                bounded_payload("release_proof_data"),
+            ),
+            Error::<Test>::DailyLimitExceeded
+        );
+
+        System::set_block_number(102);
+        assert_ok!(X3CrosschainGateway::submit_release_proof(
+            RuntimeOrigin::signed(1),
+            second,
+            [1u8; 32],
+            bounded_payload("release_proof_data"),
+        ));
+        assert_eq!(crate::RouteDailyWithdrawals::<Test>::get([1u8; 32]), 50);
+        assert_eq!(crate::PendingWithdrawalCounts::<Test>::get([1u8; 32]), 0);
     });
 }
 
@@ -842,7 +911,25 @@ fn release_proof_validator_quorum_works() {
         enable_route_for(release_route);
 
         deposit_and_credit([1u8; 32], [1u8; 32], 100);
-        let w_id = request_burn_withdrawal(40);
+        let w_id = x3_crosschain_gateway::gateway_withdrawal_id(
+            [2u8; 32],
+            [9u8; 32],
+            "0xRECIPIENT",
+            40,
+            1,
+        );
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [2u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            w_id,
+        ));
 
         assert_ok!(X3CrosschainGateway::submit_release_proof(
             RuntimeOrigin::signed(1),
@@ -1091,6 +1178,7 @@ fn request_withdrawal_empty_recipient_fails() {
         assert_noop!(
             X3CrosschainGateway::request_withdrawal(
                 RuntimeOrigin::signed(2),
+                [1u8; 32],
                 [9u8; 32],
                 ExternalChainId::BaseSepolia,
                 bounded(""),
@@ -1102,12 +1190,173 @@ fn request_withdrawal_empty_recipient_fails() {
 }
 
 #[test]
+fn request_withdrawal_requires_an_enabled_exact_route() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [99u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::RouteNotFound
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [8u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::WrongToken
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::EthereumSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::WrongChain
+        );
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100_001,
+            ),
+            Error::<Test>::AmountAboveMaximum
+        );
+
+        assert_ok!(X3CrosschainGateway::disable_route(
+            RuntimeOrigin::root(),
+            [1u8; 32],
+        ));
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::RouteDisabled
+        );
+    });
+}
+
+#[test]
+fn request_withdrawal_rejects_dry_run_route() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut dry_run = route();
+        dry_run.mode = GatewayMode::DryRun;
+        enable_route_for(dry_run);
+
+        assert_noop!(
+            X3CrosschainGateway::request_withdrawal(
+                RuntimeOrigin::signed(2),
+                [1u8; 32],
+                [9u8; 32],
+                ExternalChainId::BaseSepolia,
+                bounded("0xRECIPIENT"),
+                100,
+            ),
+            Error::<Test>::ModeBlocksRelease
+        );
+    });
+}
+
+#[test]
+fn submit_release_proof_cannot_switch_to_another_route_with_the_same_asset() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        deposit_and_credit([1u8; 32], [1u8; 32], 100);
+
+        let mut alternate_route = route();
+        alternate_route.route_id = [2u8; 32];
+        enable_route_for(alternate_route);
+        let withdrawal_id = request_burn_withdrawal(40);
+
+        assert_noop!(
+            X3CrosschainGateway::submit_release_proof(
+                RuntimeOrigin::signed(1),
+                withdrawal_id,
+                [2u8; 32],
+                bounded_payload("release_proof_data"),
+            ),
+            Error::<Test>::WrongRoute
+        );
+    });
+}
+
+#[test]
+fn request_withdrawal_records_the_exact_route() {
+    new_test_ext().execute_with(|| {
+        register_and_enable();
+        let withdrawal_id = expected_withdrawal_id(40);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+
+        assert_eq!(
+            crate::WithdrawalRoutes::<Test>::get(withdrawal_id).expect("route binding exists"),
+            [1u8; 32]
+        );
+    });
+}
+
+#[test]
+fn pre_route_binding_withdrawals_fail_closed() {
+    new_test_ext().execute_with(|| {
+        let withdrawal_id = [77u8; 32];
+        crate::Withdrawals::<Test>::insert(
+            withdrawal_id,
+            crate::WithdrawalRecord {
+                withdrawal_id,
+                x3_asset_id: [9u8; 32],
+                source_domain: crate::X3Domain::Native,
+                destination_chain: ExternalChainId::BaseSepolia,
+                recipient: bounded("0xRECIPIENT"),
+                amount: 40,
+                burned: false,
+                released: false,
+                created_at: 1,
+            },
+        );
+
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), withdrawal_id),
+            Error::<Test>::WithdrawalRouteMissing
+        );
+    });
+}
+
+#[test]
 fn request_withdrawal_zero_amount_fails() {
     new_test_ext().execute_with(|| {
         register_and_enable();
         assert_noop!(
             X3CrosschainGateway::request_withdrawal(
                 RuntimeOrigin::signed(2),
+                [1u8; 32],
                 [9u8; 32],
                 ExternalChainId::BaseSepolia,
                 bounded("0xRECIPIENT"),
@@ -1244,6 +1493,7 @@ fn burn_failure_does_not_mark_the_withdrawal_burned_and_can_be_retried() {
         let withdrawal_id = expected_withdrawal_id(40);
         assert_ok!(X3CrosschainGateway::request_withdrawal(
             RuntimeOrigin::signed(2),
+            [1u8; 32],
             [9u8; 32],
             ExternalChainId::BaseSepolia,
             bounded("0xRECIPIENT"),
@@ -1274,6 +1524,52 @@ fn burn_failure_does_not_mark_the_withdrawal_burned_and_can_be_retried() {
                 .burned
         );
         assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 40);
+    });
+}
+
+#[test]
+fn burn_respects_the_route_pending_limit() {
+    new_test_ext().execute_with(|| {
+        register_asset(ExternalChainId::BaseSepolia, TOKEN_ADDRESS, [9u8; 32]);
+        let mut limited_route = route();
+        limited_route.pending_limit = 1;
+        enable_route_for(limited_route);
+        deposit_and_credit([1u8; 32], [1u8; 32], 200);
+
+        let first = expected_withdrawal_id(40);
+        let second = expected_withdrawal_id(50);
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            40,
+        ));
+        assert_ok!(X3CrosschainGateway::request_withdrawal(
+            RuntimeOrigin::signed(2),
+            [1u8; 32],
+            [9u8; 32],
+            ExternalChainId::BaseSepolia,
+            bounded("0xRECIPIENT"),
+            50,
+        ));
+        assert_ok!(X3CrosschainGateway::burn_x3_representation(
+            RuntimeOrigin::signed(2),
+            first,
+        ));
+
+        assert_noop!(
+            X3CrosschainGateway::burn_x3_representation(RuntimeOrigin::signed(2), second),
+            Error::<Test>::PendingLimitExceeded
+        );
+        assert!(
+            !crate::Withdrawals::<Test>::get(second)
+                .expect("second withdrawal still exists")
+                .burned
+        );
+        assert_eq!(crate::PendingWithdrawals::<Test>::get([9u8; 32]), 40);
+        assert_eq!(crate::PendingWithdrawalCounts::<Test>::get([1u8; 32]), 1);
     });
 }
 
@@ -1929,9 +2225,15 @@ fn an_evm_route_measures_depth_from_the_attested_head_not_the_proof() {
 
 #[test]
 fn the_two_derivations_agree() {
-    let pallet_id =
-        crate::pallet::Pallet::<Test>::derive_withdrawal_id([9u8; 32], b"0xRECIPIENT", 1_000, 1);
-    let crate_id = x3_crosschain_gateway::gateway_withdrawal_id([9u8; 32], "0xRECIPIENT", 1_000, 1);
+    let pallet_id = crate::pallet::Pallet::<Test>::derive_withdrawal_id(
+        [1u8; 32],
+        [9u8; 32],
+        b"0xRECIPIENT",
+        1_000,
+        1,
+    );
+    let crate_id =
+        x3_crosschain_gateway::gateway_withdrawal_id([1u8; 32], [9u8; 32], "0xRECIPIENT", 1_000, 1);
     assert_eq!(
         pallet_id, crate_id,
         "pallet {:?} vs crate {:?}",

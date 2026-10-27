@@ -159,9 +159,9 @@ name = "Ethereum bridge adapter"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/lib.rs"]
-implemented = 90
-tested = 80
-mainnet_ready = 45
+implemented = 92
+tested = 84
+mainnet_ready = 50
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -192,7 +192,7 @@ blockers = [
 # deposit now carries `x3_recipient`, the message hash is keccak over all four fields,
 # and the mint must match the recorded recipient.
 evidence = ["crates/x3-bridge/src/ethereum_bridge.rs", "crates/x3-verification-router/src/evm_receipt.rs", "crates/x3-relayer/src/evm_receipt_proof.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/lib.rs", "audit-artifacts/evidence/2026-10-26-ethereum-lock-mint-burn-release.json", "note: the production deposit path verifies the EVM receipt through x3-verification-router, gates it through the governed gateway, and then mints through the wrapped-asset ledger; proof id, chain, asset, beneficiary, amount, supply cap and replay state are bound before the gateway reports X3Credited", "note: the 5-of-7 model path verifies real ECDSA — 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused — while the public production path uses the gateway's receipt verifier"]
-test_evidence = ["pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/tests.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 70 gateway tests and 26 wrapped-pallet tests pass; credit/burn calls are checked against the exact chain/asset/account/amount/id tuple, mint and burn failures roll back and retry, and 97 runtime tests include full-32-byte proof-id mint replay refusal, withdrawal-id burn replay refusal, supply/balance updates and non-canonical-beneficiary refusal", "note: SKIP_WASM_BUILD=1 cargo check -p pallet-x3-crosschain-gateway -p pallet-x3-wrapped -p x3-chain-runtime --features runtime-benchmarks passes; strict clippy passes for all three affected packages"]
+test_evidence = ["pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/tests.rs", "crates/x3-verification-router/tests/data/anvil_block1_receipts.hex", "note: 77 gateway tests and 26 wrapped-pallet tests pass; credit/burn calls are checked against the exact chain/asset/account/amount/id tuple, mint and burn failures roll back and retry, withdrawal requests and releases are bound to the exact route, and 97 runtime tests include full-32-byte proof-id mint replay refusal, withdrawal-id burn replay refusal, supply/balance updates and non-canonical-beneficiary refusal", "note: SKIP_WASM_BUILD=1 cargo check -p pallet-x3-crosschain-gateway -p pallet-x3-wrapped -p x3-chain-runtime --features runtime-benchmarks passes; strict clippy passes for the affected packages"]
 required_tests = [
     "test_burn_wrapped",
     "a_burn_debits_only_the_callers_own_account",
@@ -278,9 +278,9 @@ name = "General external gateway"
 subsystem = "cross_chain"
 source = "master"
 paths = ["crates/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/tests.rs"]
-implemented = 85
-tested = 80
-mainnet_ready = 70
+implemented = 92
+tested = 86
+mainnet_ready = 75
 priority = "P0"
 confidence = "high"
 launch_scope = "core"
@@ -289,15 +289,15 @@ blockers = [
   "**CLOSED 2026-10-26 — `credit_x3_representation` now mints instead of only emitting an event.** The runtime binds `DepositMinter` to the wrapped-asset pallet; the mint uses a full proof-id replay guard and rolls back with the gateway's status on any refusal.",
   "External bridge activation remains governance-guarded: the pallet's own note, and routes must be registered and enabled before anything moves",
   "Nothing has run against a public external chain; the verification router's EVM/SVM verifiers are exercised against anvil and solana-test-validator in local gates",
-  "The withdrawal-id change (XOR → Blake2b) takes effect for new withdrawals only after this runtime is deployed (`spec_version` 13)",
+  "The withdrawal-id and route-binding change takes effect for new withdrawals only after this runtime is deployed (`spec_version` 26)",
   "No external audit of the gateway crate or pallet",
 ]
 # This row used to cite `crates/x3-gateway`, which is the REST/GraphQL API service for
 # indexed data — it contains no gateway logic, and neither the gateway crate nor the
 # gateway pallet appeared anywhere in this matrix. That is how a protocol defect in
 # the withdrawal id survived: the readiness records never pointed at the code.
-evidence = ["crates/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/lib.rs", "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and now completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter"]
-test_evidence = ["pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/tests.rs", "note: 70 gateway tests, 26 wrapped-pallet tests and 97 runtime tests pass, including mint and burn call binding, failure rollback/retry, full 32-byte proof-id and withdrawal-id replay refusal, canonical beneficiary enforcement, release-proof quorum/double-release/wrong-chain refusals, and the existing gateway state-machine coverage"]
+evidence = ["crates/x3-crosschain-gateway/src/lib.rs", "pallets/x3-crosschain-gateway/src/lib.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/lib.rs", "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter", "note: withdrawal requests and release proofs are bound to the exact route id, route state, destination chain, X3 asset, external asset, gateway contract, recipient, amount and full withdrawal id; burned withdrawals are capped by the route pending limit, and releases consume a separate per-route daily withdrawal window"]
+test_evidence = ["pallets/x3-crosschain-gateway/src/tests.rs", "pallets/x3-wrapped/src/lib.rs", "runtime/src/tests.rs", "note: 77 gateway tests, 238 settlement-engine unit tests, 23 settlement property tests, 26 wrapped-pallet tests and 97 runtime tests pass, including exact-route request/release binding, pre-upgrade withdrawal refusal without a route binding, alternate-route refusal, disabled and dry-run refusal, pending-limit enforcement, daily release-limit enforcement and reset, mint and burn failure rollback/retry, full 32-byte proof-id and withdrawal-id replay refusal, canonical beneficiary enforcement, release-proof quorum/double-release/wrong-chain refusals, and the gateway state-machine coverage"]
 registry_feature = "atomic_gateway"
 
 [[feature]]
