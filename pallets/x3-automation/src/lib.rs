@@ -633,7 +633,7 @@ pub mod pallet {
                 // scan an unbounded block event list or pretend the event fired.
                 Condition::Event { .. } => {
                     return Err(DispatchError::Other("EventConditionUnsupported"));
-                },
+                }
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })

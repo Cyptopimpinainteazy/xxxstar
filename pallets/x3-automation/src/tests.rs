@@ -751,6 +751,9 @@ fn legacy_event_task_refusal_never_dispatches_or_charges_fees() {
         assert_eq!(reserved(1), reserved_before);
         assert_eq!(Automation::last_attempt(task_id), 0);
         assert!(Automation::receipt(task_id, 1).is_none());
-        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Active
+        );
     });
 }

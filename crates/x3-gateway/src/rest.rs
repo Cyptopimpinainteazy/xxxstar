@@ -409,6 +409,12 @@ pub enum RelayerProofRequest {
         state_root: [u8; 32],
         finalized_block: u64,
         proof_nonce: u32,
+        /// Canonical receipt proof bytes; presence is not proof of validity.
+        proof_payload: Vec<u8>,
+        /// Exact on-chain recipient bound by the deposit event.
+        expected_recipient: Vec<u8>,
+        /// String-encoded to preserve the full unsigned 128-bit value.
+        expected_amount: String,
     },
 }
 
@@ -438,9 +444,13 @@ async fn post_relayer_proof_summary(
             validator_signatures,
             required_signatures,
         } => {
+            if required_signatures == 0 {
+                return Err(GatewayError::BadRequest(
+                    "Solana required signatures must be positive".into(),
+                ));
+            }
             let attestations = validator_signatures.len();
             let validators = into_validator_signatures(&validator_signatures)?;
-            let meets_quorum = (attestations as u32) >= required_signatures;
             // Shape-validate the relayer's submission against the same
             // type the on-chain pallet consumes; if anything is malformed
             // this deserialization would have failed already.
@@ -456,7 +466,9 @@ async fn post_relayer_proof_summary(
                 proof_id_hex: hex::encode(blockhash),
                 validator_attestations: attestations,
                 required_signatures,
-                meets_quorum,
+                // A well-shaped 64-byte blob is not a verified signature,
+                // nor does this endpoint check validator committee membership.
+                meets_quorum: false,
                 chain_kind: "solana",
             }))
         }
@@ -466,20 +478,46 @@ async fn post_relayer_proof_summary(
             state_root,
             finalized_block,
             proof_nonce,
+            proof_payload,
+            expected_recipient,
+            expected_amount,
         } => {
+            let expected_amount = expected_amount
+                .parse::<u128>()
+                .map_err(|_| GatewayError::BadRequest("invalid EVM proof amount".into()))?;
+            if proof_payload.is_empty() || proof_payload.len() > 1_048_576 {
+                return Err(GatewayError::BadRequest(
+                    "EVM receipt proof must contain 1 to 1048576 bytes".into(),
+                ));
+            }
+            if expected_recipient.is_empty() || expected_recipient.len() > 128 {
+                return Err(GatewayError::BadRequest(
+                    "EVM recipient must contain 1 to 128 bytes".into(),
+                ));
+            }
+            if expected_amount == 0 || block_hash == [0u8; 32] || state_root == [0u8; 32] {
+                return Err(GatewayError::BadRequest(
+                    "EVM receipt amount, block hash and state root must be nonzero".into(),
+                ));
+            }
             let _proof = EvmProof {
                 source_domain,
                 block_hash,
                 state_root,
                 finalized_block,
                 proof_nonce,
+                proof_payload,
+                expected_recipient,
+                expected_amount,
             };
             Ok(Json(RelayerProofSummary {
                 kind: "evm",
                 proof_id_hex: hex::encode(block_hash),
                 validator_attestations: 0,
                 required_signatures: 0,
-                meets_quorum: block_hash != [0u8; 32],
+                // This endpoint only checks shape. It does not independently
+                // authenticate finalized headers or receipt inclusion.
+                meets_quorum: false,
                 chain_kind: "evm",
             }))
         }
@@ -1702,6 +1740,82 @@ mod tests {
         BenchmarkProfile, BenchmarkReportArtifact, BenchmarkReportSummary,
         BenchmarkWorkloadProfile,
     };
+
+    #[tokio::test]
+    async fn svm_proof_summary_does_not_treat_unverified_signatures_as_quorum() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
+            source_domain: 1,
+            slot: 100,
+            blockhash: [1u8; 32],
+            validator_signatures: vec![ValidatorAttestationWire {
+                validator_pubkey: [2u8; 32],
+                // Correct byte length is not an authenticated validator signature.
+                signature: vec![0u8; 64],
+            }],
+            required_signatures: 1,
+        }))
+        .await;
+        let Ok(Json(summary)) = result else {
+            panic!("summary should expose the count without asserting finality");
+        };
+        assert_eq!(summary.validator_attestations, 1);
+        assert!(
+            !summary.meets_quorum,
+            "unverified signatures cannot establish quorum"
+        );
+    }
+
+    #[tokio::test]
+    async fn svm_proof_summary_refuses_zero_signature_threshold() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Svm {
+            source_domain: 1,
+            slot: 100,
+            blockhash: [1u8; 32],
+            validator_signatures: vec![],
+            required_signatures: 0,
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
+
+    #[tokio::test]
+    async fn evm_proof_summary_never_reports_unverified_quorum() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
+            source_domain: 1,
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: vec![1, 2, 3],
+            expected_recipient: vec![3u8; 32],
+            expected_amount: "25".to_string(),
+        }))
+        .await;
+        let Ok(Json(summary)) = result else {
+            panic!("well-shaped proof summary must not fail");
+        };
+        assert_eq!(summary.kind, "evm");
+        assert!(
+            !summary.meets_quorum,
+            "a shape check is not finalized receipt verification"
+        );
+    }
+
+    #[tokio::test]
+    async fn evm_proof_summary_refuses_empty_proof_evidence() {
+        let result = post_relayer_proof_summary(Json(RelayerProofRequest::Evm {
+            source_domain: 1,
+            block_hash: [1u8; 32],
+            state_root: [2u8; 32],
+            finalized_block: 100,
+            proof_nonce: 7,
+            proof_payload: Vec::new(),
+            expected_recipient: vec![3u8; 32],
+            expected_amount: "25".to_string(),
+        }))
+        .await;
+        assert!(matches!(result, Err(GatewayError::BadRequest(_))));
+    }
 
     fn sample_report() -> BenchmarkReport {
         BenchmarkReport {
