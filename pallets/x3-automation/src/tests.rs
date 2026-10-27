@@ -759,3 +759,39 @@ fn legacy_event_task_refusal_never_executes_or_charges_fees() {
         assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
     });
 }
+
+#[test]
+fn expired_legacy_event_task_cannot_trigger_execution_side_effects() {
+    new_test_ext().execute_with(|| {
+        System::set_block_number(1);
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::Manual,
+            Action::Noop,
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+        let expiry_block = Automation::tasks(task_id).unwrap().expiry_block;
+        Tasks::<Test>::mutate(task_id, |entry| {
+            entry.as_mut().expect("existing task").condition =
+                Condition::Event { topic: [9u8; 32] };
+        });
+        System::set_block_number(expiry_block.saturating_add(1));
+        let owner_before = free(1);
+        let keeper_before = free(2);
+        let reserved_before = reserved(1);
+        let events_before = System::events().len();
+
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            sp_runtime::DispatchError::Other("EventConditionUnsupported")
+        );
+        assert_eq!(free(1), owner_before);
+        assert_eq!(free(2), keeper_before);
+        assert_eq!(reserved(1), reserved_before);
+        assert_eq!(System::events().len(), events_before);
+        assert_eq!(Automation::last_attempt(task_id), 0);
+        assert!(Automation::receipt(task_id, 1).is_none());
+        assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
+    });
+}
