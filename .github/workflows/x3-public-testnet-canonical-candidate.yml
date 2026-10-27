@@ -58,8 +58,18 @@ jobs:
           python3 scripts/ci/verify_canonical_candidate.py \
             --expected-head "$EXPECTED_HEAD" \
             --output "$RUNNER_TEMP/x3-canonical-source-evidence.json"
+          {
+            echo '## Canonical source evidence'
+            echo '```json'
+            cat "$RUNNER_TEMP/x3-canonical-source-evidence.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Publish source evidence for review, not deployment
         if: always()
+        # The verifier output above is also written to the job summary and log.
+        # Artifact quota or service failures must not turn a passed source gate
+        # into a false release failure or weaken the verification itself.
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: canonical-source-${{ github.run_id }}-${{ github.run_attempt }}
