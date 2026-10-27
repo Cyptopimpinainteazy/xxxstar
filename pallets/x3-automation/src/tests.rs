@@ -745,6 +745,7 @@ fn legacy_event_task_refusal_never_executes_or_charges_fees() {
         let owner_before = free(1);
         let keeper_before = free(2);
         let reserved_before = reserved(1);
+        let events_before = System::events().len();
         assert_noop!(
             Automation::execute_task(RuntimeOrigin::signed(2), task_id),
             sp_runtime::DispatchError::Other("EventConditionUnsupported")
@@ -752,6 +753,7 @@ fn legacy_event_task_refusal_never_executes_or_charges_fees() {
         assert_eq!(free(1), owner_before);
         assert_eq!(free(2), keeper_before);
         assert_eq!(reserved(1), reserved_before);
+        assert_eq!(System::events().len(), events_before);
         assert_eq!(Automation::last_attempt(task_id), 0);
         assert!(Automation::receipt(task_id, 1).is_none());
         assert_eq!(Automation::tasks(task_id).unwrap().status, TaskStatus::Active);
