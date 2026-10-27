@@ -1,5 +1,4 @@
 """Fail-closed tests for public-testnet candidate provenance and scope."""
-import copy
 import json
 from pathlib import Path
 import sys
@@ -131,13 +130,8 @@ class CanonicalCandidateTests(unittest.TestCase):
 
     def test_rc1_runtime_feature_surface_cannot_accidentally_enable_frontier(self):
         source = (candidate.ROOT / "runtime/src/lib.rs").read_text(encoding="utf-8")
-        selected = source.replace(
-            "        X3AtomicKernel: pallet_x3_atomic_kernel,",
-            "        X3AtomicKernel: pallet_x3_atomic_kernel,\n        Evm: pallet_evm,",
-            1,
-        )
-        # This edit could hit an earlier dev variant; make a controlled change
-        # inside the RC-1 block only to test the parser itself.
+        # Add a forbidden pallet only inside the RC-1 block, rather than in
+        # the earlier dev runtime variant.
         prefix, remaining = source.split("// ── mainnet-rc1:", 1)
         section, suffix = remaining.split("// ── default (", 1)
         section = section.replace(
