@@ -191,6 +191,18 @@ class AdmissionTests(unittest.TestCase):
         operations.pop("evidence_sha256")
         self.assertEqual(check(operations=operations)["decision"], "BLOCKED")
 
+    def test_release_policy_requires_language_parity_and_physical_checker(self):
+        policy = json.loads(g.DEFAULT_POLICY.read_text(encoding="utf-8"))
+        g.require_policy(policy)
+        gates = {item["gate"]: item for item in policy["required_workflows"]}
+        self.assertGreaterEqual(len(gates), 11)
+        self.assertEqual(gates["compiler_runtime"]["min_successful_jobs"], 3)
+        self.assertEqual(gates["language_workspace"]["min_successful_jobs"], 2)
+        self.assertIn("canonical_compiler_bridge", gates)
+        self.assertIn("control_flow_parity", gates)
+        self.assertIn("seven_validator_checker", gates)
+        self.assertEqual(policy["min_validators"], 7)
+
     def test_policy_rejects_duplicate_workflow(self):
         policy = copy.deepcopy(POLICY)
         policy["required_workflows"].append(copy.deepcopy(policy["required_workflows"][0]))
