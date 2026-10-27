@@ -201,16 +201,31 @@ pub mod pallet {
             &self,
             instruction: &x3_svm_integration::SvmInstruction,
             _payer: [u8; 32],
-            _accounts: &[(
+            accounts: &[(
                 x3_svm_integration::SvmAccountMeta,
                 x3_svm_integration::AccountUpdate,
             )],
             config: &x3_svm_integration::SvmConfig,
         ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
-            // For execution, we need the program bytecode - delegate to execute_bpf
-            // The program_id is used to look up the bytecode in the calling context
-            // Here we execute raw bytecode passed via accounts
-            self.execute_bpf(&[], &instruction.data, config)
+            if instruction.program_id == [0u8; 32] {
+                return Err(x3_svm_integration::SvmError::InvalidProgramId);
+            }
+            self.execute_with_program(&instruction.data, &[], accounts, config)
+        }
+
+        fn execute_with_program(
+            &self,
+            program: &[u8],
+            instruction_data: &[u8],
+            accounts: &[(
+                x3_svm_integration::SvmAccountMeta,
+                x3_svm_integration::AccountUpdate,
+            )],
+            config: &x3_svm_integration::SvmConfig,
+        ) -> x3_svm_integration::SvmResult<x3_svm_integration::SvmExecutionResult> {
+            let mut input = x3_svm_integration::serialize_accounts(accounts);
+            input.extend_from_slice(instruction_data);
+            x3_svm_integration::interp::execute_bpf_with_accounts(program, &input, accounts, config)
         }
 
         fn execute_bpf(
@@ -724,21 +739,38 @@ pub mod pallet {
                 .ok_or(Error::<T>::ProgramNotFound)?
                 .into_inner();
 
-            // Track writable accounts and their original lamports for supply invariant
-            // Also cache account info to avoid double storage reads in persistence loop
-            // Only include accounts that exist in storage (filter out non-existent accounts)
+            // Track writable accounts and their original lamports for supply invariant.
             let mut original_accounts: sp_std::vec::Vec<(
                 [u8; 32], // pubkey
                 u64,      // original lamports
             )> = sp_std::vec::Vec::new();
 
-            for (pubkey, _, is_writable) in &accounts {
+            let mut execution_accounts = sp_std::vec::Vec::with_capacity(accounts.len());
+            for (pubkey, is_signer, is_writable) in &accounts {
+                // This extrinsic does not bind SVM signer keys to the Substrate origin yet. A
+                // caller must not be able to claim signer authority it has not proven.
+                ensure!(!*is_signer, Error::<T>::AccountNotSigner);
+                let info = Accounts::<T>::get(pubkey).ok_or(Error::<T>::AccountNotFound)?;
+                let data = AccountData::<T>::get(pubkey)
+                    .map(|data| data.into_inner())
+                    .unwrap_or_default();
+                let meta = x3_svm_integration::SvmAccountMeta {
+                    pubkey: *pubkey,
+                    is_signer: false,
+                    is_writable: *is_writable,
+                };
+                let update = x3_svm_integration::AccountUpdate {
+                    pubkey: *pubkey,
+                    data,
+                    lamports: info.lamports,
+                    executable: info.executable,
+                    owner: info.owner,
+                    rent_epoch: info.rent_epoch,
+                };
                 if *is_writable {
-                    // Only add accounts that exist in storage - filter out non-existent
-                    if let Some(info) = Accounts::<T>::get(pubkey) {
-                        original_accounts.push((*pubkey, info.lamports));
-                    }
+                    original_accounts.push((*pubkey, info.lamports));
                 }
+                execution_accounts.push((meta, update));
             }
 
             // Create SVM config
@@ -749,9 +781,15 @@ pub mod pallet {
                 0, // block timestamp
             );
 
-            // Execute BPF program using the interpreter
             let executor = SvmBpffExecutor::<T>(core::marker::PhantomData);
-            let result = executor.execute_bpf(&bytecode, &instruction_data, &svm_config);
+            let result =
+                <SvmBpffExecutor<T> as x3_svm_integration::SvmExecutor>::execute_with_program(
+                    &executor,
+                    &bytecode,
+                    &instruction_data,
+                    &execution_accounts,
+                    &svm_config,
+                );
 
             match result {
                 Ok(exec_result) => {
@@ -1032,6 +1070,155 @@ mod tests {
 
             let account = pallet::Accounts::<Test>::get(program_id).unwrap();
             assert!(account.executable);
+        });
+    }
+
+    #[test]
+    fn writable_account_data_persists_across_program_executions() {
+        new_test_ext().execute_with(|| {
+            let program_id = [42u8; 32];
+            let account_id = [7u8; 32];
+            const ACCOUNT_DATA_OFFSET: i16 = 50;
+            let program = vec![
+                0x79,
+                0x10,
+                ACCOUNT_DATA_OFFSET as u8,
+                0,
+                0,
+                0,
+                0,
+                0, // r0 = *(u64 *)(r1 + 50)
+                0x07,
+                0x00,
+                0,
+                0,
+                1,
+                0,
+                0,
+                0, // r0 += 1
+                0x7b,
+                0x01,
+                ACCOUNT_DATA_OFFSET as u8,
+                0,
+                0,
+                0,
+                0,
+                0, // *(u64 *)(r1 + 50) = r0
+                0xb7,
+                0x00,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // r0 = 0
+                0x95,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // exit
+            ];
+
+            assert_ok!(Svm::deploy_program(
+                RuntimeOrigin::signed(1),
+                program_id,
+                program,
+                None
+            ));
+            assert_ok!(Svm::create_account(
+                RuntimeOrigin::signed(1),
+                account_id,
+                2_000_000,
+                8,
+                program_id
+            ));
+
+            assert_ok!(Svm::execute_bpf_instruction(
+                program_id,
+                vec![(account_id, false, true)],
+                vec![]
+            ));
+            assert_ok!(Svm::execute_bpf_instruction(
+                program_id,
+                vec![(account_id, false, true)],
+                vec![]
+            ));
+
+            let stored = pallet::AccountData::<Test>::get(account_id)
+                .expect("account data remains allocated")
+                .into_inner();
+            assert_eq!(stored, 2u64.to_le_bytes());
+        });
+    }
+
+    #[test]
+    fn program_receives_instruction_data_separately_from_account_state() {
+        new_test_ext().execute_with(|| {
+            let program_id = [43u8; 32];
+            let account_id = [8u8; 32];
+            const ACCOUNT_DATA_OFFSET: i16 = 50;
+            const INSTRUCTION_DATA_OFFSET: i16 = 58;
+            let program = vec![
+                0x79,
+                0x10,
+                INSTRUCTION_DATA_OFFSET as u8,
+                0,
+                0,
+                0,
+                0,
+                0, // load instruction data
+                0x7b,
+                0x01,
+                ACCOUNT_DATA_OFFSET as u8,
+                0,
+                0,
+                0,
+                0,
+                0, // store into account data
+                0xb7,
+                0x00,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // success
+                0x95,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0, // exit
+            ];
+
+            assert_ok!(Svm::deploy_program(
+                RuntimeOrigin::signed(1),
+                program_id,
+                program,
+                None
+            ));
+            assert_ok!(Svm::create_account(
+                RuntimeOrigin::signed(1),
+                account_id,
+                2_000_000,
+                8,
+                program_id
+            ));
+            assert_ok!(Svm::execute_bpf_instruction(
+                program_id,
+                vec![(account_id, false, true)],
+                7u64.to_le_bytes().to_vec()
+            ));
+
+            let stored = pallet::AccountData::<Test>::get(account_id)
+                .expect("account data remains allocated")
+                .into_inner();
+            assert_eq!(stored, 7u64.to_le_bytes());
         });
     }
 

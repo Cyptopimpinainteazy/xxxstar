@@ -938,11 +938,11 @@ impl<'a> Vm<'a> {
 /// - A full ELF64/sBPF binary (starts with `\x7fELF`).
 ///
 /// `input_data` is passed as r1 with its length in r2.
-pub fn execute_bpf(
+fn execute_bpf_capturing_input(
     payload: &[u8],
     input_data: &[u8],
     config: &SvmConfig,
-) -> SvmResult<SvmExecutionResult> {
+) -> SvmResult<(SvmExecutionResult, Vec<u8>)> {
     if payload.is_empty() {
         return Err(SvmError::InvalidPayload);
     }
@@ -981,10 +981,34 @@ pub fn execute_bpf(
                 state_root: [0u8; 32],
             };
             result.state_root = crate::compute_svm_state_root(&result);
-            Ok(result)
+            let executed_input = vm.heap;
+            Ok((result, executed_input))
         }
         Err(e) => Err(e),
     }
+}
+
+pub fn execute_bpf(
+    payload: &[u8],
+    input_data: &[u8],
+    config: &SvmConfig,
+) -> SvmResult<SvmExecutionResult> {
+    execute_bpf_capturing_input(payload, input_data, config).map(|(result, _)| result)
+}
+
+/// Execute a program against a serialized account buffer and return only authorized writable
+/// account updates.
+pub fn execute_bpf_with_accounts(
+    payload: &[u8],
+    input_data: &[u8],
+    accounts: &[(crate::SvmAccountMeta, crate::AccountUpdate)],
+    config: &SvmConfig,
+) -> SvmResult<SvmExecutionResult> {
+    let (mut result, executed_input) = execute_bpf_capturing_input(payload, input_data, config)?;
+    result.account_updates =
+        crate::account_updates_from_serialized(input_data, &executed_input, accounts)?;
+    result.state_root = crate::compute_svm_state_root(&result);
+    Ok(result)
 }
 
 /// Statically validate a raw BPF instruction stream or ELF.
@@ -1073,6 +1097,57 @@ mod tests {
         let res = execute_bpf(&p, &[], &default_config()).unwrap();
         let r0 = u64::from_le_bytes(res.output.as_slice().try_into().unwrap_or([0; 8]));
         assert_eq!(r0, 7);
+    }
+
+    #[test]
+    fn account_buffer_write_is_captured() {
+        const ACCOUNT_DATA_OFFSET: i16 = 50;
+        let program = vec![
+            0x79,
+            0x10,
+            ACCOUNT_DATA_OFFSET as u8,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0x07,
+            0x00,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0x7b,
+            0x01,
+            ACCOUNT_DATA_OFFSET as u8,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0xb7,
+            0x00,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0x95,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ];
+        let input = vec![0u8; 58];
+        let (_, executed_input) =
+            execute_bpf_capturing_input(&program, &input, &default_config()).unwrap();
+        assert_eq!(executed_input[ACCOUNT_DATA_OFFSET as usize], 1);
     }
 
     #[test]

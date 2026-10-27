@@ -9,6 +9,7 @@ use crate::{
 };
 use sha2::Digest as Sha2Digest;
 use solana_rbpf::{
+    ebpf::{MM_INPUT_START, MM_STACK_START},
     elf::Executable,
     error::ProgramResult,
     memory_region::{AccessType, MemoryMapping, MemoryRegion},
@@ -42,7 +43,9 @@ impl RbpfSvmExecutor {
                 external_internal_function_hash_collision: false,
                 reject_callx_r10: true,
                 optimize_rodata: true,
-                aligned_memory_mapping: true,
+                // Input lives at Solana's MM_INPUT_START and the runtime does not currently
+                // reserve the intermediate 4 GiB aligned regions required by the aligned mapper.
+                aligned_memory_mapping: false,
                 ..Config::default()
             },
         }
@@ -51,6 +54,80 @@ impl RbpfSvmExecutor {
     /// Create executor with custom config
     pub fn with_config(config: Config) -> Self {
         Self { config }
+    }
+
+    fn execute_bpf_capturing_input(
+        &self,
+        program: &[u8],
+        input: &[u8],
+        config: &SvmConfig,
+    ) -> SvmResult<(SvmExecutionResult, Vec<u8>)> {
+        if program.is_empty() {
+            return Err(SvmError::InvalidPayload);
+        }
+
+        let loader = create_loader();
+        let executable_result = if program.starts_with(b"\x7fELF") {
+            Executable::from_elf(program, loader.clone())
+        } else {
+            Executable::from_text_bytes(
+                program,
+                loader.clone(),
+                SBPFVersion::V1,
+                FunctionRegistry::default(),
+            )
+        };
+        let executable = executable_result.map_err(|_| SvmError::InvalidPayload)?;
+        if executable.verify::<RequisiteVerifier>().is_err() {
+            return Err(SvmError::InvalidPayload);
+        }
+
+        let mut context = AtlasSyscallContext::new(config.compute_unit_limit);
+        let mut input_buffer = input.to_vec();
+        if input_buffer.len() < 64 {
+            input_buffer.resize(64, 0);
+        }
+
+        const STACK_FRAME_SIZE: usize = 4096;
+        const MAX_CALL_DEPTH: usize = 64;
+        let mut stack = vec![0u8; STACK_FRAME_SIZE * MAX_CALL_DEPTH];
+        let regions: Vec<MemoryRegion> = vec![
+            MemoryRegion::new_writable(&mut stack, MM_STACK_START),
+            MemoryRegion::new_writable(&mut input_buffer, MM_INPUT_START),
+        ];
+        let sbpf_version = SBPFVersion::V1;
+        let memory_mapping = MemoryMapping::new(regions, &self.config, &sbpf_version)
+            .map_err(|_| SvmError::ExecutionFailed)?;
+        let mut vm = EbpfVm::new(
+            loader,
+            &sbpf_version,
+            &mut context,
+            memory_mapping,
+            STACK_FRAME_SIZE,
+        );
+
+        let (instruction_count, result) = vm.execute_program(&executable, true);
+        context.consume(instruction_count);
+        if context.get_remaining() == 0 && instruction_count >= config.compute_unit_limit {
+            return Err(SvmError::OutOfComputeUnits);
+        }
+
+        let (success, return_data) = match result {
+            ProgramResult::Ok(return_value) => {
+                (return_value == 0, return_value.to_le_bytes().to_vec())
+            }
+            ProgramResult::Err(_) => (false, vec![]),
+        };
+        let mut execution = SvmExecutionResult {
+            success,
+            output: return_data,
+            compute_units_used: context.compute_units_used,
+            account_updates: vec![],
+            logs: context.logs,
+            state_root: [0u8; 32],
+        };
+        execution.state_root = crate::compute_svm_state_root(&execution);
+        Ok((execution, input_buffer))
     }
 }
 
@@ -490,27 +567,23 @@ impl SvmExecutor for RbpfSvmExecutor {
             return Err(SvmError::InvalidProgramId);
         }
 
-        // Use shared serialize_accounts from lib.rs
-        let account_input = serialize_accounts(accounts);
+        self.execute_with_program(&instruction.data, &[], accounts, config)
+    }
 
-        // Execute the BPF program with instruction data + serialized accounts as input
-        let mut result = self.execute_bpf(&instruction.data, &account_input, config)?;
-
-        // Surface writable account balances to upper layers so canonical ledgers can
-        // persist account-level views even when the BPF program does not emit deltas.
-        if result.account_updates.is_empty() {
-            result.account_updates = accounts
-                .iter()
-                .filter_map(|(meta, update)| {
-                    if meta.is_writable {
-                        Some(update.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-        }
-
+    fn execute_with_program(
+        &self,
+        program: &[u8],
+        instruction_data: &[u8],
+        accounts: &[(SvmAccountMeta, AccountUpdate)],
+        config: &SvmConfig,
+    ) -> SvmResult<SvmExecutionResult> {
+        let mut account_input = serialize_accounts(accounts);
+        account_input.extend_from_slice(instruction_data);
+        let (mut result, executed_input) =
+            self.execute_bpf_capturing_input(program, &account_input, config)?;
+        result.account_updates =
+            crate::account_updates_from_serialized(&account_input, &executed_input, accounts)?;
+        result.state_root = crate::compute_svm_state_root(&result);
         Ok(result)
     }
 
@@ -520,97 +593,8 @@ impl SvmExecutor for RbpfSvmExecutor {
         input: &[u8],
         config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult> {
-        if program.is_empty() {
-            return Err(SvmError::InvalidPayload);
-        }
-
-        // Create the loader with no syscalls (minimal execution)
-        let loader = create_loader();
-
-        // Parse the program (either ELF or raw text bytecode)
-        let executable_result = if program.starts_with(b"\x7fELF") {
-            Executable::from_elf(program, loader.clone())
-        } else {
-            Executable::from_text_bytes(
-                program,
-                loader.clone(),
-                SBPFVersion::V1,
-                FunctionRegistry::default(),
-            )
-        };
-
-        let executable = match executable_result {
-            Ok(exe) => exe,
-            Err(_) => return Err(SvmError::InvalidPayload),
-        };
-
-        // Verify the program before execution
-        if executable.verify::<RequisiteVerifier>().is_err() {
-            return Err(SvmError::InvalidPayload);
-        }
-
-        // Create execution context with compute unit metering
-        let mut context = AtlasSyscallContext::new(config.compute_unit_limit);
-
-        // Set up memory regions for the VM
-        // Region 0: Program code (read-only)
-        // Region 1: Input data (read-write for return data)
-        let mut input_buffer = input.to_vec();
-        // Ensure minimum buffer size for BPF
-        if input_buffer.len() < 64 {
-            input_buffer.resize(64, 0);
-        }
-
-        let regions: Vec<MemoryRegion> =
-            vec![MemoryRegion::new_writable(&mut input_buffer, 0x100000000)];
-
-        let sbpf_version = SBPFVersion::V1;
-        let memory_mapping = match MemoryMapping::new(regions, &self.config, &sbpf_version) {
-            Ok(mm) => mm,
-            Err(_) => return Err(SvmError::ExecutionFailed),
-        };
-
-        // Create and run the VM
-        let mut vm = EbpfVm::new(
-            loader,
-            &sbpf_version,
-            &mut context,
-            memory_mapping,
-            4096, // stack size
-        );
-
-        // Execute the BPF program
-        let (instruction_count, result) = vm.execute_program(&executable, true);
-
-        // Consume compute units based on instructions executed
-        context.consume(instruction_count);
-
-        // Check if we ran out of compute units
-        if context.get_remaining() == 0 && instruction_count >= config.compute_unit_limit {
-            return Err(SvmError::OutOfComputeUnits);
-        }
-
-        // Interpret execution result
-        let (success, return_data) = match result {
-            ProgramResult::Ok(return_value) => {
-                // Return value 0 indicates success in BPF convention
-                (return_value == 0, vec![return_value as u8])
-            }
-            ProgramResult::Err(_) => (false, vec![]),
-        };
-
-        // Compute state root using the canonical formula shared with interp.rs
-        let mut result = SvmExecutionResult {
-            success,
-            output: return_data,
-            compute_units_used: context.compute_units_used,
-            account_updates: vec![],
-            logs: context.logs,
-            state_root: [0u8; 32],
-        };
-        result.state_root = crate::compute_svm_state_root(&result);
-
-        Ok(result)
+        self.execute_bpf_capturing_input(program, input, config)
+            .map(|(result, _)| result)
     }
 
     fn validate_program(&self, program: &[u8]) -> SvmResult<()> {

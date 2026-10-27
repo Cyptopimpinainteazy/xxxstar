@@ -102,19 +102,20 @@ pub struct AccountUpdate {
 /// (`rbpf.rs`) MUST use this function so that state roots are identical for
 /// the same logical execution, regardless of which backend produced them.
 ///
-/// Hash domain: `blake2_256(success || compute_units_used || return_data || account_updates || logs)`
+/// Hash domain: `blake2_256(success || return_data || account_updates || logs)`
+///
+/// Compute usage is resource accounting, not post-execution state. Different executors may meter
+/// the same program differently, while the economic result and the state they produce must agree.
 pub fn compute_svm_state_root(result: &SvmExecutionResult) -> [u8; 32] {
     use sp_io::hashing::blake2_256;
 
     let mut buf = Vec::new();
     // 1. success flag
     buf.push(if result.success { 1u8 } else { 0u8 });
-    // 2. compute units consumed (le)
-    buf.extend_from_slice(&result.compute_units_used.to_le_bytes());
-    // 3. return data
+    // 2. return data
     buf.extend_from_slice(&(result.output.len() as u32).to_le_bytes());
     buf.extend_from_slice(&result.output);
-    // 4. account updates (deterministic: sorted by pubkey)
+    // 3. account updates (deterministic: sorted by pubkey)
     let mut keys: Vec<usize> = (0..result.account_updates.len()).collect();
     keys.sort_by_key(|&i| result.account_updates[i].pubkey);
     for i in keys {
@@ -126,7 +127,7 @@ pub fn compute_svm_state_root(result: &SvmExecutionResult) -> [u8; 32] {
         buf.extend_from_slice(&upd.owner);
         buf.push(if upd.executable { 1 } else { 0 });
     }
-    // 5. logs
+    // 4. logs
     for log in &result.logs {
         buf.extend_from_slice(&(log.len() as u32).to_le_bytes());
         buf.extend_from_slice(log);
@@ -234,6 +235,15 @@ pub trait SvmExecutor {
         config: &SvmConfig,
     ) -> SvmResult<SvmExecutionResult>;
 
+    /// Execute explicit program bytecode with separate instruction data and account state.
+    fn execute_with_program(
+        &self,
+        program: &[u8],
+        instruction_data: &[u8],
+        accounts: &[(SvmAccountMeta, AccountUpdate)],
+        config: &SvmConfig,
+    ) -> SvmResult<SvmExecutionResult>;
+
     /// Execute raw BPF bytecode directly
     fn execute_bpf(
         &self,
@@ -292,6 +302,16 @@ impl SvmExecutor for MockSvmExecutor {
             logs: vec![],
             state_root: [0u8; 32],
         })
+    }
+
+    fn execute_with_program(
+        &self,
+        program: &[u8],
+        _instruction_data: &[u8],
+        _accounts: &[(SvmAccountMeta, AccountUpdate)],
+        _config: &SvmConfig,
+    ) -> SvmResult<SvmExecutionResult> {
+        self.execute_bpf(program, &[], &SvmConfig::default())
     }
 
     fn execute_bpf(
@@ -543,6 +563,108 @@ mod tests {
         assert_eq!(db.get_account(&to).unwrap().lamports, 500);
     }
 
+    fn increment_account_data_program() -> Vec<u8> {
+        const ACCOUNT_DATA_OFFSET: i16 = 50;
+        vec![
+            0x79,
+            0x10,
+            ACCOUNT_DATA_OFFSET as u8,
+            0,
+            0,
+            0,
+            0,
+            0, // r0 = *(u64 *)(r1 + 50)
+            0x07,
+            0x00,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0, // r0 += 1
+            0x7b,
+            0x01,
+            ACCOUNT_DATA_OFFSET as u8,
+            0,
+            0,
+            0,
+            0,
+            0, // *(u64 *)(r1 + 50) = r0
+            0xb7,
+            0x00,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // r0 = 0 (success)
+            0x95,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0, // exit
+        ]
+    }
+
+    fn increment_account_fixture() -> (Vec<u8>, Vec<(SvmAccountMeta, AccountUpdate)>) {
+        let pubkey = [0x22; 32];
+        let meta = SvmAccountMeta {
+            pubkey,
+            is_signer: false,
+            is_writable: true,
+        };
+        let account = AccountUpdate {
+            pubkey,
+            data: vec![0; 8],
+            lamports: 1_000,
+            owner: [0x33; 32],
+            ..Default::default()
+        };
+        (increment_account_data_program(), vec![(meta, account)])
+    }
+
+    #[test]
+    fn interpreter_returns_writable_account_data_changes() {
+        let (program, accounts) = increment_account_fixture();
+        let input = serialize_accounts(&accounts);
+        let result =
+            interp::execute_bpf_with_accounts(&program, &input, &accounts, &SvmConfig::default())
+                .expect("interpreter execution succeeds");
+        assert!(result.success);
+        assert_eq!(result.account_updates.len(), 1);
+        assert_eq!(result.account_updates[0].data, 1u64.to_le_bytes());
+    }
+
+    #[test]
+    fn rbpf_and_interpreter_agree_on_writable_account_data() {
+        let (program, accounts) = increment_account_fixture();
+        let input = serialize_accounts(&accounts);
+        let interp_result =
+            interp::execute_bpf_with_accounts(&program, &input, &accounts, &SvmConfig::default())
+                .expect("interpreter execution succeeds");
+
+        let executor = RbpfSvmExecutor::new();
+        let instruction = SvmInstruction {
+            program_id: [0x11; 32],
+            accounts: accounts.iter().map(|(meta, _)| meta.clone()).collect(),
+            data: program,
+        };
+        let rbpf_result = executor
+            .execute(&instruction, [0u8; 32], &accounts, &SvmConfig::default())
+            .expect("rbpf execution succeeds");
+
+        assert!(rbpf_result.success);
+        assert_eq!(interp_result.account_updates, rbpf_result.account_updates);
+        assert_eq!(interp_result.output, rbpf_result.output);
+        assert!(interp_result.compute_units_used > 0);
+        assert!(rbpf_result.compute_units_used > 0);
+        assert_eq!(interp_result.logs, rbpf_result.logs);
+        assert_eq!(interp_result.state_root, rbpf_result.state_root);
+    }
+
     #[test]
     fn test_account_db_insufficient_lamports() {
         let mut db = SvmAccountDb::new();
@@ -686,6 +808,85 @@ pub fn serialize_accounts(accounts: &[(SvmAccountMeta, AccountUpdate)]) -> Vec<u
     buffer
 }
 
+/// Extract writable account updates from a program's serialized account buffer.
+///
+/// The buffer layout is defined by [`serialize_accounts`]. Programs may mutate account data in
+/// place, but they may not rewrite the account count, public keys, lamports, access flags, or data
+/// lengths. Those fields are part of the instruction's authorization context, not program state.
+/// Any bytes after the serialized accounts are instruction data and are not persisted as account
+/// state.
+/// The returned vector includes every writable account so callers can persist unchanged balances as
+/// well as changed data.
+pub fn account_updates_from_serialized(
+    original: &[u8],
+    executed: &[u8],
+    accounts: &[(SvmAccountMeta, AccountUpdate)],
+) -> SvmResult<Vec<AccountUpdate>> {
+    if executed.len() < original.len() || original.len() < 4 {
+        return Err(SvmError::InvalidAccount);
+    }
+    let count = u32::from_le_bytes([original[0], original[1], original[2], original[3]]) as usize;
+    if count != accounts.len() || executed[0..4] != original[0..4] {
+        return Err(SvmError::InvalidAccount);
+    }
+
+    const ACCOUNT_HEADER_LEN: usize = 32 + 8 + 1 + 1 + 4;
+    let mut offset = 4usize;
+    let mut updates = Vec::with_capacity(count);
+
+    for (meta, previous) in accounts {
+        let header_end = offset
+            .checked_add(ACCOUNT_HEADER_LEN)
+            .ok_or(SvmError::InvalidAccount)?;
+        if header_end > executed.len() {
+            return Err(SvmError::InvalidAccount);
+        }
+
+        if executed[offset..header_end] != original[offset..header_end]
+            || executed[offset..offset + 32] != meta.pubkey
+        {
+            return Err(SvmError::InvalidAccount);
+        }
+
+        let length_offset = offset + 32 + 8 + 1 + 1;
+        let data_len = u32::from_le_bytes([
+            executed[length_offset],
+            executed[length_offset + 1],
+            executed[length_offset + 2],
+            executed[length_offset + 3],
+        ]) as usize;
+        if data_len != previous.data.len() {
+            return Err(SvmError::InvalidAccount);
+        }
+
+        let data_end = header_end
+            .checked_add(data_len)
+            .ok_or(SvmError::InvalidAccount)?;
+        if data_end > executed.len() {
+            return Err(SvmError::InvalidAccount);
+        }
+
+        let mutated = &executed[header_end..data_end];
+        let changed = mutated != previous.data.as_slice();
+        if changed && !meta.is_writable {
+            return Err(SvmError::InvalidAccount);
+        }
+        if meta.is_writable {
+            let mut update = previous.clone();
+            update.pubkey = meta.pubkey;
+            update.data = mutated.to_vec();
+            updates.push(update);
+        }
+        offset = data_end;
+    }
+
+    if offset <= original.len() {
+        Ok(updates)
+    } else {
+        Err(SvmError::InvalidAccount)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // InterpSvmExecutor – real no-std executor using the built-in eBPF interpreter
 // ---------------------------------------------------------------------------
@@ -703,28 +904,19 @@ impl SvmExecutor for InterpSvmExecutor {
             return Err(SvmError::InvalidProgramId);
         }
 
-        // Serialize accounts into input buffer for BPF program access
-        let account_input = serialize_accounts(accounts);
+        self.execute_with_program(&instruction.data, &[], accounts, config)
+    }
 
-        // Execute the BPF program with instruction.data as program and account_input as input
-        let mut result = self.execute_bpf(&instruction.data, &account_input, config)?;
-
-        // Surface writable account balances to upper layers so canonical ledgers can
-        // persist account-level views even when the BPF program does not emit deltas.
-        if result.account_updates.is_empty() {
-            result.account_updates = accounts
-                .iter()
-                .filter_map(|(meta, update)| {
-                    if meta.is_writable {
-                        Some(update.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-        }
-
-        Ok(result)
+    fn execute_with_program(
+        &self,
+        program: &[u8],
+        instruction_data: &[u8],
+        accounts: &[(SvmAccountMeta, AccountUpdate)],
+        config: &SvmConfig,
+    ) -> SvmResult<SvmExecutionResult> {
+        let mut input = serialize_accounts(accounts);
+        input.extend_from_slice(instruction_data);
+        interp::execute_bpf_with_accounts(program, &input, accounts, config)
     }
 
     fn execute_bpf(
