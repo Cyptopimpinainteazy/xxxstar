@@ -1,7 +1,7 @@
 {
   "name": "x3-studio",
   "version": "0.1.0",
-  "description": "X3 Blockchain IDE — full desktop IDE for X3 development",
+  "description": "X3 Blockchain IDE \u2014 full desktop IDE for X3 development",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev:renderer": "vite",

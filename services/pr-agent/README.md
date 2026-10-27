@@ -19,13 +19,20 @@ cards are worst at. Measured here on PR #671 (4.2k-token diff, `fix(dex): stop i
 | `review` | `qwen3:8b` (GPU) | 73 s | same all-clear on #672 after the timeout fix below |
 | `improve` | `qwen3:8b` (GPU) | 79 s | one scored suggestion with a code diff (small patch) |
 | `improve` | `qwen3:8b` (GPU) | 80 s | none: YAML parse failed, self-reflection fell back to score 7, no suggestion published (#672) |
-| `review` | DeepSeek | seconds | not measured — needs `DEEPSEEK_API_KEY` |
+| `review` | `deepseek-v4-pro` (routed) | 109 s | valid review; output bound must clear the reasoning budget |
 
-Two things this measured that changed the wrapper:
+Three things this measured that changed the wrapper:
 
 - **PR-Agent's default `ai_timeout` is 120 s, and an 8B here exceeds it.** The first #672 review
   died at exactly 120 s and was retried, wasting a minute. `--local` now passes
   `--config.ai_timeout=600` (`PR_AGENT_LOCAL_TIMEOUT` overrides); the cloud path keeps 120 s.
+- **The output bound is a correctness setting, not a cost knob.** A routed request whose
+  `max_output_tokens` is too small spends the whole allowance on DeepSeek's reasoning and returns
+  no assistant message; the router treats that as a provider failure, cools the provider down and
+  serves the review from the next provider — a free local 8B — while usage records `$0.0000`.
+  `--via-router` therefore sets `config.max_output_tokens`, and the self-test asserts that this is
+  the key PR-Agent's handler actually reads. An argv-only assertion did not catch the first,
+  wrong version of this fix.
 - **`extra_instructions` works on small focused diffs, not on real PRs.** On a four-line diff
   that injects `let fee = 0.5_f64;` into a `u128` money path, the routed local model reported
   *"Float Usage — use of f64 for a value that should be an exact integer without
@@ -183,8 +190,15 @@ DeepSeek per push. `gemma4:26b` was measured as a free alternative and is not on
 ## Notes
 
 - `PR_AGENT_VENV`, `PR_AGENT_LOCAL_MODEL`, `PR_AGENT_LOCAL_TIMEOUT`, `PR_AGENT_ROUTER_MODEL`,
-  `X3_ROUTER_BASE`, `X3_ROUTER_TOKEN`, `OLLAMA_BASE`, `DEEPSEEK_BASE` and `PR_AGENT_MODE`
-  override the defaults.
+  `PR_AGENT_ROUTER_MAX_TOKENS`, `X3_ROUTER_BASE`, `X3_ROUTER_TOKEN`, `OLLAMA_BASE`,
+  `DEEPSEEK_BASE` and `PR_AGENT_MODE` override the defaults.
+- `PR_AGENT_ROUTER_MAX_TOKENS` (default `16000`) is the output bound for `--via-router`. It sets
+  `config.max_output_tokens`, the key PR-Agent's handler reads. The bound has to clear the
+  reasoning the provider spends before it answers: DeepSeek runs thinking mode by default and
+  those tokens count against it, so a small cap produces an empty answer that the router reports
+  as a provider failure. `config.max_tokens` is **not** this setting — it only exists under
+  `[openrouter]` — and `config.max_model_tokens` is the total-token limit used to fit the prompt.
+  Values below 4096 are raised to 4096 by PR-Agent.
 
 ## Mode isolation
 

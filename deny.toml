@@ -71,6 +71,22 @@ ignore = [
     "RUSTSEC-2026-0002",   # lru 0.12.5 IterMut aliasing; 0.12 is pinned by libp2p-identify 0.44/0.45
     "RUSTSEC-2026-0253",   # lru LruCache::pop panic safety; same pin
     "RUSTSEC-2026-0191",   # solana_rbpf 0.8.5 EbpfVm::invoke_function; dev/test-only path
+
+    # ---- ethers 2.x / solana 3.0.14 / stable2512 transitives, 2026-10-26 -------
+    # Accepted risk, recorded rather than fixed: every patched version below is a
+    # breaking major held by an upstream crate this workspace does not own, so the
+    # remedy is an upstream release or leaving ethers 2.x, not a version bump here.
+    # Each entry names the path found by `cargo tree -e all -i <crate>` and what
+    # bounds the exposure. Remove an entry the moment it stops matching; `-D
+    # advisory-not-detected` is what makes that happen automatically.
+    "RUSTSEC-2026-0346",   # rustls 0.21.12 (>=0.23.46) Debug leaks session secrets; only via reqwest 0.11 / hyper-rustls 0.24 (ethers 2.x, solana); needs the app to Debug-format a client session, which nothing here does
+    "RUSTSEC-2026-0349",   # rustls 0.21.12 (>=0.23.46) ServerHello can downgrade later connections to classical key exchange; same legacy client path, and TLS auth itself still holds (C:L, not a confidentiality break)
+    "RUSTSEC-2026-0381",   # webpki-roots 0.24.0/0.25.4 (>=1.0.10) bundled roots trust distrusted emSign intermediates; these two versions reach only tungstenite 0.20 / reqwest 0.11, while the current reqwest 0.12 and hyper-rustls 0.27 paths already use 1.0.10
+    "RUSTSEC-2026-0382",   # rustls-webpki 0.101.7 (>=0.103.16) may accept distrusted intermediates; reached through rustls 0.21.12 and libp2p-tls 0.4/0.5; 0.103.16 is already resolved alongside and is the version the 0.23 chain verifies with
+    "RUSTSEC-2026-0387",   # crypto-bigint 0.5.5 (>=0.7.6) timing variability in constant-time ops; via elliptic-curve 0.13.8 -> ethers-signers secp256k1 signing, so it is a local side channel against key operations, not a remote break
+    "RUSTSEC-2026-0391",   # zstd 0.13.3 (>=0.14.3) abandoned stream leaks into the next on a reused context; via actix-http, solana-runtime and wasmtime-internal-cache
+    "RUSTSEC-2026-0398",   # zstd-safe 7.3.0 (>=8.2.0) Seekable::decompress sets a Vec length past capacity for an out-of-range offset; no workspace caller uses Seekable
+    "RUSTSEC-2026-0403",   # zstd-safe 5.0.2/6.0.6/7.3.0 (>=8.2.0) uninitialized memory on a failed legacy-frame stream; requires a deliberately malformed zstd v0.4-v0.7 frame and the legacy path
 ]
 
 [bans]

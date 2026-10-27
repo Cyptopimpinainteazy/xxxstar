@@ -6,6 +6,7 @@ set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG="$ROOT_DIR/.pr_agent.toml"
+VENV_DIR="${PR_AGENT_VENV:-$HOME/.venvs/pr-agent}"
 failures=0
 
 pass() { printf 'PASS  %s\n' "$1"; }
@@ -187,21 +188,21 @@ expect_entry() { # <label> <expected entry: dry_run.py|pr-agent> [wrapper args..
 expect_entry "a PR dry run prints the unpublished result via dry_run.py" dry_run.py --dry-run 672 review
 expect_entry "a plain-diff dry run calls pr-agent directly (it already prints)" pr-agent --dry-run --diff /tmp/x.diff
 expect_entry "a publishing run calls pr-agent directly" pr-agent 672
-# ── dry_run.py itself, against a fixture pr_agent package ────────────────
+# ── dry_run.py itself, against a stub pr_agent package ────────────────────
 # The shim above replaces the interpreter, so this runs the real dry_run.py:
 # the handle_request wrapper, the artifact/answer lookup and the exit codes.
-fixture="$tmp/fixture/pr_agent"
-mkdir -p "$fixture/agent"
-: > "$fixture/__init__.py"
-: > "$fixture/agent/__init__.py"
-cat > "$fixture/config_loader.py" <<'PY'
+stub="$tmp/stub/pr_agent"
+mkdir -p "$stub/agent"
+: > "$stub/__init__.py"
+: > "$stub/agent/__init__.py"
+cat > "$stub/config_loader.py" <<'PY'
 class _Settings:
     pass
 _settings = _Settings()
 def get_settings():
     return _settings
 PY
-cat > "$fixture/agent/pr_agent.py" <<'PY'
+cat > "$stub/agent/pr_agent.py" <<'PY'
 import json, os
 from pr_agent.config_loader import get_settings
 class PRAgent:
@@ -210,7 +211,7 @@ class PRAgent:
             get_settings().data = json.loads(os.environ["STUB_DATA"])
         return True
 PY
-cat > "$fixture/cli.py" <<'PY'
+cat > "$stub/cli.py" <<'PY'
 import asyncio, os
 from pr_agent.agent.pr_agent import PRAgent
 def run():
@@ -221,7 +222,7 @@ PY
 expect_dry_run() { # <label> <expected exit> <expected stdout substring> [env...]
   local label="$1" want_status="$2" want_out="$3"; shift 3
   local status=0
-env "$@" PYTHONPATH="$tmp/fixture" python3 "$ROOT_DIR/services/pr-agent/dry_run.py" \
+  env "$@" PYTHONPATH="$tmp/stub" python3 "$ROOT_DIR/services/pr-agent/dry_run.py" \
     >"$tmp/dry.out" 2>"$tmp/dry.err" || status=$?
   if [ "$status" = "$want_status" ] && { [ -z "$want_out" ] || grep -qF -- "$want_out" "$tmp/dry.out" "$tmp/dry.err"; }; then
     pass "$label"
@@ -336,12 +337,25 @@ X3_ROUTER_TOKEN=probe-token PR_AGENT_VENV="$fake_venv" PR_AGENT_ARGV_LOG="$argv_
   X3_ROUTER_BASE="http://127.0.0.1:$stub_port/v1" GITHUB_TOKEN="test-token" \
   bash "$ROOT_DIR/services/pr-agent/review.sh" --via-router --diff /tmp/x.diff review >"$tmp/out" 2>&1 || true
 actual="$(tr '\n' ' ' < "$argv_log" | sed 's/ $//')"
-expected="--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=openai/x3-deep --config.max_tokens=16000"
+expected="--diff-file=/tmp/x.diff --extra_config_url=$CONFIG review --config.model=openai/x3-deep --config.max_output_tokens=16000"
 if [ "$actual" = "$expected" ]; then
   pass "--via-router routes through the router policy with no direct fallback"
 else
   fail "--via-router routes through the router policy with no direct fallback"
   printf '        expected: %s\n        actual:   %s\n' "$expected" "$actual"
+fi
+
+# The override must be a setting PR-Agent actually reads, and it must honour the
+# env override rather than hard-coding 16000.
+: > "$argv_log"
+PR_AGENT_ROUTER_MAX_TOKENS=9000 X3_ROUTER_TOKEN=probe-token PR_AGENT_VENV="$fake_venv" \
+  PR_AGENT_ARGV_LOG="$argv_log" X3_ROUTER_BASE="http://127.0.0.1:$stub_port/v1" GITHUB_TOKEN="test-token" \
+  bash "$ROOT_DIR/services/pr-agent/review.sh" --via-router --diff /tmp/x.diff review >"$tmp/out" 2>&1 || true
+if grep -qx -- "--config.max_output_tokens=9000" "$argv_log"; then
+  pass "PR_AGENT_ROUTER_MAX_TOKENS overrides the routed output bound"
+else
+  fail "PR_AGENT_ROUTER_MAX_TOKENS overrides the routed output bound"
+  printf '        argv: %s\n' "$(tr '\n' ' ' < "$argv_log")"
 fi
 
 if [ "$(cat "$argv_log.fallback" 2>/dev/null)" = "[]" ]; then
@@ -354,6 +368,33 @@ if [ "$(cat "$stub_seen" 2>/dev/null)" = "Bearer probe-token" ]; then
   pass "the router health probe sends the bearer token"
 else
   fail "the router health probe sends the bearer token (got '$(cat "$stub_seen" 2>/dev/null)')"
+fi
+
+# ── the routed output bound must be a setting PR-Agent honours ────────────
+# Asserting our own argv proved nothing about the wire: `--config.max_tokens`
+# set a key that only exists under [openrouter], so the routed request went out
+# with no bound at all and the check still passed. Ask PR-Agent which key it
+# reads instead. Skipped, loudly, when the package is not installed here.
+handler_python="$VENV_DIR/bin/python"
+if [ ! -x "$handler_python" ]; then handler_python="$(command -v python3)"; fi
+if out="$("$handler_python" - <<'PY' 2>/dev/null
+try:
+    from pr_agent.algo.ai_handlers.litellm_ai_handler import LiteLLMAIHandler
+    from pr_agent.config_loader import get_settings
+except Exception:
+    raise SystemExit(3)
+get_settings().set("config.max_tokens", 4321)
+get_settings().set("config.max_output_tokens", 16000)
+print(LiteLLMAIHandler._configured_max_output_tokens())
+PY
+)"; then
+  if [ "$out" = "16000" ]; then
+    pass "config.max_output_tokens is the key PR-Agent reads for the output bound"
+  else
+    fail "config.max_output_tokens is the key PR-Agent reads for the output bound (got '$out')"
+  fi
+else
+  printf 'INFO  the output-bound check needs the pr-agent package; not installed here\n'
 fi
 
 # ── check.sh gates only the providers the mode uses ───────────────────────

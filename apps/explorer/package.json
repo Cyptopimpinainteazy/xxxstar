@@ -66,6 +66,7 @@
     "start": "next start"
   },
   "overrides": {
-    "jayson": "^5.0.0"
+    "jayson": "^5.0.0",
+    "zod": "^4.6.6"
   }
 }

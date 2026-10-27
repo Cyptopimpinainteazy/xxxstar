@@ -1093,6 +1093,22 @@ def normalize_usage(usage):
     return normalized
 
 
+class TruncatedResponse(Exception):
+    """The provider stopped at its output allowance instead of finishing.
+
+    Kept out of `ValueError` on purpose. A ValueError here means the body was
+    malformed — the same request will produce the same bad body, and the
+    provider is suspect. A truncated answer is a capacity limit that the
+    endpoint answered correctly: benching that provider takes a working
+    provider out of rotation for a request-side setting, and the chain then
+    serves the answer from a cheaper model with nothing to show it happened.
+    """
+
+    def __init__(self, reason):
+        super().__init__(reason)
+        self.reason = reason
+
+
 def is_responses_object(result):
     """Whether an upstream body is a Responses object rather than a chat one."""
     return (isinstance(result, dict) and result.get("object") == "response"
@@ -2054,6 +2070,7 @@ class Router:
         self.context.routing = {"policy": logical, "tier": tier,
                                 "task_class": classification["task_class"]}
         failures = []
+        truncated = []
         budget_refused = False
         for name in self.claimed_attempts(chain):
             provider = self.config["providers"][name]
@@ -2116,12 +2133,28 @@ class Router:
                             self.note_provider_failure(name, detail)
                             failures.append(self.diagnostic(name, None, detail))
                             break
+                        if result.get("status") == "incomplete":
+                            # The Responses protocol has a third terminal state
+                            # besides completed and failed: the answer stopped
+                            # early. Booking it as success would hand the
+                            # client a fragment, and with reasoning on that
+                            # fragment is often empty because the allowance
+                            # went on thinking.
+                            detail = result.get("incomplete_details")
+                            reason = (detail.get("reason") if isinstance(detail, dict) else None) or "incomplete"
+                            raise TruncatedResponse("output " + str(reason))
                     else:
                         choices = result.get("choices") if isinstance(result, dict) else None
                         if (not isinstance(choices, list) or not choices
-                                or any(not isinstance(choice, dict)
-                                       or not valid_completion_message(choice.get("message"))
-                                       for choice in choices)):
+                                or any(not isinstance(choice, dict) for choice in choices)):
+                            raise ValueError("Provider response has invalid completion choices")
+                        # Checked before the message shape: a truncated answer
+                        # is usually an empty message (content None and no
+                        # calls), which would otherwise be read as a malformed
+                        # body and bench a provider that works.
+                        if any(choice.get("finish_reason") == "length" for choice in choices):
+                            raise TruncatedResponse("output truncated at the output bound")
+                        if any(not valid_completion_message(choice.get("message")) for choice in choices):
                             raise ValueError("Provider response has invalid completion choices")
                     usage = normalize_usage(result.get("usage", {}))
                     cost = (usage.get("prompt_tokens", 0) * price_in + usage.get("completion_tokens", 0) * price_out) / 1_000_000 if usage else estimate
@@ -2152,6 +2185,17 @@ class Router:
                     self.note_provider_failure(name, type(exc).__name__)
                     failures.append(self.diagnostic(name, None, type(exc).__name__))
                     break
+                except TruncatedResponse as exc:
+                    # Capacity, not health. The endpoint answered; it ran out of
+                    # output allowance. No `note_provider_failure`, so the
+                    # provider keeps its place in the chain and the next request
+                    # is not refused with "cooling down". The reason carries the
+                    # bound so the caller can see what to raise.
+                    self.note_attempt(name, model, self.elapsed_ms(started), False, attempt_index > 0)
+                    self.finish(reservation, agent)
+                    truncated.append(name)
+                    failures.append(self.diagnostic(name, None, exc.reason))
+                    break
                 except ValueError as exc:
                     # A malformed body is not transient: the same request will
                     # produce the same malformed answer.
@@ -2165,8 +2209,28 @@ class Router:
                     self.finish(reservation, agent)
                     self.note_provider_failure(name, "unexpected error")
                     raise
+            if truncated and not self.config.get("allow_truncated_failover", False):
+                # Stop here rather than substituting a provider that happens to
+                # fit inside the same bound. A smaller model can usually finish
+                # where a reasoning model ran out, so carrying on turns "the
+                # answer was cut off" into "a different, weaker model answered"
+                # — and the caller cannot tell which happened. An operator who
+                # prefers availability over that certainty sets
+                # `allow_truncated_failover` to true.
+                break
         if budget_refused:
             return 429, self.failure_body(failures, "budget_exceeded", "Daily budget exhausted")
+        if truncated:
+            # Every other provider was skipped or failed; the only answers we
+            # got were cut off. Say that, with the bound, instead of a generic
+            # "no provider succeeded" that reads like an outage — the caller's
+            # fix is to raise max_output_tokens, not to wait for the provider.
+            bound = output_bound(request, self.config)
+            names = ", ".join(truncated)
+            return 502, self.failure_body(
+                failures, "output_truncated",
+                f"The answer was cut off at the output bound ({bound} tokens) by {names}. "
+                f"Raise max_output_tokens and retry.")
         return 502, self.failure_body(failures)
 
     def relay_chat_stream(self, response, started, start, send):
