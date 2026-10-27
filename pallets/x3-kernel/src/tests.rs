@@ -91,6 +91,56 @@ fn production_evm_writes_rollback_when_later_vm_dispatch_fails() {
     });
 }
 
+#[test]
+fn persistent_evm_state_survives_separate_signed_dispatches() {
+    use crate::adapters::{authenticated_evm_address, EvmExecutorAdapter};
+    new_test_ext().execute_with(|| {
+        mock::with_real_evm_adapter(|| {
+            // Increment storage slot zero and return the new value. The code is deployed at the
+            // same content-addressed account on both dispatches, so the second result exposes
+            // whether the first dispatch's state was written to chain storage.
+            let code = vec![
+                0x60, 0, 0x54, 0x60, 1, 0x01, 0x80, 0x60, 0, 0x55, 0x60, 0, 0x52, 0x60, 32, 0x60,
+                0, 0xf3,
+            ];
+            let first_id = H256::from_low_u64_be(9003);
+            let first_root = compute_prepare_root(first_id, &code, &[], 0, 100_000);
+            assert_ok!(AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                first_id,
+                code.clone(),
+                vec![],
+                0,
+                100_000,
+                first_root,
+            ));
+
+            let second_id = H256::from_low_u64_be(9004);
+            let second_root = compute_prepare_root(second_id, &code, &[], 1, 100_000);
+            assert_ok!(AtlasKernel::submit_comit(
+                RuntimeOrigin::signed(ALICE),
+                second_id,
+                code.clone(),
+                vec![],
+                1,
+                100_000,
+                second_root,
+            ));
+
+            let observed = crate::wasm_adapters::ContextualWasmEvmAdapter::<Test>::execute_from(
+                &code,
+                1_000_000,
+                authenticated_evm_address(&ALICE),
+            )
+            .expect("third observation must execute");
+            assert_eq!(
+                observed.return_data[31], 3,
+                "each signed dispatch must see and increment the persisted EVM slot"
+            );
+        })
+    });
+}
+
 /// Helper to get only AtlasKernel events, filtering out Balance/System events
 fn x3_events() -> Vec<AtlasEvent> {
     System::events()

@@ -711,9 +711,9 @@ GATES_FAST=(
   # pre-guard false success measurable. Same feature set the `frontier` variant builds, whole suite
   # rather than one filter.
   # Note what this measures: `frontier` swaps the kernel's EVM to `pallet_evm` for a *native* build
-  # only. The chain runs the WASM runtime, whose kernel EVM is the stateless `mini_evm`, so a pass
-  # here is evidence about the frontier build, not about the chain's EVM (see the adapter selection
-  # in runtime/src/lib.rs and X3-LANG-001).
+  # only. The chain runs the WASM runtime, whose kernel EVM is the persistent `mini_evm` adapter,
+  # so a pass here is evidence about the frontier build, not about the chain's EVM (see the adapter
+  # selection in runtime/src/lib.rs and X3-LANG-001).
   "test runtime frontier:env SKIP_WASM_BUILD=1 cargo test -p x3-chain-runtime --no-default-features --features std,frontier"
   "test atomic-swap std:cargo test -p x3-atomic-swap --features std"
   "test settlement-engine:bash scripts/x3-failure-packet.sh --label settlement-engine -- cargo test -p pallet-x3-settlement-engine"

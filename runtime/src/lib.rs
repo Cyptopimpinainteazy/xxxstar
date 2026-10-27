@@ -1983,12 +1983,14 @@ impl pallet_x3_kernel::Config for Runtime {
     // - WASM runtime / non-frontier: use inline interpreter adapters.
     //
     // These are two different EVMs, and the chain runs the second. Nodes execute the WASM runtime,
-    // which is built without `frontier`, so on chain the kernel's EVM is `mini_evm`: every execution
-    // starts from empty storage, with no deployed contract or account, and nothing it writes
-    // persists (`the_chains_evm_keeps_no_state_between_executions`). `pallet_evm` is wired in only
-    // for a native build with `frontier`, so a test run that way (`test runtime frontier`) is
-    // evidence about that build, not about the chain. This is also why `.x3` cannot make a
-    // cross-VM call: there is no stateful EVM or SVM for it to reach (X3-LANG-001).
+    // which is built without `frontier`, so on chain the kernel's EVM is the persistent `mini_evm`
+    // adapter: account, code, and storage state are read from and written to Substrate storage
+    // under the enclosing transaction. `pallet_evm` is wired in only for a native build with
+    // `frontier`, so a test run that way (`test runtime frontier`) is evidence about that build,
+    // not about the chain. The SVM adapter is a separate gap: it currently executes a payload as a
+    // standalone program with an empty account buffer, so it must not be described as stateful
+    // until account loading and write-back are wired. `.x3` cross-VM intrinsics therefore remain
+    // refused by name (X3-LANG-001), not silently routed to an interpreter without account state.
     #[cfg(all(feature = "std", feature = "frontier"))]
     type EvmAdapter = native_vm_adapters::NativeEvmAdapter;
     #[cfg(all(feature = "std", feature = "frontier"))]
@@ -4634,6 +4636,24 @@ mod benches {
     );
 }
 
+fn svm_program_data_for(svm_pubkey: &[u8]) -> Option<Vec<u8>> {
+    if svm_pubkey.len() != 32 {
+        return None;
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(svm_pubkey);
+    pallet_svm_runtime::ProgramData::<Runtime>::get(key).map(|data| data.into_inner())
+}
+
+fn svm_account_data_for(svm_pubkey: &[u8]) -> Option<Vec<u8>> {
+    if svm_pubkey.len() != 32 {
+        return None;
+    }
+    let mut key = [0u8; 32];
+    key.copy_from_slice(svm_pubkey);
+    pallet_svm_runtime::AccountData::<Runtime>::get(key).map(|data| data.into_inner())
+}
+
 impl_runtime_apis! {
     impl sp_api::Core<Block> for Runtime {
         fn version() -> sp_version::RuntimeVersion {
@@ -5224,37 +5244,11 @@ impl_runtime_apis! {
         }
 
         fn get_svm_program_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
-            // Get the SVM program bytecode for a deployed program address
-            // X3 (stable2512, RC-1 scope): pallet_evm is feature-gated under `frontier`.
-            #[cfg(feature = "frontier")]
-            {
-                use sp_core::H160;
-                if svm_pubkey.len() == 20 {
-                    let mut addr_bytes = [0u8; 20];
-                    addr_bytes.copy_from_slice(&svm_pubkey[..20]);
-                    let addr = H160::from(addr_bytes);
-                    let code = pallet_evm::AccountCodes::<Runtime>::get(addr);
-                    if !code.is_empty() {
-                        return Some(code);
-                    }
-                }
-            }
-            let _ = svm_pubkey;
-            None
+            svm_program_data_for(&svm_pubkey)
         }
 
         fn get_svm_account_data(svm_pubkey: Vec<u8>) -> Option<Vec<u8>> {
-            // Get the SVM account data for a SVM address
-            use codec::Decode;
-            if svm_pubkey.len() != 32 { return None; }
-            let Ok(account_id) = AccountId::decode(&mut &svm_pubkey[..]) else { return None; };
-            // Return account data including balance and nonce
-            let balance = pallet_x3_kernel::CanonicalLedger::<Runtime>::get(&account_id, &0u32);
-            let nonce = frame_system::Pallet::<Runtime>::account_nonce(&account_id);
-            let mut data = Vec::new();
-            data.extend_from_slice(&balance.encode());
-            data.extend_from_slice(&nonce.encode());
-            Some(data)
+            svm_account_data_for(&svm_pubkey)
         }
 
         fn get_svm_slot_history(limit: u32) -> Vec<u64> {
@@ -6161,6 +6155,40 @@ mod settlement_proof_posture_tests {
     }
 }
 
+#[cfg(all(test, feature = "std"))]
+mod svm_runtime_api_storage_tests {
+    use super::*;
+
+    #[test]
+    fn svm_runtime_api_reads_svm_program_and_account_storage() {
+        sp_io::TestExternalities::default().execute_with(|| {
+            let program_id = [0x11; 32];
+            let account_id = [0x22; 32];
+            let bytecode = vec![
+                0xb7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x95, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00,
+            ];
+            let account_data = vec![0x42, 0x43, 0x44, 0x45];
+
+            pallet_svm_runtime::ProgramData::<Runtime>::insert(
+                program_id,
+                frame_support::BoundedVec::try_from(bytecode.clone())
+                    .expect("test program is within the bytecode bound"),
+            );
+            pallet_svm_runtime::AccountData::<Runtime>::insert(
+                account_id,
+                frame_support::BoundedVec::try_from(account_data.clone())
+                    .expect("test account data is within the bound"),
+            );
+
+            assert_eq!(svm_program_data_for(&program_id), Some(bytecode));
+            assert_eq!(svm_account_data_for(&account_id), Some(account_data));
+            assert_eq!(svm_program_data_for(&program_id[..20]), None);
+            assert_eq!(svm_account_data_for(&account_id[..31]), None);
+        });
+    }
+}
+
 #[cfg(all(test, feature = "std", feature = "frontier"))]
 mod vm_adapter_tests {
     use super::*;
@@ -6222,15 +6250,19 @@ mod vm_adapter_tests {
             "the refusal has to name the reason, got: {message}"
         );
     }
+}
 
+#[cfg(all(test, feature = "std"))]
+mod adapter_selection_tests {
     #[test]
-    fn test_wasm_builds_use_mocks() {
-        // Verify WASM builds still use mock adapters
-        #[cfg(not(feature = "std"))]
-        {
-            // In WASM, adapters should be mocks
-            // This test ensures no_std compatibility
-        }
+    fn runtime_does_not_select_mock_vm_adapters() {
+        // The no-frontier runtime uses the inline interpreters, not the test mocks. Keep this
+        // assertion tied to the selected adapter types rather than to a comment: a future
+        // feature-gate change must not make a production runtime silently fall back to a mock.
+        assert!(
+            !super::runtime_uses_mock_vm_adapters(),
+            "production runtime selected a mock VM adapter"
+        );
     }
 }
 
