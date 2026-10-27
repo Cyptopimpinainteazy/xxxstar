@@ -61,6 +61,7 @@ pub mod pallet {
     use frame_system::pallet_prelude::*;
     use sp_core::H256;
     use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
+    use sp_std::vec::Vec;
 
     use x3_automation::{
         Action, ActionOutcome, Condition, ExecutionReceipt, Task, TaskId, TaskStatus,
@@ -571,7 +572,10 @@ pub mod pallet {
                     // than storing a task that is dead on arrival.
                     ensure!(lower <= upper, Error::<T>::InvalidTask);
                 }
-                Condition::Event { .. } | Condition::Manual => {}
+                // No bounded indexed event source exists in this runtime.
+                // Unbounded System::Events scans violate predictable consensus costs.
+                Condition::Event { .. } => return Err(Error::<T>::InvalidTask.into()),
+                Condition::Manual => {}
                 Condition::Custom(data) => {
                     ensure!(!data.is_empty(), Error::<T>::InvalidTask);
                 }
@@ -624,9 +628,11 @@ pub mod pallet {
                     let price = Self::oracle_price(*asset_id)?;
                     x3_automation::conditions::check_price_band(*lower, *upper, price)
                 }
-                Condition::Event { topic } => frame_system::Pallet::<T>::events()
-                    .iter()
-                    .any(|record| sp_io::hashing::blake2_256(&record.event.encode()) == *topic),
+                // Legacy tasks created before this rule must never dispatch, scan
+                // unbounded events, or consume the owner's reserved keeper fee.
+                Condition::Event { .. } => {
+                    return Err(DispatchError::Other("EventConditionUnsupported"));
+                }
                 Condition::Manual => true,
                 Condition::Custom(data) => T::CustomEvaluator::evaluate(data),
             })
