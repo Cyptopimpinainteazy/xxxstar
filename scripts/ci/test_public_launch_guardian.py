@@ -229,6 +229,40 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-candidate"):
                 g.fetch_github_runs(g.DEFAULT_REPO, HEAD, "fake")
 
+    def test_job_collection_rejects_rerun_during_evidence_capture(self):
+        runs = valid_runs()
+        original = copy.deepcopy(runs[0])
+
+        def reply(request, timeout=20):
+            url = request.full_url
+            if "/jobs?" in url:
+                return io.BytesIO(json.dumps({"jobs": original["jobs"]}).encode())
+            if url.endswith("/actions/runs/1"):
+                changed = {**original, "run_attempt": 2}
+                return io.BytesIO(json.dumps(changed).encode())
+            raise AssertionError(url)
+
+        with patch.object(g.urllib.request, "urlopen", side_effect=reply):
+            with self.assertRaisesRegex(ValueError, "changed while collecting jobs"):
+                g.fetch_required_jobs(g.DEFAULT_REPO, runs, POLICY, HEAD, "fake")
+
+    def test_job_collection_rejects_empty_job_run(self):
+        runs = valid_runs()
+
+        def reply(request, timeout=20):
+            url = request.full_url
+            if "/jobs?" in url:
+                return io.BytesIO(json.dumps({"jobs": []}).encode())
+            if url.endswith("/actions/runs/1"):
+                return io.BytesIO(json.dumps(runs[0]).encode())
+            if url.endswith("/actions/runs/2"):
+                return io.BytesIO(json.dumps(runs[1]).encode())
+            raise AssertionError(url)
+
+        with patch.object(g.urllib.request, "urlopen", side_effect=reply):
+            observed = g.fetch_required_jobs(g.DEFAULT_REPO, runs, POLICY, HEAD, "fake")
+        self.assertEqual(check(runs=observed)["checks"][0]["status"], "NO_JOBS")
+
     def test_offline_cli_returns_nonzero_even_with_all_green_runs(self):
         with tempfile.TemporaryDirectory() as scratch:
             folder = pathlib.Path(scratch)
