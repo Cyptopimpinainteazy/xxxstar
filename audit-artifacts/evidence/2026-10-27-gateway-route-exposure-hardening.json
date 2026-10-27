@@ -1,0 +1,78 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-10-27",
+  "candidate_commit": "88d1e564e",
+  "repository": "Cyptopimpinainteazy/xxxstar",
+  "branch": "codex/mainnet-p0-integration-20261025",
+  "scope": "Gateway withdrawal route binding, exposure limits, and release-build proof hardening",
+  "issue_fixed": "Withdrawal requests stored the destination chain and X3 asset but not the exact route, so a release proof could select a different route with the same chain and asset. The route pending limit was never enforced, withdrawal releases bypassed the daily limit, and the settlement engine exposed a public dev-proofs feature that could compile the accept-all validator outside tests.",
+  "implementation": [
+    "Bind every new withdrawal to the exact route selected at request time in a side map while preserving the existing withdrawal record encoding.",
+    "Fail closed for pre-upgrade withdrawals that have no exact route binding.",
+    "Validate route existence, enabled state, mode, destination chain, X3 asset, minimum amount, and maximum amount when a withdrawal is requested.",
+    "Include the route id in the domain-separated withdrawal id derivation.",
+    "Refuse release proofs and operational finalization through a different route, a disabled route, or a dry-run route.",
+    "Enforce pending_limit over burned but unreleased withdrawals.",
+    "Enforce a separate per-route daily withdrawal limit with rolling window reset.",
+    "Use checked supply and pending-counter subtraction and preserve collateral checks in one shared release settlement path.",
+    "Remove the dev-proofs feature; NoOpCrossChainValidator now exists only under cfg(test).",
+    "Bump gateway storage version to 2 and runtime spec_version to 26 while preserving historical withdrawal record decoding."
+  ],
+  "verification": [
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --locked -p pallet-x3-crosschain-gateway --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 77,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --locked -p pallet-x3-crosschain-gateway --features runtime-benchmarks --lib --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 90,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_TEST_DEBUG=0 cargo test --locked -p x3-chain-runtime --no-fail-fast",
+      "result": "PASS",
+      "tests_passed": 97,
+      "integration_tests_passed": 43,
+      "tests_failed": 0
+    },
+    {
+      "command": "SKIP_WASM_BUILD=1 CARGO_INCREMENTAL=0 cargo clippy --locked -p pallet-x3-crosschain-gateway --features runtime-benchmarks --lib --no-deps -- -D warnings",
+      "result": "PASS"
+    },
+    {
+      "command": "python3 scripts/feature_matrix.py check",
+      "result": "PASS",
+      "features": 153,
+      "warnings": 42
+    },
+    {
+      "command": "python3 scripts/x3_audit_matrix.py --check",
+      "result": "PASS"
+    },
+    {
+      "command": "python3 -m pytest -q tests/test_feature_matrix.py",
+      "result": "PASS",
+      "tests_passed": 16
+    }
+  ],
+  "negative_and_boundary_tests": [
+    "A request for an unknown, disabled, or dry-run route is refused.",
+    "A request whose chain or X3 asset disagrees with the selected route is refused.",
+    "A release proof naming another route with the same chain and asset is refused with WrongRoute.",
+    "A withdrawal created before exact route binding fails closed with WithdrawalRouteMissing.",
+    "A second burn above the route pending limit is refused without changing burned state or pending value.",
+    "A release above the route daily withdrawal limit is refused.",
+    "The release limit resets only after the configured daily window.",
+    "A mint or burn failure leaves gateway state retryable.",
+    "A second proof-id mint and a second withdrawal-id burn are refused."
+  ],
+  "limitations": [
+    "This proves the on-chain request, burn, and release state machine with real dispatch and storage transitions; it does not prove a public-chain transaction.",
+    "The new gateway weights are conservative pre-regeneration bounds and still require FRAME benchmark generation.",
+    "No public Ethereum, Solana, or Bitcoin canary has moved value.",
+    "External audits, public testnet operation, and the production signer ceremony remain open."
+  ]
+}

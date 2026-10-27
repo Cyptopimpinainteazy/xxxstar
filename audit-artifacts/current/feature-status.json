@@ -747,6 +747,7 @@
         "pallets/x3-wrapped/src/lib.rs",
         "runtime/src/lib.rs",
         "audit-artifacts/evidence/2026-10-26-ethereum-lock-mint-burn-release.json",
+        "audit-artifacts/evidence/2026-10-27-gateway-route-exposure-hardening.json",
         "note: the production deposit path verifies the EVM receipt through x3-verification-router, gates it through the governed gateway, and then mints through the wrapped-asset ledger; proof id, chain, asset, beneficiary, amount, supply cap and replay state are bound before the gateway reports X3Credited",
         "note: the 5-of-7 model path verifies real ECDSA \u2014 65-byte signature, secp256k1 recovery, recovered address compared against the registered validator, double-signing refused \u2014 while the public production path uses the gateway's receipt verifier"
       ],
@@ -884,6 +885,7 @@
         "pallets/x3-crosschain-gateway/src/lib.rs",
         "pallets/x3-wrapped/src/lib.rs",
         "runtime/src/lib.rs",
+        "audit-artifacts/evidence/2026-10-27-gateway-route-exposure-hardening.json",
         "note: the pallet routes each route's verification level to a real verifier (EVM receipt proof anchored to an attested header, Bitcoin SPV from the vault defaults, Solana finalised proof from a governance-controlled validator set that refuses everything when unset), keeps the collateral invariant, refuses unregistered/disabled routes, and completes the verified deposit by minting the wrapped X3 representation through the runtime-configured minter",
         "note: withdrawal requests and release proofs are bound to the exact route id, route state, destination chain, X3 asset, external asset, gateway contract, recipient, amount and full withdrawal id; burned withdrawals are capped by the route pending limit, and releases consume a separate per-route daily withdrawal window"
       ],
@@ -5007,14 +5009,14 @@
     "matrix_audit_date": "2026-09-12",
     "registry": "FEATURE_REGISTRY.toml",
     "scoring": "implemented*0.35 + tested*0.25 + mainnet_ready*0.40",
-    "source_digest": "48ee4a280b279d257838c052bd20e0c1bff57a79a3ffad69f89d0afebfc75311",
+    "source_digest": "1baa9ac406013305c3b5778773a6973c17570ab1df194b62f9dca6c9fe1b11ae",
     "sources": {
       "FEATURE_MATRIX.toml": "94ee8e1598e2965d12b9651370d40032cfbe9229c911cd47c505f1b1c2b1071d",
       "FEATURE_REGISTRY.toml": "f44071b1d1c7a09d9261fc0e74f5ceee6f020ea852624396232376e491be6793",
       "feature-matrix/agents-experimental.toml": "5849ed86d4577b932c6bbf89856e5d28b2f2a153e4db75b1dc01ce6e570bf34c",
       "feature-matrix/claims-hygiene.toml": "edec0353c6b35e09f65a70fd4fde00f230e34ed9e79031403c902e9b77ebc3de",
       "feature-matrix/consensus-l1.toml": "2f8e318d143997cadb24979161650b7dcd82fc1c08dbd8efed7d5d95f46378f0",
-      "feature-matrix/cross-chain.toml": "7ac38299bd485b814dd4b88d9e46177cc549a9a7c4f50d50678845310c4ee92c",
+      "feature-matrix/cross-chain.toml": "777ae6881bbdd0ebf90fb0503d8c08f2280325b840f35aec5935003e96992ed6",
       "feature-matrix/cross-vm-atomic.toml": "bf77db256fa8a741386640880a05061b0ad82fabf1b9dd3b2155ec14f9aeff51",
       "feature-matrix/economic-defi.toml": "37f258a466a09da1a4f2a13be558c84152eb074e7ea159bbaa7de7db65ed9fe8",
       "feature-matrix/gpu-performance.toml": "efbe35fc4a1dc77aa79e004b7bb03a454bec5fe84c8de6a50fb6c4f33f06dd76",
