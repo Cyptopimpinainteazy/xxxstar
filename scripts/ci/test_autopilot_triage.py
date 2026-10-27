@@ -47,6 +47,20 @@ class TriageTests(unittest.TestCase):
         self.assertEqual(output["classification"], "RUST_FORMAT")
         self.assertEqual(output["suggested_diagnostic"], "cargo fmt --all -- --check")
 
+    def test_action_download_timeout_is_not_misidentified_as_code_failure(self):
+        log = (
+            "Failed to resolve action download info. Error: "
+            "The HTTP request timed out after 00:01:40. "
+            "Resource temporarily unavailable (launch.actions.githubusercontent.com:443)"
+        )
+        result = triage.classify(
+            {"id": 121599738535, "status": "completed", "conclusion": "failure"}, log
+        )
+        self.assertEqual(result["classification"], "ACTION_DOWNLOAD_FAILURE")
+        self.assertFalse(result["safe_to_ignore"])
+        self.assertIn("do not auto-retry", result["suggested_diagnostic"])
+        self.assertNotIn("launch.actions.githubusercontent.com", str(result))
+
     def test_python_dependency_not_misreported_as_build(self):
         output = triage.classify(
             {"status": "completed", "conclusion": "failure"},
