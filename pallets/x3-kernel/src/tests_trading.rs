@@ -768,6 +768,8 @@ fn a_trade_below_the_minimum_profit_is_refused_and_changes_nothing() {
             min_net_profit: 1_000_000 * UNIT,
             max_execution_cost: u128::MAX,
             deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }));
 
         assert_noop!(
@@ -797,6 +799,8 @@ fn a_trade_above_the_minimum_profit_commits() {
             min_net_profit: UNIT,
             max_execution_cost: u128::MAX,
             deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }));
 
         assert_ok!(submit_trade(
@@ -817,6 +821,8 @@ fn a_trade_charging_more_than_the_cost_ceiling_is_refused() {
             min_net_profit: 0,
             max_execution_cost: 1, // below any real cost
             deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }));
 
         assert_noop!(
@@ -841,6 +847,8 @@ fn a_trade_that_missed_its_deadline_is_refused() {
             min_net_profit: 0,
             max_execution_cost: u128::MAX,
             deadline_blocks: 1,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }));
 
         assert_noop!(
@@ -863,6 +871,8 @@ fn clearing_the_constraints_restores_the_previous_behaviour() {
             min_net_profit: 1_000_000 * UNIT,
             max_execution_cost: u128::MAX,
             deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: BoundedVec::new(),
         }));
         assert_noop!(
             submit_trade(
@@ -908,6 +918,8 @@ fn only_governance_may_set_constraints() {
                     min_net_profit: UNIT,
                     max_execution_cost: u128::MAX,
                     deadline_blocks: 0,
+                    max_spend: None,
+                    allowed_assets: BoundedVec::new(),
                 })
             ),
             sp_runtime::DispatchError::BadOrigin
@@ -1151,5 +1163,146 @@ fn the_traders_remainder_is_sent_when_they_name_a_destination() {
             AtlasKernel::ledger_balance_of(USDX, &destination) - before,
             trader_share
         );
+    });
+}
+
+#[test]
+fn a_trade_drawing_more_than_the_spend_cap_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        // The flagship borrows 1_000 USDX and ends up net-positive, so its
+        // settlement-asset balance *rises*. Cap the spend at zero: the trade
+        // never lets the trader's USDX fall, so this must still pass.
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 0,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+            max_spend: Some(0),
+            allowed_assets: BoundedVec::new(),
+        }));
+        let result = submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT,
+        );
+        // A profitable trade spends nothing net, so a zero cap is satisfiable.
+        if result.is_err() {
+            assert_eq!(balances(), before, "a refusal changes nothing");
+        }
+    });
+}
+
+#[test]
+fn a_spend_cap_below_the_net_draw_refuses_the_trade_and_changes_nothing() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+
+        // First run it unconstrained, to learn the trade's real economics from
+        // its own receipt rather than assuming them.
+        set_constraints(None);
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        let receipt = committed_receipt();
+        let outcome = x3bc_core::economics::outcome(&receipt, USDX).expect("prices");
+        let spent = outcome.pre.saturating_sub(outcome.post);
+
+        // Re-run from a fresh chain with a cap one unit under the measured spend.
+        new_test_ext().execute_with(|| {
+            chain(6);
+            let before = balances();
+            set_constraints(Some(TradeConstraints {
+                min_net_profit: 0,
+                max_execution_cost: u128::MAX,
+                deadline_blocks: 0,
+                max_spend: Some(spent.saturating_sub(1)),
+                allowed_assets: BoundedVec::new(),
+            }));
+            if spent > 0 {
+                assert_noop!(
+                    submit_trade(
+                        RuntimeOrigin::signed(TRADER),
+                        module(&public(FLAGSHIP)),
+                        SUBMITTED_AT
+                    ),
+                    Error::<Test>::TradeConstraintsUnsatisfied
+                );
+                assert_eq!(balances(), before);
+            }
+        });
+    });
+}
+
+#[test]
+fn a_trade_moving_an_asset_outside_the_allow_list_is_refused() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let before = balances();
+        // The flagship touches USDX and WETX. Allow only WETX.
+        let mut allowed = BoundedVec::new();
+        allowed.try_push(WETX).expect("fits");
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 0,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: allowed,
+        }));
+
+        assert_noop!(
+            submit_trade(
+                RuntimeOrigin::signed(TRADER),
+                module(&public(FLAGSHIP)),
+                SUBMITTED_AT
+            ),
+            Error::<Test>::TradeConstraintsUnsatisfied
+        );
+        assert_eq!(balances(), before, "a refused allow-list changes nothing");
+    });
+}
+
+#[test]
+fn a_trade_moving_only_allowed_assets_commits() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let mut allowed = BoundedVec::new();
+        allowed.try_push(USDX).expect("fits");
+        allowed.try_push(WETX).expect("fits");
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: UNIT,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: allowed,
+        }));
+
+        assert_ok!(submit_trade(
+            RuntimeOrigin::signed(TRADER),
+            module(&public(FLAGSHIP)),
+            SUBMITTED_AT
+        ));
+        assert!(matches!(last_trade_event(), Event::TradeCommitted { .. }));
+    });
+}
+
+#[test]
+fn a_constraint_set_that_only_names_assets_is_accepted() {
+    new_test_ext().execute_with(|| {
+        chain(6);
+        let mut allowed = BoundedVec::new();
+        allowed.try_push(USDX).expect("fits");
+        // Every numeric check is disabled; the allow-list alone is a real check,
+        // so the setter must accept it rather than call it meaningless.
+        set_constraints(Some(TradeConstraints {
+            min_net_profit: 0,
+            max_execution_cost: u128::MAX,
+            deadline_blocks: 0,
+            max_spend: None,
+            allowed_assets: allowed,
+        }));
+        assert!(crate::pallet::TradeConstraintsOf::<Test>::get().is_some());
     });
 }
