@@ -35,6 +35,7 @@ parameter_types! {
     pub const ExecutorRewardShare: u32 = 70;
     pub const ProtocolFeeShare: u32 = 15;
     pub const SlashAmount: u128 = 400;
+    pub FeeDestination: AccountId = AccountId32::new([9u8; 32]);
     pub const JobTimeout: u64 = 10;
 }
 
@@ -76,6 +77,7 @@ impl pallet_x3_verifier::Config for Test {
     type MaxProofDepth = MaxProofDepth;
     type ExecutorRewardShare = ExecutorRewardShare;
     type ProtocolFeeShare = ProtocolFeeShare;
+    type ProtocolFeeDestination = FeeDestination;
     type SlashAmount = SlashAmount;
     type JobTimeout = JobTimeout;
     type WeightInfo = ();
@@ -123,6 +125,7 @@ fn new_test_ext() -> sp_io::TestExternalities {
         balances: vec![
             (submitter(), ENDOWED),
             (stranger(), ENDOWED),
+            (FeeDestination::get(), ENDOWED),
             (account_of(&executor_key()), ENDOWED),
             (account_of(&other_key()), ENDOWED),
         ],
@@ -419,6 +422,8 @@ fn a_valid_receipt_is_applied_and_pays_the_executor() {
         let exec = register(&executor_key());
         let job_id = submit_job();
         let exec_before = free(&exec);
+        let fees_before = free(&FeeDestination::get());
+        let issuance_before = Balances::total_issuance();
 
         let r = receipt(job_id, &executor_key(), exec.clone());
         assert_ok!(Verifier::submit_receipt(
@@ -435,8 +440,25 @@ fn a_valid_receipt_is_applied_and_pays_the_executor() {
         );
 
         let executor_amount = REWARD * u128::from(ExecutorRewardShare::get()) / 100;
+        let protocol_amount = REWARD * u128::from(ProtocolFeeShare::get()) / 100;
         assert_eq!(free(&exec), exec_before + executor_amount);
+        assert_eq!(
+            free(&FeeDestination::get()),
+            fees_before + protocol_amount,
+            "the protocol share is paid, not just counted"
+        );
+        assert_eq!(ProtocolTreasury::<Test>::get(), protocol_amount);
         assert_eq!(reserved(&submitter()), 0);
+        assert_eq!(
+            free(&submitter()),
+            ENDOWED - executor_amount - protocol_amount,
+            "the submitter keeps only the unallocated remainder"
+        );
+        assert_eq!(
+            Balances::total_issuance(),
+            issuance_before,
+            "nothing is minted or burned"
+        );
 
         let record = Verifier::executors(&exec).unwrap();
         assert_eq!(record.jobs_completed, 1);

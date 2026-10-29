@@ -2933,6 +2933,7 @@ impl pallet_x3_verifier::Config for Runtime {
     type MaxProofDepth = MaxProofDepth;
     type ExecutorRewardShare = ExecutorRewardShare;
     type ProtocolFeeShare = ProtocolFeeShare;
+    type ProtocolFeeDestination = TreasuryAccountId;
     type SlashAmount = SlashAmount;
     type JobTimeout = JobTimeout;
     type WeightInfo = pallet_x3_verifier::weights::SubstrateWeight<Runtime>;

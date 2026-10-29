@@ -304,6 +304,9 @@ pub mod pallet {
         #[pallet::constant]
         type ProtocolFeeShare: Get<u32>;
 
+        /// Account that receives the protocol fee share of each job reward
+        type ProtocolFeeDestination: Get<Self::AccountId>;
+
         /// Slash amount for invalid submissions
         #[pallet::constant]
         type SlashAmount: Get<BalanceOf<Self>>;
@@ -358,7 +361,7 @@ pub mod pallet {
     #[pallet::storage]
     pub type TotalJobsVerified<T: Config> = StorageValue<_, u64, ValueQuery>;
 
-    /// Protocol treasury
+    /// Running total of protocol fees paid to `ProtocolFeeDestination`
     #[pallet::storage]
     pub type ProtocolTreasury<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
@@ -907,6 +910,15 @@ pub mod pallet {
                 &job.submitter,
                 executor,
                 executor_amount,
+                frame_support::traits::ExistenceRequirement::KeepAlive,
+            )?;
+
+            // Pay the protocol share to the destination account. Counting it in
+            // `ProtocolTreasury` without moving it would leave it with the submitter.
+            T::Currency::transfer(
+                &job.submitter,
+                &T::ProtocolFeeDestination::get(),
+                protocol_amount,
                 frame_support::traits::ExistenceRequirement::KeepAlive,
             )?;
 
