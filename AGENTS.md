@@ -4,6 +4,15 @@ This repository is the X3 blockchain / cross-VM atomic execution project.
 
 Agents must write production-grade code and prove all claims with commands.
 
+## Repository Map
+
+Start with `docs/REPO_MAP.md`: every workspace crate and pallet (size, tests,
+extrinsics, which runtime variants ship it), crates outside the root workspace,
+and the JS/Python projects. It is generated from code, not hand-written, so
+prefer it over older architecture docs. After adding, moving or removing a
+crate, package or pallet, run `python3 scripts/gen-repo-map.py`;
+`--check` exits non-zero if the map is stale.
+
 ## Prime Directive
 
 Fix real code. Do not update documents instead of implementing working systems.
