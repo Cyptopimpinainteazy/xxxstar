@@ -629,7 +629,7 @@ fn an_expired_task_never_dispatches_and_releases_the_reservation() {
         let task_id = Automation::account_tasks(1)[0];
         assert_eq!(reserved(1), BaseRegistrationFee::get());
 
-        System::set_block_number(100);
+        System::set_block_number(Automation::tasks(task_id).unwrap().expiry_block);
         let keeper_before = free(2);
         assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
 
@@ -655,7 +655,7 @@ fn cleanup_expires_stale_tasks_without_dispatching() {
             1000
         ));
         let task_id = Automation::account_tasks(1)[0];
-        System::set_block_number(100);
+        System::set_block_number(Automation::tasks(task_id).unwrap().expiry_block);
         assert_eq!(Automation::cleanup_expired_tasks(), 1);
         assert_eq!(
             Automation::tasks(task_id).unwrap().status,
@@ -702,5 +702,81 @@ fn due_tasks_surfaces_only_active_block_triggers_that_are_ready() {
             1,
             "batch bound is honoured"
         );
+    });
+}
+
+#[test]
+fn block_trigger_executes_at_target_with_a_receipt() {
+    new_test_ext().execute_with(|| {
+        let mut recipient = [0u8; 32];
+        recipient[..8].copy_from_slice(&3u64.to_le_bytes());
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::BlockNumber(50),
+            Action::TransferNative {
+                recipient,
+                amount: 100
+            },
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+        assert!(Automation::tasks(task_id).unwrap().expiry_block > 50);
+        System::set_block_number(49);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            Error::<Test>::ConditionNotMet
+        );
+        let recipient_before = free(3);
+        System::set_block_number(50);
+        assert_ok!(Automation::execute_task(RuntimeOrigin::signed(2), task_id));
+        assert_eq!(free(3), recipient_before + 100);
+        assert_eq!(
+            Automation::tasks(task_id).unwrap().status,
+            TaskStatus::Executed
+        );
+        assert!(Automation::receipt(task_id, 1).is_some());
+        assert_eq!(reserved(1), 0);
+        assert_noop!(
+            Automation::execute_task(RuntimeOrigin::signed(2), task_id),
+            Error::<Test>::TaskNotActive
+        );
+        assert_eq!(free(3), recipient_before + 100);
+    });
+}
+
+#[test]
+fn block_targets_at_or_beyond_expiry_are_rejected_without_reserving_funds() {
+    new_test_ext().execute_with(|| {
+        let deadline = System::block_number() + u64::from(MaxTaskExpiryBlocks::get());
+        for target in [deadline, deadline + 1] {
+            assert_noop!(
+                Automation::register_task(
+                    RuntimeOrigin::signed(1),
+                    Condition::BlockNumber(target),
+                    Action::Noop,
+                    1000
+                ),
+                Error::<Test>::ExpiryTooFar
+            );
+        }
+        assert_eq!(reserved(1), 0);
+        assert!(Automation::account_tasks(1).is_empty());
+    });
+}
+
+#[test]
+fn due_scan_excludes_expired_tasks_before_cleanup() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(Automation::register_task(
+            RuntimeOrigin::signed(1),
+            Condition::BlockNumber(50),
+            Action::Noop,
+            1000
+        ));
+        let task_id = Automation::account_tasks(1)[0];
+        let deadline = Automation::tasks(task_id).unwrap().expiry_block;
+        assert_eq!(Automation::due_tasks(deadline - 1, 10), vec![task_id]);
+        assert!(Automation::due_tasks(deadline, 10).is_empty());
+        assert!(Automation::due_tasks(deadline + 1, 10).is_empty());
     });
 }
