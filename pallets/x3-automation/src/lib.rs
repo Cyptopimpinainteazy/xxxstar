@@ -316,10 +316,12 @@ pub mod pallet {
 
             let current_block = frame_system::Pallet::<T>::block_number();
             let max_expiry = current_block.saturating_add(T::MaxTaskExpiryBlocks::get().into());
-            let expiry_block = match condition {
-                Condition::BlockNumber(block) => block.min(max_expiry.saturated_into::<u64>()),
-                _ => max_expiry.saturated_into::<u64>(),
-            };
+            // Expiry is exclusive. A block trigger must become eligible before
+            // that deadline, otherwise it can never execute.
+            let expiry_block = max_expiry.saturated_into::<u64>();
+            if let Condition::BlockNumber(target) = &condition {
+                ensure!(*target < expiry_block, Error::<T>::ExpiryTooFar);
+            }
             ensure!(
                 expiry_block > current_block.saturated_into::<u64>(),
                 Error::<T>::ExpiryTooFar
@@ -679,7 +681,9 @@ pub mod pallet {
         /// indexer, and so tests can assert the due set directly.
         pub fn due_tasks(block: u64, max_batch: u32) -> Vec<TaskId> {
             Tasks::<T>::iter()
-                .filter(|(_id, task)| task.status == TaskStatus::Active)
+                .filter(|(_id, task)| {
+                    task.status == TaskStatus::Active && block < task.expiry_block
+                })
                 .filter(|(_id, task)| match &task.condition {
                     Condition::BlockNumber(target) => block >= *target,
                     Condition::Manual => true,
